@@ -109,6 +109,7 @@ export function createUI(game) {
   for (const p of ['inv', 'map', 'tree']) H.slots[p].on('click', 'open', () => ({ panel: p }));
   H.slots.set.on('click', 'open', () => ({ panel: 'settings' }));
   H.chatIn.on('focus', 'chat:focus');
+  H.chatIn.on('blur', 'chat:blur');
   H.chatIn.on('keydown', 'chat:key', (e) => ({ key: e.key, text: e.target.value }));
   H.hotbar.link((ev) => { ev.ctx.from = 'hotbar'; });
 
@@ -148,6 +149,48 @@ export function createUI(game) {
   BOX.shared.link((ev) => { ev.ctx.source = 'box'; });
   const deathT = death.add('t', '#death-t');
 
+  // ---- スマホ（横持ち）の操作: 左にスティック、右に攻撃ボタンを中心としたボタン群 ----
+  const tp = (list) => [...list].map((t) => ({ id: t.identifier, x: t.clientX, y: t.clientY }));
+  const NP = { passive: false };
+  const T = { layer: hud.add('touch', '#touch'), btn: {} };
+  T.zone = T.layer.add('zone', '#t-stick-zone');
+  T.stick = T.zone.add('stick', '#t-stick');
+  T.knob = T.stick.add('knob', '#t-knob');
+  T.zone.on('touchstart', 'stick:start', (e) => ({ t: tp(e.changedTouches)[0] }), NP)
+    .on('touchmove', 'stick:move', (e) => ({ ts: tp(e.changedTouches) }), NP)
+    .on('touchend', 'stick:end', (e) => ({ ts: tp(e.changedTouches) }), NP)
+    .on('touchcancel', 'stick:end', (e) => ({ ts: tp(e.changedTouches) }), NP);
+  T.cluster = T.layer.add('cluster', '#t-cluster');
+  for (const el of T.cluster.el.querySelectorAll('.tb')) {
+    const act = el.id.replace('tb-', '');
+    const v = T.cluster.add(act, el);
+    v.cd = el.querySelector('.cd') ? v.add('cd', '.cd') : null;
+    v.nm = el.querySelector('small') ? v.add('nm', 'small') : null;
+    v.num = el.querySelector('b') ? v.add('num', 'b') : null;
+    v.link((ev) => { ev.payload.act = act; });
+    v.on('touchstart', 'tbtn:down', (e) => ({ t: tp(e.changedTouches)[0] }), NP)
+      .on('touchmove', 'tbtn:move', (e) => ({ ts: tp(e.changedTouches) }), NP)
+      .on('touchend', 'tbtn:up', (e) => ({ ts: tp(e.changedTouches) }), NP)
+      .on('touchcancel', 'tbtn:up', (e) => ({ ts: tp(e.changedTouches) }), NP);
+    T.btn[act] = v;
+  }
+  T.menu = T.layer.add('menu', '#t-menu');
+  for (const b of T.menu.el.querySelectorAll('button')) T.menu.add(b.dataset.panel, b).on('click', 'open', () => ({ panel: b.dataset.panel }));
+  T.sp = T.menu.add('sp', '#t-sp');
+  // スティック・ボタンのタッチは、ブラウザのスクロールやマウスの代替イベントを起こさない
+  T.layer.link((ev) => { if (ev.dom?.type?.startsWith('touch')) ev.preventDefault = true; });
+  // 画面（ゲーム）を2本指でつまむとズーム
+  canvas.on('touchstart', 'pinch', (e) => ({ ts: tp(e.touches) }), NP)
+    .on('touchmove', 'pinch', (e) => ({ ts: tp(e.touches) }), NP)
+    .on('touchend', 'pinch', (e) => ({ ts: tp(e.touches) }), NP);
+  canvas.link((ev) => { if (ev.dom?.type?.startsWith('touch')) ev.preventDefault = true; });
+  // インベントリ（スマホ）: 選んだ装備への操作
+  const invActions = root.add('invActions', '#inv-actions');
+  invActions.add('use', '#ia-use').on('click', 'invAction', () => ({ what: 'use' }));
+  invActions.add('salvage', '#ia-salvage').on('click', 'invAction', () => ({ what: 'salvage' }));
+  const isTouch = new URLSearchParams(location.search).has('touch') || matchMedia('(hover: none) and (pointer: coarse)').matches;
+  addEventListener('touchstart', () => root.emit('device:touch'), { once: true, passive: true });
+
   // ---- ウィンドウ全体の入力も Root 配下のイベントとして流す ----
   addEventListener('keydown', (e) => {
     if (e.target === H.chatIn.el || e.target === L.name.el) return;
@@ -179,7 +222,7 @@ export function createUI(game) {
   // 項目のセル（Passive View）。どの項目かは data に持たせ、親へ伝わる途中で文脈として付く
   const cellSetup = (v) => {
     v.link((ev) => { ev.payload.id = v.data; });
-    v.on('click', 'item:click').on('contextmenu', 'item:context').on('mouseenter', 'item:hover', (e) => ({ x: e.clientX, y: e.clientY }))
+    v.on('click', 'item:click', (e) => ({ x: e.clientX, y: e.clientY })).on('contextmenu', 'item:context').on('mouseenter', 'item:hover', (e) => ({ x: e.clientX, y: e.clientY }))
       .on('mousemove', 'item:move', (e) => ({ x: e.clientX, y: e.clientY })).on('mouseleave', 'item:leave');
     v.link((ev) => { if (ev.type === 'item:context') ev.preventDefault = true; });
   };
@@ -220,7 +263,7 @@ export function createUI(game) {
     const w = tooltip.el.offsetWidth, h = tooltip.el.offsetHeight;
     tooltip.set({ style: { left: Math.min(x + 16, innerWidth - w - 8) + 'px', top: Math.min(y + 10, innerHeight - h - 10) + 'px' } });
   };
-  P.hideTip = () => tooltip.set({ visible: false });
+  P.hideTip = () => { tooltip.set({ visible: false }); };
 
   P.inv = () => {
     const S = game.S, char = game.char;
@@ -475,6 +518,44 @@ export function createUI(game) {
     if (me.dead) deathT.set({ text: `${Math.max(0, me.deadT).toFixed(1)} 秒後に${world.def.gate ? '転移門' : 'エリアの入口'}で復活` });
   };
 
+  // ---- スマホの操作ボタン ----
+  const tc = { on: false, stick: null, btn: {}, pinch: 0 };
+  const STICK_R = 60;
+  P.stick = (dx = 0, dy = 0) => {
+    const zr = T.zone.el.getBoundingClientRect();
+    const o = tc.stick || { ox: zr.left + 100, oy: zr.bottom - 96 };
+    T.stick.set({ cls: { active: !!tc.stick }, style: { left: (o.ox - zr.left) + 'px', top: (o.oy - zr.top) + 'px' } });
+    T.knob.set({ style: { transform: `translate(${dx}px, ${dy}px)` } });
+  };
+  const USE_LABEL = { gate: '転移門', npc: '話す', box: 'ボックス', lever: 'レバー', chest: '宝箱' };
+  P.touch = () => {
+    root.set({ cls: { touch: tc.on, playing: !mediator.is('login'), chatting: mediator.is('chat') } });
+    if (!tc.on) return;
+    T.layer.set({ visible: mediator.is('play') });
+    if (!mediator.is('play')) return;
+    const S = game.S, me = game.me, char = game.char, B = T.btn;
+    B.atk.nm.set({ text: `${S.W.name}・長押し${HEAVY[S.wk].name}` });
+    B.atk.set({ cls: { charging: me.charging && me.chargeT >= game.CHARGE_MIN } });
+    B.skill.nm.set({ text: S.ws.name });
+    setCd(B.skill, me.wsCd, S.ws.cd * (1 - S.cdr / 100));
+    for (let i = 0; i < 2; i++) {
+      const id = char.slots?.[i], v = B['t' + (i + 1)];
+      const usable = id && S.actives.has(id);
+      v.nm.set({ text: id ? TREE_SKILLS[id].name : '未設定' });
+      v.set({ cls: { off: !usable } });
+      setCd(v, usable ? (me.tcd[id] || 0) : 1, usable ? TREE_SKILLS[id].cd * (1 - S.cdr / 100) : 1);
+    }
+    setCd(B.dodge, me.dodgeCd, S.dodgeCd);
+    B.guard.set({ visible: !!S.W.guard, cls: { pressed: me.guarding } });
+    B.pot.num.set({ text: String(me.potions) });
+    setCd(B.pot, me.potions > 0 ? me.potCd : 1, 1);
+    const it = game.nearestInteract();
+    B.use.set({ visible: !!it });
+    if (it) B.use.nm.set({ text: USE_LABEL[it.kind] || '調べる' });
+    const left = spTotal(char.lv) - spSpent(char.tree);
+    T.sp.set({ text: left > 0 ? String(left) : '' });
+  };
+
   // ミニマップ: 図形の一覧を作って View に渡す
   P.minimap = () => {
     const W = H.minimap.el.width, me = game.me, world = game.world, def = world.def, env = game.env();
@@ -593,6 +674,8 @@ export function createUI(game) {
   const showPanel = (name, data) => {
     for (const p of PANELS) panels[p].set({ visible: p === name });
     P.hideTip();
+    invActions.set({ visible: false });
+    mediator.sel = null;
     if (name) panelPresenter[name](data);
   };
 
@@ -614,6 +697,30 @@ export function createUI(game) {
     if (it) P.tip(P.itemTip(it, ev.ctx.source !== 'equipped'), ev.payload.x, ev.payload.y);
   };
   const KEY_PANEL = { i: 'inv', tab: 'inv', k: 'tree', m: 'map', o: 'settings' };
+  const AIMABLE = new Set(['atk', 'skill', 't1', 't2']);
+  const enableTouch = () => {
+    if (tc.on) return;
+    tc.on = true;
+    game.input.setTouch(true);
+    P.touch(); P.stick();
+  };
+  // パネルを開くなどでプレイ画面を離れるとき、押しっぱなしの操作を離す
+  const releaseTouch = () => {
+    if (tc.stick) { tc.stick = null; game.input.stick(0, 0); P.stick(); }
+    for (const act of Object.keys(tc.btn)) {
+      if (act === 'atk' || act === 'guard') game.input.button(act, false);
+      T.btn[act].set({ cls: { pressed: false, aiming: false } });
+      delete tc.btn[act];
+    }
+    game.input.aim(null);
+  };
+  // スマホでは、装備のタップ1回目で詳細を出し、2回目（または下のボタン）で操作する
+  const touchSelect = (mediatorSelf, ev) => {
+    if (!tc.on || mediatorSelf.sel === ev.payload.id) return false;
+    mediatorSelf.sel = ev.payload.id;
+    itemTip(ev);
+    return true;
+  };
 
   mediator.states = {
     // ---------- 全状態で共通 ----------
@@ -633,8 +740,68 @@ export function createUI(game) {
         },
         'key:up'(ev) { game.input.keyUp(ev.payload.key); },
         'window:blur'() { game.input.blur(); },
-        'pointer:down'(ev) { if (!this.is('login')) game.input.pointerDown(ev.payload.button); },
-        'pointer:up'(ev) { if (!this.is('login')) game.input.pointerUp(ev.payload.button); },
+        // スマホ操作中は、タッチから作られるマウスの代替イベントを無視する
+        'pointer:down'(ev) { if (!this.is('login') && !tc.on) game.input.pointerDown(ev.payload.button); },
+        'pointer:up'(ev) { if (!this.is('login') && !tc.on) game.input.pointerUp(ev.payload.button); },
+        // ---- スマホ ----
+        'device:touch'() { enableTouch(); },
+        'stick:start'(ev) {
+          const t = ev.payload.t;
+          if (!this.is('play') || tc.stick || !t) return;
+          tc.stick = { id: t.id, ox: t.x, oy: t.y };
+          P.stick();
+        },
+        'stick:move'(ev) {
+          const s = tc.stick, t = s && ev.payload.ts.find((q) => q.id === s.id);
+          if (!t) return;
+          let dx = t.x - s.ox, dy = t.y - s.oy;
+          const d = Math.hypot(dx, dy);
+          if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+          game.input.stick(dx / STICK_R, dy / STICK_R); // 画面の上 = 奥（-z）なので、そのまま x / z になる
+          P.stick(dx, dy);
+        },
+        'stick:end'(ev) {
+          const s = tc.stick;
+          if (!s || !ev.payload.ts.some((q) => q.id === s.id)) return;
+          tc.stick = null;
+          game.input.stick(0, 0);
+          P.stick();
+        },
+        // ボタン: 攻撃・ガード・回避・ポーションは押した瞬間、スキルは離した瞬間に出す（引っぱると狙える）
+        'tbtn:down'(ev) {
+          const { act, t } = ev.payload;
+          if (!this.is('play') || !t) return undefined;
+          tc.btn[act] = { id: t.id, ox: t.x, oy: t.y, aiming: false };
+          T.btn[act].set({ cls: { pressed: true } });
+          if (act === 'use') return this.handleInteract();
+          if (['atk', 'guard', 'dodge', 'pot'].includes(act)) game.input.button(act, true);
+          return undefined;
+        },
+        'tbtn:move'(ev) {
+          const { act } = ev.payload, b = tc.btn[act];
+          const t = b && AIMABLE.has(act) && ev.payload.ts.find((q) => q.id === b.id);
+          if (!t) return;
+          const dx = t.x - b.ox, dy = t.y - b.oy, d = Math.hypot(dx, dy);
+          if (d > 16) { b.aiming = true; game.input.aim(Math.atan2(dx, dy), Math.min(1, d / 120)); }
+          else if (b.aiming) { b.aiming = false; game.input.aim(null); } // 真ん中に戻すと自動ターゲットへ
+          T.btn[act].set({ cls: { aiming: b.aiming } });
+        },
+        'tbtn:up'(ev) {
+          const { act } = ev.payload, b = tc.btn[act];
+          if (!b || !ev.payload.ts.some((q) => q.id === b.id)) return;
+          delete tc.btn[act];
+          T.btn[act].set({ cls: { pressed: false, aiming: false } });
+          if (['skill', 't1', 't2'].includes(act)) game.input.button(act, true);
+          if (act === 'atk' || act === 'guard') game.input.button(act, false);
+          game.input.aim(null);
+        },
+        pinch(ev) {
+          const ts = ev.payload.ts;
+          if (ts.length < 2) { tc.pinch = 0; return; }
+          const d = Math.hypot(ts[0].x - ts[1].x, ts[0].y - ts[1].y);
+          if (tc.pinch) game.input.zoomBy(tc.pinch / d);
+          tc.pinch = d;
+        },
         'pointer:move'(ev) { game.input.pointerMove(ev.payload.x, ev.payload.y); },
         'pointer:wheel'(ev) { if (!this.is('login')) game.input.wheel(ev.payload.dy); },
         open: (ev) => ev.payload.panel,
@@ -642,7 +809,8 @@ export function createUI(game) {
         'chat:focus': () => 'chat',
         'item:hover': itemTip,
         'item:move': (ev) => P.tip(null, ev.payload.x, ev.payload.y),
-        'item:leave': () => P.hideTip(),
+        // スマホではタップの後にマウスの代替イベント（leave）が来るので、選択中は詳細を出したままにする
+        'item:leave'() { if (!(tc.on && this.sel)) P.hideTip(); },
       },
     },
     // ---------- ログイン ----------
@@ -686,6 +854,7 @@ export function createUI(game) {
         'login:start'() {
           if (this.starting) return undefined;
           this.starting = true;
+          if (tc.on) game.fullscreen(); // スマホ: 全画面＋横向き固定（対応ブラウザのみ）
           L.start.set({ disabled: true, text: '接続中…' });
           game.start({ name: L.name.el.value.trim() || 'プレイヤー', color: L.color.el.value, kind: this.kind }).then((ok) => {
             H.mode.set({ text: ok ? 'ONLINE' : 'SOLO MODE（サーバー未接続）' });
@@ -698,25 +867,36 @@ export function createUI(game) {
       },
     },
     // ---------- プレイ中（パネルなし） ----------
-    play: { enter() { showPanel(null); H.chatIn.set({ focus: false }); }, on: {} },
+    play: { enter() { showPanel(null); H.chatIn.set({ focus: false }); }, exit() { releaseTouch(); }, on: {} },
     // ---------- チャット入力中: ゲームのキー操作は止める ----------
     chat: {
-      enter() { H.chatIn.set({ focus: true }); game.input.blur(); },
-      exit() { H.chatIn.set({ focus: false, value: '' }); },
+      enter() { root.set({ cls: { chatting: true } }); H.chatIn.set({ focus: true }); game.input.blur(); },
+      exit() { root.set({ cls: { chatting: false } }); H.chatIn.set({ focus: false, value: '' }); },
       on: {
         'chat:key'(ev) {
           if (ev.payload.key === 'Enter') { const t = ev.payload.text.trim(); if (t) game.chat(t); return 'play'; }
           if (ev.payload.key === 'Escape') return 'play';
           return undefined;
         },
+        // スマホ: キーボードを閉じたらチャットも閉じる
+        'chat:blur': () => (tc.on ? 'play' : undefined),
         'key:down': () => undefined,
         'chat:focus': () => undefined,
       },
     },
     inv: panelState('inv', {
-      'item:click'(ev) { if (ev.ctx.source === 'inv') { game.equip(ev.payload.id); P.hideTip(); } },
+      'item:click'(ev) {
+        if (ev.ctx.source !== 'inv') return;
+        if (touchSelect(this, ev)) { invActions.set({ visible: true }); return; }
+        game.equip(ev.payload.id); this.sel = null; P.hideTip(); invActions.set({ visible: false });
+      },
       'item:context'(ev) { if (ev.ctx.source === 'inv') { game.salvage(ev.payload.id); P.hideTip(); } },
       'inv:salvageCommon'() { game.salvageCommon(); },
+      invAction(ev) {
+        if (!this.sel) return;
+        if (ev.payload.what === 'use') game.equip(this.sel); else game.salvage(this.sel);
+        this.sel = null; P.hideTip(); invActions.set({ visible: false });
+      },
     }),
     tree: panelState('tree', {
       'tree:tab'(ev) { treeTab = ev.payload.tab; game.sfx('ui'); P.tree(); },
@@ -739,6 +919,8 @@ export function createUI(game) {
     box: {
       ...panelState('box', {
         'item:click'(ev) {
+          if (touchSelect(this, ev)) return;
+          this.sel = null;
           if (ev.ctx.source === 'inv') game.boxPut(ev.payload.id);
           if (ev.ctx.source === 'box') game.boxTake(ev.payload.id);
           P.hideTip();
@@ -759,6 +941,7 @@ export function createUI(game) {
     return undefined;
   };
   mediator.go('login');
+  if (isTouch) enableTouch();
 
   // ==================================================================
   // ゲーム側から呼ぶ窓口（Presenter への通知）
@@ -766,7 +949,7 @@ export function createUI(game) {
   return {
     root, mediator,
     get state() { return mediator.state; },
-    frame(dt) { P.hud(); P.minimap(); P.floats(dt); },
+    frame(dt) { P.hud(); P.touch(); P.minimap(); P.floats(dt); },
     // データが変わったので、開いているパネルとクエスト表示を描き直す
     refresh() {
       if (mediator.is(...PANELS)) panelPresenter[mediator.state](mediator.data);

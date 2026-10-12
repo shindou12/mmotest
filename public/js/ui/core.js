@@ -123,12 +123,18 @@ export class Mediator {
   }
   go(name, data = null) {
     if (!this.states[name]) throw new Error(`Mediator: unknown state ${name}`);
+    // 遷移中（exit / enter の中）に起きた遷移は、今の遷移が終わってから行う
+    if (this.moving) { this.queued = [name, data]; return; }
     const from = this.state;
     if (from === name && !data) { this.states[name].refresh?.call(this, this.data); return; }
-    this.states[from]?.exit?.call(this, name);
-    this.state = name;
-    this.data = data;
-    this.states[name].enter?.call(this, data, from);
+    this.moving = true;
+    try {
+      this.states[from]?.exit?.call(this, name);
+      this.state = name;
+      this.data = data;
+      this.states[name].enter?.call(this, data, from);
+    } finally { this.moving = false; }
+    if (this.queued) { const [n, d] = this.queued; this.queued = null; if (n !== this.state) this.go(n, d); }
   }
   is(...names) { return names.includes(this.state); }
 }

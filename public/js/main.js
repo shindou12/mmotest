@@ -268,6 +268,29 @@ const input = {
   },
   // ホイール1段で一定の比率だけ寄る/引く（どの距離でも同じ手触り）
   wheel(dy) { cam.zoomT = clamp(cam.zoomT * Math.exp(clamp(dy, -120, 120) * 0.0012), CAM_ZOOM[0], CAM_ZOOM[1]); },
+  // ---- スマホ ----
+  zoomBy(f) { cam.zoomT = clamp(cam.zoomT * f, CAM_ZOOM[0], CAM_ZOOM[1]); },
+  setTouch(on) {
+    if (touch.on === on) return;
+    touch.on = on;
+    if (on) cam.zoom = cam.zoomT = 1.12; // 画面が小さいので少し引く
+  },
+  stick(x, y) { touch.stick.x = x; touch.stick.y = y; },
+  // ボタンを引っぱって狙う（len: 0〜1）。null で自動ターゲットに戻す
+  aim(a, len = 0) { touch.aim = a; touch.aimLen = len; },
+  // 右側のボタン
+  button(act, down) {
+    audio.init();
+    if (!started) return;
+    if (act === 'atk') return down ? input.pointerDown(0) : input.pointerUp(0);
+    if (act === 'guard') return down ? input.pointerDown(2) : input.pointerUp(2);
+    if (!down) return;
+    if (act === 'skill') tryWeaponSkill();
+    if (act === 't1') tryTreeSkill(0);
+    if (act === 't2') tryTreeSkill(1);
+    if (act === 'dodge') tryDodge();
+    if (act === 'pot') usePotion();
+  },
 };
 
 const raycaster = new THREE.Raycaster();
@@ -723,7 +746,38 @@ function die() {
 // ======================================================================
 // 戦闘（プレイヤー側）
 // ======================================================================
-function aimAngle() { return Math.atan2(mouse.world.x - me.x, mouse.world.z - me.z); }
+// ---- 狙い: マウス、またはスマホ（ボタンを引っぱった方向 → 自動ターゲット → 向いている方向） ----
+const touch = { on: false, stick: { x: 0, y: 0 }, aim: null, aimLen: 0, target: null };
+function autoTarget() {
+  if (!S) return null;
+  const range = S.W.ranged ? WEAPONS.bow.range : S.W.range + 4;
+  // 近さと、スティック（または向き）の方向との近さで選ぶ
+  const sl = Math.hypot(touch.stick.x, touch.stick.y);
+  const want = sl > 0.3 ? Math.atan2(touch.stick.x, touch.stick.y) : me.a;
+  let best = null, bs = Infinity;
+  for (const mb of mobs.values()) {
+    if (mb.hp <= 0) continue;
+    const d = Math.hypot(mb.x - me.x, mb.z - me.z);
+    if (d > range + mb.rad) continue;
+    const off = Math.abs(angDiff(Math.atan2(mb.x - me.x, mb.z - me.z), want));
+    const s = d * (1 + off / Math.PI) * (mb.kind === 2 ? 0.8 : 1);
+    if (s < bs) { bs = s; best = mb; }
+  }
+  return best;
+}
+function aimAngle() {
+  if (!touch.on) return Math.atan2(mouse.world.x - me.x, mouse.world.z - me.z);
+  if (touch.aim != null) return touch.aim;
+  const t = touch.target;
+  return t ? Math.atan2(t.x - me.x, t.z - me.z) : me.a;
+}
+// 地点を狙うスキル（アローレインなど）
+function aimPoint() {
+  if (!touch.on) return { x: mouse.world.x, z: mouse.world.z };
+  if (touch.aim != null) { const r = 3 + touch.aimLen * 13; return { x: me.x + Math.sin(touch.aim) * r, z: me.z + Math.cos(touch.aim) * r }; }
+  if (touch.target) return { x: touch.target.x, z: touch.target.z };
+  return { x: me.x + Math.sin(me.a) * 8, z: me.z + Math.cos(me.a) * 8 };
+}
 function addShake(v) { if (settings.shake) shake = Math.max(shake, v); }
 
 const TYPE_MOD = { normal: 'normp', heavy: 'heavyp', wskill: 'wskillp' };
@@ -795,7 +849,7 @@ const combat = {
   heal: (frac) => heal(S.mhp * frac, true),
   buff: addBuff,
   taunt: (r) => net.send({ t: 'taunt', r }),
-  point: () => ({ x: mouse.world.x, z: mouse.world.z }),
+  point: aimPoint,
   zone: () => bowZone(me.releaseZoneW ?? BOW_ZONE.min),
   arrow(o) {
     const color = o.color ?? RARITIES[S.wr].color;
@@ -1031,6 +1085,7 @@ function tryDodge() {
   if (!S || me.dead || me.dodgeCd > 0 || me.dashT > 0 || me.staggerT > 0) return;
   let dx = 0, dz = 0;
   if (keys.has('w')) dz -= 1; if (keys.has('s')) dz += 1; if (keys.has('a')) dx -= 1; if (keys.has('d')) dx += 1;
+  if (Math.hypot(touch.stick.x, touch.stick.y) > 0.25) { dx = touch.stick.x; dz = touch.stick.y; }
   if (!dx && !dz) { dx = Math.sin(me.a); dz = Math.cos(me.a); }
   const l = Math.hypot(dx, dz);
   const after = hasBuff('afterimage');
@@ -1356,6 +1411,41 @@ function updateBowGuide(t) {
   }
 }
 
+// ---- スマホの狙い: 自動ターゲットの印と、ボタンを引っぱったときの狙い線 ----
+let touchGuide = null;
+function updateTouchAim(t) {
+  if (!touch.on) { if (touchGuide) touchGuide.group.visible = false; return; }
+  if (!touchGuide) {
+    const group = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48), new THREE.MeshBasicMaterial({ color: 0xff5a4a, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
+    ring.rotation.x = -Math.PI / 2;
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1), new THREE.MeshBasicMaterial({ color: 0x9ae8ff, transparent: true, opacity: 0.45, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+    line.geometry.translate(0, 0.5, 0); line.geometry.rotateX(Math.PI / 2);
+    const spot = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.5, 40), new THREE.MeshBasicMaterial({ color: 0x9ae8ff, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
+    spot.rotation.x = -Math.PI / 2;
+    for (const m of [ring, line, spot]) { m.renderOrder = 5; group.add(m); }
+    scene.add(group);
+    touchGuide = { group, ring, line, spot };
+  }
+  const G = touchGuide;
+  G.group.visible = !me.dead;
+  touch.target = touch.aim == null ? autoTarget() : null;
+  const tg = touch.target;
+  G.ring.visible = !!tg;
+  if (tg) {
+    const s = tg.rad * 1.6 + Math.sin(t * 6) * 0.08;
+    G.ring.position.set(tg.x, heightAt(tg.x, tg.z) + 0.12, tg.z); G.ring.scale.set(s, s, 1);
+  }
+  G.line.visible = G.spot.visible = touch.aim != null;
+  if (touch.aim != null) {
+    const len = S.W.ranged ? WEAPONS.bow.range : Math.max(4, S.W.range + 2);
+    G.line.position.set(me.x, heightAt(me.x, me.z) + 0.15, me.z);
+    G.line.rotation.y = touch.aim; G.line.scale.set(1, 1, len);
+    const p = aimPoint();
+    G.spot.position.set(p.x, heightAt(p.x, p.z) + 0.15, p.z);
+  }
+}
+
 // ---- ハザード / 宝箱 ----
 function hazardAt(x, z) {
   if (world.def.shape !== 'open') return null;
@@ -1398,6 +1488,10 @@ function update(dt) {
       if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
       if (keys.has('d') || keys.has('arrowright')) dx += 1;
     }
+    // スマホのアナログスティック（倒した量で歩く速さが変わる）
+    let analog = 1;
+    const sl = Math.hypot(touch.stick.x, touch.stick.y);
+    if (sl > 0.12) { dx = touch.stick.x; dz = touch.stick.y; analog = Math.min(1, sl * 1.15); }
     const l = Math.hypot(dx, dz);
     me.moving = false;
     if (me.dodgeT > 0) {
@@ -1415,7 +1509,7 @@ function update(dt) {
     } else if (l > 0) {
       const busy = me.swingT < me.swingDur || me.skillT >= 0;
       const slow = me.guarding ? 0.45 : busy ? 0.45 : me.charging && me.chargeT > CHARGE_MIN ? 0.4 : 1;
-      const sp = 7.2 * (1 + (S.move + buffMod('move')) / 100) * slow * (hazardAt(me.x, me.z)?.kind === 'sand' ? 0.5 : 1);
+      const sp = 7.2 * (1 + (S.move + buffMod('move')) / 100) * slow * analog * (hazardAt(me.x, me.z)?.kind === 'sand' ? 0.5 : 1);
       moveMe(dx / l * sp * dt, dz / l * sp * dt);
       me.moving = true;
       if (!busy && !me.charging && !me.guarding) me.a = Math.atan2(dx, dz);
@@ -1568,6 +1662,7 @@ function update(dt) {
   updateBossProjs(dt);
   updateDrops(dt);
   updateBowGuide(t);
+  updateTouchAim(t);
 
   // 送信
   sendT -= dt;
@@ -1681,6 +1776,13 @@ const game = {
     } catch { /* */ }
   },
   start: startGame,
+  fullscreen() {
+    try {
+      document.documentElement.requestFullscreen?.()
+        .then(() => screen.orientation?.lock?.('landscape').catch(() => {}))
+        .catch(() => {});
+    } catch { /* 対応していないブラウザ（iOS Safari など） */ }
+  },
   interact(it) {
     if (it.kind === 'lever') { net.send({ t: 'interact', what: 'lever' }); audio.sfx('equip'); }
     if (it.kind === 'chest' && !chestOpen(it.chest)) net.send({ t: 'interact', what: 'chest', id: it.chest.id });

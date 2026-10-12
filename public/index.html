@@ -2,7 +2,9 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>浮遊城エテルナ</title>
 <link rel="stylesheet" href="style.css">
 <script type="importmap">
@@ -69,6 +71,23 @@
   <div id="chat">
     <div id="chat-log"></div>
     <input id="chat-in" maxlength="120" placeholder="Enterでチャット">
+  </div>
+  <!-- スマホ（横持ち）用の操作: 左にアナログスティック、右に攻撃ボタンを中心としたボタン群 -->
+  <div id="touch" class="hidden">
+    <div id="t-stick-zone"><div id="t-stick"><div id="t-knob"></div></div></div>
+    <div id="t-cluster">
+      <div class="tb big" id="tb-atk"><span class="ic">⚔</span><small id="tb-atk-nm">攻撃</small><span class="ring"></span></div>
+      <div class="tb" id="tb-skill"><span class="ic">✦</span><small></small><span class="cd"></span></div>
+      <div class="tb" id="tb-t1"><span class="ic">◆</span><small></small><span class="cd"></span></div>
+      <div class="tb" id="tb-t2"><span class="ic">◆</span><small></small><span class="cd"></span></div>
+      <div class="tb mid" id="tb-dodge"><span class="ic">↻</span><small>回避</small><span class="cd"></span></div>
+      <div class="tb mid" id="tb-guard"><span class="ic">⛨</span><small>ガード</small></div>
+      <div class="tb small" id="tb-pot"><span class="ic">⚗</span><b></b><span class="cd"></span></div>
+      <div class="tb small use" id="tb-use"><span class="ic">F</span><small>調べる</small></div>
+    </div>
+    <div id="t-menu">
+      <button data-panel="inv">🎒</button><button data-panel="tree">✧<i id="t-sp"></i></button><button data-panel="map">🗺</button><button data-panel="chat">💬</button><button data-panel="settings">⚙</button>
+    </div>
   </div>
   <div id="prompt" class="hidden"></div>
   <div id="toasts"></div>
@@ -156,6 +175,8 @@
   </div>
 </div>
 
+<div id="rotate"><div>📱</div>横向きにして遊んでください</div>
+<div id="inv-actions" class="hidden"><button id="ia-use">装備する</button><button id="ia-salvage">分解</button></div>
 <div id="death" class="hidden"><div>HP が尽きた…</div><small id="death-t"></small></div>
 <div id="tooltip" class="hidden"></div>
 
