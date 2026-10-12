@@ -1394,7 +1394,29 @@ if (existing) {
   $('lname').value = existing.name; $('lcolor').value = existing.color;
   $('lexisting').textContent = `セーブデータあり: Lv${existing.lv} ${existing.name}（続きから）`;
   $('lweapon-wrap').style.display = 'none';
+  $('lnew').classList.remove('hidden');
 }
+
+// 最初からはじめる（誤操作防止のため2回押しで実行）
+let newArmT = 0;
+$('lnew').onclick = () => {
+  const btn = $('lnew');
+  if (performance.now() - newArmT > 5000) {
+    newArmT = performance.now();
+    btn.classList.add('armed');
+    btn.textContent = `Lv${existing.lv} のデータが消えます。もう一度押すと最初から`;
+    setTimeout(() => { if (performance.now() - newArmT >= 5000 && !btn.classList.contains('hidden')) { btn.classList.remove('armed'); btn.textContent = '最初からはじめる'; } }, 5100);
+    return;
+  }
+  try {
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem('aincrad_solo_world'); // ソロの階層解放状況もリセット
+  } catch { /* */ }
+  btn.classList.add('hidden');
+  $('lexisting').textContent = '新しいキャラクターではじめます';
+  $('lweapon-wrap').style.display = '';
+  $('lname').focus();
+};
 
 $('lstart').onclick = async () => {
   audio.init();

@@ -31,6 +31,9 @@ button:hover { background: rgba(100, 170, 255, .4); }
 button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: linear-gradient(90deg, #2a6aff, #3ad0ff); border: none; }
 .note { font-size: 11px; color: var(--dim); text-align: center; }
 #lexisting { font-size: 13px; color: #9fe; text-align: center; }
+#lnew { background: transparent; color: var(--dim); font-size: 13px; }
+#lnew:hover { color: var(--txt); }
+#lnew.armed { color: #ffb0a0; border-color: #ff7a6a; background: rgba(255, 90, 70, .15); }
 
 /* HUD */
 #hud { position: fixed; inset: 0; pointer-events: none; }
