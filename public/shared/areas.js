@@ -328,10 +328,23 @@ export const MOB_POOL = {
   f2_field: [0, 1, 2], f2_hunt: [2, 2, 0], f2_dun: [3, 1], f2_lab: [3, 0, 1],
   f3_field: [0, 1], f3_hunt: [2, 2, 0], f3_canyon: [2, 3, 0], f3_dun: [3, 1], f3_lab: [2, 3],
 };
+// 天候: 粒子（particles）、霧の近さ・遠さの倍率（near/far）、霧と空の色を寄せる色（tint/mix）、日差しの強さ（sun）、環境音（amb）
+export const WEATHERS = {
+  rain: { name: '雨', icon: '🌧', particles: 'downpour', count: 1400, near: 0.4, far: 0.55, tint: 0x5a6880, mix: 0.55, sun: 0.4, amb: 'rain' },
+  fog: { name: '霧', icon: '🌫', particles: 'mist', count: 260, near: 0.15, far: 0.42, tint: 0xd4dee2, mix: 0.7, sun: 0.7, amb: 'fog' },
+  sandstorm: { name: '砂嵐', icon: '🌪', particles: 'sand', count: 1600, near: 0.1, far: 0.3, tint: 0xd09a58, mix: 0.75, sun: 0.6, amb: 'sandstorm' },
+};
+// エリアごとの天候（屋内の迷宮・ダンジョンにはない）
+export const AREA_WEATHER = {
+  f1_hunt: 'rain', f1_lake: 'rain',
+  f2_field: 'fog', f2_hunt: 'fog',
+  f3_hunt: 'sandstorm', f3_canyon: 'sandstorm',
+};
 // 踏破の条件: 迷宮区はボス、秘境はネームドを倒す。ほかは敵を15体倒す
 export const CLEAR_KILLS = 15;
 for (const [id, a] of Object.entries(AREAS)) {
   if (a.mobs && MOB_POOL[id]) { a.mobs.pool = MOB_POOL[id]; delete a.mobs.only; }
+  a.weather = AREA_WEATHER[id] || null;
   a.id = id;
   a.bias = AREA_BIAS[id]?.affixes || [];
   a.kinds = AREA_BIAS[id]?.kinds || [];

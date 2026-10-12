@@ -9,7 +9,7 @@ import {
   CRAFT_MAX_TIER, weightedTier, loreTitle,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
 } from '../shared/data.js';
-import { AREAS, AREA_TYPES, HAZARDS, CLEAR_KILLS, grid, collide, spawnPoint, hazardsOf, chestsOf, insideOpen } from '../shared/areas.js';
+import { AREAS, AREA_TYPES, HAZARDS, CLEAR_KILLS, WEATHERS, grid, collide, spawnPoint, hazardsOf, chestsOf, insideOpen } from '../shared/areas.js';
 import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
@@ -101,6 +101,7 @@ addEventListener('resize', () => {
 
 const fx = new FX(scene);
 const ambient = new AmbientParticles(scene);
+const weatherParts = new AmbientParticles(scene, 1600); // 天候（雨・霧・砂嵐）の粒子
 const audio = new AudioEngine();
 audio.setVolumes(settings);
 
@@ -461,7 +462,7 @@ function onMsg(m) {
 function buildEnv(id) {
   if (env) fx.dispose(env.group);
   const def = AREAS[id];
-  env = buildArea(def, FLOORS[def.floor - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1 });
+  env = buildArea(def, FLOORS[def.floor - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1, weather: WEATHERS[def.weather] });
   scene.add(env.group);
   const L = env.light;
   scene.fog = new THREE.Fog(L.fog, L.fogNear, L.fogFar);
@@ -476,9 +477,15 @@ function enterArea(id, x, z) {
   const fdef = FLOORS[def.floor - 1];
   buildEnv(id);
   hemi.color.set(fdef.hemi[0]); hemi.groundColor.set(fdef.hemi[1]);
-  sun.color.set(fdef.sun);
   const indoor = def.shape === 'grid';
+  const W = indoor ? null : WEATHERS[def.weather];
+  sun.color.set(fdef.sun);
+  if (W) sun.color.lerp(new THREE.Color(W.tint), W.mix * 0.5);
   ambient.setKind(indoor ? 'dust' : fdef.particles);
+  weatherParts.setKind(W ? W.particles : null);
+  weatherParts.points.geometry.setDrawRange(0, W ? W.count : 0);
+  weatherParts.lines.geometry.setDrawRange(0, W ? W.count * 2 : 0);
+  audio.setWeather(W ? W.amb : null);
   for (const mid of [...mobs.keys()]) removeMob(mid);
   for (const oid of [...others.keys()]) removeOther(oid);
   for (const t of teles.splice(0)) t.meshes.forEach((mm) => fx.dispose(mm));
@@ -494,6 +501,7 @@ function enterArea(id, x, z) {
   const T = AREA_TYPES[def.type];
   banner(`第${def.floor}層 ・ ${T.name}`, def.name, T.color);
   if (def.named) toast(`この地には主「${def.named.name}」が棲むという…`, '#ffb27a');
+  if (W) toast(`${W.icon} 天候：${W.name}`, '#cfe0ff');
   audio.sfx('warp');
   fx.beam(me.x, me.z, 0x6ad0ff, 12, 1.2, 1.2);
   cam.focus.set(x, 1.2, z); cam.back = null;
@@ -2145,6 +2153,7 @@ function update(dt) {
   for (const m of env.ringMats) m.opacity = fighting ? 0.28 + Math.sin(t * 4) * 0.1 : 0.4;
   if (world.def.gate && Math.random() < 0.3) fx.parts.emit(world.def.gate.x + rnd(-3, 3), 0.5, world.def.gate.z + rnd(-0.5, 0.5), { color: 0x6ad0ff, size: 0.3, life: 1.5, speed: 0.5, gravity: 2 });
   ambient.update(dt, me.x, me.z, t);
+  if (weatherParts.kind) weatherParts.update(dt, me.x, me.z, t);
   fx.update(dt);
   updateMobLabels();
   ui.frame(dt);
@@ -2268,4 +2277,4 @@ function enterPreview() {
 }
 loop();
 
-window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, coins, api: game };
+window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, coins, audio, api: game };

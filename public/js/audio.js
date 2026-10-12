@@ -258,12 +258,48 @@ export class AudioEngine {
   setAmbient(kind) {
     if (!this.ctx || this.ambKind === kind) return;
     this.ambKind = kind;
-    const t = this.ctx.currentTime;
-    if (this.amb) {
-      const old = this.amb;
-      old.g.gain.setTargetAtTime(0, t, 0.5);
-      setTimeout(() => old.nodes.forEach((n) => { try { n.stop(); } catch { /* */ } }), 3000);
+    this.fadeOut(this.amb);
+    const { g, nodes, bed, drone } = this.layer();
+    switch (kind) {
+      case 'meadow': bed(this.noise, 'bandpass', 500, 0.05, 0.08, 250); break;
+      case 'forest': bed(this.noise, 'bandpass', 380, 0.06, 0.06, 200); bed(this.brown, 'lowpass', 300, 0.1); break;
+      case 'desert': bed(this.noise, 'bandpass', 900, 0.08, 0.12, 600); break;
+      case 'cave': bed(this.brown, 'lowpass', 200, 0.12); drone(55, 0.02); break;
+      case 'lava': bed(this.brown, 'lowpass', 120, 0.35, 0.05, 40); bed(this.noise, 'highpass', 3000, 0.008); break;
+      case 'snow': bed(this.noise, 'bandpass', 1200, 0.07, 0.1, 800); bed(this.noise, 'highpass', 6000, 0.01); break;
+      case 'underwater': bed(this.brown, 'lowpass', 250, 0.25, 0.07, 120); drone(73, 0.015); break;
+      case 'storm': bed(this.noise, 'bandpass', 700, 0.12, 0.15, 500); bed(this.noise, 'lowpass', 2500, 0.04); break;
+      case 'void': drone(41, 0.04); drone(61.7, 0.02); bed(this.brown, 'lowpass', 150, 0.08); break;
+      case 'heaven': drone(196, 0.008); drone(293.7, 0.006); bed(this.noise, 'bandpass', 600, 0.03, 0.05, 200); break;
     }
+    this.amb = { g, nodes };
+  }
+
+  // 天候の音（環境音に重ねる）: 雨・霧・砂嵐
+  setWeather(kind) {
+    if (!this.ctx || this.wxKind === kind) return;
+    this.wxKind = kind;
+    this.fadeOut(this.wx);
+    this.wx = null;
+    if (!kind) return;
+    const { g, nodes, bed, drone } = this.layer();
+    switch (kind) {
+      case 'rain': bed(this.noise, 'highpass', 3200, 0.05); bed(this.noise, 'bandpass', 1300, 0.07, 0.09, 400); bed(this.brown, 'lowpass', 420, 0.1); break;
+      case 'fog': bed(this.brown, 'lowpass', 180, 0.12, 0.04, 60); drone(82.4, 0.008); drone(123.5, 0.005); break;
+      case 'sandstorm': bed(this.noise, 'bandpass', 800, 0.16, 0.2, 500); bed(this.noise, 'highpass', 4500, 0.03, 0.3, 1500); bed(this.brown, 'lowpass', 160, 0.14); break;
+    }
+    this.wx = { g, nodes };
+  }
+
+  fadeOut(layer) {
+    if (!layer) return;
+    layer.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
+    setTimeout(() => layer.nodes.forEach((n) => { try { n.stop(); } catch { /* */ } }), 3000);
+  }
+
+  // ループする音の層を作る（bed: 雑音を濾波、drone: うなり）
+  layer() {
+    const t = this.ctx.currentTime;
     const ctx = this.ctx, g = ctx.createGain();
     g.gain.value = 0; g.connect(this.ambBus);
     g.gain.setTargetAtTime(1, t + 0.5, 1);
@@ -290,24 +326,18 @@ export class AudioEngine {
       o.connect(vg); o2.connect(vg); vg.connect(g); vg.connect(this.revSend);
       o.start(); o2.start(); nodes.push(o, o2);
     };
-    switch (kind) {
-      case 'meadow': bed(this.noise, 'bandpass', 500, 0.05, 0.08, 250); break;
-      case 'forest': bed(this.noise, 'bandpass', 380, 0.06, 0.06, 200); bed(this.brown, 'lowpass', 300, 0.1); break;
-      case 'desert': bed(this.noise, 'bandpass', 900, 0.08, 0.12, 600); break;
-      case 'cave': bed(this.brown, 'lowpass', 200, 0.12); drone(55, 0.02); break;
-      case 'lava': bed(this.brown, 'lowpass', 120, 0.35, 0.05, 40); bed(this.noise, 'highpass', 3000, 0.008); break;
-      case 'snow': bed(this.noise, 'bandpass', 1200, 0.07, 0.1, 800); bed(this.noise, 'highpass', 6000, 0.01); break;
-      case 'underwater': bed(this.brown, 'lowpass', 250, 0.25, 0.07, 120); drone(73, 0.015); break;
-      case 'storm': bed(this.noise, 'bandpass', 700, 0.12, 0.15, 500); bed(this.noise, 'lowpass', 2500, 0.04); break;
-      case 'void': drone(41, 0.04); drone(61.7, 0.02); bed(this.brown, 'lowpass', 150, 0.08); break;
-      case 'heaven': drone(196, 0.008); drone(293.7, 0.006); bed(this.noise, 'bandpass', 600, 0.03, 0.05, 200); break;
-    }
-    this.amb = { g, nodes };
+    return { g, nodes, bed, drone };
   }
 
   ambientEvents() {
-    if (!this.ctx || !this.ambKind) return;
-    const t = this.ctx.currentTime + 0.05, k = this.ambKind, R = Math.random;
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime + 0.05, k = this.ambKind, w = this.wxKind, R = Math.random;
+    // 天候の音: 雨は時々遠雷と雨だれ、霧はかすかな風、砂嵐は強い突風
+    if (w === 'rain' && R() < 0.006) this.thunder(t, 0.25);
+    if (w === 'rain' && R() < 0.2) this.drip(t);
+    if (w === 'fog' && R() < 0.02) this.whisper(t);
+    if (w === 'sandstorm' && R() < 0.08) this.gust(t);
+    if (!k) return;
     if ((k === 'meadow' && R() < 0.12) || (k === 'forest' && R() < 0.07) || (k === 'heaven' && R() < 0.03)) this.bird(t);
     if (k === 'forest' && R() < 0.04) this.owl(t);
     if ((k === 'cave' && R() < 0.12) || (k === 'underwater' && R() < 0.06)) this.drip(t);
