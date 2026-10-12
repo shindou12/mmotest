@@ -305,17 +305,17 @@ export const PLATE_WINDOW = 50; // 2つの感圧板は迷路の端と端（約29
 // エリアごとの傾向: 出やすい武器種（kinds）と付きやすい特性（affixes）。
 // 偏りはゆるめ（武器種は25%でそのエリアの種類から、特性は2倍出やすい）。踏破するとマップに表示される
 export const AREA_BIAS = {
-  f1_field: { kinds: ['sword', 'bow'], affixes: ['atkp', 'hpp'] },
-  f1_hunt: { kinds: ['axe', 'greatsword'], affixes: ['aspd', 'move'] },
+  f1_field: { kinds: ['sword', 'bow'], affixes: ['atkp', 'hpp', 'sv_holy'] },
+  f1_hunt: { kinds: ['axe', 'greatsword'], affixes: ['aspd', 'move', 'sv_heavy'] },
   f1_lake: { kinds: ['dagger'], affixes: ['vamp', 'sv_drain'] },
   f1_dun: { kinds: ['dagger', 'sword'], affixes: ['crit', 'critd'] },
   f1_lab: { kinds: ['spear', 'greatsword'], affixes: ['def', 'sv_quake'] },
-  f2_field: { kinds: ['bow', 'spear'], affixes: ['cdr', 'hpp'] },
+  f2_field: { kinds: ['bow', 'spear'], affixes: ['cdr', 'hpp', 'sv_frost'] },
   f2_hunt: { kinds: ['dagger', 'axe'], affixes: ['aspd', 'crit', 'sv_rapid'] },
   f2_dun: { kinds: ['bow'], affixes: ['def', 'sv_blink'] },
   f2_lab: { kinds: ['sword', 'greatsword'], affixes: ['critd', 'sv_twin'] },
   f3_field: { kinds: ['axe', 'spear'], affixes: ['atkp', 'def'] },
-  f3_hunt: { kinds: ['dagger', 'bow'], affixes: ['move', 'critd'] },
+  f3_hunt: { kinds: ['dagger', 'bow'], affixes: ['move', 'critd', 'sv_gale'] },
   f3_dun: { kinds: ['spear'], affixes: ['cdr', 'sv_storm'] },
   f3_canyon: { kinds: ['greatsword', 'axe'], affixes: ['crit', 'sv_giant'] },
   f3_lab: { kinds: ['sword', 'axe'], affixes: ['atkp', 'sv_blaze'] },

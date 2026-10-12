@@ -163,6 +163,10 @@ export const SKILL_VARIANTS = {
   sv_drain: { name: '吸命', icon: '♥', color: 0xc060ff, desc: (t) => `武器スキルで与えたダメージの${8 + t * 3}%を回復する` },
   sv_blink: { name: '瞬身', icon: '➶', color: 0x9affff, desc: (t) => `発動の直前に、狙った方向へ${4 + t}m瞬間移動する（無敵あり）` },
   sv_quake: { name: '崩撃', icon: '◎', color: 0xd8b080, desc: (t) => `ボスのスタン値が${(2 + t * 0.5).toFixed(1)}倍。当たった所に衝撃波が走る` },
+  sv_frost: { name: '氷結', icon: '❄', color: 0x80d8ff, desc: (t) => `氷属性になる。当たった敵が凍りつき、1秒後に氷が砕けて周りの敵にも威力${50 + t * 10}%` },
+  sv_gale: { name: '旋風', icon: '🌀', color: 0x8affb0, desc: (t) => `風属性になる。狙った場所に竜巻が${(2 + t * 0.25).toFixed(1)}秒残り、0.4秒ごとに威力${12 + t * 3}%` },
+  sv_heavy: { name: '剛撃', icon: '✊', color: 0xff5040, desc: (t) => `武器スキルが必ず会心になり、威力 ×${(1.6 + t * 0.1).toFixed(1)}。クールタイム +80%` },
+  sv_holy: { name: '聖光', icon: '✚', color: 0xfff0a0, desc: (t) => `光属性になる。発動の0.6秒後、狙った場所に光の柱が落ちて威力${60 + t * 12}%。自分のHPを${3 + t}%回復する` },
 };
 export const isVariant = (key) => key.startsWith('sv_');
 export const affixName = (key) => (isVariant(key) ? `スキル変化「${SKILL_VARIANTS[key].name}」` : AFFIXES[key].name);

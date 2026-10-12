@@ -828,7 +828,7 @@ function dealDamage(mb, mult, o = {}) {
   if (!mb || mb.hp <= 0) return;
   const skill = o.type === 'wskill' || o.type === 'tskill';
   const tough = mb.kind === 2 || !!mb.elite;
-  let crit = o.crit || Math.random() * 100 < S.crit + buffMod('crit') + (tough && tf('t_shark') ? 15 : 0) || (skill && S.fx.has('skillcrit'));
+  let crit = o.crit || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + (tough && tf('t_shark') ? 15 : 0) || (skill && S.fx.has('skillcrit'));
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; }
   const typeMult = 1 + (S[TYPE_MOD[o.type]] || 0) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
@@ -891,6 +891,7 @@ function variantParams(v, second = false) {
   const P = { mult: 1, range: 1, cd: 1 };
   if (v.key === 'sv_giant') { P.range = 1.3 + t * 0.1; P.mult = 1 + t * 0.05; P.cd = 1.3; }
   if (v.key === 'sv_rapid') { P.mult = 0.7; P.cd = 1 - (0.35 + t * 0.05); }
+  if (v.key === 'sv_heavy') { P.mult = 1.6 + t * 0.1; P.cd = 1.8; }
   if (second) P.mult *= 0.4 + t * 0.1; // 二連の2回目
   return P;
 }
@@ -929,6 +930,9 @@ function castWeaponSkill(sk) {
     combat.dash(a, d, 0.1, 0.35);
     later(0.12, () => { fx.parts.burst(me.x, 1, me.z, 25, { color: 0x9affff, speed: 4, size: 0.5, life: 0.4 }); go(); });
   } else go();
+  if (v.key === 'sv_gale') galeAt(aimPoint(), v);
+  if (v.key === 'sv_holy') holyAt(aimPoint(), v);
+  if (v.key === 'sv_heavy') { addShake(0.25); fx.parts.burst(me.x, 1, me.z, 30, { color: 0xff5040, speed: 7, size: 0.6, life: 0.4 }); }
   if (v.color) fx.flash(me.x, 1.5, me.z, v.color, 30, 0.3);
 }
 function onVariantHit(mb, dmg, o) {
@@ -969,6 +973,46 @@ function onVariantHit(mb, dmg, o) {
     fx.parts.burst(mb.x, 0.3, mb.z, 20, { color: 0xb89870, speed: 6, size: 0.6, life: 0.5, up: 2 });
     addShake(0.15);
   }
+  // 氷結: 当たった敵が凍り、1秒後に砕けて周りにも当たる（1回の発動で敵ごとに1回）
+  if (v.key === 'sv_frost' && !c.hitSet.has(mb.id) && o.type !== 'dot') {
+    c.hitSet.add(mb.id);
+    const x = mb.x, z = mb.z;
+    fx.parts.burst(x, 1, z, 16, { color: 0xbfefff, speed: 2, size: 0.5, life: 1, gravity: 0 });
+    fx.ringWave(x, z, 0x80d8ff, 1.6, 0.9, 0.2, 0.4);
+    later(1, () => {
+      fx.parts.burst(x, 1, z, 40, { color: 0xd8f6ff, speed: 8, size: 0.55, life: 0.5, gravity: 6 });
+      fx.ringWave(x, z, 0x80d8ff, 3.2, 0.3); fx.flash(x, 1.5, z, 0x80d8ff, 30, 0.25);
+      audio.sfx('hit', { crit: true });
+      combat.circle(x, z, 3, 0.5 + v.t * 0.1, { type: 'wskill', noProc: true });
+    });
+  }
+}
+// 旋風: 狙った場所に竜巻を残す
+function galeAt(p, v) {
+  const life = 2 + v.t * 0.25, pow = 0.12 + v.t * 0.03;
+  fx.ringWave(p.x, p.z, 0x8affb0, 3, 0.4);
+  audio.sfx('wave');
+  for (let k = 0; k * 0.1 < life; k++) {
+    later(k * 0.1, () => {
+      for (let j = 0; j < 4; j++) {
+        const a = k * 0.9 + j * Math.PI / 2, h = (j + (k % 3)) * 0.8, r = 0.6 + h * 0.35;
+        fx.parts.emit(p.x + Math.sin(a) * r, h, p.z + Math.cos(a) * r, { color: j % 2 ? 0x8affb0 : 0xe0fff0, size: 0.45, life: 0.35, speed: 1, gravity: -2 });
+      }
+      if (k % 4 === 0) combat.circle(p.x, p.z, 2.6, pow, { type: 'wskill', noProc: true });
+    });
+  }
+}
+// 聖光: 少し遅れて光の柱が落ちる
+function holyAt(p, v) {
+  fx.ringWave(p.x, p.z, 0xfff0a0, 2.8, 0.6, 0.15, 0.3);
+  later(0.6, () => {
+    fx.beam(p.x, p.z, 0xfff0a0, 16, 1.4, 0.45);
+    fx.flash(p.x, 3, p.z, 0xfff0a0, 60, 0.4, 16);
+    fx.parts.burst(p.x, 0.5, p.z, 50, { color: 0xfff6c0, speed: 6, size: 0.6, life: 0.6, gravity: -4 });
+    audio.sfx('thunder'); addShake(0.2);
+    combat.circle(p.x, p.z, 3, 0.6 + v.t * 0.12, { type: 'wskill', noProc: true });
+    heal(S.mhp * (0.03 + v.t * 0.01), true);
+  });
 }
 
 // スキルから使う戦闘コンテキスト（skills.js の c）
