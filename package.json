@@ -1,0 +1,25 @@
+{
+  "name": "aincrad-mini",
+  "version": "1.0.0",
+  "description": "友達で遊ぶ10階層ミニMMO (three.js)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shindou12/mmotest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/shindou12/mmotest/issues"
+  },
+  "homepage": "https://github.com/shindou12/mmotest#readme",
+  "dependencies": {
+    "three": "^0.160.0",
+    "ws": "^8.22.0"
+  },
+  "type": "module"
+}

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>浮遊城エテルナ</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="float"></div>
+<div id="vignette"></div>
+
+<div id="login">
+  <div class="logo">
+    <div class="sub">― 10 FLOORS OF THE FLOATING CASTLE ―</div>
+    <h1>浮遊城エテルナ</h1>
+  </div>
+  <div class="panel login-panel">
+    <label>キャラクター名 <input id="lname" maxlength="12" placeholder="名前を入力"></label>
+    <label>カラー <input id="lcolor" type="color" value="#3aa0ff"></label>
+    <div id="lweapon-wrap">
+      <div class="lbl">初期武器（新規キャラのみ）</div>
+      <div id="lweapon" class="seg">
+        <button data-k="sword" class="on">片手剣</button><button data-k="greatsword">大剣</button><button data-k="spear">槍</button><button data-k="dagger">短剣</button>
+      </div>
+    </div>
+    <div id="lexisting"></div>
+    <button id="lstart" class="big">リンク・スタート</button>
+    <div class="note" id="lnote">サーバーに接続できない場合はソロモードで起動します</div>
+  </div>
+</div>
+
+<div id="hud" class="hidden">
+  <div id="me-frame" class="panel">
+    <div class="row"><span id="me-name"></span><span id="me-lv"></span></div>
+    <div class="bar hp"><div id="me-hp"></div><span id="me-hp-t"></span></div>
+    <div class="bar xp"><div id="me-xp"></div><span id="me-xp-t"></span></div>
+    <div id="me-floor"></div>
+    <div id="buffs"></div>
+  </div>
+  <div id="boss" class="hidden">
+    <div id="boss-name"></div>
+    <div class="bar boss"><div id="boss-hp-lag"></div><div id="boss-hp"></div></div>
+  </div>
+  <div id="party" class="panel"></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="hotbar">
+    <div class="slot" id="s-atk"><kbd>左クリック</kbd><div class="ic">⚔</div><div class="nm">通常攻撃</div></div>
+    <div class="slot" id="s-skill"><kbd>右クリック</kbd><div class="ic">✦</div><div class="nm" id="skill-name">スキル</div><div class="cd"></div></div>
+    <div class="slot" id="s-dodge"><kbd>Space</kbd><div class="ic">↻</div><div class="nm">回避</div><div class="cd"></div></div>
+    <div class="slot" id="s-pot"><kbd>Q</kbd><div class="ic">⚗</div><div class="nm">ポーション <b id="pot-n">3</b></div><div class="cd"></div></div>
+    <div class="slot small" id="s-inv"><kbd>I</kbd><div class="ic">🎒</div><div class="nm">装備</div></div>
+  </div>
+  <div id="chat">
+    <div id="chat-log"></div>
+    <input id="chat-in" maxlength="120" placeholder="Enterでチャット">
+  </div>
+  <div id="prompt" class="hidden"></div>
+  <div id="toasts"></div>
+  <div id="banner"></div>
+  <div id="mode-tag"></div>
+  <div id="help" class="panel">
+    <b>操作</b><br>
+    WASD 移動 / マウス 向き<br>
+    左クリック長押し 攻撃（3段コンボ）<br>
+    右クリック ソードスキル<br>
+    Space 回避（無敵時間あり）<br>
+    Q ポーション / I 装備 / F 転移門<br>
+    Enter チャット / M ミュート / H このヘルプ<br>
+    <span class="dim">赤い予兆の中にいると被弾。回避の無敵で抜けると「JUST回避」</span>
+  </div>
+</div>
+
+<div id="inv" class="panel hidden">
+  <div class="inv-head"><b>装備 / インベントリ</b><span class="dim">クリック:装備　右クリック:分解</span><button id="inv-salvage">コモン・アンコモン一括分解</button><button id="inv-close">×</button></div>
+  <div class="inv-body">
+    <div class="inv-left">
+      <div class="eq" data-slot="weapon"><div class="eq-l">武器</div><div class="cell"></div></div>
+      <div class="eq" data-slot="armor"><div class="eq-l">防具</div><div class="cell"></div></div>
+      <div class="eq" data-slot="acc"><div class="eq-l">装飾</div><div class="cell"></div></div>
+      <div id="stats"></div>
+    </div>
+    <div class="inv-right"><div id="inv-grid"></div></div>
+  </div>
+</div>
+
+<div id="gate-menu" class="panel hidden">
+  <div class="inv-head"><b>転移門</b><button id="gate-close">×</button></div>
+  <div id="gate-list"></div>
+</div>
+
+<div id="death" class="hidden"><div>HP が尽きた…</div><small id="death-t"></small></div>
+<div id="tooltip" class="hidden"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
