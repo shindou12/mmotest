@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
-  FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES,
+  FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, INSTINCT_CD,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass,
 } from '../shared/data.js';
 import { AREAS, AREA_TYPES, CELL, grid, collide, exitsOf, spawnPoint } from '../shared/areas.js';
@@ -104,6 +104,7 @@ const me = {
   wsCd: 0, tcd: {}, skillT: -1, spin: false, dashT: 0, dashA: 0, dashSpeed: 0,
   potions: 3, potCd: 0, lastHurt: -99, walkT: 0, moving: false, stepT: 0,
   buffs: [], ambush: 0, lastStandT: -999, transit: false,
+  staggerT: 0, instinctT: -9999, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
   model: null,
 };
 const world = { area: 'f1_town', def: AREAS.f1_town, floor: 1, unlocked: 1, bossState: 'idle', door: false, plates: [] };
@@ -115,6 +116,7 @@ const npcs = [];
 const teles = [];
 const drops = [];
 const projs = [];
+const bprojs = []; // ボスの弾
 const pending = []; // 遅延処理
 let roster = [];
 let started = false;
@@ -161,16 +163,27 @@ function calcStats() {
   const mhp = (baseHp(char.lv) + (eq.armor?.hp || 0) + (eq.acc?.hp || 0)) * (1 + m('hpp') / 100);
   const weight = items.reduce((a, it) => a + itemWeight(it), 0);
   const wc = weightClass(weight);
+  const W = WEAPONS[wk];
+  // 武器パッシブ
+  const P = {
+    heavy: wk === 'greatsword' ? 20 : wk === 'axe' ? 25 : 0,
+    vamp: wk === 'axe' ? 3 : 0,
+    def: wk === 'spear' ? 10 : 0,
+    dodge: wk === 'dagger' || wk === 'bow' ? 0.75 : 1,
+    iframe: wk === 'sword' ? 0.1 : 0,
+  };
   S = {
-    wk, W: WEAPONS[wk], atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: T.actives,
+    wk, W, atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: T.actives,
     crit: 5 + m('crit'), critd: 150 + m('critd'), aspd: m('aspd'), move: m('move'),
-    vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0), cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
-    def: Math.min(65, m('def') + (eq.armor?.def || 0)), wr: eq.weapon ? eq.weapon.rarity : 0,
-    normp: m('normp'), heavyp: m('heavyp'), wskillp: m('wskillp'), dodgecd: Math.min(60, m('dodgecd')),
+    vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0) + P.vamp, cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
+    def: Math.min(65, m('def') + (eq.armor?.def || 0) + P.def), wr: eq.weapon ? eq.weapon.rarity : 0,
+    normp: m('normp'), heavyp: m('heavyp') + P.heavy, wskillp: m('wskillp'), dodgecd: Math.min(60, m('dodgecd')),
     justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion') + (char.potBonus || 0),
     ws: WEAPON_SKILLS[weaponSkillId()], weight, wc,
-    dodgeCd: DODGE_CD * wc.cd * (1 - Math.min(60, m('dodgecd')) / 100),
+    dodgeCd: DODGE_CD * wc.cd * (1 - Math.min(60, m('dodgecd')) / 100) * P.dodge,
+    iframeBonus: P.iframe, stunp: m('stunp'), optimal: (W.optimal || 0) + m('range'),
   };
+  if (me.optRing) me.optRing.visible = !!W.ranged;
   me.hp = Math.min(me.hp, S.mhp);
   if (me.model) setPlayerWeapon(me.model, S.wk, S.wr);
   $('s-guard').classList.toggle('hidden', !S.W.guard);
@@ -241,7 +254,15 @@ addEventListener('mouseup', (e) => {
       else doHeavy(me.chargeLv);
     }
   }
-  if (e.button === 2) { mouse.r = false; me.guarding = false; }
+  if (e.button === 2) {
+    mouse.r = false;
+    // 盾槍: ガードしていた時間に応じて次の攻撃にボーナス（最大+50%・2秒で最大）
+    if (me.guarding) {
+      me.nextAtkBonus = 1 + Math.min(now() - me.guardStart, 2) / 2 * 0.5;
+      if (me.nextAtkBonus > 1.15) floatText(me.x, 2.6, me.z, `反撃準備 +${Math.round((me.nextAtkBonus - 1) * 100)}%`, 'info');
+    }
+    me.guarding = false;
+  }
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('wheel', (e) => { camZoom = clamp(camZoom + e.deltaY * 0.001, 0.6, 1.6); });
@@ -330,7 +351,55 @@ function onMsg(m) {
       for (let i = 0; i < 6; i++) setTimeout(() => fx.parts.burst(L.x + rnd(-8, 8), rnd(4, 10), L.z + rnd(-8, 8), 80, { color: [0xffd84a, 0x6ad0ff, 0xff6ab0][i % 3], size: 0.6, speed: 10, life: 1.5, gravity: -4 }), i * 250);
       break;
     }
-    case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); break;
+    case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); clearBossProjs(); break;
+    case 'proj': spawnBossProj(m); break;
+    case 'pgone': {
+      const i = bprojs.findIndex((p) => p.id === m.id);
+      if (i >= 0) { const p = bprojs[i]; fx.parts.burst(p.x, 1.2, p.z, 20, { color: 0xbfe0ff, speed: 6, size: 0.4, life: 0.35 }); fx.dispose(p.mesh); bprojs.splice(i, 1); }
+      break;
+    }
+    case 'stun': {
+      // スタン: そのボスが出していた攻撃はすべて取り消される
+      for (let i = teles.length - 1; i >= 0; i--) if (teles[i].src === m.id) { teles[i].meshes.forEach((g) => fx.dispose(g)); teles.splice(i, 1); }
+      clearBossProjs();
+      const b = mobs.get(m.id);
+      banner('STUN!', `${m.sec}秒間 動けない・被ダメージ1.3倍`, '#ffd84a', 3);
+      audio.sfx('impact'); audio.sfx('perfect'); addShake(0.8);
+      if (b) { fx.ringWave(b.x, b.z, 0xffd84a, 8, 0.6); fx.parts.burst(b.x, 4, b.z, 80, { color: 0xffe080, speed: 10, size: 0.6, life: 1 }); }
+      break;
+    }
+    case 'guardStop': {
+      const who = m.pid === me.id ? 'あなた' : others.get(m.pid)?.name || '仲間';
+      toast(`${who}が突進を受け止めた！`, '#bfe0ff');
+      fx.ringWave(m.x, m.z, 0xbfe0ff, 5, 0.4);
+      fx.parts.burst(m.x, 1.5, m.z, 40, { color: 0xbfe0ff, speed: 9, size: 0.5, life: 0.5 });
+      audio.sfx('block'); audio.sfx('impact'); addShake(0.6);
+      if (m.pid === me.id) floatText(me.x, 2.8, me.z, 'GUARD BREAK!', 'just');
+      break;
+    }
+    case 'hateReset': {
+      const b = mobs.get(m.id);
+      if (b) { toast('ヘイトがリセットされた！ 狙いを取り直そう', '#ff9a8a'); fx.ringWave(b.x, b.z, 0xff9a8a, 6, 0.5); }
+      break;
+    }
+    case 'aim': {
+      // 遠距離攻撃の照準線（ボス → 狙われた人）
+      const b = mobs.get(m.id);
+      const tgt = () => (m.tid === me.id ? me : others.get(m.tid));
+      if (!b || !tgt()) break;
+      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff4a3a, transparent: true, depthTest: false }));
+      line.renderOrder = 7;
+      fx.add(line, m.d / 1000, (o, k) => {
+        const t = tgt();
+        if (!t) return;
+        const pos = o.geometry.attributes.position;
+        pos.setXYZ(0, b.x, 1.6, b.z); pos.setXYZ(1, t.x, 1.0, t.z); pos.needsUpdate = true;
+        o.material.opacity = 0.4 + 0.6 * Math.abs(Math.sin(k * 20));
+      });
+      if (m.tid === me.id) { audio.sfx('telegraph'); toast('ボスに狙われている！', '#ff6a5a'); }
+      break;
+    }
     case 'disconnected': addChat('', 'サーバーとの接続が切れました。ページを再読み込みしてください。', '#f66'); break;
   }
 }
@@ -363,6 +432,7 @@ function enterArea(id, x, z) {
   for (const oid of [...others.keys()]) removeOther(oid);
   for (const t of teles.splice(0)) t.meshes.forEach((mm) => fx.dispose(mm));
   for (const d of drops.splice(0)) disposeDrop(d);
+  clearBossProjs();
   buildNpcs(def);
   me.x = x; me.z = z; me.a = Math.PI; me.transit = false;
   for (const p of env.portals) p.armed = Math.hypot(p.x - x, p.z - z) > p.r + 1.5;
@@ -434,7 +504,8 @@ function onSnap(m) {
     if (sw !== o.sw) {
       o.sw = sw; o.swingT = 0; o.combo++;
       const W = WEAPONS[wk];
-      fx.slash(o.x, o.z, o.a, W.range, W.arc, RARITIES[wr].color, 1.0, o.combo % 2 === 1);
+      if (W.ranged) fxArrow(o.x, o.z, o.a, RARITIES[wr].color);
+      else fx.slash(o.x, o.z, o.a, W.range, W.arc, RARITIES[wr].color, 1.0, o.combo % 2 === 1);
     }
     if (sk !== o.sk) { o.sk = sk; o.spinT = 0; fx.ringWave(o.x, o.z, 0x9ad8ff, 5); fx.parts.burst(o.x, 1, o.z, 30, { color: 0x9ad8ff, speed: 6 }); }
   }
@@ -443,7 +514,7 @@ function onSnap(m) {
   const seenM = new Set();
   const fdef = FLOORS[world.floor - 1];
   for (const r of m.m) {
-    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr, elite, target] = r;
+    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr, elite, target, hateT, stunPct, stunT] = r;
     seenM.add(id);
     let mb = mobs.get(id);
     if (!mb) {
@@ -470,7 +541,7 @@ function onSnap(m) {
         fx.flash(x, 4, z, fdef.boss.accent, 80, 0.6, 30);
       }
     }
-    Object.assign(mb, { tx: x, tz: z, ta: a, mhp, lv, st, enraged: !!enr, target });
+    Object.assign(mb, { tx: x, tz: z, ta: a, mhp, lv, st, enraged: !!enr, target, hateT, stunPct, stunT });
     // ローカル予測ダメージを少しの間優先
     if (now() - mb.localT > 0.4) mb.hp = hp; else mb.hp = Math.min(mb.hp, hp);
   }
@@ -551,6 +622,7 @@ function resolveTele(te) {
   const hit = te.sh.some((s) => inShape(s, me.x, me.z));
   if (!hit) return;
   if (me.iframe > 0) { onJustDodge(); return; }
+  if (te.src) net.send({ t: 'absorb', id: te.src }); // 狙われ役が攻撃を受けるとヘイトのリセットが少し延びる
   if (S.fx.has('aegis') && Math.random() < 0.25) {
     floatText(me.x, 2.4, me.z, '無効化!', 'info');
     audio.sfx('block');
@@ -558,6 +630,13 @@ function resolveTele(te) {
     return;
   }
   let raw = te.dmg;
+  // 敵の正面で受けると苛烈、背後なら軽い
+  const srcMob = mobs.get(te.src);
+  if (srcMob) {
+    const off = Math.abs(angDiff(Math.atan2(me.x - srcMob.x, me.z - srcMob.z), srcMob.a));
+    if (off < THREE.MathUtils.degToRad(60)) raw *= 1.3;
+    else if (off > THREE.MathUtils.degToRad(120)) raw *= 0.7;
+  }
   // 盾槍のガード（攻撃してきた方向が正面なら軽減）
   if (me.guarding && S.W.guard) {
     const src = mobs.get(te.src) || { x: te.sh[0].x, z: te.sh[0].z };
@@ -580,6 +659,11 @@ function resolveTele(te) {
       if (raw <= 0) { floatText(me.x, 2.4, me.z, '防御', 'info'); return; }
     }
   }
+  takeDamage(raw);
+}
+
+// 被ダメージの共通処理（予兆・ボスの弾）
+function takeDamage(raw) {
   const dr = clamp(buffMod('dr'), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
@@ -589,11 +673,26 @@ function resolveTele(te) {
   addShake(0.3);
   $('vignette').style.boxShadow = 'inset 0 0 160px rgba(255,0,0,.55)';
   setTimeout(() => { $('vignette').style.boxShadow = 'inset 0 0 120px rgba(255,0,0,0)'; }, 180);
+  // ひるみ（大剣の溜め中はひるまない）
+  if (dmg >= S.mhp * 0.1 && me.hp > 0) {
+    const armor = S.wk === 'greatsword' && me.charging;
+    if (armor) floatText(me.x, 2.8, me.z, 'スーパーアーマー', 'info');
+    else { me.staggerT = 0.35; me.charging = false; me.guarding = false; me.queued = 0; }
+  }
   if (me.hp <= 0 && S.flags.has('laststand') && now() - me.lastStandT > 90) {
     me.hp = 1; me.lastStandT = now(); me.iframe = 1.0;
     floatText(me.x, 2.8, me.z, '不屈!', 'just');
     audio.sfx('perfect');
     fx.beam(me.x, me.z, 0xffd84a, 8, 0.8, 0.8);
+    return;
+  }
+  // 生存本能（近接武器のパッシブ）
+  if (me.hp <= 0 && S.W.melee && now() - me.instinctT > INSTINCT_CD) {
+    me.hp = 1; me.instinctT = now(); me.iframe = 1.2; me.staggerT = 0;
+    floatText(me.x, 2.8, me.z, '生存本能!', 'just');
+    audio.sfx('perfect');
+    fx.beam(me.x, me.z, 0xff6a5a, 8, 0.8, 0.8);
+    toast(`生存本能が発動！（次は${INSTINCT_CD / 60}分後）`, '#ff9a8a');
     return;
   }
   if (me.hp <= 0) die();
@@ -637,18 +736,35 @@ function dealDamage(mb, mult, o = {}) {
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; }
   const typeMult = 1 + (S[TYPE_MOD[o.type]] || 0) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
-  let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * (1 + buffMod('dmgp') / 100) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1);
+  const stunned = mb.stunT > 0 ? 1.3 : 1;
+  const exec = S.flags.has('execute') && mb.hp < mb.mhp * 0.3 ? 1.5 : 1;
+  const guardBonus = now() < me.atkBonusT ? me.atkBonus : 1;
+  let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus
+    * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1);
   dmg = Math.max(1, Math.round(dmg));
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
-  net.send({ t: 'hit', id: mb.id, dmg, crit });
+  // スタン値: 強攻撃で大きく溜まる。近接武器ほど溜めやすい
+  let st = 0;
+  if (mb.kind === 2 && !(mb.stunT > 0)) {
+    st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
+    st *= S.W.stun * (S.W.melee ? 1 + S.stunp / 100 : 1);
+    st = Math.round(st * 10) / 10;
+  }
+  net.send({ t: 'hit', id: mb.id, dmg, crit, st });
   if (o.threat > 1) net.send({ t: 'threat', id: mb.id, n: Math.round(dmg * (o.threat - 1)) });
+  // 武器パッシブ（攻撃が当たったとき）
+  if (['normal', 'heavy', 'wskill', 'tskill'].includes(o.type)) {
+    if (S.wk === 'sword') { me.wsCd -= 0.15; for (const k in me.tcd) me.tcd[k] -= 0.15; }
+    if (S.wk === 'dagger') { me.dStack = Math.min(10, me.dStack + 1); me.dStackT = 3; }
+  }
   floatText(mb.x, 2.2 * (mb.kind === 2 ? 2.5 : 1), mb.z, dmg, o.type === 'dot' ? 'poison' : crit ? 'crit' : '');
   if (o.type !== 'dot') {
     const wc = RARITIES[S.wr].color;
     fx.parts.burst(mb.x, 1.2, mb.z, crit ? 18 : 8, { color: crit ? 0xffd84a : wc, speed: crit ? 9 : 6, size: crit ? 0.5 : 0.35, life: 0.4 });
     audio.sfx('hit', { crit });
   }
-  if (S.vamp > 0) heal(dmg * S.vamp / 100, false);
+  const vamp = S.vamp + buffMod('vamp');
+  if (vamp > 0) heal(dmg * vamp / 100, false);
   if (o.noProc) return;
   if (hasBuff('poison')) mb.poisonUntil = now() + 4;
   if (crit && S.fx.has('thunder')) {
@@ -681,6 +797,14 @@ const combat = {
   heal: (frac) => heal(S.mhp * frac, true),
   buff: addBuff,
   taunt: (r) => net.send({ t: 'taunt', r }),
+  point: () => ({ x: mouse.world.x, z: mouse.world.z }),
+  arrow(o) {
+    const color = o.color ?? RARITIES[S.wr].color;
+    const mesh = arrowMesh(color, o.big);
+    mesh.position.set(me.x, 1.2, me.z); mesh.rotation.y = o.a;
+    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set() });
+    audio.sfx('swing');
+  },
   arc(range, deg, mult, o = {}) {
     const a = o.a ?? me.a, arc = THREE.MathUtils.degToRad(deg) / 2;
     for (const mb of [...mobs.values()]) {
@@ -719,27 +843,61 @@ const combat = {
   },
 };
 
-function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding; }
+function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0; }
+// 弓は回避中も通常攻撃ができる（転がり撃ち）
+const canShootInDodge = () => S.W.ranged && !me.dead && me.dodgeT > 0 && me.skillT < 0 && me.staggerT <= 0;
+
+// 攻撃を始めるとき、盾槍のガードボーナスをこの攻撃に乗せる
+function startAttack() {
+  me.atkBonus = me.nextAtkBonus; me.atkBonusT = now() + 0.7; me.nextAtkBonus = 1;
+}
 
 function doSwing() {
   const W = S.W;
+  startAttack();
   me.combo = now() - me.lastSwing < W.speed * 2.2 ? (me.combo + 1) % 3 : 0;
   me.lastSwing = now();
   me.swingT = 0;
-  me.swingDur = W.speed * (1 - (S.aspd + buffMod('aspd')) / 100) * (me.combo === 2 ? 1.25 : 1);
+  me.swingDur = W.speed * (1 - (S.aspd + buffMod('aspd') + me.dStack * 4) / 100) * (me.combo === 2 ? 1.25 : 1);
   me.sw++;
   me.a = aimAngle();
   const mult = W.mult * [1, 1.1, 1.6][me.combo];
   const col = RARITIES[S.wr].color;
-  fx.slash(me.x, me.z, me.a, W.range, W.arc, col, 1.0, me.combo % 2 === 1);
-  audio.sfx('swing', { heavy: S.wk === 'greatsword' || me.combo === 2 });
   const a = me.a;
+  if (W.ranged) {
+    combat.arrow({ a, mult, type: 'normal' });
+    if (me.dodgeT > 0) floatText(me.x, 2.4, me.z, '転がり撃ち', 'info');
+    return;
+  }
+  fx.slash(me.x, me.z, me.a, W.range, W.arc, col, 1.0, me.combo % 2 === 1);
+  audio.sfx('swing', { heavy: S.wk === 'greatsword' || S.wk === 'axe' || me.combo === 2 });
   later(0.06, () => combat.arc(W.range, W.arc, mult, { a, type: 'normal' }));
   if (me.combo === 2 && S.fx.has('wave')) combat.proj({ a, mult: 1.4, type: 'normal' });
 }
 
+// 矢の見た目
+function arrowMesh(color, big) {
+  const g = new THREE.Group();
+  const s = big ? 1.6 : 1;
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * s, 0.03 * s, 1.1 * s, 5), new THREE.MeshBasicMaterial({ color: 0xe8dcc0 }));
+  shaft.rotation.x = Math.PI / 2; g.add(shaft);
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.08 * s, 0.25 * s, 5), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.5) }));
+  head.rotation.x = Math.PI / 2; head.position.z = 0.6 * s; g.add(head);
+  const trail = new THREE.Mesh(new THREE.PlaneGeometry(0.18 * s, 1.4 * s), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  trail.rotation.x = Math.PI / 2; trail.position.z = -0.5 * s; g.add(trail);
+  g.userData.isArrow = true;
+  return g;
+}
+// 他プレイヤーの矢（見た目だけ）
+function fxArrow(x, z, a, color) {
+  const m = arrowMesh(color, false);
+  m.position.set(x, 1.2, z); m.rotation.y = a;
+  fx.add(m, 0.6, (o, k) => { o.position.x = x + Math.sin(a) * 40 * k * 0.6; o.position.z = z + Math.cos(a) * 40 * k * 0.6; });
+}
+
 function doHeavy(lv) {
   if (!canAct() || lv < 1) return;
+  startAttack();
   me.a = aimAngle();
   me.swingT = 0; me.swingDur = 0.5; me.combo = 2; me.sw++;
   audio.sfx('heavy');
@@ -766,6 +924,7 @@ function tryTreeSkill(i) {
 }
 
 function startSkill(sk) {
+  startAttack();
   me.skillT = 0; me.spin = !!sk.spin; me.sk++;
   me.a = aimAngle();
   me.charging = false;
@@ -780,6 +939,24 @@ function updateProjs(dt) {
     const w = projs[i];
     w.t += dt;
     w.x += Math.sin(w.a) * w.speed * dt; w.z += Math.cos(w.a) * w.speed * dt;
+    if (w.arrow) {
+      // 矢: 適性距離より遠いとダメージが下がる（最低40%）
+      w.mesh.position.set(w.x, 1.2, w.z);
+      let done = false;
+      for (const mb of [...mobs.values()]) {
+        if (w.hit.has(mb.id) || Math.hypot(mb.x - w.x, mb.z - w.z) > w.rad + mb.rad) continue;
+        w.hit.add(mb.id);
+        const d = Math.hypot(mb.x - w.sx, mb.z - w.sz), opt = S.optimal + buffMod('range');
+        const falloff = d <= opt ? 1 : Math.max(0.4, 1 - (d - opt) / opt * 0.9);
+        dealDamage(mb, w.mult, { type: w.type, falloff });
+        if (falloff < 0.75) floatText(mb.x, 3.2, mb.z, '遠い', 'info');
+        fx.parts.burst(w.x, 1.2, w.z, 6, { color: 0xffffff, speed: 4, size: 0.3, life: 0.3 });
+        if (!w.pierce) { done = true; break; }
+      }
+      const c = collide(world.def, w.x, w.z, 0.1, world.door);
+      if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fx.dispose(w.mesh); projs.splice(i, 1); }
+      continue;
+    }
     w.mesh.position.set(w.x, 1, w.z);
     w.mesh.material.opacity = 0.9 * (1 - w.t / w.life);
     w.mesh.scale.setScalar(1 + w.t * 1.5);
@@ -793,9 +970,51 @@ function updateProjs(dt) {
   }
 }
 
+// ---- ボスの弾 ----
+function spawnBossProj(m) {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(new THREE.SphereGeometry(m.r, 14, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(m.c).multiplyScalar(1.6) }));
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(m.r * 1.7, 14, 10), new THREE.MeshBasicMaterial({ color: m.c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+  g.add(core, halo);
+  g.position.set(m.x, 1.3, m.z);
+  scene.add(g);
+  bprojs.push({ ...m, mesh: g, dodged: false });
+}
+function clearBossProjs() { for (const p of bprojs.splice(0)) fx.dispose(p.mesh); }
+function updateBossProjs(dt) {
+  for (let i = bprojs.length - 1; i >= 0; i--) {
+    const p = bprojs[i];
+    p.x += p.vx * dt; p.z += p.vz * dt; p.life -= dt;
+    p.mesh.position.set(p.x, 1.3, p.z);
+    if (Math.random() < 0.6) fx.parts.emit(p.x, 1.3, p.z, { color: p.c, size: 0.4, life: 0.3, speed: 0.3, gravity: 0 });
+    let gone = p.life <= 0;
+    const d = Math.hypot(p.x - me.x, p.z - me.z);
+    if (!gone && !me.dead && d < p.r + 0.6) {
+      const facing = Math.abs(angDiff(Math.atan2(p.x - me.x, p.z - me.z), me.a)) < THREE.MathUtils.degToRad(80);
+      if (me.guarding && S.W.guard && facing) {
+        // ガードで弾を消す
+        net.send({ t: 'pblock', id: p.id });
+        const just = now() - me.guardStart <= 0.28 + (S.flags.has('bulwark') ? 0.15 : 0);
+        floatText(me.x, 2.6, me.z, just ? 'JUST GUARD!' : '防御', just ? 'just' : 'info');
+        audio.sfx('block');
+        fx.parts.burst(p.x, 1.3, p.z, 20, { color: 0xbfe0ff, speed: 6, size: 0.4, life: 0.35 });
+        gone = true;
+      } else if (me.iframe > 0) {
+        if (!p.dodged) { p.dodged = true; onJustDodge(); }
+      } else {
+        net.send({ t: 'absorb', id: p.src });
+        takeDamage(p.dmg);
+        fx.parts.burst(p.x, 1.3, p.z, 20, { color: p.c, speed: 6, size: 0.5, life: 0.4 });
+        gone = true;
+      }
+    }
+    if (gone) { fx.dispose(p.mesh); bprojs.splice(i, 1); }
+  }
+}
+
 function tryDodge() {
   audio.init();
-  if (!S || me.dead || me.dodgeCd > 0 || me.dashT > 0) return;
+  if (!S || me.dead || me.dodgeCd > 0 || me.dashT > 0 || me.staggerT > 0) return;
   let dx = 0, dz = 0;
   if (keys.has('w')) dz -= 1; if (keys.has('s')) dz += 1; if (keys.has('a')) dx -= 1; if (keys.has('d')) dx += 1;
   if (!dx && !dz) { dx = Math.sin(me.a); dz = Math.cos(me.a); }
@@ -804,7 +1023,7 @@ function tryDodge() {
   me.dodgeDir = [dx / l, dz / l];
   me.dodgeT = 0.38;
   me.dodgeCd = S.dodgeCd * (after ? 0.25 : 1);
-  me.iframe = after ? 0.6 : 0.32;
+  me.iframe = (after ? 0.6 : 0.32) + S.iframeBonus;
   me.swingT = 9; me.skillT = -1; me.charging = false; me.guarding = false;
   audio.sfx('dodge');
   fx.parts.burst(me.x, 0.3, me.z, 12, { color: after ? 0x9affff : 0xdddddd, speed: 3, size: 0.4, life: 0.4, gravity: 1 });
@@ -1151,7 +1370,14 @@ function updateHud() {
     ch.classList.toggle('max', me.chargeLv === 2);
   } else ch.classList.add('hidden');
 
-  $('buffs').innerHTML = me.buffs.map((b) => `<span style="color:${hex(new THREE.Color(b.color).getHex())}">✦ ${esc(b.label)} ${b.t.toFixed(1)}s</span>`).join('　');
+  const status = me.buffs.map((b) => `<span style="color:${hex(new THREE.Color(b.color).getHex())}">✦ ${esc(b.label)} ${b.t.toFixed(1)}s</span>`);
+  if (me.dStack > 0) status.push(`<span style="color:#9fe">⚡ 連撃 攻速+${me.dStack * 4}%</span>`);
+  if (me.nextAtkBonus > 1.01) status.push(`<span style="color:#bfe0ff">⛨ 反撃準備 +${Math.round((me.nextAtkBonus - 1) * 100)}%</span>`);
+  if (S.W.melee) {
+    const left = INSTINCT_CD - (now() - me.instinctT);
+    status.push(left > 0 ? `<span class="dim">生存本能 ${Math.ceil(left)}s</span>` : '<span style="color:#ff9a8a">♥ 生存本能</span>');
+  }
+  $('buffs').innerHTML = status.join('　');
 
   const boss = [...mobs.values()].find((m) => m.kind === 2);
   $('boss').classList.toggle('hidden', !boss);
@@ -1161,8 +1387,12 @@ function updateHud() {
     const pct = clamp(boss.hp / boss.mhp * 100, 0, 100) + '%';
     $('boss-hp').style.width = pct; $('boss-hp-lag').style.width = pct;
     const tname = boss.target === me.id ? 'あなた' : others.get(boss.target)?.name;
-    $('boss-target').textContent = tname ? `ターゲット：${tname}` : '';
+    $('boss-target').textContent = (tname ? `ターゲット：${tname}` : '') + (boss.hateT != null ? `　ヘイトリセットまで ${Math.max(0, boss.hateT).toFixed(0)}秒` : '');
     $('boss-target').classList.toggle('me', boss.target === me.id);
+    const stunned = boss.stunT > 0;
+    $('boss-stun').style.width = (stunned ? 100 : clamp(boss.stunPct || 0, 0, 100)) + '%';
+    $('boss-stun-bar').classList.toggle('stunned', stunned);
+    $('boss-stun-t').textContent = stunned ? `STUN ${boss.stunT.toFixed(1)}秒（被ダメ1.3倍）` : 'スタン';
   }
   const pr = $('prompt');
   const it = nearestInteract();
@@ -1257,7 +1487,8 @@ function renderMap() {
 $('map-close').onclick = () => togglePanel('map');
 
 // ---- インベントリ ----
-const GLYPH = { sword: '剣', greatsword: '大', spear: '盾', dagger: '短', armor: '鎧', acc: '飾' };
+const GLYPH = { sword: '剣', greatsword: '大', spear: '盾', dagger: '短', axe: '斧', bow: '弓', armor: '鎧', acc: '飾' };
+const passiveLines = (kind) => [...WEAPONS[kind].passive, ...(WEAPONS[kind].melee ? [`生存本能：一度だけHP1で耐える（CT ${INSTINCT_CD / 60}分）`] : [])];
 function cellHtml(it, showUp) {
   const c = RARITIES[it.rarity].color;
   const up = showUp && itemPower(it) > itemPower(char.eq[it.slot]) ? '<span class="up">▲</span>' : '';
@@ -1283,6 +1514,8 @@ function renderInv() {
     + `<div class="wbar"><i style="width:${clamp(S.weight / 22 * 100, 0, 100)}%;background:${S.wc.color}"></i></div>`
     + `<div><span class="dim">回避のクールタイム</span><span>${S.dodgeCd.toFixed(2)}秒</span></div>`
     + st.map(([k, v]) => `<div><span class="dim">${k}</span><span>${v}</span></div>`).join('')
+    + `<div class="dim" style="margin-top:4px">武器パッシブ（${S.W.name}）</div>`
+    + passiveLines(S.wk).map((t) => `<div style="color:#bfe0ff;font-size:11px">◇ ${esc(t)}</div>`).join('')
     + [...S.fx].filter((f) => UNIQUE_FX[f]).map((f) => `<div style="color:#ffd27a;font-size:11px">✦ ${UNIQUE_FX[f]}</div>`).join('');
   bindCells();
 }
@@ -1337,6 +1570,7 @@ function itemLines(it, compare) {
     const ws = WEAPON_SKILLS[sid];
     h += `<div class="wsk">武器スキル「${ws.name}」<br><span class="dim">${ws.desc}（CT ${ws.cd}秒）</span></div>`;
     if (WEAPONS[it.kind].guard) h += '<div class="dim">右クリック長押しでガード</div>';
+    h += passiveLines(it.kind).map((t) => `<div style="color:#bfe0ff">◇ ${esc(t)}</div>`).join('');
   }
   if (it.lore) h += `<div class="lore">${esc(it.lore)}</div>`;
   const cur = char.eq[it.slot];
@@ -1368,8 +1602,8 @@ function renderTree() {
   const tree = char.tree || (char.tree = {});
   const left = spTotal(char.lv) - spSpent(tree);
   $('sp-left').innerHTML = `残りスキルポイント <b>${left}</b>`;
-  const tabs = [['sword', '片手剣'], ['greatsword', '大剣'], ['spear', '盾槍'], ['dagger', '短剣'], ['stat', 'ステータス'], ['style', 'プレイスタイル']];
-  $('tree-tabs').innerHTML = tabs.map(([id, nm], i) => `${i === 4 ? '<span class="tsep"></span>' : ''}<button data-t="${id}" class="${treeTab === id ? 'on' : ''}">${nm}<small>${id === S.wk ? '装備中・' : ''}${treeSpent(tree, id)}pt</small></button>`).join('');
+  const tabs = [['sword', '片手剣'], ['greatsword', '大剣'], ['axe', '大斧'], ['spear', '盾槍'], ['dagger', '短剣'], ['bow', '弓'], ['stat', 'ステータス'], ['style', 'プレイスタイル']];
+  $('tree-tabs').innerHTML = tabs.map(([id, nm], i) => `${i === 6 ? '<span class="tsep"></span>' : ''}<button data-t="${id}" class="${treeTab === id ? 'on' : ''}">${nm}<small>${id === S.wk ? '装備中・' : ''}${treeSpent(tree, id)}pt</small></button>`).join('');
   for (const b of $('tree-tabs').querySelectorAll('button')) b.onclick = () => { treeTab = b.dataset.t; audio.sfx('ui'); renderTree(); };
 
   const T = TREES[treeTab];
@@ -1491,7 +1725,8 @@ function update(dt) {
   // 遅延処理（スキルの多段ヒットなど）
   for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= t) { const p = pending.splice(i, 1)[0]; if (!me.dead) p.fn(); }
 
-  me.dodgeCd -= dt; me.wsCd -= dt; me.potCd -= dt; me.iframe -= dt;
+  me.dodgeCd -= dt; me.wsCd -= dt; me.potCd -= dt; me.iframe -= dt; me.staggerT -= dt;
+  me.dStackT -= dt; if (me.dStackT <= 0) me.dStack = 0;
   for (const k in me.tcd) me.tcd[k] -= dt;
   for (const b of me.buffs) b.t -= dt;
   me.buffs = me.buffs.filter((b) => b.t > 0);
@@ -1527,6 +1762,9 @@ function update(dt) {
       me.dashT -= dt;
       moveMe(Math.sin(me.dashA) * me.dashSpeed * dt, Math.cos(me.dashA) * me.dashSpeed * dt);
       fx.parts.emit(me.x, 0.8, me.z, { color: RARITIES[S.wr].color, size: 0.4, life: 0.3, speed: 0.5, gravity: 0 });
+    } else if (me.staggerT > 0) {
+      // ひるみ中は動けない
+      if (Math.random() < 0.3) fx.parts.emit(me.x + rnd(-0.3, 0.3), 2.2, me.z + rnd(-0.3, 0.3), { color: 0xffffff, size: 0.25, life: 0.3, speed: 1, gravity: 0 });
     } else if (l > 0) {
       const busy = me.swingT < me.swingDur || me.skillT >= 0;
       const slow = me.guarding ? 0.45 : busy ? 0.45 : me.charging && me.chargeT > CHARGE_MIN ? 0.4 : 1;
@@ -1574,7 +1812,7 @@ function update(dt) {
 
     // 通常攻撃（短押しの入力を少し保持してコンボをつなぐ）
     me.swingT += dt;
-    if (me.queued > t && canAct() && me.swingT >= me.swingDur && !safe) { me.queued = 0; doSwing(); }
+    if (me.queued > t && (canAct() || canShootInDodge()) && me.swingT >= me.swingDur && !safe) { me.queued = 0; doSwing(); }
     if (me.skillT >= 0) { me.skillT += dt; if (me.skillT > 0.55) me.skillT = -1; }
 
     // 自然回復 / 町や転移門の近くでポーション補充
@@ -1638,6 +1876,12 @@ function update(dt) {
     animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged });
     if (mb.model.userData.float && Math.random() < 0.25) fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.elite && Math.random() < 0.15) fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
+    if (mb.stunT > 0 && Math.random() < 0.5) {
+      // スタン中: 頭上で星が回る
+      const a = t * 6 + Math.random() * 6, h = 2.6 * mb.model.scale.y;
+      fx.parts.emit(mb.x + Math.sin(a) * 1.5, h, mb.z + Math.cos(a) * 1.5, { color: 0xffe060, size: 0.5, life: 0.4, speed: 0.3, gravity: 0 });
+      mb.model.userData.body.rotation.z = Math.sin(t * 3) * 0.15;
+    } else if (mb.model.userData.body) mb.model.userData.body.rotation.z = 0;
     if (mb.kind === 2 && mb.enraged && Math.random() < 0.5) fx.parts.emit(mb.x + rnd(-2, 2), rnd(0.5, 5), mb.z + rnd(-2, 2), { color: 0xff3a20, size: 0.6, life: 0.8, speed: 1, gravity: 3 });
   }
 
@@ -1658,7 +1902,15 @@ function update(dt) {
 
   updateTeles();
   updateProjs(dt);
+  updateBossProjs(dt);
   updateDrops(dt);
+  // 弓の適性距離の目安
+  if (me.optRing) {
+    me.optRing.position.set(me.x, heightAt(me.x, me.z) + 0.08, me.z);
+    const r = S.optimal + buffMod('range');
+    me.optRing.scale.set(r, r, 1);
+    me.optRing.visible = !!S.W.ranged && !me.dead;
+  }
 
   // 送信
   sendT -= dt;
@@ -1758,6 +2010,10 @@ $('lstart').onclick = async () => {
   $('mode-tag').textContent = ok ? 'ONLINE' : 'SOLO MODE（サーバー未接続）';
   me.model = makePlayer(char.color);
   scene.add(me.model);
+  me.optRing = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 96), new THREE.MeshBasicMaterial({ color: 0x9ae8ff, transparent: true, opacity: 0.3, side: THREE.DoubleSide, depthWrite: false, depthTest: false }));
+  me.optRing.rotation.x = -Math.PI / 2;
+  me.optRing.renderOrder = 4;
+  scene.add(me.optRing);
   calcStats(); me.hp = S.mhp; me.potions = S.maxPot;
   $('login').classList.add('hidden');
   $('hud').classList.remove('hidden');
@@ -1793,4 +2049,4 @@ function enterPreview() {
 }
 loop();
 
-window.__game = { me, mobs, drops, teles, npcs, char: () => char, world, fx, S: () => S, net, settings, env: () => env };
+window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env };

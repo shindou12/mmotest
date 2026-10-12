@@ -4,7 +4,9 @@
 //   c.me, c.aim(), c.col(), c.later(sec, fn), c.arc(range, deg, mult, o), c.line(len, w, mult, o),
 //   c.circle(x, z, r, mult, o), c.proj(o), c.dash(a, dist, dur, iframe), c.buff(id, label, sec, mods, color),
 //   c.heal(frac), c.text(str, cls), c.shake(v), c.sfx(name, opt), c.fx, c.nearest(range)
-// o.type: 'normal' | 'heavy' | 'wskill' | 'tskill'（ツリーの強化倍率の対象を決める）
+//   c.arrow(o) 矢を放つ（弓。適性距離より遠いとダメージ減）, c.point() マウスの地面座標
+// o.type: 'normal' | 'heavy' | 'wskill' | 'tskill'（ツリーの強化倍率とスタン値の基準を決める）
+// o.stun: ボスに溜めるスタン値を直接指定（省略時は type から計算）
 
 const fwd = (a, d) => [Math.sin(a) * d, Math.cos(a) * d];
 
@@ -45,6 +47,25 @@ export const HEAVY = {
         c.line(lv === 2 ? 8 : 6.5, 2.0, lv === 2 ? 3.8 : 2.4, { type: 'heavy', a, sx, sz });
         for (let d = 0; d < 8; d += 0.5) c.fx.parts.emit(sx + Math.sin(a) * d, 1.1, sz + Math.cos(a) * d, { color: c.col(), size: 0.5, life: 0.35, speed: 1, gravity: 0 });
       });
+    },
+  },
+  axe: {
+    name: '大地砕き', desc: '斧を振り下ろし、前方の地面ごと叩き割る。スタン値が非常に高い',
+    run(c, lv) {
+      const a = c.aim(), [dx, dz] = fwd(a, 2.4), x = c.me.x + dx, z = c.me.z + dz;
+      c.fx.slash(c.me.x, c.me.z, a, 3.2, 70, c.col(), 2.4);
+      c.later(0.16, () => {
+        c.circle(x, z, lv === 2 ? 3.4 : 2.8, lv === 2 ? 5.0 : 3.2, { type: 'heavy', stun: lv === 2 ? 16 : 10 });
+        c.fx.ringWave(x, z, 0xd8b080, lv === 2 ? 4.5 : 3.5, 0.4);
+        c.fx.parts.burst(x, 0.3, z, 50, { color: 0xb89870, speed: 8, size: 0.6, life: 0.7, up: 2.5 });
+        c.shake(lv === 2 ? 0.6 : 0.35); c.sfx('impact');
+      });
+    },
+  },
+  bow: {
+    name: '溜め撃ち', desc: '弓を引き絞り、貫通する矢を放つ',
+    run(c, lv) {
+      c.arrow({ a: c.aim(), mult: lv === 2 ? 3.6 : 2.2, type: 'heavy', pierce: true, speed: 55, rad: lv === 2 ? 1.2 : 0.8, big: lv === 2 });
     },
   },
   dagger: {
@@ -183,10 +204,79 @@ export const WEAPON_SKILLS = {
   },
 };
 
+Object.assign(WEAPON_SKILLS, {
+  rampage: {
+    name: 'ランペイジ', kind: 'axe', cd: 7, desc: '前進しながら3回叩き斬る。スタン値が高い',
+    run(c) {
+      for (let i = 0; i < 3; i++) {
+        c.later(i * 0.22, () => {
+          const a = c.aim();
+          c.dash(a, 1.6, 0.1, 0);
+          c.later(0.08, () => {
+            c.arc(3.4, 130, 1.5, { type: 'wskill', a, stun: 6 });
+            c.fx.slash(c.me.x, c.me.z, a, 3.4, 130, c.col(), 1.2, i % 2 === 1);
+            c.sfx('swing', { heavy: true });
+          });
+        });
+      }
+    },
+  },
+  tomahawk: {
+    name: 'トマホーク', kind: 'axe', cd: 6, desc: '斧を回転させて投げ、直線上の敵を切り裂く',
+    run(c) { c.proj({ a: c.aim(), mult: 2.8, speed: 26, life: 0.7, rad: 1.6, type: 'wskill', color: 0xd8b080 }); },
+  },
+  multishot: {
+    name: 'マルチショット', kind: 'bow', cd: 5, desc: '扇状に5本の矢を同時に放つ',
+    run(c) { const a = c.aim(); for (let i = -2; i <= 2; i++) c.arrow({ a: a + i * 0.14, mult: 1.1, type: 'wskill' }); },
+  },
+  arrowrain: {
+    name: 'アローレイン', kind: 'bow', cd: 7, desc: '狙った場所に矢の雨を降らせる',
+    run(c) {
+      const p = c.point();
+      for (let i = 0; i < 8; i++) {
+        c.later(0.15 + i * 0.07, () => {
+          const x = p.x + (Math.random() - 0.5) * 4, z = p.z + (Math.random() - 0.5) * 4;
+          c.circle(x, z, 1.6, 0.6, { type: 'wskill', stun: 0.5 });
+          c.fx.parts.burst(x, 0.3, z, 8, { color: 0xd8e8ff, speed: 3, size: 0.35, life: 0.3 });
+        });
+      }
+      c.fx.ringWave(p.x, p.z, 0xd8e8ff, 3.5, 0.6);
+    },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // ツリーで覚えるスキル（1 / 2 キー）
 // ---------------------------------------------------------------------------
 export const TREE_SKILLS = {
+  warstomp: {
+    name: 'ウォーストンプ', cd: 10, desc: '地面を踏み鳴らし、周囲の敵を揺さぶる。スタン値が非常に高い',
+    run(c) {
+      c.later(0.1, () => {
+        c.circle(c.me.x, c.me.z, 5, 1.8, { type: 'tskill', stun: 22 });
+        c.fx.ringWave(c.me.x, c.me.z, 0xd8b080, 6, 0.45);
+        c.fx.parts.burst(c.me.x, 0.3, c.me.z, 60, { color: 0xb89870, speed: 8, size: 0.6, life: 0.7, up: 2 });
+        c.sfx('heavy'); c.shake(0.5);
+      });
+    },
+  },
+  bloodlust: {
+    name: 'ブラッドラスト', cd: 18, desc: '8秒間、攻撃力+20%・与ダメージの8%を回復',
+    run(c) { c.buff('bloodlust', 'ブラッドラスト', 8, { atkp: 20, vamp: 8 }, 0xff3a3a); },
+  },
+  backshot: {
+    name: 'バックショット', cd: 8, desc: '後ろへ跳びながら3本の矢を放つ（無敵あり）',
+    run(c) {
+      const a = c.aim();
+      c.dash(a + Math.PI, 5, 0.22, 0.3);
+      c.me.a = a;
+      for (let i = -1; i <= 1; i++) c.later(0.05, () => c.arrow({ a: a + i * 0.1, mult: 1.4, type: 'tskill' }));
+    },
+  },
+  focus: {
+    name: '集中', cd: 18, desc: '8秒間、会心率+20%・適性距離+8m',
+    run(c) { c.buff('focus', '集中', 8, { crit: 20, range: 8 }, 0x9ae8ff); },
+  },
   slant: {
     name: 'スラント・ラッシュ', cd: 9, desc: '3回連続で踏み込み斬り',
     run(c) {
@@ -226,7 +316,7 @@ export const TREE_SKILLS = {
       const a = c.aim();
       c.dash(a, 1.5, 0.1, 0);
       c.later(0.08, () => {
-        c.arc(3.4, 110, 2.2, { type: 'tskill', a, threat: 4 });
+        c.arc(3.4, 110, 2.2, { type: 'tskill', a, threat: 4, stun: 14 });
         c.fx.ringWave(c.me.x + Math.sin(a) * 2, c.me.z + Math.cos(a) * 2, 0xbfd8ff, 3, 0.3);
         c.sfx('block'); c.shake(0.3);
       });
@@ -299,12 +389,15 @@ export const TREES = {
   greatsword: { name: '大剣', nodes: weaponTree('greatsword', ['大剣の心得'], 'gslam', 'fortress', { name: '大地割り', flag: 'quake', desc: '兜割りの後、さらに大きな衝撃波が広がる' }) },
   spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ジャストガードの猶予が長くなる' }) },
   dagger: { name: '短剣', nodes: weaponTree('dagger', ['短剣の心得'], 'poison', 'smoke', { name: '暗殺術', mods: { crit: 8, critd: 40 }, desc: '会心率 +8%、会心ダメージ +40%' }) },
+  axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },
+  bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { range: 8 }, desc: '適性距離 +8m' }) },
   stat: {
     name: 'ステータス', nodes: [
       { id: 'st_str', name: '筋力', tier: 0, max: 5, mods: { atkp: 3 }, desc: '攻撃力 +3%' },
       { id: 'st_vit', name: '体力', tier: 0, max: 5, mods: { hpp: 5 }, desc: '最大HP +5%' },
       { id: 'st_dex', name: '技量', tier: 1, max: 5, mods: { crit: 2 }, desc: '会心率 +2%' },
       { id: 'st_agi', name: '敏捷', tier: 1, max: 5, mods: { move: 2, aspd: 2 }, desc: '移動速度 +2%、攻撃速度 +2%' },
+      { id: 'st_break', name: '崩しの心得', tier: 1, max: 3, mods: { stunp: 15 }, desc: 'ボスに溜めるスタン値 +15%（近接武器のみ）' },
       { id: 'st_mnd', name: '精神', tier: 2, max: 5, mods: { cdr: 3 }, desc: 'スキルのクールタイム -3%' },
       { id: 'st_skin', name: '鉄の肌', tier: 2, max: 5, mods: { def: 2 }, desc: '被ダメージ -2%' },
       { id: 'st_crd', name: '極意', tier: 3, max: 3, mods: { critd: 15 }, desc: '会心ダメージ +15%' },

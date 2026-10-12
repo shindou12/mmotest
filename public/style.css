@@ -98,7 +98,7 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .inv-head b { font-size: 16px; }
 .inv-head button:last-child { margin-left: auto; }
 .inv-body { display: flex; gap: 14px; overflow: hidden; }
-.inv-left { width: 260px; flex-shrink: 0; }
+.inv-left { width: 260px; flex-shrink: 0; overflow-y: auto; }
 .inv-right { flex: 1; overflow-y: auto; }
 .eq { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .eq-l { width: 34px; font-size: 12px; color: var(--dim); }
@@ -176,6 +176,12 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 
 /* ガード・ボスのターゲット */
 #s-guard.active { box-shadow: 0 0 14px rgba(160, 210, 255, .9) inset; border-color: #bfe0ff; }
+.bar.stun { height: 10px; width: 60%; margin: 3px auto 0; border-color: rgba(255,216,74,.4); }
+.bar.stun > div { background: linear-gradient(90deg, #b88a1a, #ffd84a); transition: width .15s; }
+.bar.stun span { font-size: 9px; line-height: 9px; }
+.bar.stun.stunned { box-shadow: 0 0 14px #ffd84a; animation: pulse .25s infinite alternate; }
+.seg { flex-wrap: wrap; }
+.seg button { min-width: 30%; }
 #boss-target { font-size: 12px; color: #ffc0b0; margin-top: 3px; text-shadow: 0 1px 2px #000; min-height: 16px; }
 #boss-target.me { color: #ff6a5a; font-weight: bold; }
 

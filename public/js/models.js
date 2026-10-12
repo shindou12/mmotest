@@ -70,6 +70,33 @@ export function makeWeapon(kind, rarity = 0) {
       g.add(tassel);
       break;
     }
+    case 'axe': {
+      g.add(mesh(cyl(0.05, 0.06, 1.9, 8), toon(0x5a3a22), [0, 0.65, 0]));
+      for (const y of [0.0, 1.45]) g.add(mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 10), gold, [0, y, 0], [Math.PI / 2, 0, 0]));
+      // 三日月形の刃（両刃）
+      const blade = [[0, -0.32], [0.18, -0.36], [0.5, -0.55], [0.62, -0.1], [0.62, 0.1], [0.5, 0.55], [0.18, 0.36], [0, 0.32]];
+      edge(blade.map(([x, y]) => [x + 0.04, y + 1.45]), 0.07);
+      g.add(mesh(extrude(blade, 0.07), steel, [0.04, 1.45, 0]));
+      g.add(mesh(extrude(blade.map(([x, y]) => [x * 0.6, y * 0.7]), 0.07), steel, [-0.04, 1.45, 0], [0, Math.PI, 0]));
+      g.add(mesh(new THREE.BoxGeometry(0.16, 0.42, 0.12), gold, [0, 1.45, 0]));
+      g.add(mesh(cone(0.06, 0.3, 6), steel, [0, 1.75, 0]));
+      g.add(mesh(sphere(0.06, 8, 6), gem, [0, 1.45, 0.07]));
+      break;
+    }
+    case 'bow': {
+      const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
+      const R = 0.8, arc = Math.PI * 0.72;
+      const limb = new THREE.TorusGeometry(R, 0.045, 6, 28, arc);
+      limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+      g.add(mesh(limb, wood));
+      const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+      const str = mesh(cyl(0.008, 0.008, tip * 2, 4), glow(rarity >= 2 ? rc : new THREE.Color(0xeeeeee)), [sx, 0, 0]);
+      str.userData.noOutline = true; g.add(str);
+      g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip, [0, 0, 0]));
+      for (const s of [-1, 1]) g.add(mesh(sphere(0.06, 8, 6), gold, [sx, s * tip, 0]));
+      g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
+      break;
+    }
     case 'dagger': {
       const pts = [[-0.06, 0], [0.065, 0], [0.07, 0.4], [0.02, 0.72], [-0.04, 0.5]];
       edge(pts, 0.03);
@@ -176,11 +203,18 @@ export function setPlayerWeapon(model, kind, rarity) {
   if (kind === 'spear') u.shield = makeShield(rarity, u.armL);
   // 見下ろし視点で刃が「線」に見えないよう、刃の平らな面を上に向けて持つ
   const w = makeWeapon(kind, rarity);
-  w.rotation.y = Math.PI / 2;
   u.weapon = new THREE.Group();
   u.weapon.add(w);
-  u.weapon.rotation.x = Math.PI / 2;
+  if (kind === 'bow') {
+    // 弓は縦に持ち、弦を体側へ向ける
+    w.rotation.set(0, Math.PI / 2, 0);
+    u.weapon.rotation.set(0, 0, 0);
+  } else {
+    w.rotation.y = Math.PI / 2;
+    u.weapon.rotation.x = Math.PI / 2;
+  }
   if (kind === 'spear') u.weapon.position.z = -0.7;
+  u.wKind = kind;
   u.hand.add(u.weapon);
 }
 
@@ -221,12 +255,18 @@ export function animatePlayer(model, s) {
     const e = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75 * 0.3;
     const dir = s.combo % 2 === 0 ? 1 : -1;
     if (s.kind === 'spear') { u.armR.rotation.set(-Math.PI / 2 + 0.15, 0, 0); u.armR.position.z = -0.25 + e * 0.8; }
-    else { u.armR.rotation.set(-1.4 + e * 0.2, 0, dir * (1.4 - e * 2.8)); u.armR.position.z = 0; }
-    u.body.rotation.y = dir * (0.5 - e) * 0.6;
+    else if (s.kind === 'bow') {
+      // 弓: 腕をまっすぐ前へ伸ばし、反対の手で弦を引く
+      u.armR.rotation.set(-Math.PI / 2, 0, 0.1); u.armR.position.z = 0;
+      u.armL.rotation.set(-Math.PI / 2 + 0.2, 0, -0.6 + e * 0.3);
+    } else { u.armR.rotation.set(-1.4 + e * 0.2, 0, dir * (1.4 - e * 2.8)); u.armR.position.z = 0; }
+    u.body.rotation.y = s.kind === 'bow' ? 0 : dir * (0.5 - e) * 0.6;
+    if (u.wKind === 'bow' && u.weapon) u.weapon.rotation.x = Math.PI / 2;
   } else if (s.spin >= 0) {
     u.body.rotation.y = s.spin * Math.PI * 4; u.armR.rotation.set(-Math.PI / 2, 0, 0);
   } else {
     u.armR.rotation.set(walk * 0.4 - 0.25, 0, 0.12); u.armR.position.z = 0; u.body.rotation.y = 0;
+    if (u.wKind === 'bow' && u.weapon) u.weapon.rotation.x = 0;
   }
   if (s.dodge > 0) { u.body.rotation.x = (1 - s.dodge) * Math.PI * 2; u.body.position.y = 0.4 * Math.sin((1 - s.dodge) * Math.PI); }
   else u.body.rotation.x = 0;

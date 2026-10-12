@@ -27,32 +27,50 @@ export const RARITIES = [
 
 // --- 武器種 ---------------------------------------------------------------
 // weight: 装備重量（回避のクールタイムに影響）
+// stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ
+// melee: 近接武器（生存本能を持つ）
 export const WEAPONS = {
   sword: {
-    name: '片手剣', range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4,
+    name: '片手剣', range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4, stun: 1.0, melee: true,
+    passive: ['回避の無敵時間 +0.1秒', '攻撃を当てるたびにスキルのクールタイムが0.15秒縮む'],
     skill: { name: 'ヴォーパル・ストライク', cd: 5, desc: '前方へ突進しながら貫く', mult: 3.2 },
   },
   greatsword: {
-    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9,
+    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true,
+    passive: ['強攻撃ダメージ +20%', '溜め中はひるまない'],
     skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
   },
   spear: {
     // 盾槍: 右クリック長押しでガードできる。ヘイトを集めやすい
-    name: '盾槍', range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true,
+    name: '盾槍', range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true, stun: 1.3, melee: true,
+    passive: ['被ダメージ -10%', 'ガードしていた時間に応じて、次の攻撃のダメージが最大+50%'],
     skill: { name: 'ライトニング・ランス', cd: 5.5, desc: '直線上を雷光で貫く', mult: 3.0 },
   },
   dagger: {
-    name: '短剣', range: 2.3, arc: 90, speed: 0.26, mult: 0.68, weight: 2,
+    name: '短剣', range: 2.3, arc: 90, speed: 0.26, mult: 0.68, weight: 2, stun: 0.6, melee: true,
+    passive: ['回避のクールタイム -25%', '攻撃を当てるたびに攻撃速度+4%（最大+40%・3秒）'],
     skill: { name: 'シャドウ・ダンス', cd: 4.5, desc: '目にも止まらぬ五連撃', mult: 1.0 },
+  },
+  axe: {
+    name: '大斧', range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true,
+    passive: ['強攻撃ダメージ +25%', '与えたダメージの3%を回復'],
+  },
+  // 弓: 矢を飛ばす。optimal（適性距離）より遠いとダメージが下がる
+  bow: {
+    name: '弓', range: 28, arc: 0, speed: 0.36, mult: 0.85, weight: 3, stun: 0.3, ranged: true, optimal: 14,
+    passive: ['回避のクールタイム -25%', '回避中も攻撃できる（転がり撃ち）', `適性距離（14m）より遠いとダメージが下がる`],
   },
 };
 export const WEAPON_KINDS = Object.keys(WEAPONS);
+export const INSTINCT_CD = 180; // 生存本能（近接武器のパッシブ）のクールタイム
 // 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
 export const WEAPON_SKILL_POOL = {
   sword: ['vorpal', 'square', 'leap'],
   greatsword: ['cyclone', 'breaker'],
   spear: ['lance', 'helix'],
   dagger: ['shadow', 'phantom'],
+  axe: ['rampage', 'tomahawk'],
+  bow: ['multishot', 'arrowrain'],
 };
 // 品質を固めるまでは3階層で運用
 export const MAX_FLOOR = 3;
@@ -122,6 +140,10 @@ export const UNIQUES = [
   { key: 'muramasa', name: '妖刀 村正', rarity: 4, slot: 'weapon', kind: 'dagger', fx: ['vamp'], lore: '血を求めて止まぬ妖刀。' },
   { key: 'dainsleif', name: 'ダーインスレイヴ', rarity: 4, slot: 'weapon', kind: 'greatsword', fx: ['vamp', 'flame'], lore: '一度抜けば血を見ずには収まらぬ。' },
   { key: 'laevateinn', name: 'レーヴァテイン', rarity: 4, slot: 'weapon', kind: 'sword', fx: ['flame'], lore: '世界を焼く炎の枝。' },
+  { key: 'labrys', name: 'ラブリュス', rarity: 4, slot: 'weapon', kind: 'axe', fx: ['flame'], lore: '迷宮の王が掲げた両刃の斧。' },
+  { key: 'yoichi', name: '与一の弓', rarity: 4, slot: 'weapon', kind: 'bow', fx: ['thunder'], lore: '揺れる扇の的をも射抜いたという名弓。' },
+  { key: 'artemis', name: 'アルテミスの銀弓', rarity: 5, slot: 'weapon', kind: 'bow', fx: ['skillcrit', 'star'], lore: '月の女神の銀の弓。' },
+  { key: 'mjolnir', name: '雷斧ミョルニル', rarity: 5, slot: 'weapon', kind: 'axe', fx: ['thunder', 'vamp'], lore: '雷神の怒りを宿す、振るえば戻る斧。' },
   { key: 'dragonscale', name: '竜鱗の鎧', rarity: 4, slot: 'armor', armor: 'heavy', fx: ['aegis'], lore: '古竜の鱗を編んだ鎧。' },
   { key: 'starseer', name: '星詠みの指輪', rarity: 4, slot: 'acc', fx: ['star'], lore: '星の巡りを識る指輪。' },
   { key: 'phantom', name: '幻影の外套', rarity: 4, slot: 'armor', armor: 'light', fx: ['mirror'], lore: '纏う者の影を揺らがせる。' },
@@ -137,7 +159,7 @@ export const FLOORS = [
     particles: 'pollen', amb: 'meadow',
     music: { root: 62, mode: 'major', bpm: 88, prog: [0, 4, 5, 3], feel: 'calm' },
     mobs: [{ t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 }],
-    boss: { name: 'コボルド王 グラズ', t: 'knight', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, patterns: ['combo', 'cone', 'charge', 'sweep', 'slam'], p3: ['chase', 'shock'] },
+    boss: { name: 'コボルド王 グラズ', t: 'knight', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, patterns: ['combo', 'cone', 'charge', 'sweep', 'slam', 'shot'], p3: ['chase', 'shock'] },
   },
   {
     n: 2, name: '霧の森', ground: 0x2f5a3a, ground2: 0x3f6f4a, fog: 0x9ab8b0, skyTop: 0x6a8a90, skyBot: 0xb7cfc8,
@@ -146,7 +168,7 @@ export const FLOORS = [
     particles: 'firefly', amb: 'forest',
     music: { root: 57, mode: 'dorian', bpm: 80, prog: [0, 3, 6, 4], feel: 'mystic' },
     mobs: [{ t: 'wisp', name: 'フォレストウィスプ', color: 0x8cffb0 }, { t: 'beast', name: 'ミストウルフ', color: 0x8a9a9a }],
-    boss: { name: '霧の大樹 ユグドラ', t: 'golem', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['rain', 'shock', 'combo', 'cage', 'summon', 'cone'], p3: ['spiral', 'nova'] },
+    boss: { name: '霧の大樹 ユグドラ', t: 'golem', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['rain', 'shock', 'combo', 'cage', 'summon', 'cone', 'shot', 'shot'], p3: ['spiral', 'nova'] },
   },
   {
     n: 3, name: '砂塵の荒野', ground: 0xc9a066, ground2: 0xe0bf86, fog: 0xf0d6a8, skyTop: 0xf0b070, skyBot: 0xffe6c0,
@@ -155,7 +177,7 @@ export const FLOORS = [
     particles: 'dust', amb: 'desert',
     music: { root: 60, mode: 'phrygian', bpm: 92, prog: [0, 1, 0, 6], feel: 'exotic' },
     mobs: [{ t: 'beast', name: 'デザートスコーピオン', color: 0xc08040 }, { t: 'golem', name: 'サンドゴーレム', color: 0xd0aa70 }],
-    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo'], p3: ['spiral', 'cross', 'cage'] },
+    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo', 'shot', 'charge'], p3: ['spiral', 'cross', 'cage'] },
   },
   {
     n: 4, name: '水晶洞窟', ground: 0x2a2a44, ground2: 0x3a3a60, fog: 0x1a1a38, skyTop: 0x0a0a1a, skyBot: 0x202048,

@@ -21,6 +21,11 @@ const ARCH = {
 };
 const ELITE = { hp: 2.6, dmg: 1.35, xp: 2.5 };
 const CHEST_COOLDOWN = 300;
+// ヘイトは一定時間ごとにリセット。狙われている人が攻撃を受けると少し延びる
+const HATE_RESET = { boss: 12, mob: 15 };
+const HATE_ABSORB = 1.2;
+const STUN_TIME = 4;
+const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
 
 export class World {
   constructor(opts = {}) {
@@ -40,7 +45,7 @@ export class World {
       const A = {
         id, def, n: def.floor, fdef: FLOORS[def.floor - 1], mobs: new Map(),
         boss: null, bossState: 'idle', bossCd: 0, spawnT: 0, timers: [], noTargetT: 0, emptyT: 0,
-        lair: lairOf(def), door: false, plates: [], trapT: 2, trapGroup: 0, points: [], chests: new Map(),
+        lair: lairOf(def), door: false, plates: [], trapT: 2, trapGroup: 0, points: [], chests: new Map(), projs: [],
       };
       if (def.shape === 'grid') {
         const g = grid(def);
@@ -124,7 +129,29 @@ export class World {
         // 盾槍はヘイトを稼ぎやすい
         this.addThreat(mob, p.id, dmg * (p.wk === 'spear' ? 2 : 1));
         if (mob.kind !== 'boss') mob.provoked = 6;
+        // スタン値（ボスのみ）
+        if (mob.kind === 'boss' && mob.stunT <= 0 && mob.hp > 0) {
+          mob.stun += Math.max(0, Math.min(Number(m.st) || 0, 60));
+          if (mob.stun >= mob.stunMax) this.stunBoss(A, mob);
+        }
         if (mob.hp <= 0) this.killMob(A, mob);
+        break;
+      }
+      case 'absorb': {
+        // 狙われている本人がその敵の攻撃を受けた/防いだ → ヘイトのリセットまでの時間が少し延びる
+        const mob = A.mobs.get(m.id);
+        if (mob && mob.target === p.id) mob.hateT = Math.min(mob.hateMax, mob.hateT + HATE_ABSORB);
+        break;
+      }
+      case 'pblock': {
+        // ガードで弾を消した
+        const i = A.projs.findIndex((pr) => pr.id === m.id);
+        if (i < 0) return;
+        const pr = A.projs[i];
+        A.projs.splice(i, 1);
+        this.broadcastArea(A.id, { t: 'pgone', id: pr.id, by: p.id });
+        const src = A.mobs.get(pr.src);
+        if (src) { this.addThreat(src, p.id, pr.dmg * 3); if (src.target === p.id) src.hateT = Math.min(src.hateMax, src.hateT + HATE_ABSORB); }
         break;
       }
       case 'threat': {
@@ -211,7 +238,7 @@ export class World {
     const mob = {
       id: this.seq++, kind, d: defIdx, t: def.t, name: def.name, arch, lv, hp, mhp: hp, x, z, hx: x, hz: z, elite,
       a: Math.random() * Math.PI * 2, st: 0, target: null, cd: rnd(0.5, 1.5), windT: 0, wanderT: 0, wx: x, wz: z,
-      provoked: 0, threat: new Map(), tauntT: 0, pathT: 0, wp: null,
+      provoked: 0, threat: new Map(), tauntT: 0, pathT: 0, wp: null, hateT: HATE_RESET.mob, hateMax: HATE_RESET.mob,
     };
     A.mobs.set(mob.id, mob);
     return mob;
@@ -224,6 +251,7 @@ export class World {
     const b = {
       id: this.seq++, kind: 'boss', d: 2, t: A.fdef.boss.t, lv, hp, mhp: hp, x: A.lair.x, z: A.lair.z - 5, a: 0,
       st: 0, actT: 2.5, busyT: 0, enraged: false, phase: 1, last: null, dash: null, arch: { speed: 3.4 }, threat: new Map(),
+      hateT: HATE_RESET.boss, hateMax: HATE_RESET.boss, stun: 0, stunMax: Math.round(100 * (1 + 0.5 * (n - 1))), stunT: 0,
     };
     A.mobs.set(b.id, b);
     A.boss = b;
@@ -311,8 +339,26 @@ export class World {
   resetBoss(A) {
     if (A.boss) A.mobs.delete(A.boss.id);
     for (const m of [...A.mobs.values()]) if (m.kind === 'add') A.mobs.delete(m.id);
-    A.boss = null; A.bossState = 'idle'; A.bossCd = 5; A.timers = [];
+    A.boss = null; A.bossState = 'idle'; A.bossCd = 5; A.timers = []; A.projs = [];
     this.broadcastArea(A.id, { t: 'bossReset' });
+  }
+
+  // スタン: 一定時間固まり、出している最中の攻撃もすべて取り消す
+  stunBoss(A, b) {
+    b.stunT = STUN_TIME;
+    b.stun = 0;
+    b.stunMax = Math.round(b.stunMax * 1.3);
+    b.dash = null; b.busyT = 0; b.actT = STUN_TIME + 0.6;
+    A.timers = [];
+    A.projs = [];
+    this.broadcastArea(A.id, { t: 'stun', id: b.id, sec: STUN_TIME });
+  }
+
+  // 弾を撃つ（クライアントが同じ軌道で動かし、当たり判定やガードはクライアント側）
+  shoot(A, b, x, z, ang, speed, r, life, dmg, color) {
+    const pr = { id: this.seq++, src: b.id, x, z, vx: Math.sin(ang) * speed, vz: Math.cos(ang) * speed, r, life, dmg: Math.round(dmg) };
+    A.projs.push(pr);
+    this.broadcastArea(A.id, { t: 'proj', ...pr, c: color });
   }
 
   tickArea(A, dt) {
@@ -397,8 +443,22 @@ export class World {
       }
     }
 
+    // ボスの弾
+    for (let i = A.projs.length - 1; i >= 0; i--) {
+      const pr = A.projs[i];
+      pr.x += pr.vx * dt; pr.z += pr.vz * dt; pr.life -= dt;
+      if (pr.life <= 0) A.projs.splice(i, 1);
+    }
+
     for (const m of A.mobs.values()) {
       for (const [pid, v] of m.threat) m.threat.set(pid, v * (1 - 0.04 * dt));
+      m.hateT -= dt;
+      if (m.hateT <= 0) {
+        // ヘイトのリセット: 誰が取り直すか
+        m.threat.clear(); m.tauntT = 0;
+        m.hateT = m.hateMax;
+        if (m.kind === 'boss') this.broadcastArea(A.id, { t: 'hateReset', id: m.id });
+      }
       if (m.kind === 'boss') this.tickBoss(A, m, alive, dt);
       else this.tickMob(A, m, alive, dt);
     }
@@ -540,6 +600,8 @@ export class World {
       b.dash = null; b.busyT = 0; b.actT = 0.6; b.forced = 'ultimate';
     }
 
+    if (b.stunT > 0) { b.stunT -= dt; b.st = 4; return; }
+
     if (b.dash) {
       b.dash.t += dt;
       const k = Math.min(1, b.dash.t / b.dash.dur);
@@ -547,6 +609,18 @@ export class World {
       b.z = b.dash.fz + (b.dash.tz - b.dash.fz) * k;
       if (k >= 1) b.dash = null;
       b.st = 3;
+      // 正面でガードしている盾槍に当たると突進が止まる
+      for (const p of alive) {
+        if (!p.gd || Math.hypot(p.x - b.x, p.z - b.z) > 3.2) continue;
+        if (Math.abs(angDiff(p.a, Math.atan2(b.x - p.x, b.z - p.z))) > 1.4) continue;
+        b.dash = null; b.busyT = 1.2; b.st = 2;
+        b.stun += 25;
+        this.addThreat(b, p.id, 800);
+        if (b.target === p.id) b.hateT = Math.min(b.hateMax, b.hateT + HATE_ABSORB);
+        this.broadcastArea(A.id, { t: 'guardStop', id: b.id, pid: p.id, x: r2(b.x), z: r2(b.z) });
+        if (b.stun >= b.stunMax) this.stunBoss(A, b);
+        break;
+      }
       return;
     }
     b.busyT -= dt; b.actT -= dt;
@@ -616,10 +690,34 @@ export class World {
     const sp = [1, 0.9, 0.78, 0.68][b.phase || 1];
     const base = mobDmg(b.lv) * 3.3;
     const col = b.phase === 3 ? '#ff1a8a' : b.enraged ? '#ff2a6a' : '#ff3a3a';
+    // 遠距離攻撃と突進は、ときどき離れている別の人を狙う
+    if (['shot', 'charge', 'chase'].includes(pat) && inArena.length > 1 && Math.random() < (pat === 'shot' ? 0.6 : 0.4)) {
+      const far = inArena.filter((p) => p.id !== target.id).sort((p, q) => dist(q, b) - dist(p, b))[0];
+      if (far) {
+        target = far;
+        this.broadcastArea(A.id, { t: 'chat', from: '', text: `${A.fdef.boss.name}が ${far.name} に狙いを変えた！`, color: '#ff9a8a' });
+      }
+    }
     const ang = Math.atan2(target.x - b.x, target.z - b.z);
+    b.a = ang;
     const tid = target.id;
-    this.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: pat });
+    this.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: pat, tid });
     switch (pat) {
+      case 'shot': {
+        // 狙った相手へ弾を扇状に撃つ（盾槍のガードで消せる）
+        const n = b.phase === 3 ? 5 : 3;
+        this.broadcastArea(A.id, { t: 'aim', id: b.id, tid, d: 700 });
+        this.later(A, 0.7 * sp, () => {
+          if (A.boss !== b) return;
+          const p = this.livePlayer(A, tid) || target;
+          const a0 = Math.atan2(p.x - b.x, p.z - b.z);
+          for (let i = 0; i < n; i++) {
+            const a = a0 + (i - (n - 1) / 2) * 0.22;
+            this.shoot(A, b, b.x + Math.sin(a) * 2, b.z + Math.cos(a) * 2, a, 14, 0.9, 2.6, base * 0.75, '#ff5a3a');
+          }
+        });
+        return 1.2 * sp;
+      }
       case 'combo': {
         // 狙った相手を追いかける3〜5連叩きつけ
         const n = 3 + (b.phase || 1) - 1;
@@ -764,7 +862,11 @@ export class World {
 
   snapshot(A) {
     const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd]);
-    const ms = [...A.mobs.values()].map((m) => [m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st, m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0]);
+    const ms = [...A.mobs.values()].map((m) => [
+      m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st,
+      m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,
+      Math.round(m.hateT * 10) / 10, m.kind === 'boss' ? Math.round(m.stun / m.stunMax * 100) : 0, m.stunT > 0 ? Math.round(m.stunT * 10) / 10 : 0,
+    ]);
     const plates = A.plates.map((t) => this.time - t <= PLATE_WINDOW ? 1 : 0);
     this.broadcastArea(A.id, { t: 'snap', ar: A.id, p: ps, m: ms, bs: A.bossState, door: A.door ? 1 : 0, pl: plates });
   }
