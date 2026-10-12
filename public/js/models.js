@@ -1,7 +1,7 @@
 // トゥーン調のキャラクター / 武器 / モンスター（プリミティブ＋押し出し形状で造形）
 import * as THREE from 'three';
 import { RARITIES } from '../shared/data.js';
-import { toon, glow, outline, compact } from './toon.js';
+import { toon, glow, outline, compact, gradientMap } from './toon.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 function mesh(geo, mat, pos, rot, scale) {
@@ -480,6 +480,48 @@ export function animateMob(model, s) {
 }
 
 // ドロップアイテムのオーブ
+// ゴールド: 硬貨（たくさん出るのでジオメトリとマテリアルは共有）と金貨袋
+let coinParts = null;
+function coinShared() {
+  if (coinParts) return coinParts;
+  const geo = new THREE.CylinderGeometry(0.17, 0.17, 0.05, 14); geo.rotateX(Math.PI / 2);
+  const rim = new THREE.TorusGeometry(0.17, 0.018, 5, 16);
+  const mat = new THREE.MeshToonMaterial({ color: 0xffc83a, emissive: 0x8a5a00, emissiveIntensity: 0.6, gradientMap: gradientMap() });
+  const rimMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff0a0).multiplyScalar(1.6) });
+  for (const o of [geo, rim]) o.userData.shared = true;
+  for (const o of [mat, rimMat]) o.userData.shared = true;
+  coinParts = { geo, rim, mat, rimMat };
+  return coinParts;
+}
+export function makeCoin() {
+  const P = coinShared();
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(P.geo, P.mat);
+  body.add(new THREE.Mesh(P.rim, P.rimMat));
+  body.castShadow = true;
+  g.add(body);
+  g.userData.body = body;
+  return g;
+}
+export function makeGoldBag() {
+  const g = new THREE.Group();
+  const body = new THREE.Group(); g.add(body);
+  const cloth = toon(0x8a5a2e), tie = toon(0xd8b060), gold = toon(0xffc83a, { emissive: 0x7a4a00, emissiveIntensity: 0.6 });
+  const sack = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 12), cloth); sack.scale.set(1, 0.85, 1); sack.position.y = 0.36; body.add(sack);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 0.18, 12), cloth); neck.position.y = 0.76; body.add(neck);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.04, 6, 16), tie); band.rotation.x = Math.PI / 2; band.position.y = 0.72; body.add(band);
+  const flap = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.2, 10, 1, true), cloth); flap.position.y = 0.92; flap.rotation.x = Math.PI; body.add(flap);
+  const mark = new THREE.Mesh(new THREE.CircleGeometry(0.13, 16), gold); mark.position.set(0, 0.4, 0.365); body.add(mark);
+  for (let i = 0; i < 4; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 12), gold); c.position.set(Math.cos(i * 1.7) * 0.35, 0.03, Math.sin(i * 1.7) * 0.35); c.rotation.z = 0.2; body.add(c); }
+  body.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  outline(body, 1);
+  const halo = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 32), new THREE.MeshBasicMaterial({ color: 0xffd84a, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  halo.rotation.x = -Math.PI / 2; halo.position.y = 0.04; g.add(halo);
+  g.userData.body = body; g.userData.halo = halo;
+  g.scale.setScalar(1.4);
+  return g;
+}
+
 export function makeLootOrb(rarity) {
   const c = new THREE.Color(RARITIES[rarity].color);
   const g = new THREE.Group();

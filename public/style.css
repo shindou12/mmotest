@@ -392,6 +392,14 @@ body.touch .inv-head .dim { display: none; }
 #hotbar .slot.ready { border-color: rgba(255, 236, 170, .75); box-shadow: 0 0 10px rgba(255, 220, 120, .35); }
 #hotbar .slot .cd, .tb .cd { inset: 0; height: 100% !important; border-radius: 50%; background: conic-gradient(rgba(0,0,0,.62) var(--p, 0%), transparent 0); }
 
+#inv-grid > .dim, .box-col .cells > .dim { grid-column: 1 / -1; }
+/* 所持ゴールド（メニューの左） */
+#gold { position: absolute; top: 24px; right: 232px; display: flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; border-radius: 14px; background: rgba(10,14,24,.5); border: 1px solid rgba(255, 216, 106, .35); font-size: 13px; font-variant-numeric: tabular-nums; color: #ffe7a0; text-shadow: 0 1px 2px #000; transition: transform .12s; }
+#gold i { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff4b0, #ffc83a 45%, #b07a10); box-shadow: 0 0 0 1px #8a5a00 inset, 0 0 6px rgba(255, 200, 60, .6); }
+#gold.gain { transform: scale(1.15); border-color: #ffd86a; box-shadow: 0 0 12px rgba(255, 216, 106, .6); }
+.dmg.gold { color: #ffd84a; font-size: 18px; text-shadow: 0 0 8px rgba(255, 200, 60, .8), 0 2px 3px #000; }
+body.touch #gold { top: calc(8px + env(safe-area-inset-top)); right: calc(312px + env(safe-area-inset-right)); font-size: 11px; }
+
 /* 自キャラの横: スタミナ（回避の回復） */
 #stamina { position: absolute; width: 34px; height: 34px; transform: translate(-50%, -50%) rotate(-90deg); pointer-events: none; }
 #stamina circle { fill: none; stroke-width: 5; }

@@ -125,6 +125,10 @@ export function itemWeight(it) {
 export function weightClass(total) {
   return WEIGHT_CLASSES.find((w) => total <= w.max);
 }
+// 装備を分解したときにもらえるゴールド（レアリティとアイテムレベルで決まる）
+const SALVAGE_BASE = [2, 5, 14, 40, 130, 400];
+export const salvageValue = (it) => Math.round(SALVAGE_BASE[it.rarity] * (1 + (it.ilvl || 1) * 0.15));
+
 const ACC_BASE = ['お守り', '銅の指輪', '銀の首飾り', '翠玉の指輪', '紅玉の護符', '星の耳飾り', '天球の指輪'];
 
 export const AFFIXES = {

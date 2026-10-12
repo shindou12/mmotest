@@ -442,6 +442,29 @@ export class AudioEngine {
         break;
       }
       case 'pickup': tone('sine', 1320, 1760, 0.08, 0.08); tone('sine', 1760, 2200, 0.1, 0.06, 0.06); break;
+      // 硬貨: 金属らしい非整数倍の倍音を短く重ねる（チャリン）
+      case 'coin': {
+        const f = 2400 + Math.random() * 900;
+        for (const [k, v] of [[1, 0.05], [2.76, 0.025], [5.4, 0.012]]) tone('sine', f * k, 0, 0.09 + Math.random() * 0.05, v * (opt.vol ?? 1));
+        break;
+      }
+      // 硬貨がばらまかれる（チャリチャリ…）
+      case 'coins': {
+        const n = Math.min(10, 3 + (opt.n || 4));
+        for (let i = 0; i < n; i++) {
+          const f = 2200 + Math.random() * 1400, at = i * 0.045 + Math.random() * 0.03;
+          for (const [k, v] of [[1, 0.035], [2.76, 0.018]]) tone('sine', f * k, 0, 0.08, v, at);
+        }
+        break;
+      }
+      // 金貨袋: ずしっとした音＋たくさんの硬貨
+      case 'bag': {
+        this.noiseHit(t, 0.25, 'lowpass', 600, 0.15, B);
+        tone('triangle', 180, 90, 0.15, 0.12);
+        for (let i = 0; i < 9; i++) { const f = 2000 + Math.random() * 1600; tone('sine', f, 0, 0.1, 0.03, 0.05 + i * 0.035); tone('sine', f * 2.76, 0, 0.07, 0.015, 0.05 + i * 0.035); }
+        [0, 4, 7, 12].forEach((s, i) => tone('sine', mtof(84 + s), 0, 0.3, 0.035, 0.25 + i * 0.06).connect(this.revSend));
+        break;
+      }
       case 'potion': [600, 800, 1000, 1300].forEach((f, i) => tone('sine', f, f * 1.2, 0.12, 0.07, i * 0.05)); break;
       case 'roar': {
         const g = tone('sawtooth', 160, 45, 1.4, 0.35); g.connect(this.revSend);

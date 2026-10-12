@@ -13,7 +13,7 @@
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
 import {
   FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT, BOW_ZONE,
-  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass,
+  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue,
 } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, CELL, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
 import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, TREES, STYLE_COLS, spTotal, spSpent, treeSpent, canLearn } from '../skills.js';
@@ -88,11 +88,12 @@ export function createUI(game) {
     boss: '#boss', bossName: '#boss-name', bossHp: '#boss-hp', bossLag: '#boss-hp-lag', bossStunBar: '#boss-stun-bar', bossStun: '#boss-stun',
     bossStunT: '#boss-stun-t', bossTarget: '#boss-target', party: '#party', quests: '#quests', minimap: '#minimap', charge: '#charge',
     hotbar: '#hotbar', chat: '#chat', chatLog: '#chat-log', chatIn: '#chat-in', prompt: '#prompt', toasts: '#toasts', banner: '#banner',
-    mode: '#mode-tag', help: '#help', topbar: '#topbar', stamina: '#stamina', vitals: '#vitals',
+    mode: '#mode-tag', help: '#help', topbar: '#topbar', stamina: '#stamina', vitals: '#vitals', gold: '#gold',
   })) H[k] = hud.add(k, sel, k === 'minimap' ? CanvasView : View);
   H.hpBar = H.hp.parent.add('hpBar', H.hp.el.parentElement);
   H.chargeFill = H.charge.add('fill', H.charge.el.firstElementChild);
   H.staminaFg = H.stamina.add('fg', '#stamina-fg');
+  H.goldN = H.gold.add('n', '#gold-n');
   H.slots = {};
   for (const bar of [H.hotbar, H.topbar]) {
     for (const el of bar.el.querySelectorAll('.slot')) {
@@ -252,6 +253,7 @@ export function createUI(game) {
     }
     if (it.lore) h += `<div class="lore">${esc(it.lore)}</div>`;
     if (it.by) h += `<div class="dim">入れた人：${esc(it.by)}</div>`;
+    h += `<div style="color:#ffd86a">分解すると ${salvageValue(it).toLocaleString()} G</div>`;
     const cur = char.eq[it.slot];
     if (compare && cur && cur.id !== it.id) {
       const d = game.itemPower(it) - game.itemPower(cur);
@@ -285,6 +287,7 @@ export function createUI(game) {
     if (S.W.ranged) st.push(['適性エリア', `${S.optimal}m の内側 ${BOW_ZONE.min}〜${S.zoneMax}m`]);
     INV.stats.set({
       html: `<b>Lv${char.lv} ${esc(char.name)}</b> <span class="dim">${S.W.name}</span>`
+        + `<div><span class="dim">所持ゴールド</span><span style="color:#ffd86a">${(char.gold || 0).toLocaleString()} G</span></div>`
         + `<div class="wrow"><span class="dim">装備重量</span><span><b style="color:${S.wc.color}">${S.weight.toFixed(1)}（${S.wc.name}）</b></span></div>`
         + `<div class="wbar"><i style="width:${clamp(S.weight / 22 * 100, 0, 100)}%;background:${S.wc.color}"></i></div>`
         + `<div><span class="dim">回避のクールタイム</span><span>${S.dodgeCd.toFixed(2)}秒</span></div>`
@@ -448,7 +451,7 @@ export function createUI(game) {
     });
   };
 
-  let stamSeen = -9;
+  let stamSeen = -9, lastGold = -1, goldPopT = 0;
   // クールタイムの影（--p: 残りの割合。丸いボタンは時計回りに減る扇形で表示）
   const setCd = (v, val, max) => {
     const p = clamp(max > 0 ? val / max * 100 : 0, 0, 100).toFixed(1) + '%';
@@ -469,6 +472,13 @@ export function createUI(game) {
     const def = game.world.def;
     H.floor.set({ text: def.name.startsWith('第') ? def.name : `第${def.floor}層 ${def.name}` });
     H.potN.set({ text: String(me.potions) });
+    // 所持ゴールド: 増えたら少し弾む
+    const gold = char.gold || 0;
+    if (gold !== lastGold) {
+      if (gold > lastGold && lastGold >= 0) { H.gold.set({ cls: { gain: true } }); clearTimeout(goldPopT); goldPopT = setTimeout(() => H.gold.set({ cls: { gain: false } }), 160); }
+      lastGold = gold;
+      H.goldN.set({ text: gold.toLocaleString() });
+    }
     H.atkName.set({ text: HEAVY[S.wk].name });
     H.skillName.set({ text: S.ws.name });
     H.wsKey.set({ text: S.W.guard ? 'E' : 'E / 右' });

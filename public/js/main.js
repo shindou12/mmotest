@@ -5,13 +5,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
   FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE,
-  WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass,
+  WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
 } from '../shared/data.js';
 import { AREAS, AREA_TYPES, HAZARDS, grid, collide, spawnPoint, hazardsOf, chestsOf, insideOpen } from '../shared/areas.js';
 import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
-import { makePlayer, setPlayerWeapon, animatePlayer, makeMob, animateMob, makeLootOrb } from './models.js';
+import { makePlayer, setPlayerWeapon, animatePlayer, makeMob, animateMob, makeLootOrb, makeCoin, makeGoldBag } from './models.js';
 import { Net } from './net.js';
 import { OCC } from './toon.js';
 import {
@@ -332,6 +332,7 @@ function onMsg(m) {
         saveChar();
       }
       break;
+    case 'gold': spawnGold(m.n, m.x, m.z, !!m.bag); break;
     // 共有ボックス
     case 'box': ui.boxItems(m.items, m.max); break;
     case 'boxPut': {
@@ -455,6 +456,7 @@ function enterArea(id, x, z) {
   for (const oid of [...others.keys()]) removeOther(oid);
   for (const t of teles.splice(0)) t.meshes.forEach((mm) => fx.dispose(mm));
   for (const d of drops.splice(0)) disposeDrop(d);
+  if (char) flushCoins();
   clearBossProjs();
   buildNpcs(def);
   me.x = x; me.z = z; me.a = Math.PI; me.transit = false;
@@ -1246,6 +1248,107 @@ function updateDrops(dt) {
 }
 
 // ======================================================================
+// ゴールド: 硬貨が飛び散って跳ね、近づくと吸い寄せられて拾える。大金は金貨袋
+// ======================================================================
+const coins = [];
+const GOLD_MAGNET = 4.5;
+let goldGainBuf = 0, goldGainT = 0, coinSfxT = 0;
+function spawnGold(n, x, z, bag = false) {
+  n = Math.max(1, Math.round(n));
+  if (Math.hypot(x - me.x, z - me.z) < 30) audio.sfx(bag ? 'drop' : 'coins', { n: Math.min(10, Math.ceil(Math.sqrt(n))), rarity: 3 });
+  if (bag) {
+    const model = makeGoldBag();
+    model.position.set(x, heightAt(x, z), z);
+    scene.add(model);
+    const a = Math.random() * Math.PI * 2;
+    coins.push({ bag: true, model, value: n, x, z, y: 1.2, vx: Math.sin(a) * 1.5, vz: Math.cos(a) * 1.5, vy: 7, t: 0, spin: 0 });
+    fx.parts.burst(x, 1, z, 40, { color: 0xffd84a, speed: 6, size: 0.45, life: 0.9, gravity: 6 });
+    fx.beam(x, z, 0xffd84a, 8, 0.35);
+    return;
+  }
+  // 硬貨の枚数は金額の平方根くらい（3〜14枚）。端数は最初の1枚に
+  const k = clamp(Math.round(Math.sqrt(n)), Math.min(3, n), 14);
+  const each = Math.floor(n / k);
+  for (let i = 0; i < k; i++) {
+    const model = makeCoin();
+    const a = Math.random() * Math.PI * 2, sp = rnd(1.5, 4.5);
+    model.position.set(x, 1, z);
+    scene.add(model);
+    coins.push({ model, value: each + (i === 0 ? n - each * k : 0), x, z, y: 1.0, vx: Math.sin(a) * sp, vz: Math.cos(a) * sp, vy: rnd(5, 8.5), t: 0, spin: rnd(8, 16), bounces: 0 });
+  }
+}
+function addGold(n) {
+  char.gold = (char.gold || 0) + n;
+  goldGainBuf += n; goldGainT = 0.35;
+}
+function collectCoin(c) {
+  addGold(c.value);
+  if (c.bag) {
+    audio.sfx('bag');
+    fx.parts.burst(c.x, 1, c.z, 50, { color: 0xffd84a, speed: 7, size: 0.5, life: 0.8, gravity: 4 });
+    fx.ringWave(c.x, c.z, 0xffd84a, 3, 0.35);
+  } else {
+    // 連続で拾ったときは音を間引く（重なりすぎてうるさくならないように）
+    if (coinSfxT <= 0) { audio.sfx('coin', { vol: 1 }); coinSfxT = 0.035; }
+    fx.parts.burst(me.x, 1.2, me.z, 4, { color: 0xffe080, speed: 3, size: 0.3, life: 0.3, gravity: 0 });
+  }
+  fx.dispose(c.model);
+}
+function updateCoins(dt) {
+  coinSfxT -= dt;
+  for (let i = coins.length - 1; i >= 0; i--) {
+    const c = coins[i];
+    c.t += dt;
+    const ground = heightAt(c.x, c.z) + (c.bag ? 0 : 0.17);
+    const dx = me.x - c.x, dz = me.z - c.z, d = Math.hypot(dx, dz);
+    const settled = c.t > (c.bag ? 0.7 : 0.45);
+    if (settled && !me.dead && d < (c.bag ? 2.6 : GOLD_MAGNET)) {
+      // 吸い寄せ: 近いほど速く、少し浮き上がって飛んでくる
+      const sp = (c.bag ? 9 : 14) + (GOLD_MAGNET - d) * 4;
+      c.x += dx / (d || 1) * Math.min(d, sp * dt); c.z += dz / (d || 1) * Math.min(d, sp * dt);
+      c.y += ((ground + 0.9) - c.y) * Math.min(1, dt * 8);
+      if (d < 0.6) { collectCoin(c); coins.splice(i, 1); continue; }
+    } else if (c.y > ground || c.vy > 0) {
+      // 放物線で飛んで、地面で跳ねる
+      c.vy -= 22 * dt;
+      c.x += c.vx * dt; c.z += c.vz * dt; c.y += c.vy * dt;
+      const col = collide(world.def, c.x, c.z, 0.2, world.door); c.x = col.x; c.z = col.z;
+      if (c.y <= ground) {
+        c.y = ground;
+        if (Math.abs(c.vy) > 2.2) {
+          c.vy = -c.vy * 0.38; c.vx *= 0.6; c.vz *= 0.6;
+          if (!c.bag && c.bounces++ < 1 && coinSfxT <= 0 && d < 20) { audio.sfx('coin', { vol: 0.45 }); coinSfxT = 0.03; }
+          if (c.bag) { addShake(0.1); fx.parts.burst(c.x, 0.2, c.z, 10, { color: 0xd8c8a0, speed: 3, size: 0.4, life: 0.4, up: 1 }); }
+        } else { c.vy = 0; c.vx = 0; c.vz = 0; }
+      }
+    }
+    // 見た目: 硬貨は回転しながら、地面ではキラッと光る。袋は少し弾む
+    if (c.bag) {
+      c.model.position.set(c.x, c.y, c.z);
+      c.model.userData.body.rotation.y += dt * 1.2;
+      c.model.userData.halo.material.opacity = 0.35 + Math.sin(c.t * 4) * 0.2;
+      if (Math.random() < 0.15) fx.parts.emit(c.x + rnd(-0.4, 0.4), c.y + rnd(0.3, 1), c.z + rnd(-0.4, 0.4), { color: 0xfff0a0, size: 0.3, life: 0.5, speed: 0.3, gravity: -1 });
+    } else {
+      c.model.position.set(c.x, c.y, c.z);
+      const b = c.model.userData.body;
+      b.rotation.y += c.spin * dt;
+      if (c.vy === 0 && c.y <= ground + 0.01) { c.spin = Math.max(2.5, c.spin * (1 - dt * 2)); }
+      if (Math.random() < 0.012) fx.parts.emit(c.x, c.y + 0.2, c.z, { color: 0xffffff, size: 0.35, life: 0.25, speed: 0, gravity: 0 });
+    }
+    if (c.t > 90) { fx.dispose(c.model); coins.splice(i, 1); }
+  }
+  // 拾った金額はまとめて表示（チャリチャリ拾っている間は合算）
+  if (goldGainBuf > 0) {
+    goldGainT -= dt;
+    if (goldGainT <= 0) { floatText(me.x, 2.9, me.z, `+${goldGainBuf} G`, 'gold'); goldGainBuf = 0; saveChar(); ui.refresh(); }
+  }
+}
+// エリア移動などで残った硬貨は、そのまま所持金に入れる
+function flushCoins() {
+  for (const c of coins.splice(0)) { addGold(c.value); fx.dispose(c.model); }
+}
+
+// ======================================================================
 // 3D 空間のラベル（DOM の UI は ui/app.js）
 // ======================================================================
 // 敵の名前とHPバーは、モデルの子として3D空間に置く（画面上でずれない）
@@ -1318,9 +1421,23 @@ function salvage(id) {
     return;
   }
   char.inv.splice(char.inv.indexOf(it), 1);
-  audio.sfx('ui'); saveChar(); ui.refresh();
+  salvageGold(salvageValue(it));
+  saveChar(); ui.refresh();
 }
-function salvageCommon() { char.inv = char.inv.filter((i) => i.rarity >= 2); audio.sfx('ui'); saveChar(); ui.refresh(); }
+function salvageCommon() {
+  const junk = char.inv.filter((i) => i.rarity < 2);
+  if (!junk.length) return;
+  char.inv = char.inv.filter((i) => i.rarity >= 2);
+  salvageGold(junk.reduce((a, i) => a + salvageValue(i), 0));
+  toast(`${junk.length}個を分解した`, '#ffd84a');
+  saveChar(); ui.refresh();
+}
+// 分解したゴールドは足元から噴き出して、そのまま吸い寄せられる
+function salvageGold(n) {
+  audio.sfx('equip');
+  if (!started || me.dead) { addGold(n); return; }
+  spawnGold(n, me.x, me.z, n >= 300);
+}
 
 function learn(id) {
   if (!canLearn(char, id)) { audio.sfx('ui'); return; }
@@ -1661,6 +1778,7 @@ function update(dt) {
   updateProjs(dt);
   updateBossProjs(dt);
   updateDrops(dt);
+  updateCoins(dt);
   updateBowGuide(t);
   updateTouchAim(t);
 
@@ -1826,4 +1944,4 @@ function enterPreview() {
 }
 loop();
 
-window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam };
+window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, coins };

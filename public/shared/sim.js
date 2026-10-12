@@ -230,6 +230,7 @@ export class World {
         // 小さな宝箱: レア以上を1つ
         items = [makeItem(ilvl, Math.max(2, rollRarity(1, 1)))];
       }
+      this.send(p, { t: 'gold', n: Math.round((C.big ? 80 + ilvl * 12 : 20 + ilvl * 4) * rnd(0.85, 1.15)), x: r2(C.x), z: r2(C.z + 1.2), bag: C.big });
       this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
       for (const it of items) if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
     }
@@ -326,6 +327,10 @@ export class World {
       const gap = p.lv - mob.lv;
       const mult = gap > 6 ? 0.35 : gap < -3 ? 1.3 : 1;
       this.send(p, { t: 'xp', n: Math.max(1, Math.round(xp * mult)), nm: isBoss ? A.fdef.boss.name : mob.name, ar: A.id, boss: isBoss ? A.n : 0 });
+      // ゴールド（個人ごと）。雑魚はたまに落とさない。ボス・ネームドは金貨袋
+      let gold = (3 + mob.lv * 1.5) * rnd(0.7, 1.3) * (isBoss ? 40 : mob.named ? 15 : mob.elite ? 3 : 1) * (mob.kind === 'add' ? 0.2 : 1);
+      if (!isBoss && !mob.named && !mob.elite && Math.random() < 0.25) gold = 0;
+      if (gold >= 1) this.send(p, { t: 'gold', n: Math.round(gold), x: r2(mob.x), z: r2(mob.z), bag: isBoss || !!mob.named });
       // 個人ドロップ（友達と取り合いにならない）
       const items = [];
       const ilvl = mob.lv;
