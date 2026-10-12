@@ -764,9 +764,10 @@ export class World {
     if (b.actT <= 0) {
       const bd = A.fdef.boss;
       const pats = b.phase === 3 ? [...bd.patterns, ...(bd.p3 || [])] : bd.patterns;
-      let pat = b.forced || pick(pats);
+      const forced = b.forced;
+      let pat = forced || pick(pats);
       b.forced = null;
-      if (pat === b.last && pats.length > 1) pat = pick(pats.filter((p) => p !== b.last));
+      if (!forced && pat === b.last && pats.length > 1) pat = pick(pats.filter((p) => p !== b.last));
       b.last = pat;
       const victim = Math.random() < 0.2 && inArena.length > 1 ? pick(inArena) : target;
       const busy = this.bossPattern(A, b, pat, victim, inArena);
@@ -975,6 +976,58 @@ export class World {
           this.later(A, 0.4 + i * 0.2, () => this.tele(A, b, [{ k: 'circle', x: r2(L.x + Math.sin(a) * rr), z: r2(L.z + Math.cos(a) * rr), r: 3 }], 1.1, base * 0.8, col));
         }
         return 1.6 * sp;
+      }
+      case 'fissure': {
+        // 地割れ: 狙った方向へ3本の亀裂が根元から先へ順に走る
+        const sx = b.x, sz = b.z;
+        for (let s = 0; s < 4; s++) {
+          this.later(A, s * 0.22 * sp, () => {
+            const sh = [-0.45, 0, 0.45].map((o) => ({ k: 'line', x: r2(sx + Math.sin(ang + o) * s * 6), z: r2(sz + Math.cos(ang + o) * s * 6), a: r2(ang + o), len: 6.5, w: 2.6 }));
+            this.tele(A, b, sh, 0.85 * sp, base * 0.95, col);
+          });
+        }
+        return (0.22 * 4 + 0.8) * sp;
+      }
+      case 'checker': {
+        // 市松: 格子の半分 → 残りの半分が交互に爆発する
+        const cell = 6;
+        const mk = (par) => {
+          const sh = [];
+          for (let i = -4; i <= 4; i++) {
+            for (let j = -4; j <= 4; j++) {
+              if (((i + j) & 1) !== par || Math.hypot(i, j) * cell > L.r) continue;
+              sh.push({ k: 'circle', x: r2(L.x + i * cell), z: r2(L.z + j * cell), r: 3.4 });
+            }
+          }
+          return sh;
+        };
+        const first = Math.random() < 0.5 ? 0 : 1;
+        this.tele(A, b, mk(first), 1.3 * sp, base, col);
+        this.later(A, 1.35 * sp, () => this.tele(A, b, mk(1 - first), 1.0 * sp, base, col));
+        return 2.5 * sp;
+      }
+      case 'haven': {
+        // 聖域: アリーナ全体が爆発する大技。光る小さな安全地帯にだけ逃げ込める
+        const a = Math.random() * Math.PI * 2, rr = rnd(6, L.r - 6);
+        const safe = { x: L.x + Math.sin(a) * rr, z: L.z + Math.cos(a) * rr };
+        this.broadcastArea(A.id, { t: 'chat', from: '', text: `${A.fdef.boss.name}が力を溜めている…光の輪へ逃げろ！`, color: '#ffd84a' });
+        this.tele(A, b, [{ k: 'ring', x: r2(safe.x), z: r2(safe.z), r0: 4, r1: rr + L.r + 2 }], 2.4 * sp, base * 1.8, col);
+        return 2.6 * sp;
+      }
+      case 'barrage': {
+        // 全方位弾幕: 溜め（足元の予兆）のあと、全方向へ2波撃つ
+        const n = b.phase === 3 ? 16 : 12;
+        this.tele(A, b, [{ k: 'circle', x: r2(b.x), z: r2(b.z), r: 4.5 }], 0.9 * sp, base * 0.9, col);
+        for (let w = 0; w < 2; w++) {
+          this.later(A, (0.9 + w * 0.5) * sp, () => {
+            if (A.boss !== b) return;
+            for (let i = 0; i < n; i++) {
+              const a = ang + (i + w * 0.5) * Math.PI * 2 / n;
+              this.shoot(A, b, b.x + Math.sin(a) * 2, b.z + Math.cos(a) * 2, a, 11, 0.9, 2.6, base * 0.6, '#ff8a3a');
+            }
+          });
+        }
+        return (0.9 + 0.5 + 0.6) * sp;
       }
     }
     return 1;
