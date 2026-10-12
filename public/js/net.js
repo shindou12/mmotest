@@ -19,9 +19,9 @@ export class Net {
 
   async startSolo() {
     const { World } = await import('../shared/sim.js');
-    let unlocked = 1;
-    try { unlocked = JSON.parse(localStorage.getItem('aincrad_solo_world') || '{}').unlocked || 1; } catch { /* */ }
-    this.world = new World({ unlocked, onSave: (d) => { try { localStorage.setItem('aincrad_solo_world', JSON.stringify(d)); } catch { /* */ } } });
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('aincrad_solo_world') || '{}'); } catch { /* */ }
+    this.world = new World({ unlocked: saved.unlocked || 1, box: saved.box || [], onSave: (d) => { try { localStorage.setItem('aincrad_solo_world', JSON.stringify(d)); } catch { /* */ } } });
     this.world.addPlayer(1, (m) => queueMicrotask(() => this.onMsg(m)));
     let last = performance.now();
     setInterval(() => { const now = performance.now(); this.world.tick(Math.min(0.1, (now - last) / 1000)); last = now; }, 50);

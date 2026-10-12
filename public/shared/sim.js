@@ -5,6 +5,7 @@ import {
 } from './data.js';
 import {
   AREAS, FLOOR_HUB, PLATE_WINDOW, grid, collide, pathStep, exitsOf, arrival, spawnPoint, lairOf,
+  obstaclesOf, hazardsOf, chestsOf, namedSpot, insideOpen, boundR, dirOf,
 } from './areas.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -20,7 +21,11 @@ const ARCH = {
   knight: { speed: 4.0, hp: 1.3, dmg: 1.15, wind: 0.75, range: 4.0, aggro: 13 },
 };
 const ELITE = { hp: 2.6, dmg: 1.35, xp: 2.5 };
-const CHEST_COOLDOWN = 300;
+const CHEST_COOLDOWN = 300; // ダンジョン最奥の宝箱
+const SMALL_CHEST_COOLDOWN = 600; // 屋外の小さな宝箱
+const NAMED = { hp: 6, dmg: 1.5, xp: 8, respawn: 240 };
+const BOX_MAX = 60; // 共有ボックスの容量
+const BOX_RANGE = 4.5;
 // ヘイトは一定時間ごとにリセット。狙われている人が攻撃を受けると少し延びる
 const HATE_RESET = { boss: 12, mob: 15 };
 const HATE_ABSORB = 1.2;
@@ -33,6 +38,8 @@ export class World {
     this.areas = new Map();
     this.unlocked = Math.min(MAX_FLOOR, opts.unlocked || 1);
     this.onSave = opts.onSave || (() => {});
+    // 町・野営地の共有ボックス（全員で1つ。どの町の箱からでも同じ中身）
+    this.box = Array.isArray(opts.box) ? opts.box.slice(0, BOX_MAX) : [];
     this.seq = 1;
     this.time = 0;
     this.snapT = 0;
@@ -56,6 +63,8 @@ export class World {
     }
     return this.areas.get(id);
   }
+
+  save() { this.onSave({ unlocked: this.unlocked, box: this.box }); }
 
   // ---- 送信ヘルパ ----
   send(p, msg) { try { p.send(msg); } catch (e) { /* ignore */ } }
@@ -84,7 +93,7 @@ export class World {
   }
 
   movePlayer(p, areaId, pos) {
-    p.area = areaId; p.x = pos.x; p.z = pos.z;
+    p.area = areaId; p.x = pos.x; p.z = pos.z; p.boxOpen = false;
     for (const A of this.areas.values()) for (const m of A.mobs.values()) m.threat?.delete(p.id);
     this.area(areaId);
     this.send(p, { t: 'warped', area: areaId, x: r2(pos.x), z: r2(pos.z) });
@@ -182,7 +191,8 @@ export class World {
         this.movePlayer(p, to, arrival(AREAS[to], A.id));
         break;
       }
-      case 'interact': this.interact(A, p, String(m.what || '')); break;
+      case 'interact': this.interact(A, p, String(m.what || ''), String(m.id || '')); break;
+      case 'box': this.boxOp(A, p, m); break;
       case 'chat': {
         const text = String(m.text || '').slice(0, 120);
         if (text) this.broadcast({ t: 'chat', from: p.name, text, color: p.color });
@@ -191,29 +201,74 @@ export class World {
     }
   }
 
-  interact(A, p, what) {
+  interact(A, p, what, id) {
     const g = A.def.shape === 'grid' ? grid(A.def) : null;
     if (what === 'lever' && A.def.gimmick === 'lever' && !A.door) {
       const L = g.pts.L?.[0];
       if (!L || dist(L, p) > 4) return;
       this.openDoor(A, `${p.name} がレバーを引いた。重い扉が開いていく…`);
     }
-    if (what === 'chest' && A.def.unique) {
-      const C = g?.pts.C?.[0];
+    if (what === 'chest') {
+      const list = chestsOf(A.def);
+      const C = list.find((c) => c.id === id) || (!id && list[0]);
       if (!C || dist(C, p) > 4) return;
-      const last = A.chests.get(p.name) ?? -1e9;
-      if (this.time - last < CHEST_COOLDOWN) {
-        this.send(p, { t: 'chat', from: '', text: `宝箱は空っぽだ。（あと${Math.ceil(CHEST_COOLDOWN - (this.time - last))}秒で中身が戻る）`, color: '#aab' });
+      const cd = C.big ? CHEST_COOLDOWN : SMALL_CHEST_COOLDOWN;
+      const key = `${C.id}:${p.name}`;
+      const last = A.chests.get(key) ?? -1e9;
+      if (this.time - last < cd) {
+        this.send(p, { t: 'chat', from: '', text: `宝箱は空っぽだ。（あと${Math.ceil(cd - (this.time - last))}秒で中身が戻る）`, color: '#aab' });
         return;
       }
-      A.chests.set(p.name, this.time);
-      const ilvl = floorLevel(A.n) + 5;
-      const t = Math.random();
-      const rar = t < 0.05 ? 5 : t < 0.3 ? 4 : 3;
-      const items = [makeItem(ilvl, rar, { uniqueDef: A.def.unique }), makeItem(ilvl, rollRarity(1, 2))];
-      this.send(p, { t: 'loot', src: 'chest', ar: A.id, items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
+      A.chests.set(key, this.time);
+      const ilvl = floorLevel(A.n) + (C.big ? 5 : 3);
+      let items;
+      if (C.big && A.def.unique) {
+        const t = Math.random();
+        const rar = t < 0.05 ? 5 : t < 0.3 ? 4 : 3;
+        items = [makeItem(ilvl, rar, { uniqueDef: A.def.unique }), makeItem(ilvl, rollRarity(1, 2))];
+      } else {
+        // 小さな宝箱: レア以上を1つ
+        items = [makeItem(ilvl, Math.max(2, rollRarity(1, 1)))];
+      }
+      this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
       for (const it of items) if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
     }
+  }
+
+  // 共有ボックス: open（中身を見る）/ put（入れる）/ take（取り出す）
+  boxOp(A, p, m) {
+    const op = String(m.op || '');
+    if (op === 'close') { p.boxOpen = false; return; }
+    const B = A.def.box;
+    if (!B || dist(B, p) > BOX_RANGE) return;
+    if (op === 'put') {
+      const it = m.item;
+      if (!it || typeof it !== 'object' || typeof it.name !== 'string' || typeof it.slot !== 'string') return;
+      if (this.box.length >= BOX_MAX) { this.send(p, { t: 'chat', from: '', text: '共有ボックスがいっぱいだ。', color: '#f88' }); return; }
+      const json = JSON.stringify(it);
+      if (json.length > 4000) return;
+      const item = JSON.parse(json);
+      item.uid = this.seq++;
+      item.by = p.name;
+      this.box.push(item);
+      this.send(p, { t: 'boxPut', ok: true, ref: m.ref });
+      this.save();
+      if (item.rarity >= 3) this.sys(`${p.name} が共有ボックスに「${item.name}」を入れた`, '#cfe');
+    } else if (op === 'take') {
+      const i = this.box.findIndex((it) => it.uid === m.uid);
+      if (i < 0) { this.send(p, { t: 'chat', from: '', text: 'その装備はもう誰かが取り出したようだ。', color: '#aab' }); }
+      else {
+        const [item] = this.box.splice(i, 1);
+        delete item.by;
+        this.send(p, { t: 'boxTake', item });
+        this.save();
+      }
+    } else if (op !== 'open') return;
+    // 開いている人全員に最新の中身を送る
+    for (const q of this.players.values()) {
+      if (q.joined && (q === p || q.boxOpen)) this.send(q, { t: 'box', items: this.box, max: BOX_MAX });
+    }
+    p.boxOpen = op === 'open' || p.boxOpen;
   }
 
   openDoor(A, text) {
@@ -262,7 +317,8 @@ export class World {
     A.mobs.delete(mob.id);
     const isBoss = mob.kind === 'boss';
     this.broadcastArea(A.id, { t: 'die', id: mob.id, x: r2(mob.x), z: r2(mob.z), boss: isBoss });
-    let xp = mobXp(mob.lv) * (A.def.mobs?.xp || 1) * (mob.elite ? ELITE.xp : 1);
+    let xp = mobXp(mob.lv) * (A.def.mobs?.xp || 1) * (mob.named ? NAMED.xp : mob.elite ? ELITE.xp : 1);
+    if (mob.named) A.namedT = NAMED.respawn;
     if (isBoss) xp *= 12;
     if (mob.kind === 'add') xp *= 0.3;
     for (const p of this.areaPlayers(A.id)) {
@@ -277,6 +333,10 @@ export class World {
         items.push(makeItem(ilvl + 1, rollRarity(1, 2)));
         items.push(makeItem(ilvl + 1, rollRarity(1, 1)));
         if (Math.random() < 0.5) items.push(makeItem(ilvl, rollRarity(1, 0)));
+      } else if (mob.named) {
+        // ネームド: 良いものが必ず出る
+        items.push(makeItem(ilvl + 2, Math.max(3, rollRarity(1, 2))));
+        items.push(makeItem(ilvl, Math.max(2, rollRarity(1, 1))));
       } else if (Math.random() < (mob.elite ? 0.6 : mob.kind === 'add' ? 0.08 : 0.34)) {
         items.push(makeItem(ilvl, rollRarity(mob.elite ? 0.4 : 0, mob.elite ? 1 : 0)));
       }
@@ -298,7 +358,7 @@ export class World {
       this.broadcastArea(A.id, { t: 'bossClear', n: A.n, name: A.fdef.boss.name });
       if (A.n === this.unlocked && A.n < MAX_FLOOR) {
         this.unlocked++;
-        this.onSave({ unlocked: this.unlocked });
+        this.save();
         this.broadcast({ t: 'unlock', unlocked: this.unlocked });
         this.sys(`第${A.n}層 攻略！ 第${A.n + 1}層「${FLOORS[A.n].name}」への転移門が開放された`, '#7fffd4');
       } else if (A.n === MAX_FLOOR) {
@@ -380,11 +440,14 @@ export class World {
       A.spawnT -= dt;
       if (field < want && A.spawnT <= 0) {
         A.spawnT = field < want / 2 ? 0.1 : (def.mobs.respawn ?? 1.2);
-        const exits = exitsOf(def);
+        const exits = exitsOf(def), blocks = [...obstaclesOf(def), ...hazardsOf(def)];
         for (let tries = 0; tries < 12; tries++) {
-          const ang = Math.random() * Math.PI * 2, rr = rnd(8, def.R - 6);
-          const pos = { x: Math.sin(ang) * rr, z: Math.cos(ang) * rr };
+          const ang = Math.random() * Math.PI * 2, [dx, dz] = dirOf(ang), rr = rnd(0.15, 0.85) * boundR(def, ang);
+          const pos = { x: dx * rr, z: dz * rr };
+          if (!insideOpen(def, pos.x, pos.z, 3)) continue;
+          if (blocks.some((o) => dist(o, pos) < o.r + 1.5)) continue;
           if (exits.some((e) => dist(e, pos) < 10)) continue;
+          if (def.gate && dist(def.gate, pos) < 14) continue;
           if (players.some((p) => dist(p, pos) < 12)) continue;
           const d = def.mobs.only ?? (Math.random() < 0.55 ? 0 : 1);
           this.spawnMob(A, d, pos.x, pos.z, floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1)));
@@ -405,6 +468,21 @@ export class World {
         const mob = this.spawnMob(A, pt.ch === 'G' ? 1 : (Math.random() < 0.5 ? 0 : 1), pt.x, pt.z, lv, 'mob', elite);
         if (pt.ch === 'G') { mob.gatekeeper = true; mob.name = '門番'; }
         pt.mobId = mob.id;
+      }
+    }
+
+    // ネームド（秘境の主）
+    if (def.named && !(A.namedId && A.mobs.has(A.namedId))) {
+      A.namedId = null;
+      A.namedT = (A.namedT ?? 2) - dt;
+      const sp = namedSpot(def);
+      if (A.namedT <= 0 && !players.some((p) => dist(p, sp) < 10)) {
+        const nd = def.named;
+        const mob = this.spawnMob(A, nd.d, sp.x, sp.z, nd.lv, 'mob', true);
+        mob.named = true; mob.name = nd.name;
+        mob.hp = mob.mhp = Math.round(mobHp(mob.lv) * mob.arch.hp * NAMED.hp);
+        A.namedId = mob.id;
+        this.sysArea(A.id, `どこからか強大な気配がする…「${nd.name}」が現れた`, '#ffb27a');
       }
     }
 
@@ -542,7 +620,20 @@ export class World {
       if (m.pathT <= 0 || !m.wp) { m.pathT = 0.4; m.wp = pathStep(A.def, m.x, m.z, t.x, t.z, A.door); }
       this.moveMob(A, m, Math.atan2(m.wp.x - m.x, m.wp.z - m.z), speed, dt);
       m.a = Math.atan2(t.x - m.x, t.z - m.z);
-    } else this.moveMob(A, m, Math.atan2(t.x - m.x, t.z - m.z), speed, dt);
+    } else {
+      // 屋外: 正面の障害物は横へ回り込む
+      let ang = Math.atan2(t.x - m.x, t.z - m.z);
+      const fx = Math.sin(ang), fz = Math.cos(ang), dT = dist(m, t);
+      for (const o of obstaclesOf(A.def)) {
+        const ox = o.x - m.x, oz = o.z - m.z, along = ox * fx + oz * fz;
+        if (along <= 0 || along > Math.min(dT, o.r + 4)) continue;
+        const side = ox * fz - oz * fx;
+        if (Math.abs(side) > o.r + 0.9) continue;
+        ang += (side > 0 ? 1 : -1) * Math.PI / 2.2;
+        break;
+      }
+      this.moveMob(A, m, ang, speed, dt);
+    }
   }
 
   moveMob(A, m, ang, speed, dt) {
@@ -561,7 +652,7 @@ export class World {
 
   mobAttack(A, m, target, ang) {
     const Ar = m.arch;
-    const dmg = mobDmg(m.lv) * Ar.dmg * (m.elite ? ELITE.dmg : 1);
+    const dmg = mobDmg(m.lv) * Ar.dmg * (m.named ? NAMED.dmg : m.elite ? ELITE.dmg : 1);
     const wind = Ar.wind * (m.elite ? 0.85 : 1);
     m.st = 2; m.windT = wind; m.cd = rnd(1.4, 2.4) + wind;
     const fx = Math.sin(ang), fz = Math.cos(ang);
@@ -864,7 +955,7 @@ export class World {
     const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd]);
     const ms = [...A.mobs.values()].map((m) => [
       m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st,
-      m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,
+      m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.named ? 3 : m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,
       Math.round(m.hateT * 10) / 10, m.kind === 'boss' ? Math.round(m.stun / m.stunMax * 100) : 0, m.stunT > 0 ? Math.round(m.stunT * 10) / 10 : 0,
     ]);
     const plates = A.plates.map((t) => this.time - t <= PLATE_WINDOW ? 1 : 0);

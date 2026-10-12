@@ -12,8 +12,56 @@ export function gradientMap() {
   return grad;
 }
 
-export const toon = (color, o = {}) => new THREE.MeshToonMaterial({ color, gradientMap: gradientMap(), ...o });
-export const glow = (color, o = {}) => new THREE.MeshBasicMaterial({ color, ...o });
+// ---------------------------------------------------------------------------
+// 近景の透過: カメラと自キャラの間にあるもの（敵・木・岩・壁）や、カメラに近すぎるものを
+// ディザで抜いて、自キャラと周りが見えるようにする。main が毎フレーム uniform を更新する
+// ---------------------------------------------------------------------------
+export const OCC = {
+  uOccCam: { value: new THREE.Vector3() },
+  uOccTgt: { value: new THREE.Vector3() },
+  uOccR: { value: 0 },
+  // カメラからこの距離より手前のものは消す（外周の岩の中にカメラが入ったとき、輪郭線の裏側で画面が黒くならないように）
+  uOccNear: { value: 0 },
+};
+const OCC_VERT = `
+  {
+    vec4 occW = vec4(transformed, 1.0);
+    #ifdef USE_INSTANCING
+      occW = instanceMatrix * occW;
+    #endif
+    vOccW = (modelMatrix * occW).xyz;
+  }`;
+const OCC_FRAG = `
+uniform vec3 uOccCam; uniform vec3 uOccTgt; uniform float uOccR; uniform float uOccNear; varying vec3 vOccW;
+void occClip() {
+  float k = 0.0;
+  if (uOccR > 0.0) {
+    vec3 seg = uOccTgt - uOccCam; float L2 = dot(seg, seg);
+    float t = clamp(dot(vOccW - uOccCam, seg) / max(L2, 1e-4), 0.0, 1.0);
+    float d = length(vOccW - (uOccCam + seg * t));
+    // 線分の手前側（自キャラの直前までは）だけ抜く
+    k = smoothstep(uOccR, uOccR * 0.45, d) * smoothstep(0.93, 0.8, t);
+  }
+  // カメラに近すぎるもの
+  if (uOccNear > 0.0) k = max(k, smoothstep(uOccNear, uOccNear * 0.7, length(vOccW - uOccCam)));
+  if (k <= 0.0) return;
+  vec2 p = mod(floor(gl_FragCoord.xy), 4.0);
+  float th = (mod(p.x, 2.0) * 2.0 + mod(p.y, 2.0) + floor(p.x / 2.0) * 0.5 + floor(p.y / 2.0) * 0.25) / 4.0 + 0.06;
+  if (k * 0.85 > th) discard;
+}
+`;
+function injectOcc(sh) {
+  Object.assign(sh.uniforms, OCC);
+  sh.vertexShader = 'varying vec3 vOccW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>' + OCC_VERT);
+  sh.fragmentShader = OCC_FRAG + sh.fragmentShader.replace('void main() {', 'void main() {\n  occClip();');
+}
+function withOcc(m, on) {
+  if (on) { m.onBeforeCompile = injectOcc; m.customProgramCacheKey = () => 'occ'; }
+  return m;
+}
+
+export const toon = (color, { noOcc = false, ...o } = {}) => withOcc(new THREE.MeshToonMaterial({ color, gradientMap: gradientMap(), ...o }), !noOcc);
+export const glow = (color, { noOcc = false, ...o } = {}) => withOcc(new THREE.MeshBasicMaterial({ color, ...o }), !noOcc && !o.transparent);
 
 // 背面法線押し出しによる輪郭線。画面上でほぼ一定の太さになるよう深度で補正する
 const outlineMats = new Map();
@@ -22,7 +70,8 @@ export function outlineMat(width = 1, color = 0x17121f) {
   if (outlineMats.has(key)) return outlineMats.get(key);
   const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
   m.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', `
+    Object.assign(sh.uniforms, OCC);
+    sh.vertexShader = 'varying vec3 vOccW;\n' + sh.vertexShader.replace('#include <project_vertex>', `
       vec4 mvPosition = vec4(transformed, 1.0);
       #ifdef USE_INSTANCING
         mvPosition = instanceMatrix * mvPosition;
@@ -30,7 +79,8 @@ export function outlineMat(width = 1, color = 0x17121f) {
       mvPosition = modelViewMatrix * mvPosition;
       vec3 oN = normalize(normalMatrix * normal);
       mvPosition.xyz += oN * ${(0.0021 * width).toFixed(5)} * -mvPosition.z;
-      gl_Position = projectionMatrix * mvPosition;`);
+      gl_Position = projectionMatrix * mvPosition;` + OCC_VERT);
+    sh.fragmentShader = OCC_FRAG + sh.fragmentShader.replace('void main() {', 'void main() {\n  occClip();');
   };
   m.customProgramCacheKey = () => 'outline' + width;
   m.userData.shared = true;

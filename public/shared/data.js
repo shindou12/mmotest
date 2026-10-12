@@ -55,14 +55,17 @@ export const WEAPONS = {
     name: '大斧', range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true,
     passive: ['強攻撃ダメージ +25%', '与えたダメージの3%を回復'],
   },
-  // 弓: 矢を飛ばす。optimal（適性距離）より遠いとダメージが下がる
+  // 弓: 矢を飛ばす。適性エリア（外円=optimal と、引き絞るほど内側へ広がる内円の間）でだけ本来のダメージ
   bow: {
-    name: '弓', range: 28, arc: 0, speed: 0.36, mult: 0.85, weight: 3, stun: 0.3, ranged: true, optimal: 14,
-    passive: ['回避のクールタイム -25%', '回避中も攻撃できる（転がり撃ち）', `適性距離（14m）より遠いとダメージが下がる`],
+    name: '弓', range: 24, arc: 0, speed: 0.4, mult: 0.7, weight: 3, stun: 0.3, ranged: true, optimal: 10,
+    passive: ['回避中も攻撃できる（転がり撃ち）', '適性エリア（足元の2つの円の間）の敵にだけ本来のダメージ。引き絞るほどエリアが内側へ広がる'],
   },
 };
 export const WEAPON_KINDS = Object.keys(WEAPONS);
-export const INSTINCT_CD = 180; // 生存本能（近接武器のパッシブ）のクールタイム
+// 弓の適性エリア: 外円 = 適性距離、内円 = 外円 - 幅。幅は引き絞り具合で BOW_ZONE.min〜max
+export const BOW_ZONE = { min: 2, max: 8, outside: 0.35 };
+// 生存本能（近接武器のパッシブ）: HPが一定以下になると一時的に被ダメージ軽減
+export const INSTINCT = { hp: 0.35, dr: 50, sec: 6, cd: 90 };
 // 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
 export const WEAPON_SKILL_POOL = {
   sword: ['vorpal', 'square', 'leap'],
@@ -79,10 +82,31 @@ const TIER_PREFIX = ['木の', '青銅の', '鉄の', '鋼の', '銀の', 'ミ�
 
 // 防具の重さの種類。重いほどHPと被ダメ軽減が高いが、回避が遅くなる
 export const ARMOR_CLASSES = {
-  light: { name: '軽装', weight: 3, hp: 0.75, def: 0, names: ['布の服', '革の胴着', '狩人の外套', '魔導の外套', '星衣'] },
-  medium: { name: '中装', weight: 6, hp: 1.0, def: 3, names: ['革の鎧', '鎖帷子', '竜革の鎧', '銀の鎖鎧', '天衣'] },
-  heavy: { name: '重装', weight: 11, hp: 1.35, def: 7, names: ['鉄の胸当て', '鋼の鎧', '騎士の甲冑', '重装甲冑', '天鋼の大鎧'] },
+  light: { name: '軽装', weight: 3, hp: 0.75, def: 0 },
+  medium: { name: '中装', weight: 6, hp: 1.0, def: 3 },
+  heavy: { name: '重装', weight: 11, hp: 1.35, def: 7 },
 };
+// 防具の種類。lv 以上のアイテムレベルで出る。trait は防具ごとの特性
+export const ARMOR_TYPES = [
+  { id: 'cloth', name: '布の服', cls: 'light', lv: 1, trait: ['move', 3] },
+  { id: 'tunic', name: '革の胴着', cls: 'light', lv: 1, trait: ['aspd', 3] },
+  { id: 'hunter', name: '狩人の外套', cls: 'light', lv: 4, trait: ['crit', 3] },
+  { id: 'robe', name: '魔導ローブ', cls: 'light', lv: 6, trait: ['cdr', 6] },
+  { id: 'ninja', name: '忍び装束', cls: 'light', lv: 8, trait: ['move', 6] },
+  { id: 'bard', name: '吟遊詩人の衣', cls: 'light', lv: 10, trait: ['aspd', 5] },
+  { id: 'leather', name: '革の鎧', cls: 'medium', lv: 1, trait: ['hpp', 4] },
+  { id: 'chain', name: '鎖帷子', cls: 'medium', lv: 3, trait: ['def', 2] },
+  { id: 'scale', name: '鱗鎧', cls: 'medium', lv: 6, trait: ['critd', 8] },
+  { id: 'brigandine', name: 'ブリガンダイン', cls: 'medium', lv: 8, trait: ['atkp', 4] },
+  { id: 'ranger', name: '遊撃兵の胸甲', cls: 'medium', lv: 10, trait: ['move', 4] },
+  { id: 'dragonhide', name: '竜革の鎧', cls: 'medium', lv: 12, trait: ['vamp', 1] },
+  { id: 'breast', name: '鉄の胸当て', cls: 'heavy', lv: 1, trait: ['def', 2] },
+  { id: 'plate', name: '板金鎧', cls: 'heavy', lv: 4, trait: ['hpp', 6] },
+  { id: 'knight', name: '騎士の甲冑', cls: 'heavy', lv: 7, trait: ['def', 3] },
+  { id: 'oyoroi', name: '大鎧', cls: 'heavy', lv: 9, trait: ['atkp', 5] },
+  { id: 'paladin', name: '聖騎士の鎧', cls: 'heavy', lv: 11, trait: ['hpp', 8] },
+  { id: 'fortress', name: '城塞の重甲冑', cls: 'heavy', lv: 13, trait: ['def', 4] },
+];
 
 // 合計重量 → 回避のクールタイム倍率・転がる距離の倍率
 export const WEIGHT_CLASSES = [
@@ -328,12 +352,16 @@ export function makeItem(ilvl, rarity, opts = {}) {
     it.name = unique ? unique.name : TIER_PREFIX[tier] + WEAPONS[kind].name;
     it.skill = pick(WEAPON_SKILL_POOL[kind]);
   } else if (slot === 'armor') {
-    const cls = unique?.armor || opts.armor || pick(['light', 'medium', 'medium', 'heavy']);
-    const A = ARMOR_CLASSES[cls];
-    it.armor = cls;
+    const want = unique?.armor || opts.armor;
+    const pool = ARMOR_TYPES.filter((t) => t.lv <= Math.max(ilvl, 1) && (!want || t.cls === want));
+    const type = pick(pool.length ? pool : ARMOR_TYPES.filter((t) => t.lv === 1));
+    const A = ARMOR_CLASSES[type.cls];
+    it.armor = type.cls;
+    it.atype = type.id;
+    it.trait = type.trait.slice();
     it.hp = Math.round(45 * g * A.hp);
     it.def = A.def;
-    it.name = unique ? unique.name : A.names[Math.min(A.names.length - 1, Math.floor((ilvl - 1) / 8))];
+    it.name = unique ? unique.name : type.name;
   } else {
     it.atk = Math.round(2.5 * g);
     it.hp = Math.round(15 * g);

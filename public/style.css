@@ -140,6 +140,13 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 #tree-tabs button small { color: var(--dim); font-size: 10px; }
 #tree-tabs button.on { background: rgba(100, 190, 255, .5); border-color: #9ad8ff; }
 #tree-tabs .tsep { width: 12px; }
+#tree-tabs button.gap { margin-left: 12px; }
+#box { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(820px, 96vw); max-height: 86vh; padding: 12px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
+.box-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-height: 0; overflow: hidden; }
+.box-col { display: flex; flex-direction: column; min-height: 0; }
+.box-h { font-weight: bold; margin-bottom: 6px; color: #9ae8ff; }
+.box-col .cells { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; overflow-y: auto; max-height: 62vh; padding-right: 4px; align-content: start; }
+.cell .by { position: absolute; bottom: 1px; left: 0; right: 0; font-size: 8px; color: #9ae8ff; text-align: center; overflow: hidden; white-space: nowrap; }
 #tree-body { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .tree-note { font-size: 12px; color: #ffcf7a; padding: 6px 10px; background: rgba(255,180,60,.1); border-radius: 6px; }
 .tree-cols { display: grid; grid-template-columns: 70px repeat(3, 1fr); gap: 8px; font-size: 12px; color: var(--acc); text-align: center; }

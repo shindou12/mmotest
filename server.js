@@ -20,6 +20,7 @@ try { saved = JSON.parse(fs.readFileSync(SAVE, 'utf8')); } catch { /* 初回 */ 
 
 const world = new World({
   unlocked: saved.unlocked || 1,
+  box: saved.box || [],
   onSave: (data) => fs.writeFile(SAVE, JSON.stringify(data), () => {}),
 });
 

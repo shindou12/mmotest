@@ -65,7 +65,8 @@ export const HEAVY = {
   bow: {
     name: '溜め撃ち', desc: '弓を引き絞り、貫通する矢を放つ',
     run(c, lv) {
-      c.arrow({ a: c.aim(), mult: lv === 2 ? 3.6 : 2.2, type: 'heavy', pierce: true, speed: 55, rad: lv === 2 ? 1.2 : 0.8, big: lv === 2 });
+      // 適性エリアは引き絞った長さで広がる（main の c.zone()）
+      c.arrow({ a: c.aim(), mult: lv === 2 ? 2.6 : 1.6, type: 'heavy', pierce: true, speed: 55, rad: lv === 2 ? 1.2 : 0.8, big: true, zone: c.zone() });
     },
   },
   dagger: {
@@ -227,7 +228,7 @@ Object.assign(WEAPON_SKILLS, {
   },
   multishot: {
     name: 'マルチショット', kind: 'bow', cd: 5, desc: '扇状に5本の矢を同時に放つ',
-    run(c) { const a = c.aim(); for (let i = -2; i <= 2; i++) c.arrow({ a: a + i * 0.14, mult: 1.1, type: 'wskill' }); },
+    run(c) { const a = c.aim(); for (let i = -2; i <= 2; i++) c.arrow({ a: a + i * 0.14, mult: 0.75, type: 'wskill' }); },
   },
   arrowrain: {
     name: 'アローレイン', kind: 'bow', cd: 7, desc: '狙った場所に矢の雨を降らせる',
@@ -236,7 +237,7 @@ Object.assign(WEAPON_SKILLS, {
       for (let i = 0; i < 8; i++) {
         c.later(0.15 + i * 0.07, () => {
           const x = p.x + (Math.random() - 0.5) * 4, z = p.z + (Math.random() - 0.5) * 4;
-          c.circle(x, z, 1.6, 0.6, { type: 'wskill', stun: 0.5 });
+          c.circle(x, z, 1.6, 0.42, { type: 'wskill', stun: 0.5 });
           c.fx.parts.burst(x, 0.3, z, 8, { color: 0xd8e8ff, speed: 3, size: 0.35, life: 0.3 });
         });
       }
@@ -270,12 +271,12 @@ export const TREE_SKILLS = {
       const a = c.aim();
       c.dash(a + Math.PI, 5, 0.22, 0.3);
       c.me.a = a;
-      for (let i = -1; i <= 1; i++) c.later(0.05, () => c.arrow({ a: a + i * 0.1, mult: 1.4, type: 'tskill' }));
+      for (let i = -1; i <= 1; i++) c.later(0.05, () => c.arrow({ a: a + i * 0.1, mult: 1.0, type: 'tskill' }));
     },
   },
   focus: {
-    name: '集中', cd: 18, desc: '8秒間、会心率+20%・適性距離+8m',
-    run(c) { c.buff('focus', '集中', 8, { crit: 20, range: 8 }, 0x9ae8ff); },
+    name: '集中', cd: 18, desc: '8秒間、強攻撃の溜め（引き絞り）が2倍の速さになる',
+    run(c) { c.buff('focus', '集中', 8, { chargeRate: 100 }, 0x9ae8ff); },
   },
   slant: {
     name: 'スラント・ラッシュ', cd: 9, desc: '3回連続で踏み込み斬り',
@@ -390,7 +391,7 @@ export const TREES = {
   spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ジャストガードの猶予が長くなる' }) },
   dagger: { name: '短剣', nodes: weaponTree('dagger', ['短剣の心得'], 'poison', 'smoke', { name: '暗殺術', mods: { crit: 8, critd: 40 }, desc: '会心率 +8%、会心ダメージ +40%' }) },
   axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },
-  bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { range: 8 }, desc: '適性距離 +8m' }) },
+  bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { zone: 3 }, desc: '引き絞ったときの適性エリアの幅 +3m' }) },
   stat: {
     name: 'ステータス', nodes: [
       { id: 'st_str', name: '筋力', tier: 0, max: 5, mods: { atkp: 3 }, desc: '攻撃力 +3%' },

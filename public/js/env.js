@@ -1,6 +1,8 @@
 // エリアの地形・建物・プロップ・草・空・遠景（トゥーン調）
 import * as THREE from 'three';
-import { CELL, AREAS, grid, exitsOf, lairOf } from '../shared/areas.js';
+import {
+  CELL, AREAS, grid, exitsOf, lairOf, boundR, maxR, angOf, insideOpen, obstaclesOf, hazardsOf, chestsOf,
+} from '../shared/areas.js';
 import { toon, glow, outline, Batch } from './toon.js';
 
 function seeded(seed) {
@@ -16,14 +18,24 @@ function noise2(x, z) {
 // エリアごとの地面の高さ関数（屋内は平ら）
 export function makeHeight(def) {
   if (def.shape === 'grid') return () => 0;
-  const exits = exitsOf(def), R = def.R;
+  const exits = exitsOf(def);
   const flat = def.type === 'town' ? 0.15 : def.type === 'camp' ? 0.4 : 1;
+  // 池はくぼみ、毒沼・流砂は平らにならす
+  const sinks = [
+    ...obstaclesOf(def).filter((o) => o.kind === 'pond').map((o) => ({ x: o.x, z: o.z, r: o.r, y: -0.9 })),
+    ...hazardsOf(def).map((o) => ({ x: o.x, z: o.z, r: o.r, y: o.kind === 'poison' ? -0.12 : -0.04 })),
+  ];
   return (x, z) => {
     const r = Math.hypot(x, z);
     let h = noise2(x, z) * 0.35 * flat;
     if (def.gate) h *= Math.min(1, Math.hypot(x - def.gate.x, z - def.gate.z) / 12);
     for (const e of exits) h *= Math.min(1, Math.hypot(x - e.x, z - e.z) / 6);
-    if (r > R) h += (r - R) * 0.6;
+    for (const s of sinks) {
+      const d = Math.hypot(x - s.x, z - s.z);
+      if (d < s.r + 1.5) { const k = Math.min(1, (s.r + 1.5 - d) / 2); h = h * (1 - k) + s.y * k; }
+    }
+    const br = boundR(def, angOf(x, z)) - 0.5;
+    if (r > br) h += (r - br) * 0.6;
     return h;
   };
 }
@@ -165,7 +177,7 @@ function makeLair(lair, accent, groundCol) {
 }
 
 // 草（インスタンス描画＋風と踏み分け）
-function makeGrass(fdef, R, heightAt, R_, avoid, density) {
+function makeGrass(fdef, R, heightAt, R_, avoid, density, areaR = R) {
   const gcfg = GRASS[fdef.n];
   if (!gcfg || density <= 0) return null;
   const [cb, ct, dens, hgt] = gcfg;
@@ -179,7 +191,7 @@ function makeGrass(fdef, R, heightAt, R_, avoid, density) {
   blade.setAttribute('normal', new THREE.Float32BufferAttribute(vp.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
   blade.setAttribute('color', new THREE.Float32BufferAttribute(vc, 3));
   blade.setIndex(idx);
-  const count = Math.min(36000, Math.round(Math.PI * R * R * dens * density));
+  const count = Math.min(36000, Math.round(Math.PI * areaR * areaR * dens * density));
   const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
   const U = { uTime: { value: 0 }, uPlayer: { value: new THREE.Vector2() } };
   mat.onBeforeCompile = (sh) => {
@@ -200,7 +212,7 @@ function makeGrass(fdef, R, heightAt, R_, avoid, density) {
   const col = new THREE.Color();
   const Rn = R_;
   let n = 0;
-  for (let tries = 0; n < count && tries < count * 3; tries++) {
+  for (let tries = 0; n < count && tries < count * 5; tries++) {
     const a = Rn() * Math.PI * 2, r = Math.sqrt(Rn()) * (R - 1);
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
     if (avoid(x, z)) continue;
@@ -255,8 +267,13 @@ function buildOpen(def, fdef, opts) {
   group.add(makeSky(fdef, false));
 
   // 地面
-  const size = (def.R + 30) * 2;
-  const ground = new THREE.PlaneGeometry(size, size, 120, 120);
+  const MR = maxR(def);
+  const size = (MR + 30) * 2;
+  const ground = new THREE.PlaneGeometry(size, size, 150, 150);
+  const obst = obstaclesOf(def), haz = hazardsOf(def), chestDefs = chestsOf(def);
+  const blockers = [...obst, ...haz, ...chestDefs.map((c) => ({ x: c.x, z: c.z, r: 1.5 })), ...(def.box ? [{ ...def.box, r: 2 }] : [])];
+  const nearBlock = (x, z, pad) => blockers.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + pad);
+  const hazC = { poison: new THREE.Color(0x3a2a40), sand: new THREE.Color(0xe0c890) };
   ground.rotateX(-Math.PI / 2);
   const pos = ground.attributes.position;
   const cols = new Float32Array(pos.count * 3);
@@ -278,42 +295,69 @@ function buildOpen(def, fdef, opts) {
     const r = Math.hypot(x, z);
     if (r < plaza) tmp.copy(stoneC).offsetHSL(0, 0, ((Math.floor(x * 0.8) + Math.floor(z * 0.8)) % 2) * 0.03 + Math.random() * 0.02);
     else if (onPath(x, z, 2.6)) tmp.lerp(pathC, onPath(x, z, 1.7) ? 0.85 : 0.45);
+    for (const h of haz) {
+      const d = Math.hypot(x - h.x, z - h.z);
+      if (d < h.r + 1.2) tmp.lerp(hazC[h.kind], Math.min(1, (h.r + 1.2 - d) / 1.5) * 0.8);
+    }
+    for (const o of obst) if (o.kind === 'pond' && Math.hypot(x - o.x, z - o.z) < o.r + 1.4) tmp.lerp(new THREE.Color(0x8a7a5a), 0.5);
     cols[i * 3] = tmp.r; cols[i * 3 + 1] = tmp.g; cols[i * 3 + 2] = tmp.b;
   }
   ground.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   ground.computeVertexNormals();
-  const gm = new THREE.Mesh(ground, toon(0xffffff, { vertexColors: true }));
+  const gm = new THREE.Mesh(ground, toon(0xffffff, { vertexColors: true, noOcc: true }));
   gm.receiveShadow = true;
   group.add(gm);
 
-  // 外周の崖とプロップ
+  // 外周の崖（輪郭に沿って並べる）とプロップ
   const B = new Batch();
   const wallC = new THREE.Color(fdef.ground).multiplyScalar(0.55);
-  const nWall = Math.round(def.R * 1.3);
-  for (let i = 0; i < nWall; i++) {
-    const a = (i / nWall) * Math.PI * 2 + R() * 0.05, r = def.R + 4 + R() * 6;
-    const x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7)) continue;
-    const h = 7 + R() * 14, w = 4 + R() * 5;
-    B.add(new THREE.DodecahedronGeometry(1, 1), wallC.clone().offsetHSL(0, 0, (R() - 0.5) * 0.06), local(I, x, h * 0.3, z, R(), R() * 6, R(), w, h, w), { flat: true });
+  // 岩の内側の面が輪郭（boundR）より内へはみ出さないように、岩の大きさぶん外へ置く
+  const nWall = Math.round(MR * 1.8);
+  for (let ring = 0; ring < 2; ring++) {
+    for (let i = 0; i < nWall; i++) {
+      const a = (i / nWall) * Math.PI * 2 + R() * 0.08;
+      const w = ring ? 5 + R() * 4 : 3 + R() * 2.5, h = ring ? 12 + R() * 14 : 5 + R() * 8;
+      const r = boundR(def, a) + w + (ring ? 6 : 1.2) + R() * 1.5;
+      const x = Math.sin(a) * r, z = -Math.cos(a) * r;
+      if (exits.some((e) => Math.hypot(e.x - x, e.z - z) < w + 4)) continue;
+      B.add(new THREE.DodecahedronGeometry(1, 1), wallC.clone().offsetHSL(0, 0, (R() - 0.5) * 0.06 + (ring ? -0.03 : 0)), local(I, x, heightAt(x, z) + h * 0.25, z, R() * 0.3, R() * 6, R() * 0.3, w, h, w), { flat: true });
+    }
   }
-  const avoid = (x, z, pad = 3) => Math.hypot(x, z) < plaza + pad || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
-  const scale = (def.R / 68) ** 2 * (def.type === 'hunt' ? 0.6 : def.type === 'field' ? 1.1 : 0.7);
+  const avoid = (x, z, pad = 3) => Math.hypot(x, z) < plaza + pad || !insideOpen(def, x, z, 2) || nearBlock(x, z, 1.5) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
+  const sx = def.ell?.[0] ?? 1, sz = def.ell?.[1] ?? 1;
+  const scale = (def.R / 68) ** 2 * sx * sz * (def.type === 'hunt' ? 0.6 : def.type === 'field' ? 1.1 : def.type === 'secret' ? 0.9 : 0.7);
   for (const [type, count, col1, col2] of fdef.props) {
     for (let i = 0; i < Math.round(count * scale); i++) {
-      const a = R() * Math.PI * 2, r = 4 + Math.sqrt(R()) * (def.R - 3);
-      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      const a = R() * Math.PI * 2, r = 4 + Math.sqrt(R()) * (boundR(def, a) - 3);
+      const x = Math.sin(a) * r, z = -Math.cos(a) * r;
       if (avoid(x, z)) continue;
       makeProp(B, type, local(I, x, heightAt(x, z), z, 0, R() * Math.PI * 2, 0, 0.7 + R() * 0.8), R, col1, col2, fdef);
     }
   }
+  // 障害物・ハザード・宝箱・共有ボックス
+  for (const o of obst) makeObstacle(B, o, fdef, heightAt, R, group, anims);
+  for (const h of haz) { const m = makeHazard(h, heightAt); group.add(m); anims.push(m.userData.anim); }
+  const chests = chestDefs.map((c) => {
+    const obj = makeChest(false);
+    obj.position.set(c.x, heightAt(c.x, c.z), c.z);
+    obj.rotation.y = Math.atan2(-c.x, -c.z);
+    group.add(obj); anims.push(obj.userData.anim);
+    return { ...c, obj };
+  });
+  let box = null;
+  if (def.box) {
+    box = makeBox();
+    box.position.set(def.box.x, heightAt(def.box.x, def.box.z), def.box.z);
+    box.rotation.y = Math.atan2(-def.box.x, -def.box.z);
+    group.add(box); anims.push(box.userData.anim);
+  }
   if (def.type === 'town') buildTown(B, def, R, heightAt, anims, group);
-  if (def.type === 'camp') buildCamp(B, def, R, heightAt, anims, group);
+  if (def.type === 'camp') buildCamp(B, def, R, heightAt, anims, group, nearBlock);
   if (def.type === 'hunt') {
     // 狩場: 木の柵と獣よけの杭
     for (let i = 0; i < 40; i++) {
-      const a = R() * Math.PI * 2, r = def.R * (0.35 + R() * 0.55);
-      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      const a = R() * Math.PI * 2, r = boundR(def, a) * (0.35 + R() * 0.55);
+      const x = Math.sin(a) * r, z = -Math.cos(a) * r;
       if (avoid(x, z, 0)) continue;
       const m = local(I, x, heightAt(x, z), z, 0, a + Math.PI / 2, 0);
       for (const s of [-1, 0, 1]) B.add(new THREE.CylinderGeometry(0.12, 0.14, 1.4, 6), 0x7a5a3a, local(m, s * 1.1, 0.7, 0));
@@ -325,8 +369,8 @@ function buildOpen(def, fdef, opts) {
   group.add(makeFar(fdef, R));
 
   // 草
-  const grassAvoid = (x, z) => Math.hypot(x, z) < plaza + 1 || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 7) || onPath(x, z, 1.6) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 3);
-  const grass = makeGrass(fdef, def.R, heightAt, R, grassAvoid, (opts.grass ?? 1) * (def.type === 'town' ? 0.5 : 1));
+  const grassAvoid = (x, z) => Math.hypot(x, z) < plaza + 1 || !insideOpen(def, x, z, 0) || nearBlock(x, z, 0.2) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 7) || onPath(x, z, 1.6) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 3);
+  const grass = makeGrass(fdef, MR, heightAt, R, grassAvoid, (opts.grass ?? 1) * (def.type === 'town' ? 0.5 : 1), def.R * Math.sqrt(sx * sz));
   if (grass) group.add(grass.mesh);
 
   // 転移門・出口
@@ -341,7 +385,7 @@ function buildOpen(def, fdef, opts) {
   });
 
   return {
-    group, gate, portals, heightAt, ringMats: [], lair: null,
+    group, gate, portals, heightAt, ringMats: [], lair: null, chests, box,
     light: { hemi: 1.1, sun: fdef.sunI, fogNear: fdef.fogNear, fogFar: fdef.fogFar, fog: fdef.fog },
     update(t, px, pz) { for (const a of anims) a(t); if (grass) { grass.U.uTime.value = t; grass.U.uPlayer.value.set(px, pz); } },
   };
@@ -354,7 +398,8 @@ function buildTown(B, def, R, heightAt, anims, group) {
   for (let i = 0; i < n; i++) {
     const a = (i + 0.5) / n * Math.PI * 2;
     if (Math.abs(Math.atan2(Math.sin(a), -Math.cos(a))) > Math.PI - 0.5) continue; // 北
-    const r = def.R - 7, x = Math.sin(a) * r, z = Math.cos(a) * r;
+    const r = boundR(def, Math.atan2(Math.sin(a), -Math.cos(a))) - 7, x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (def.box && Math.hypot(def.box.x - x, def.box.z - z) < 7) continue;
     const m = local(I, x, heightAt(x, z), z, 0, a, 0, 0.9 + R() * 0.3);
     const w = 5 + R() * 2, d = 4.5, h = 3.2 + R() * 1.2;
     B.add(new THREE.BoxGeometry(w, h, d), 0xeee6d4, local(m, 0, h / 2, 0));
@@ -368,6 +413,7 @@ function buildTown(B, def, R, heightAt, anims, group) {
   // 街灯
   for (let i = 0; i < 8; i++) {
     const a = i / 8 * Math.PI * 2 + 0.2, r = 13, x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (def.box && Math.hypot(def.box.x - x, def.box.z - z) < 4) continue;
     B.add(new THREE.CylinderGeometry(0.1, 0.14, 3.2, 8), 0x3a3a44, local(I, x, 1.6, z));
     B.add(new THREE.SphereGeometry(0.28, 10, 8), 0xffe0a0, local(I, x, 3.3, z), { glowing: true });
   }
@@ -382,10 +428,11 @@ function buildTown(B, def, R, heightAt, anims, group) {
   void group; void anims;
 }
 
-function buildCamp(B, def, R, heightAt, anims, group) {
+function buildCamp(B, def, R, heightAt, anims, group, nearBlock) {
   // テントと焚き火
   for (let i = 0; i < 4; i++) {
     const a = Math.PI * 0.3 + i * Math.PI * 0.45, r = 12, x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (nearBlock(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 4) || exitsOf(def).some((e) => Math.hypot(e.x - x, e.z - z) < 7)) continue;
     const m = local(I, x, heightAt(x, z), z, 0, a + Math.PI, 0);
     B.add(new THREE.CylinderGeometry(0.01, 2.2, 2.6, 4), [0xc8b490, 0x8aa08a, 0xb08a6a, 0x9a9ab8][i], local(m, 0, 1.3, 0, 0, Math.PI / 4, 0, 1, 1, 1.4));
     B.add(new THREE.BoxGeometry(0.8, 1.2, 0.05), 0x3a2a1a, local(m, 0, 0.6, 1.55));
@@ -400,7 +447,171 @@ function buildCamp(B, def, R, heightAt, anims, group) {
   fire.position.set(fx, 0, fz);
   group.add(fire);
   anims.push((t) => { const s = 1 + Math.sin(t * 13) * 0.12; f1.scale.set(1, s, 1); f2.scale.set(1, 2 - s, 1); });
-  for (let k = 0; k < 4; k++) B.add(new THREE.BoxGeometry(1, 1, 1), 0x9a7a4a, local(I, -8 + (k % 2) * 1.1, 0.5 + Math.floor(k / 2) * 1.0, 6 + (k % 2) * 0.2, 0, k * 0.3, 0));
+}
+
+// ---------------------------------------------------------------------------
+// 屋外の障害物・ハザード・宝箱・共有ボックス
+// ---------------------------------------------------------------------------
+const propColor = (fdef, types, i, fb) => {
+  const p = fdef.props.find((q) => types.includes(q[0]));
+  return p ? p[2 + i] ?? fb : fb;
+};
+
+function makeObstacle(B, o, fdef, heightAt, R, group, anims) {
+  const y = heightAt(o.x, o.z);
+  const M = local(I, o.x, o.kind === 'pond' ? 0 : y, o.z, 0, R() * Math.PI * 2, 0);
+  const C = (c, d = 0.08) => new THREE.Color(c).offsetHSL(0, 0, (R() - 0.5) * d);
+  switch (o.kind) {
+    case 'rock': {
+      const col = new THREE.Color(propColor(fdef, ['rock'], 0, 0x8a8a8a));
+      B.add(new THREE.DodecahedronGeometry(o.r * 0.95, 1), C(col), local(M, 0, o.r * 0.3, 0, R(), R() * 3, R(), 1.05, 0.85, 1), { flat: true });
+      for (let k = 0; k < 3; k++) {
+        const a = R() * Math.PI * 2, s = o.r * (0.3 + R() * 0.2);
+        B.add(new THREE.DodecahedronGeometry(s, 0), C(col), local(M, Math.sin(a) * o.r * 0.85, s * 0.3, Math.cos(a) * o.r * 0.85, R(), R(), R()), { flat: true });
+      }
+      if (fdef.n <= 2) B.add(new THREE.SphereGeometry(o.r * 0.7, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2.4), C(0x5a9a3a), local(M, 0, o.r * 0.62, 0, 0, 0, 0, 1.15, 0.45, 1.1));
+      break;
+    }
+    case 'tree': {
+      // 大樹: 太い幹と張った根、大きな樹冠
+      const trunk = propColor(fdef, ['tree', 'pine'], 1, 0x6a4a2a), leaf = propColor(fdef, ['tree', 'pine'], 0, 0x3f8f3a);
+      const s = o.r * 0.9;
+      B.add(new THREE.CylinderGeometry(0.32 * s, 0.55 * s, 3.4 * s, 10), C(trunk), local(M, 0, 1.7 * s, 0));
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * Math.PI * 2 + R() * 0.5;
+        B.add(new THREE.CylinderGeometry(0.08 * s, 0.22 * s, 1.5 * s, 6), C(trunk), local(M, Math.sin(a) * 0.55 * s, 0.25 * s, Math.cos(a) * 0.55 * s, Math.cos(a) * 1.1, 0, -Math.sin(a) * 1.1));
+      }
+      const clumps = [[0, 4.2, 0, 1.6], [1.0, 3.7, 0.4, 1.15], [-0.95, 3.8, -0.3, 1.2], [0.3, 5.1, -0.3, 1.1], [-0.3, 3.6, 1.0, 1.0], [0.4, 3.5, -1.0, 1.0]];
+      for (const [x, yy, z, r] of clumps) B.add(new THREE.SphereGeometry(r * s, 12, 10), C(new THREE.Color(leaf).offsetHSL(0, 0, yy > 4.5 ? 0.06 : -0.02)), local(M, x * s, yy * s, z * s, 0, 0, 0, 1, 0.85, 1));
+      break;
+    }
+    case 'ruin': {
+      // 崩れた石壁と柱
+      const col = new THREE.Color(0xb8ab90).lerp(new THREE.Color(fdef.ground), 0.25);
+      const n = 4 + Math.floor(R() * 3);
+      for (let k = 0; k < n; k++) {
+        const a = k / n * Math.PI * 1.5 + R() * 0.2, h = 0.8 + R() * 2.6;
+        B.add(new THREE.BoxGeometry(o.r * 0.75, h, 0.7), C(col), local(M, Math.sin(a) * o.r * 0.75, h / 2, Math.cos(a) * o.r * 0.75, 0, a + Math.PI / 2, (R() - 0.5) * 0.1), { flat: true });
+      }
+      makeProp(B, 'pillar', local(M, 0, 0, 0), R, col.getHex(), col.getHex(), fdef);
+      for (let k = 0; k < 4; k++) B.add(new THREE.DodecahedronGeometry(0.4 + R() * 0.3, 0), C(col), local(M, (R() - 0.5) * o.r * 1.4, 0.2, (R() - 0.5) * o.r * 1.4, R(), R(), R()), { flat: true });
+      break;
+    }
+    case 'crystal': {
+      const c1 = propColor(fdef, ['crystal'], 0, 0x7ae0ff), c2 = propColor(fdef, ['crystal'], 1, 0xb07aff);
+      makeProp(B, 'crystal', local(M, 0, 0, 0, 0, 0, 0, o.r * 1.1), R, c1, c2, fdef);
+      break;
+    }
+    case 'pond': {
+      // 水面（くぼみの上に置く）と縁の石・葦
+      const water = new THREE.Mesh(new THREE.CircleGeometry(o.r + 0.9, 48), new THREE.MeshToonMaterial({
+        color: fdef.n === 3 ? 0x3ab0b0 : 0x3a8ad0, transparent: true, opacity: 0.82, gradientMap: null,
+      }));
+      water.rotation.x = -Math.PI / 2;
+      water.position.set(o.x, -0.25, o.z);
+      water.userData.noOutline = true;
+      group.add(water);
+      const shine = new THREE.Mesh(new THREE.RingGeometry(o.r * 0.3, o.r * 0.34, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, depthWrite: false }));
+      shine.rotation.x = -Math.PI / 2; shine.position.set(o.x, -0.22, o.z); group.add(shine);
+      anims.push((t) => { const s = 1 + (t * 0.25 % 1) * 2; shine.scale.setScalar(s); shine.material.opacity = 0.3 * (1 - (s - 1) / 2); });
+      const n = Math.round(o.r * 2.2);
+      for (let k = 0; k < n; k++) {
+        const a = k / n * Math.PI * 2 + R() * 0.2, rr = o.r + 0.8 + R() * 0.6;
+        const x = Math.sin(a) * rr, z = Math.cos(a) * rr;
+        if (R() < 0.55) B.add(new THREE.DodecahedronGeometry(0.35 + R() * 0.3, 0), C(0x8a8a80), local(I, o.x + x, heightAt(o.x + x, o.z + z), o.z + z, R(), R(), R()), { flat: true });
+        else for (let j = 0; j < 3; j++) B.add(new THREE.ConeGeometry(0.05, 1.2 + R() * 0.6, 4), C(0x6a8a3a), local(I, o.x + x + (R() - 0.5) * 0.4, heightAt(o.x + x, o.z + z) + 0.6, o.z + z + (R() - 0.5) * 0.4, (R() - 0.5) * 0.3, 0, (R() - 0.5) * 0.3));
+      }
+      break;
+    }
+  }
+}
+
+// 毒沼（泡が立つ）と流砂（渦を巻く）
+function makeHazard(h, heightAt) {
+  const poison = h.kind === 'poison';
+  const U = { uTime: { value: 0 }, uR: { value: h.r } };
+  const mat = new THREE.ShaderMaterial({
+    uniforms: U, transparent: true, depthWrite: false,
+    vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: `uniform float uTime; uniform float uR; varying vec2 vP;
+      void main(){
+        float r = length(vP) / uR; if (r > 1.0) discard;
+        float a = atan(vP.y, vP.x);
+        ${poison
+    ? `vec3 c = mix(vec3(0.42,0.16,0.55), vec3(0.25,0.75,0.25), 0.5 + 0.5 * sin(a * 3.0 + r * 9.0 - uTime * 1.3));
+        c *= 0.75 + 0.25 * sin(r * 20.0 - uTime * 2.0);`
+    : `float s = 0.5 + 0.5 * sin(a * 3.0 + r * 14.0 + uTime * 2.4);
+        vec3 c = mix(vec3(0.72,0.58,0.36), vec3(0.95,0.84,0.6), s);
+        c = mix(c, vec3(0.45,0.34,0.2), smoothstep(0.35, 0.0, r));`}
+        float edge = smoothstep(1.0, 0.85, r);
+        gl_FragColor = vec4(c, edge * ${poison ? '0.88' : '0.8'});
+      }`,
+  });
+  const m = new THREE.Mesh(new THREE.CircleGeometry(h.r, 40), mat);
+  m.rotation.x = -Math.PI / 2;
+  const g = new THREE.Group();
+  g.add(m);
+  m.position.y = (poison ? -0.12 : -0.04) + 0.06;
+  // 泡
+  const bubbles = [];
+  if (poison) {
+    const bm = new THREE.MeshBasicMaterial({ color: 0x9aff7a, transparent: true, opacity: 0.8 });
+    for (let k = 0; k < 6; k++) {
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), bm);
+      const a = Math.random() * 6.28, rr = Math.random() * h.r * 0.7;
+      b.position.set(Math.sin(a) * rr, 0, Math.cos(a) * rr);
+      b.userData.ph = Math.random() * 3;
+      g.add(b); bubbles.push(b);
+    }
+  }
+  g.position.set(h.x, 0, h.z);
+  g.userData.anim = (t) => {
+    U.uTime.value = t;
+    for (const b of bubbles) { const p = (t * 0.6 + b.userData.ph) % 1; b.position.y = -0.05 + p * 0.25; b.scale.setScalar(p < 0.85 ? 0.4 + p : 0.01); }
+  };
+  void heightAt;
+  return g;
+}
+
+// 宝箱（big: ダンジョン最奥の大きな宝箱）
+function makeChest(big) {
+  const chest = new THREE.Group();
+  const body = new THREE.Group(); chest.add(body);
+  const wood = toon(big ? 0x8a5a2a : 0x7a5a3a), gold = toon(big ? 0xe8b84a : 0xb0b0b8);
+  body.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.0, 1.1), wood), 0, 0.5, 0));
+  const lid = new THREE.Group(); lid.position.set(0, 1.0, -0.55); body.add(lid);
+  const lidMesh = at(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.8, 12, 1, false, 0, Math.PI), wood), 0, 0, 0.55);
+  lidMesh.rotation.z = Math.PI / 2;
+  lid.add(lidMesh);
+  for (const s of [-1, 1]) body.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.05, 1.15), gold), s * 0.7, 0.52, 0));
+  body.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.35, 0.1), gold), 0, 0.85, 0.58));
+  if (!big) body.scale.setScalar(0.75);
+  const shine = at(new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), new THREE.MeshBasicMaterial({ color: big ? 0xffe08a : 0xbfe6ff, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })), 0, big ? 1.2 : 0.9, 0);
+  chest.add(shine);
+  chest.traverse((o) => { if (o.isMesh && o.material.isMeshToonMaterial) o.castShadow = true; });
+  outline(chest, 1);
+  chest.add(at(textSprite('宝箱', big ? '#ffd27a' : '#cfe6ff', 3, '[F] 開ける'), 0, big ? 2.6 : 2.1, 0));
+  chest.userData = { lid, shine, anim: (t) => { shine.scale.setScalar(1 + Math.sin(t * 3) * 0.15); } };
+  return chest;
+}
+
+// 共有ボックス（町・野営地。全員で中身を共有）
+function makeBox() {
+  const g = new THREE.Group();
+  const wood = toon(0x5a6a8a), trim = toon(0xd0d8e8), rune = glow(new THREE.Color(0x7ae0ff).multiplyScalar(1.5));
+  g.add(at(new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.3, 1.5), wood), 0, 0.65, 0));
+  g.add(at(new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.25, 1.65), trim), 0, 1.38, 0));
+  for (const s of [-1, 1]) g.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.35, 1.6), trim), s * 0.95, 0.67, 0));
+  g.add(at(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.2, 1.7), toon(0x3a4256)), 0, 0.1, 0));
+  const gem = at(new THREE.Mesh(new THREE.OctahedronGeometry(0.28), rune), 0, 0.8, 0.8);
+  g.add(gem);
+  g.traverse((o) => { if (o.isMesh && o.material.isMeshToonMaterial) o.castShadow = true; });
+  outline(g, 1);
+  const halo = new THREE.Mesh(new THREE.RingGeometry(1.9, 2.1, 40), new THREE.MeshBasicMaterial({ color: 0x7ae0ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  halo.rotation.x = -Math.PI / 2; halo.position.y = 0.08; g.add(halo);
+  g.add(at(textSprite('共有ボックス', '#9ae8ff', 4, '[F] 開く'), 0, 3, 0));
+  g.userData.anim = (t) => { gem.rotation.y = t * 1.5; gem.position.y = 0.8 + Math.sin(t * 2) * 0.05; halo.material.opacity = 0.35 + Math.sin(t * 2) * 0.15; };
+  return g;
 }
 
 function buildGrid(def, fdef) {
@@ -488,27 +699,12 @@ function buildGrid(def, fdef) {
   }
 
   // 宝箱
-  let chest = null;
-  for (const C of g.pts.C || []) {
-    chest = new THREE.Group();
-    const wood = toon(0x8a5a2a), gold = toon(0xe8b84a);
-    chest.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.0, 1.1), wood), 0, 0.5, 0));
-    const lid = new THREE.Group(); lid.position.set(0, 1.0, -0.55); chest.add(lid);
-    const lidMesh = at(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.8, 12, 1, false, 0, Math.PI), wood), 0, 0, 0.55);
-    lidMesh.rotation.z = Math.PI / 2;
-    lid.add(lidMesh);
-    for (const s of [-1, 1]) chest.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.05, 1.15), gold), s * 0.7, 0.52, 0));
-    chest.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.35, 0.1), gold), 0, 0.85, 0.58));
-    const shine = at(new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })), 0, 1.2, 0);
-    chest.add(shine);
-    chest.traverse((o) => { if (o.isMesh && o.material.isMeshToonMaterial) o.castShadow = true; });
-    outline(chest, 1);
-    chest.add(at(textSprite('宝箱', '#ffd27a', 3, '[F] 開ける'), 0, 2.6, 0));
-    chest.userData = { lid, shine };
-    chest.position.set(C.x, 0, C.z);
-    group.add(chest);
-    anims.push((t) => { shine.scale.setScalar(1 + Math.sin(t * 3) * 0.15); });
-  }
+  const chests = chestsOf(def).map((c) => {
+    const obj = makeChest(true);
+    obj.position.set(c.x, 0, c.z);
+    group.add(obj); anims.push(obj.userData.anim);
+    return { ...c, obj };
+  });
 
   // 感圧板
   const plates = (g.pts.P || []).map((P) => {
@@ -528,7 +724,7 @@ function buildGrid(def, fdef) {
   }
 
   return {
-    group, gate: null, portals, door, lever, chest, plates, lair, ringMats, heightAt: () => 0,
+    group, gate: null, portals, door, lever, chests, box: null, plates, lair, ringMats, heightAt: () => 0,
     light: { hemi: 0.75, sun: fdef.sunI * 0.45, fogNear: 14, fogFar: 60, fog: new THREE.Color(fdef.fog).multiplyScalar(0.25).getHex() },
     update(t) { for (const a of anims) a(t); },
   };

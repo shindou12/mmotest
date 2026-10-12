@@ -84,14 +84,15 @@
     Space 回避（無敵時間あり）<br>
     盾槍：右クリック長押しでガード（構えた直後はジャストガード）<br>
     Q ポーション / I 装備 / K スキルツリー / M エリアマップ<br>
-    F 調べる（転移門・NPC・レバー・宝箱）<br>
+    F 調べる（転移門・NPC・レバー・宝箱・共有ボックス）<br>
+    ホイール ズーム<br>
     Esc 設定 / Enter チャット / H ヘルプ<br>
     <span class="dim">赤い予兆の中にいると被弾。回避の無敵で抜けると「JUST回避」</span>
   </div>
 </div>
 
 <div id="inv" class="panel hidden">
-  <div class="inv-head"><b>装備 / インベントリ</b><span class="dim">クリック:装備　右クリック:分解</span><button id="inv-salvage">コモン・アンコモン一括分解</button><button id="inv-close">×</button></div>
+  <div class="inv-head"><b>装備 / インベントリ</b><span class="dim">クリック:装備　右クリック:分解</span><button id="inv-salvage">コモン・アンコモン一括分解</button><button id="inv-close" data-close>×</button></div>
   <div class="inv-body">
     <div class="inv-left">
       <div class="eq" data-slot="weapon"><div class="eq-l">武器</div><div class="cell"></div></div>
@@ -104,13 +105,13 @@
 </div>
 
 <div id="tree" class="panel hidden">
-  <div class="inv-head"><b>スキルツリー</b><span id="sp-left"></span><span class="dim">クリックで習得 ／ ◆は使うスキル（[1][2]でスロットに入れる）</span><button id="tree-reset">振り直し</button><button id="tree-close">×</button></div>
+  <div class="inv-head"><b>スキルツリー</b><span id="sp-left"></span><span class="dim">クリックで習得 ／ ◆は使うスキル（[1][2]でスロットに入れる）</span><button id="tree-reset">振り直し</button><button id="tree-close" data-close>×</button></div>
   <div id="tree-tabs"></div>
   <div id="tree-body"></div>
 </div>
 
 <div id="settings" class="panel hidden">
-  <div class="inv-head"><b>設定</b><button id="settings-close">×</button></div>
+  <div class="inv-head"><b>設定</b><button id="settings-close" data-close>×</button></div>
   <div class="set-group">
     <div class="set-h">サウンド</div>
     <label class="set-row" for="set-master"><span>全体の音量</span><input id="set-master" type="range" min="0" max="100"><output></output></label>
@@ -124,21 +125,35 @@
       <select id="set-quality"><option value="high">高（光の演出・影・草すべて）</option><option value="mid">標準（草を半分に）</option><option value="low">軽量（光の演出と影なし・草少なめ）</option></select></label>
     <label class="set-row" for="set-shake"><span>画面の揺れ</span><input id="set-shake" type="checkbox"></label>
     <label class="set-row" for="set-dmgnum"><span>ダメージの数字</span><input id="set-dmgnum" type="checkbox"></label>
+    <label class="set-row" for="set-occlusion"><span>手前の敵・障害物を透かす</span><input id="set-occlusion" type="checkbox"></label>
   </div>
   <div class="dim">設定はこのブラウザに保存されます</div>
 </div>
 
 <div id="map" class="panel hidden">
-  <div class="inv-head"><b id="map-title">エリアマップ</b><span class="dim">出口（光る門）を通ると隣のエリアへ移動します</span><button id="map-close">×</button></div>
+  <div class="inv-head"><b id="map-title">エリアマップ</b><span class="dim">出口（光る門）を通ると隣のエリアへ移動します</span><button id="map-close" data-close>×</button></div>
   <svg id="map-svg" viewBox="-40 -10 680 420" role="img" aria-label="エリアマップ"></svg>
   <div class="map-legend"><span>⌂ 町・野営地：転移門とNPC</span><span>✿ フィールド</span><span>⚔ 狩場：経験値1.6倍</span><span>◈ ダンジョン：最奥にユニーク装備</span><span>♜ 迷宮区：ギミックと階層ボス</span></div>
 </div>
 
-<div id="dialog" class="panel hidden"></div>
+<div id="dialog" class="panel hidden">
+  <div class="inv-head"><b id="dialog-title"></b><button data-close>×</button></div>
+  <p class="npc-line" id="dialog-line"></p>
+  <div id="dialog-quests"></div>
+</div>
 
 <div id="gate-menu" class="panel hidden">
-  <div class="inv-head"><b>転移門</b><button id="gate-close">×</button></div>
+  <div class="inv-head"><b>転移門</b><button id="gate-close" data-close>×</button></div>
   <div id="gate-list"></div>
+  <div class="dim" style="text-align:center;margin-top:4px">第4層以降は準備中</div>
+</div>
+
+<div id="box" class="panel hidden">
+  <div class="inv-head"><b>共有ボックス</b><span class="dim">みんなで共有する箱です。クリックで入れる / 取り出す（どの町の箱でも中身は同じ）</span><button data-close>×</button></div>
+  <div class="box-body">
+    <div class="box-col"><div class="box-h">自分の持ち物</div><div id="box-mine" class="cells"></div></div>
+    <div class="box-col"><div class="box-h">共有ボックスの中 <span id="box-count" class="dim"></span></div><div id="box-shared" class="cells"></div></div>
+  </div>
 </div>
 
 <div id="death" class="hidden"><div>HP が尽きた…</div><small id="death-t"></small></div>
