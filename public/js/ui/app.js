@@ -271,7 +271,7 @@ export function createUI(game) {
     v.link((ev) => { if (ev.type === 'item:context') ev.preventDefault = true; });
   };
 
-  const passiveLines = (kind) => [...WEAPONS[kind].passive, ...(WEAPONS[kind].melee ? [`生存本能：HPが${INSTINCT.hp * 100}%を切ると${INSTINCT.sec}秒間 被ダメージ-${INSTINCT.dr}%（CT ${INSTINCT.cd}秒）`] : [])];
+  const passiveLines = (kind) => [...WEAPONS[kind].passive, ...(WEAPONS[kind].melee ? [`生存本能：常に被ダメージ-${INSTINCT.dr}%`] : [])];
   P.itemTip = (it, compare) => {
     const S = game.S, char = game.char;
     const r = RARITIES[it.rarity];
@@ -744,10 +744,6 @@ export function createUI(game) {
     const status = me.buffs.map((b) => `<span style="color:${hex(b.color)}">✦ ${esc(b.label)} ${b.t.toFixed(1)}s</span>`);
     if (me.dStack > 0) status.push(`<span style="color:#9fe">⚡ 連撃 攻速+${me.dStack * 4}%</span>`);
     if (me.nextAtkBonus > 1.01) status.push(`<span style="color:#bfe0ff">⛨ 反撃準備 +${Math.round((me.nextAtkBonus - 1) * 100)}%</span>`);
-    if (S.W.melee) {
-      const cd = INSTINCT.cd - (t - me.instinctT);
-      status.push(cd > 0 ? `<span class="dim">生存本能 ${Math.ceil(cd)}s</span>` : '<span style="color:#ff9a8a">♥ 生存本能</span>');
-    }
     const hz = game.hazard();
     if (hz) status.push(`<span style="color:${hz.kind === 'poison' ? '#c08aff' : '#e0c890'}">⚠ ${HAZARDS[hz.kind].name}</span>`);
     H.buffs.set({ html: status.join('　') });

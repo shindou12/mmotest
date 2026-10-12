@@ -64,8 +64,8 @@ export const WEAPONS = {
 export const WEAPON_KINDS = Object.keys(WEAPONS);
 // 弓の適性エリア: 外円 = 適性距離、内円 = 外円 - 幅。幅は引き絞り具合で BOW_ZONE.min〜max
 export const BOW_ZONE = { min: 2, max: 8, outside: 0.35 };
-// 生存本能（近接武器のパッシブ）: HPが一定以下になると一時的に被ダメージ軽減
-export const INSTINCT = { hp: 0.35, dr: 50, sec: 6, cd: 90 };
+// 生存本能（近接武器のパッシブ）: 常に被ダメージを少し軽減する
+export const INSTINCT = { dr: 8 };
 // 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
 export const WEAPON_SKILL_POOL = {
   sword: ['vorpal', 'square', 'leap', 'horizon'],

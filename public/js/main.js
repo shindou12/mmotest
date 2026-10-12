@@ -118,7 +118,7 @@ const me = {
   wsCd: 0, tcd: {}, skillT: -1, spin: false, dashT: 0, dashA: 0, dashSpeed: 0,
   potions: 3, potCd: 0, lastHurt: -99, walkT: 0, moving: false, stepT: 0,
   buffs: [], ambush: 0, lastStandT: -999, transit: false,
-  staggerT: 0, instinctT: -9999, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
+  staggerT: 0, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
   model: null,
 };
 const world = { area: 'f1_town', def: AREAS.f1_town, floor: 1, unlocked: 1, bossState: 'idle', door: false, plates: [] };
@@ -207,7 +207,8 @@ function calcStats() {
     wk, W, atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: T.actives,
     crit: 5 + m('crit'), critd: 150 + m('critd'), aspd: m('aspd'), move: m('move'),
     vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0) + P.vamp, cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
-    def: Math.min(65, m('def') + base(eq.armor, 'def') + P.def), wr: eq.weapon ? eq.weapon.rarity : 0,
+    // 生存本能: 近接武器は常に被ダメ軽減
+    def: Math.min(65, m('def') + base(eq.armor, 'def') + P.def + (W.melee ? INSTINCT.dr : 0)), wr: eq.weapon ? eq.weapon.rarity : 0,
     sv, title, titleOn, tfx,
     normp: m('normp'), heavyp: m('heavyp') + P.heavy, wskillp: m('wskillp'), dodgecd: Math.min(60, m('dodgecd')),
     justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion') + (char.potBonus || 0),
@@ -807,14 +808,6 @@ function takeDamage(raw) {
     return;
   }
   if (me.hp <= 0) { die(); return; }
-  // 生存本能（近接武器のパッシブ）: HPが一定以下になると、しばらく被ダメージを大きく軽減
-  if (S.W.melee && me.hp < S.mhp * INSTINCT.hp && now() - me.instinctT > INSTINCT.cd) {
-    me.instinctT = now();
-    addBuff('instinct', '生存本能', INSTINCT.sec, { dr: INSTINCT.dr }, 0xff6a5a);
-    floatText(me.x, 2.8, me.z, '生存本能!', 'just');
-    fx.beam(me.x, me.z, 0xff6a5a, 8, 0.8, 0.8);
-    ui.toast(`生存本能が発動！ ${INSTINCT.sec}秒間 被ダメージ-${INSTINCT.dr}%（次は${INSTINCT.cd}秒後）`, '#ff9a8a');
-  }
 }
 
 function onJustDodge() {
@@ -2137,10 +2130,8 @@ function update(dt) {
       }
     }
 
-    // 自然回復 / 町や転移門の近くでポーション補充
-    const regen = t - me.lastHurt > 5 ? 0.03 : 0.004;
-    me.hp = Math.min(S.mhp, me.hp + S.mhp * (safe ? 0.1 : regen) * dt);
-    if (safe) me.potions = S.maxPot;
+    // 自然回復はなし（回復はポーション・スキル・吸収などで）。町や転移門の近くだけ、HPとポーションが戻る
+    if (safe) { me.hp = Math.min(S.mhp, me.hp + S.mhp * 0.1 * dt); me.potions = S.maxPot; }
   }
 
   // 毒
