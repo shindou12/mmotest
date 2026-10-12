@@ -28,7 +28,179 @@ const finish = (root, w = 1) => { compact(root); outline(root, w); return root; 
 // ---------------------------------------------------------------------------
 // 武器
 // ---------------------------------------------------------------------------
-export function makeWeapon(kind, rarity = 0) {
+// 武器の形のバリエーション（style 1・2 = 形違い、3 = 伝説・神器の専用形）。style 0 は基本形（makeWeapon 内）
+function weaponVariant(kind, style, C) {
+  const { g, steel, gold, grip, gem, edge, handle, rc, rarity } = C;
+  const glowM = (k = 1) => glow(rc.clone().multiplyScalar(k));
+  const blade = (pts, depth, y = 0.12, mat = steel) => { edge(pts.map(([x, yy]) => [x, yy]), depth); const m = mesh(extrude(pts, depth), mat, [0, y, 0]); g.add(m); return m; };
+  if (kind === 'sword') {
+    if (style === 1) { // 刀: 反りのある片刃
+      const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x + 0.045, y]); }
+      for (let i = 10; i >= 0; i--) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x - (t > 0.92 ? 0 : 0.03), y]); }
+      blade(pts, 0.03);
+      g.add(mesh(cyl(0.1, 0.1, 0.03, 14), gold, [0, 0.1, 0], [Math.PI / 2, 0, 0]));
+      handle(0.5, 0.032);
+      return true;
+    }
+    if (style === 2) { // 幅広の葉形
+      blade([[-0.06, 0], [0.06, 0], [0.13, 0.55], [0.1, 0.95], [0, 1.25], [-0.1, 0.95], [-0.13, 0.55]], 0.04);
+      g.add(mesh(new THREE.BoxGeometry(0.42, 0.07, 0.09), gold, [0, 0.08, 0]));
+      g.add(mesh(sphere(0.05, 10, 8), gem, [0, 0.08, 0.05]));
+      handle(0.38);
+      return true;
+    }
+    if (style === 3) { // 専用: 光の結晶の刃と翼の鍔
+      const pts = [[-0.07, 0], [0.07, 0], [0.09, 0.8], [0.04, 1.3], [0, 1.5], [-0.04, 1.3], [-0.09, 0.8]];
+      blade(pts, 0.03, 0.12, glowM(1.3));
+      g.add(mesh(extrude(pts.map(([x, y]) => [x * 0.55, y * 0.96]), 0.045), steel, [0, 0.14, 0]));
+      for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.42, 0.18], [0.36, 0.05], [0.5, -0.02], [0.2, -0.06]].map(([x, y]) => [x * s, y]), 0.03), gold, [0, 0.08, 0]));
+      g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0, 0.1, 0.03]));
+      handle(0.42);
+      return true;
+    }
+  }
+  if (kind === 'greatsword') {
+    if (style === 1) { // 大包丁: 四角い幅広の刃
+      blade([[-0.18, 0], [0.18, 0], [0.24, 1.8], [-0.05, 2.0], [-0.24, 1.75]], 0.07);
+      g.add(mesh(cyl(0.05, 0.05, 0.08, 12), gold, [0.1, 1.6, 0], [Math.PI / 2, 0, 0]));
+      g.add(mesh(new THREE.BoxGeometry(0.5, 0.12, 0.16), gold, [0, 0.08, 0]));
+      handle(0.6, 0.05);
+      return true;
+    }
+    if (style === 2) { // ツヴァイハンダー: 細長い刃と返し
+      blade([[-0.1, 0], [0.1, 0], [0.11, 2.1], [0, 2.45], [-0.11, 2.1]], 0.05);
+      for (const s of [-1, 1]) g.add(mesh(cone(0.04, 0.2, 6), steel, [s * 0.16, 0.5, 0], [0, 0, -s * 1.57]));
+      g.add(mesh(new THREE.BoxGeometry(0.95, 0.07, 0.1), gold, [0, 0.08, 0]));
+      handle(0.75, 0.042);
+      return true;
+    }
+    if (style === 3) { // 専用: 波打つ炎の刃（フランベルジュ）
+      const L = 2.3, pts = [];
+      for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push([0.17 + Math.sin(t * 18) * 0.04 - t * 0.08, t * L]); }
+      pts.push([0, L + 0.25]);
+      for (let i = 12; i >= 0; i--) { const t = i / 12; pts.push([-(0.17 + Math.sin(t * 18 + 1) * 0.04 - t * 0.08), t * L]); }
+      blade(pts, 0.06);
+      g.add(mesh(new THREE.BoxGeometry(0.05, L * 0.8, 0.08), glowM(1.4), [0, 0.12 + L * 0.42, 0]));
+      g.add(mesh(new THREE.TorusGeometry(0.32, 0.05, 6, 16, Math.PI), gold, [0, 0.0, 0], [0, 0, Math.PI]));
+      g.add(mesh(sphere(0.08, 10, 8), gem, [0, 0.1, 0.07]));
+      handle(0.6, 0.048);
+      return true;
+    }
+  }
+  if (kind === 'spear') {
+    const shaft = (len, col = 0x6a4428) => g.add(mesh(cyl(0.035, 0.04, len, 8), toon(col), [0, len / 2 - 0.5, 0]));
+    if (style === 1) { // ハルバード: 斧頭と突起
+      shaft(2.9);
+      blade([[0, 0], [0.06, 0.25], [0, 0.6], [-0.06, 0.25]].map(([x, y]) => [x, y]), 0.04, 2.4);
+      blade([[0.03, -0.18], [0.42, -0.3], [0.48, 0], [0.42, 0.3], [0.03, 0.18]], 0.05, 2.2);
+      g.add(mesh(cone(0.04, 0.22, 6), steel, [-0.13, 2.2, 0], [0, 0, 1.57]));
+      g.add(mesh(new THREE.TorusGeometry(0.05, 0.016, 5, 10), gold, [0, 2.0, 0], [Math.PI / 2, 0, 0]));
+      return true;
+    }
+    if (style === 2) { // 三叉槍
+      shaft(2.8, 0x4a4a58);
+      for (const s of [-1, 0, 1]) blade([[-0.035, 0], [0.035, 0], [0, s ? 0.45 : 0.6]], 0.03, 2.35 + (s ? 0 : 0.05)).position.x = s * 0.15;
+      g.add(mesh(new THREE.BoxGeometry(0.4, 0.07, 0.07), gold, [0, 2.33, 0]));
+      g.add(mesh(sphere(0.06, 10, 8), gem, [0, 2.26, 0]));
+      return true;
+    }
+    if (style === 3) { // 専用: 翼のある光の槍
+      shaft(3.1, 0xe8e0d0);
+      blade([[0, 0], [0.12, 0.25], [0.06, 0.8], [0, 1.0], [-0.06, 0.8], [-0.12, 0.25]], 0.04, 2.45, glowM(1.3));
+      for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.4, 0.3], [0.3, 0.1], [0.45, 0.05], [0.1, -0.1]].map(([x, y]) => [x * s, y]), 0.025), gold, [0, 2.35, 0]));
+      g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0, 2.38, 0]));
+      return true;
+    }
+  }
+  if (kind === 'axe') {
+    const haft = (len) => g.add(mesh(cyl(0.05, 0.06, len, 8), toon(0x5a3a22), [0, len / 2 - 0.3, 0]));
+    if (style === 1) { // 髭斧: 片刃で下に伸びる刃
+      haft(1.9);
+      blade([[0, 0.2], [0.35, 0.3], [0.6, 0.1], [0.55, -0.45], [0.3, -0.6], [0.25, -0.2], [0, -0.1]], 0.07, 1.4);
+      g.add(mesh(new THREE.BoxGeometry(0.14, 0.36, 0.12), gold, [0, 1.42, 0]));
+      return true;
+    }
+    if (style === 2) { // 戦鎚
+      haft(1.8);
+      g.add(mesh(new THREE.BoxGeometry(0.62, 0.34, 0.34), steel, [0, 1.45, 0]));
+      for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.4, 0.4), gold, [s * 0.32, 1.45, 0]));
+      g.add(mesh(cone(0.08, 0.3, 6), steel, [0, 1.75, 0]));
+      if (rarity >= 3) g.add(mesh(new THREE.BoxGeometry(0.64, 0.06, 0.36), glowM(1.2), [0, 1.45, 0]));
+      return true;
+    }
+    if (style === 3) { // 専用: ルーンの大三日月
+      haft(2.0);
+      const b = [[0, -0.42], [0.3, -0.55], [0.75, -0.8], [0.85, 0], [0.75, 0.8], [0.3, 0.55], [0, 0.42]];
+      blade(b, 0.07, 1.45);
+      blade(b.map(([x, y]) => [-x, y]), 0.07, 1.45);
+      for (let i = 0; i < 3; i++) g.add(mesh(new THREE.BoxGeometry(0.05, 0.16, 0.09), glowM(1.5), [0.45, 1.45 + (i - 1) * 0.22, 0]));
+      g.add(mesh(new THREE.OctahedronGeometry(0.1), gem, [0, 1.45, 0.06]));
+      return true;
+    }
+  }
+  if (kind === 'bow') {
+    const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
+    const string = (tip, sx) => { const s = mesh(cyl(0.008, 0.008, tip * 2, 4), glow(rarity >= 2 ? rc : new THREE.Color(0xeeeeee)), [sx, 0, 0]); s.userData.noOutline = true; g.add(s); };
+    if (style === 1 || style === 2) { // 1: リカーブ（先端が反る） 2: ロングボウ（長い）
+      const R = style === 2 ? 1.25 : 0.75, arc = style === 2 ? Math.PI * 0.62 : Math.PI * 0.66;
+      const limb = new THREE.TorusGeometry(R, style === 2 ? 0.04 : 0.05, 6, 28, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+      g.add(mesh(limb, wood));
+      const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+      if (style === 1) for (const s of [-1, 1]) g.add(mesh(new THREE.TorusGeometry(0.12, 0.035, 5, 10, Math.PI * 0.8), wood, [sx + 0.1, s * tip, 0], [0, 0, s > 0 ? 0.3 : Math.PI - 0.3]));
+      string(tip, sx);
+      g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip));
+      g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
+      return true;
+    }
+    if (style === 3) { // 専用: 三日月と刃の翼
+      const R = 0.85, arc = Math.PI * 0.8;
+      const limb = new THREE.TorusGeometry(R, 0.05, 6, 32, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+      g.add(mesh(limb, toon(0xe8e0d0)));
+      const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+      for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.18, 0.1 * s], [0.35, 0.45 * s], [0.12, 0.25 * s]], 0.025), glowM(1.3), [0.02, s * 0.2, 0]));
+      string(tip, sx);
+      g.add(mesh(cyl(0.06, 0.06, 0.3, 8), gold));
+      g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0.06, 0, 0]));
+      return true;
+    }
+  }
+  if (kind === 'dagger') {
+    if (style === 1) { // クナイ: 菱形の刃と輪の柄頭
+      blade([[0, 0], [0.07, 0.25], [0, 0.65], [-0.07, 0.25]], 0.035);
+      g.add(mesh(cyl(0.028, 0.028, 0.3, 8), grip, [0, -0.08, 0]));
+      g.add(mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 12), gold, [0, -0.28, 0]));
+      return true;
+    }
+    if (style === 2) { // クリス: 波打つ刃
+      const pts = [];
+      for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push([0.05 + Math.sin(t * 14) * 0.025 - t * 0.04, t * 0.7]); }
+      pts.push([0, 0.78]);
+      for (let i = 8; i >= 0; i--) { const t = i / 8; pts.push([-(0.05 + Math.sin(t * 14 + 1.2) * 0.025 - t * 0.04), t * 0.7]); }
+      blade(pts, 0.03);
+      g.add(mesh(new THREE.BoxGeometry(0.2, 0.05, 0.06), gold, [0, 0.1, 0]));
+      handle(0.28, 0.028);
+      return true;
+    }
+    if (style === 3) { // 専用: 月の形の双刃
+      blade([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]], 0.03, 0.12, glowM(1.2));
+      g.add(mesh(extrude([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]].map(([x, y]) => [-x * 0.7, y * 0.8]), 0.025), steel, [0, 0.12, 0]));
+      g.add(mesh(new THREE.OctahedronGeometry(0.05), gem, [0, 0.1, 0.03]));
+      handle(0.3, 0.03);
+      return true;
+    }
+  }
+  return false;
+}
+
+// 装備から武器の形を決める: 伝説・神器は専用形（3）、それ以外は名前から 0〜2
+export function weaponStyle(it) {
+  if (!it) return 0;
+  if (it.rarity >= 4) return 3;
+  const s = [...String(it.name || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  return s % 3;
+}
+
+export function makeWeapon(kind, rarity = 0, style = 0) {
   const g = new THREE.Group();
   const rc = new THREE.Color(RARITIES[rarity].color);
   const steel = toon(rarity >= 4 ? new THREE.Color(0xe8eef6).lerp(rc, 0.35) : 0xdfe7f0, rarity >= 3 ? { emissive: rc, emissiveIntensity: 0.15 + (rarity - 3) * 0.15 } : {});
@@ -46,6 +218,7 @@ export function makeWeapon(kind, rarity = 0) {
     for (let i = 0; i < 4; i++) g.add(mesh(new THREE.TorusGeometry(r * 1.05, 0.008, 4, 10), gold, [0, -len * (0.15 + i * 0.22) + 0.05, 0], [Math.PI / 2, 0, 0]));
     g.add(mesh(sphere(r * 1.6, 10, 8), gold, [0, -len + 0.03, 0]));
   };
+  if (style && weaponVariant(kind, style, { g, steel, gold, grip, gem, edge, handle, rc, rarity })) return finish(g, 0.8);
   switch (kind) {
     case 'greatsword': {
       const w = 0.17, L = 2.2;
@@ -193,16 +366,16 @@ export function makePlayer(color) {
   return root;
 }
 
-export function setPlayerWeapon(model, kind, rarity) {
+export function setPlayerWeapon(model, kind, rarity, style = 0) {
   const u = model.userData;
-  const key = kind + rarity;
+  const key = kind + rarity + ':' + style;
   if (u.wKey === key) return;
   u.wKey = key;
   if (u.weapon) u.hand.remove(u.weapon);
   if (u.shield) { u.armL.remove(u.shield); u.shield = null; }
   if (kind === 'spear') u.shield = makeShield(rarity, u.armL);
   // 見下ろし視点で刃が「線」に見えないよう、刃の平らな面を上に向けて持つ
-  const w = makeWeapon(kind, rarity);
+  const w = makeWeapon(kind, rarity, style);
   u.weapon = new THREE.Group();
   u.weapon.add(w);
   if (kind === 'bow') {
