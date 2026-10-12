@@ -526,7 +526,16 @@ export function animatePlayer(model, s) {
     if (u.wKind === 'bow' && u.weapon) u.weapon.rotation.x = 0;
   }
   if (s.dodge > 0) { u.body.rotation.x = (1 - s.dodge) * Math.PI * 2; u.body.position.y = 0.4 * Math.sin((1 - s.dodge) * Math.PI); }
-  else u.body.rotation.x = 0;
+  else if (s.down > 0) {
+    // ダウン: 仰向けに倒れる（down 1 = 倒れきった状態）。手足を投げ出す
+    u.body.rotation.x = -s.down * 1.45; u.body.position.y = 0.12 * s.down;
+    u.armR.rotation.set(-2.6 * s.down, 0, 0.5); u.armL.rotation.set(-2.6 * s.down, 0, -0.5);
+    u.legs[0].rotation.x = 0.3 * s.down; u.legs[1].rotation.x = -0.15 * s.down;
+    u.head.rotation.x = -0.3 * s.down;
+  } else if (s.hurt > 0) {
+    // のけぞり: 上体が後ろへ反って頭が揺れる
+    u.body.rotation.x = -s.hurt * 0.35; u.head.rotation.x = -s.hurt * 0.4;
+  } else u.body.rotation.x = 0;
   model.visible = !s.dead;
 }
 

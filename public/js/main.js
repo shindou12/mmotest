@@ -118,7 +118,7 @@ const me = {
   wsCd: 0, tcd: {}, skillT: -1, spin: false, dashT: 0, dashA: 0, dashSpeed: 0,
   potions: 3, potCd: 0, lastHurt: -99, walkT: 0, moving: false, stepT: 0,
   buffs: [], ambush: 0, lastStandT: -999, transit: false,
-  staggerT: 0, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
+  staggerT: 0, hurtT: 0, downT: 0, downStart: -99, noDownT: 0, kbT: 0, kbX: 0, kbZ: 0, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
   model: null,
 };
 const world = { area: 'f1_town', def: AREAS.f1_town, floor: 1, unlocked: 1, bossState: 'idle', door: false, plates: [] };
@@ -262,11 +262,11 @@ const input = {
   pointerDown(button) {
     audio.init();
     if (!started) return;
-    if (button === 0) { mouse.l = true; me.charging = true; me.chargeT = 0; me.chargeLv = 0; }
+    if (button === 0) { mouse.l = true; if (me.downT <= 0) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
     if (button === 2) {
       mouse.r = true;
-      // 盾槍は右クリック長押しでガード。それ以外は武器スキル
-      if (S?.W.guard) { if (!me.dead) { me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip'); } }
+      // 盾槍は右クリック長押しでガード。それ以外は武器スキル（ダウン中はどちらもできない）
+      if (S?.W.guard) { if (!me.dead && me.downT <= 0) { me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip'); } }
       else tryWeaponSkill();
     }
   },
@@ -608,7 +608,7 @@ function onSnap(m) {
   world.plates = m.pl || [];
   const seenP = new Set();
   for (const p of m.p) {
-    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm] = p;
+    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm, rc] = p;
     if (id === me.id) continue;
     seenP.add(id);
     let o = others.get(id);
@@ -617,7 +617,7 @@ function onSnap(m) {
       scene.add(o.model);
       others.set(id, o);
     }
-    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd });
+    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd, rc: rc | 0 });
     setPlayerWeapon(o.model, wk, wr, wst | 0);
     setPlayerArmor(o.model, arm | 0);
     if (sw !== o.sw) {
@@ -703,7 +703,7 @@ function onMobDie(m) {
 function onTele(m) {
   const color = m.c || '#ff3030';
   const meshes = m.sh.map((s) => { const g = makeTelegraph(s, color, heightAt); scene.add(g); return g; });
-  teles.push({ meshes, sh: m.sh, start: now(), dur: m.d / 1000, dmg: m.dmg, color, src: m.src });
+  teles.push({ meshes, sh: m.sh, start: now(), dur: m.d / 1000, dmg: m.dmg, color, src: m.src, kd: !!m.kd });
   const near = m.sh.some((s) => Math.hypot(s.x - me.x, s.z - me.z) < 25);
   if (near) audio.sfx('telegraph');
 }
@@ -781,11 +781,70 @@ function resolveTele(te) {
       if (raw <= 0) { floatText(me.x, 2.4, me.z, '防御', 'info'); return; }
     }
   }
-  takeDamage(raw);
+  const from = srcMob || te.sh[0];
+  takeDamage(raw, { x: from.x, z: from.z }, te.kd);
 }
 
-// 被ダメージの共通処理（予兆・ボスの弾）
-function takeDamage(raw) {
+// ---- 被弾リアクション ----
+//   軽: のけぞるだけ（動ける）/ 中: 最大HPの10%以上 → 押し戻されてひるむ
+//   大: 最大HPの25%以上、または大技（kd）→ 吹き飛んでダウン。倒れた直後に回避で「受け身」
+const REACT = { stagger: 0.1, down: 0.25, downT: 1.1, techFrom: 0.1, techTo: 0.8, getupIframe: 0.6, noDown: 1.2 };
+let hitStop = 0;
+// 防具の重さで飛ばされやすさが変わる（軽装は飛ぶ・重装は踏ん張る）
+const kbScale = () => ({ light: 1.3, medium: 1, heavy: 0.6 })[char.eq.armor?.armor] ?? 1.15;
+function knockFrom(src, dist, dur) {
+  let dx = me.x - (src?.x ?? me.x), dz = me.z - (src?.z ?? me.z);
+  let d = Math.hypot(dx, dz);
+  if (d < 0.3) { dx = -Math.sin(me.a); dz = -Math.cos(me.a); d = 1; } // 真上からなら後ろへ
+  const v = dist * kbScale() / dur;
+  me.kbX = dx / d * v; me.kbZ = dz / d * v; me.kbT = dur;
+  me.a = Math.atan2(-dx, -dz); // 攻撃してきた方を向いたまま飛ぶ
+}
+function hitReaction(dmg, src, kd) {
+  me.hurtT = 0.28;
+  const armor = S.wk === 'greatsword' && me.charging; // 大剣の溜め中はスーパーアーマー
+  const canDown = now() >= (me.noDownT || 0) && !armor;
+  if ((dmg >= S.mhp * REACT.down || kd) && canDown) {
+    // ダウン（吹き飛び）
+    hitStop = 0.09;
+    knockFrom(src, 4, 0.32);
+    me.downT = REACT.downT; me.downStart = now(); me.staggerT = 0;
+    me.charging = false; me.guarding = false; me.queued = 0; me.swingT = 9; me.skillT = -1;
+    me.noDownT = now() + REACT.downT + REACT.noDown;
+    floatText(me.x, 2.8, me.z, 'ダウン!', 'info');
+    fx.parts.burst(me.x, 0.4, me.z, 24, { color: 0xd8c8a8, speed: 5, size: 0.5, life: 0.5, gravity: 4 });
+    addShake(0.5);
+    return;
+  }
+  if (dmg >= S.mhp * (tf('t_relic') ? REACT.stagger * 2 : REACT.stagger) && me.hp > 0) {
+    if (armor) { floatText(me.x, 2.8, me.z, 'スーパーアーマー', 'info'); return; }
+    hitStop = 0.05;
+    knockFrom(src, 1.4, 0.18);
+    me.staggerT = 0.35; me.charging = false; me.guarding = false; me.queued = 0;
+    return;
+  }
+  hitStop = Math.max(hitStop, 0.03);
+}
+// ダウン中に回避を押すと受け身（すぐ起き上がって転がる・無敵）
+function tryTech() {
+  const k = now() - me.downStart;
+  if (k < REACT.techFrom || k > REACT.techTo) return false;
+  me.downT = 0; me.kbT = 0; me.dodgeCd = 0;
+  floatText(me.x, 2.8, me.z, '受け身!', 'just');
+  audio.sfx('perfect');
+  fx.ringWave(me.x, me.z, 0x9affff, 2.5, 0.3);
+  tryDodge();
+  me.iframe = Math.max(me.iframe, 0.5);
+  return true;
+}
+function getUp() {
+  me.downT = 0;
+  me.iframe = Math.max(me.iframe, REACT.getupIframe);
+  fx.parts.burst(me.x, 0.3, me.z, 10, { color: 0xd8c8a8, speed: 2, size: 0.4, life: 0.4, gravity: 2 });
+}
+
+// 被ダメージの共通処理（予兆・ボスの弾）。src: 攻撃してきた位置 / kd: 吹き飛ばす大技
+function takeDamage(raw, src = null, kd = false) {
   const dr = clamp(buffMod('dr') + (tf('t_relic') ? 8 : 0) + (tf('t_shell') ? 12 : 0) - (tf('t_berserk') ? 15 : 0), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
@@ -794,12 +853,8 @@ function takeDamage(raw) {
   audio.sfx('hurt');
   addShake(0.3);
   ui.hurt();
-  // ひるみ（大剣の溜め中はひるまない）
-  if (dmg >= S.mhp * (tf('t_relic') ? 0.2 : 0.1) && me.hp > 0) {
-    const armor = S.wk === 'greatsword' && me.charging;
-    if (armor) floatText(me.x, 2.8, me.z, 'スーパーアーマー', 'info');
-    else { me.staggerT = 0.35; me.charging = false; me.guarding = false; me.queued = 0; }
-  }
+  // 被弾リアクション（のけぞり / ひるみ / ダウン）
+  if (me.hp > 0) hitReaction(dmg, src, kd);
   if (me.hp <= 0 && S.flags.has('laststand') && now() - me.lastStandT > 90) {
     me.hp = 1; me.lastStandT = now(); me.iframe = 1.0;
     floatText(me.x, 2.8, me.z, '不屈!', 'just');
@@ -838,7 +893,7 @@ function die() {
     audio.sfx('phase');
     return;
   }
-  me.hp = 0; me.dead = true; me.deadT = 5; me.charging = false; me.guarding = false; me.buffs = [];
+  me.hp = 0; me.dead = true; me.deadT = 5; me.charging = false; me.guarding = false; me.buffs = []; me.downT = 0; me.kbT = 0;
   audio.sfx('death');
   fx.parts.burst(me.x, 1, me.z, 80, { color: 0x9ad8ff, speed: 8, size: 0.5, life: 1.2 });
 }
@@ -1165,7 +1220,7 @@ const combat = {
   },
 };
 
-function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0; }
+function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0 && me.downT <= 0; }
 // 弓は回避中も通常攻撃ができる（転がり撃ち）
 const canShootInDodge = () => S.W.ranged && !me.dead && me.dodgeT > 0 && me.skillT < 0 && me.staggerT <= 0;
 
@@ -1338,7 +1393,7 @@ function updateBossProjs(dt) {
         if (!p.dodged) { p.dodged = true; onJustDodge(); }
       } else {
         net.send({ t: 'absorb', id: p.src });
-        takeDamage(p.dmg * (tf('t_spell') ? 0.65 : 1));
+        takeDamage(p.dmg * (tf('t_spell') ? 0.65 : 1), { x: p.x - p.vx, z: p.z - p.vz });
         fx.parts.burst(p.x, 1.3, p.z, 20, { color: p.c, speed: 6, size: 0.5, life: 0.4 });
         gone = true;
       }
@@ -1349,6 +1404,7 @@ function updateBossProjs(dt) {
 
 function tryDodge() {
   audio.init();
+  if (me.downT > 0) { tryTech(); return; } // ダウン中は受け身
   if (!S || me.dead || me.dodgeCd > 0 || me.dashT > 0 || me.staggerT > 0) return;
   let dx = 0, dz = 0;
   if (keys.has('w')) dz -= 1; if (keys.has('s')) dz += 1; if (keys.has('a')) dx -= 1; if (keys.has('d')) dx += 1;
@@ -2022,7 +2078,7 @@ function update(dt) {
   // 遅延処理（スキルの多段ヒットなど）
   for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= t) { const p = pending.splice(i, 1)[0]; if (!me.dead) p.fn(); }
 
-  me.dodgeCd -= dt; me.wsCd -= dt; me.potCd -= dt; me.iframe -= dt; me.staggerT -= dt;
+  me.dodgeCd -= dt; me.wsCd -= dt; me.potCd -= dt; me.iframe -= dt; me.staggerT -= dt; me.hurtT -= dt;
   me.dStackT -= dt; if (me.dStackT <= 0) me.dStack = 0;
   for (const k in me.tcd) me.tcd[k] -= dt;
   for (const b of me.buffs) b.t -= dt;
@@ -2052,7 +2108,18 @@ function update(dt) {
     if (sl > 0.12) { dx = touch.stick.x; dz = touch.stick.y; analog = Math.min(1, sl * 1.15); }
     const l = Math.hypot(dx, dz);
     me.moving = false;
-    if (me.dodgeT > 0) {
+    // 押し戻し・吹き飛び（ほかの動きと重ねて流される）
+    if (me.kbT > 0) {
+      const k = Math.min(dt, me.kbT);
+      me.kbT -= dt;
+      moveMe(me.kbX * k, me.kbZ * k);
+      if (me.downT > 0 && Math.random() < 0.6) fx.parts.emit(me.x, 0.3, me.z, { color: 0xd8c8a8, size: 0.4, life: 0.4, speed: 1, gravity: 1 });
+    }
+    if (me.downT > 0) {
+      // ダウン中は動けない（回避で受け身）
+      me.downT -= dt;
+      if (me.downT <= 0) getUp();
+    } else if (me.dodgeT > 0) {
       me.dodgeT -= dt;
       const sp = 17 * S.wc.roll;
       moveMe(me.dodgeDir[0] * sp * dt, me.dodgeDir[1] * sp * dt);
@@ -2156,6 +2223,9 @@ function update(dt) {
     swing: me.swingT < me.swingDur ? me.swingT / me.swingDur : me.charging && me.chargeT > CHARGE_MIN ? 0.02 : -1,
     spin: me.skillT >= 0 && me.spin ? me.skillT / 0.55 : -1,
     dodge: me.dodgeT > 0 ? me.dodgeT / 0.38 : 0,
+    // 倒れる → 起き上がる（最後の0.25秒で起きる）/ のけぞり
+    down: me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
+    hurt: me.hurtT > 0 ? Math.sin(me.hurtT / 0.28 * Math.PI) : 0,
   });
   if (me.guarding && Math.random() < 0.3) fx.parts.emit(me.x + Math.sin(me.a) * 0.9 + rnd(-0.4, 0.4), rnd(0.6, 1.8), me.z + Math.cos(me.a) * 0.9 + rnd(-0.4, 0.4), { color: 0xbfe0ff, size: 0.25, life: 0.3, speed: 0.3, gravity: 0 });
   for (const b of me.buffs) if (Math.random() < 0.25) fx.parts.emit(me.x + rnd(-0.5, 0.5), rnd(0.2, 2), me.z + rnd(-0.5, 0.5), { color: b.color, size: 0.3, life: 0.6, speed: 1, gravity: 2 });
@@ -2181,7 +2251,7 @@ function update(dt) {
     if (moving) o.walkT += dt;
     o.model.position.set(o.x, heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
-    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && o.wk === 'greatsword' ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0 });
+    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && o.wk === 'greatsword' ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
   }
 
   // モンスター
@@ -2231,7 +2301,7 @@ function update(dt) {
   sendT -= dt;
   if (sendT <= 0) {
     sendT = 0.066;
-    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm });
+    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm, rc: me.downT > 0 ? 2 : me.hurtT > 0 ? 1 : 0 });
   }
   saveT -= dt;
   if (saveT <= 0) { saveT = 10; saveChar(); }
@@ -2285,8 +2355,10 @@ function update(dt) {
 function loop() {
   requestAnimationFrame(loop);
   const t = now();
-  const dt = Math.min(0.05, t - lastT);
+  let dt = Math.min(0.05, t - lastT);
   lastT = t;
+  // ヒットストップ: 被弾の瞬間だけ動きをほぼ止めて、手応えを出す
+  if (hitStop > 0) { hitStop -= dt; dt *= 0.1; }
   if (started) update(dt);
   composer.render();
 }

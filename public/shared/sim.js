@@ -81,7 +81,7 @@ export class World {
   addPlayer(id, send) {
     this.players.set(id, {
       id, send, joined: false, name: '???', area: FLOOR_HUB[1], x: 0, z: 0, a: Math.PI,
-      hp: 100, mhp: 100, lv: 1, dead: false, color: '#4af', wk: 'sword', wr: 0, sw: 0, sk: 0, dg: 0, gd: 0, wst: 0, arm: 0,
+      hp: 100, mhp: 100, lv: 1, dead: false, color: '#4af', wk: 'sword', wr: 0, sw: 0, sk: 0, dg: 0, gd: 0, wst: 0, arm: 0, rc: 0,
     });
   }
 
@@ -127,8 +127,8 @@ export class World {
         break;
       }
       case 'st': {
-        // wst: 武器の形 / arm: 防具の見た目（他のプレイヤーにも同じ見た目で見せる）
-        for (const k of ['x', 'z', 'a', 'hp', 'mhp', 'lv', 'sw', 'sk', 'wr', 'dg', 'gd', 'wst', 'arm']) {
+        // wst: 武器の形 / arm: 防具の見た目 / rc: 被弾リアクション（1 のけぞり・2 ダウン）。他のプレイヤーにも同じに見せる
+        for (const k of ['x', 'z', 'a', 'hp', 'mhp', 'lv', 'sw', 'sk', 'wr', 'dg', 'gd', 'wst', 'arm', 'rc']) {
           if (typeof m[k] === 'number' && isFinite(m[k])) p[k] = m[k];
         }
         if (typeof m.wk === 'string') p.wk = m.wk;
@@ -295,8 +295,9 @@ export class World {
   }
 
   // ---- テレグラフ（予兆） ----
-  tele(A, src, shapes, delay, dmg, color) {
-    this.broadcastArea(A.id, { t: 'tele', id: this.seq++, src: src ? src.id : 0, sh: shapes, d: Math.round(delay * 1000), dmg: Math.round(dmg), c: color });
+  // kd: 当たると吹き飛ばされる大技（ボスの突進・爆発など）
+  tele(A, src, shapes, delay, dmg, color, kd = 0) {
+    this.broadcastArea(A.id, { t: 'tele', id: this.seq++, src: src ? src.id : 0, sh: shapes, d: Math.round(delay * 1000), dmg: Math.round(dmg), c: color, ...(kd ? { kd: 1 } : {}) });
   }
   later(A, sec, fn) { A.timers.push({ at: this.time + sec, fn }); }
 
@@ -801,7 +802,7 @@ export class World {
     const ang = Math.atan2(tx - b.x, tz - b.z);
     const len = Math.min(26, Math.hypot(tx - b.x, tz - b.z) + 6);
     const sx = b.x, sz = b.z;
-    this.tele(A, b, [{ k: 'line', x: r2(sx), z: r2(sz), a: r2(ang), len: r2(len), w: 4.2 }], delay, dmg, col);
+    this.tele(A, b, [{ k: 'line', x: r2(sx), z: r2(sz), a: r2(ang), len: r2(len), w: 4.2 }], delay, dmg, col, 1);
     this.later(A, delay, () => {
       if (A.boss !== b) return;
       const end = { x: sx + Math.sin(ang) * (len - 1), z: sz + Math.cos(ang) * (len - 1) };
@@ -892,7 +893,7 @@ export class World {
       case 'cage': {
         // 外周と足元が同時に爆発。安全地帯はドーナツ状の狭い帯だけ
         const cx = b.x, cz = b.z;
-        this.tele(A, b, [{ k: 'ring', x: r2(cx), z: r2(cz), r0: 8, r1: 26 }, { k: 'circle', x: r2(cx), z: r2(cz), r: 4 }], 1.25 * sp, base * 1.3, col);
+        this.tele(A, b, [{ k: 'ring', x: r2(cx), z: r2(cz), r0: 8, r1: 26 }, { k: 'circle', x: r2(cx), z: r2(cz), r: 4 }], 1.25 * sp, base * 1.3, col, 1);
         this.later(A, 1.0 * sp, () => this.tele(A, b, [{ k: 'ring', x: r2(cx), z: r2(cz), r0: 3.5, r1: 7 }], 0.9 * sp, base, col));
         return 2.2 * sp;
       }
@@ -923,7 +924,7 @@ export class World {
         return 1.4 * sp;
       }
       case 'nova': {
-        this.tele(A, b, [{ k: 'circle', x: r2(b.x), z: r2(b.z), r: 8.5 }], 1.5 * sp, base * 1.5, col);
+        this.tele(A, b, [{ k: 'circle', x: r2(b.x), z: r2(b.z), r: 8.5 }], 1.5 * sp, base * 1.5, col, 1);
         return 1.6 * sp;
       }
       case 'ring': {
@@ -979,7 +980,7 @@ export class World {
       }
       case 'meteor': {
         const pt = { x: target.x + rnd(-2, 2), z: target.z + rnd(-2, 2) };
-        this.tele(A, b, [{ k: 'circle', x: r2(pt.x), z: r2(pt.z), r: 10 }], 2.2 * sp, base * 2.0, '#ff6a20');
+        this.tele(A, b, [{ k: 'circle', x: r2(pt.x), z: r2(pt.z), r: 10 }], 2.2 * sp, base * 2.0, '#ff6a20', 1);
         for (let i = 0; i < 4; i++) {
           const a = Math.random() * Math.PI * 2, rr = rnd(8, L.r);
           this.later(A, 0.4 + i * 0.2, () => this.tele(A, b, [{ k: 'circle', x: r2(L.x + Math.sin(a) * rr), z: r2(L.z + Math.cos(a) * rr), r: 3 }], 1.1, base * 0.8, col));
@@ -1020,7 +1021,7 @@ export class World {
         const a = Math.random() * Math.PI * 2, rr = rnd(6, L.r - 6);
         const safe = { x: L.x + Math.sin(a) * rr, z: L.z + Math.cos(a) * rr };
         this.broadcastArea(A.id, { t: 'chat', from: '', text: `${A.fdef.boss.name}が力を溜めている…光の輪へ逃げろ！`, color: '#ffd84a' });
-        this.tele(A, b, [{ k: 'ring', x: r2(safe.x), z: r2(safe.z), r0: 4, r1: rr + L.r + 2 }], 2.4 * sp, base * 1.8, col);
+        this.tele(A, b, [{ k: 'ring', x: r2(safe.x), z: r2(safe.z), r0: 4, r1: rr + L.r + 2 }], 2.4 * sp, base * 1.8, col, 1);
         return 2.6 * sp;
       }
       case 'barrage': {
@@ -1043,7 +1044,7 @@ export class World {
   }
 
   snapshot(A) {
-    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0]);
+    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0, p.rc | 0]);
     const ms = [...A.mobs.values()].map((m) => [
       m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st,
       m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.named ? 3 : m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,
