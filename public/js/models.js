@@ -649,6 +649,94 @@ export function makeMob(t, color, scale = 1, accent = null, boss = false) {
       parts.float = true; parts.shell = orbit;
       break;
     }
+    case 'bat': { // コウモリ: 小さな体と、はばたく膜の翼
+      const f = new THREE.Group(); f.position.y = 1.5; body.add(f);
+      f.add(mesh(sphere(0.32, 14, 10), m, null, null, [1, 0.9, 1.1]));
+      f.add(mesh(sphere(0.2, 12, 8), mL, [0, -0.05, 0.22]));
+      for (const s of [-1, 1]) {
+        f.add(mesh(cone(0.09, 0.28, 6), m, [s * 0.15, 0.3, 0.05], [0, 0, -s * 0.3]));
+        f.add(mesh(sphere(0.06, 8, 6), eyeM, [s * 0.1, 0.05, 0.3]));
+        f.add(mesh(cone(0.025, 0.08, 4), horn, [s * 0.05, -0.12, 0.33], [Math.PI, 0, 0]));
+      }
+      const wings = [];
+      for (const s of [-1, 1]) {
+        const w = new THREE.Group(); w.position.set(s * 0.25, 0.05, 0); f.add(w);
+        w.add(mesh(extrude([[0, 0.1], [0.4, 0.35], [0.85, 0.25], [0.95, -0.1], [0.7, -0.05], [0.55, -0.25], [0.35, -0.1], [0.15, -0.2], [0, -0.1]].map(([x, y]) => [x * s, y]), 0.02, 0), mD, null, [Math.PI / 2, 0, 0]));
+        for (const x of [0.4, 0.75]) w.add(mesh(cyl(0.015, 0.015, 0.45, 4), m, [x * s, 0, 0.05], [Math.PI / 2, 0, s * 0.4]));
+        wings.push(w);
+      }
+      parts.wings = wings; parts.float = true; parts.flap = true;
+      break;
+    }
+    case 'mushroom': { // キノコ: 大きな傘を揺らして胞子をまく
+      const b = new THREE.Group(); b.position.y = 0.55; body.add(b);
+      b.add(mesh(cyl(0.28, 0.36, 0.75, 14), toon(0xf2e6d0), [0, -0.15, 0]));
+      const cap = new THREE.Group(); cap.position.y = 0.25; b.add(cap);
+      cap.add(mesh(new THREE.SphereGeometry(0.75, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), m, null, null, [1, 0.7, 1]));
+      cap.add(mesh(cyl(0.72, 0.6, 0.08, 20), mD, [0, 0.02, 0]));
+      for (let i = 0; i < 7; i++) { const a = i * 0.9, r = i ? 0.45 : 0; cap.add(mesh(sphere(0.1, 8, 6), toon(0xfff4e0), [Math.sin(a) * r, 0.45 - r * 0.25, Math.cos(a) * r], null, [1, 0.5, 1])); }
+      for (const s of [-1, 1]) {
+        b.add(mesh(sphere(0.06, 8, 6), glow(0x201010), [s * 0.12, 0.0, 0.32], null, [0.8, 1.3, 0.5]));
+        b.add(mesh(capsule(0.06, 0.1, 6), toon(0xf2e6d0), [s * 0.22, -0.48, 0.08]));
+      }
+      parts.squash = b; parts.cap = cap;
+      break;
+    }
+    case 'scorpion': { // サソリ: 6本脚、はさみ、反り上がった尾と毒針
+      const seg = (r, z, y = 0.45) => body.add(mesh(sphere(r, 12, 8), m, [0, y, z], null, [1.2, 0.6, 1]));
+      seg(0.42, 0.2); seg(0.36, -0.25); seg(0.3, -0.62);
+      body.add(mesh(sphere(0.3, 12, 8), mD, [0, 0.5, 0.6], null, [1.1, 0.6, 0.9]));
+      for (const s of [-1, 1]) body.add(mesh(sphere(0.05, 6, 4), eyeM, [s * 0.1, 0.62, 0.82]));
+      const legs = [];
+      for (let i = 0; i < 6; i++) {
+        const s = i % 2 ? 1 : -1, z = 0.35 - Math.floor(i / 2) * 0.35;
+        const leg = new THREE.Group(); leg.position.set(s * 0.35, 0.45, z); body.add(leg);
+        leg.add(mesh(capsule(0.05, 0.4, 5), mD, [s * 0.25, -0.12, 0], [0, 0, s * 1.1]));
+        leg.add(mesh(capsule(0.045, 0.35, 5), mD, [s * 0.5, -0.32, 0], [0, 0, s * 0.3]));
+        legs.push(leg);
+      }
+      parts.legs = legs;
+      const arms = [];
+      for (const s of [-1, 1]) {
+        const a = new THREE.Group(); a.position.set(s * 0.3, 0.5, 0.7); body.add(a);
+        a.add(mesh(capsule(0.07, 0.35, 6), m, [s * 0.1, 0, 0.2], [Math.PI / 2, 0, -s * 0.4]));
+        a.add(mesh(sphere(0.16, 10, 8), mL, [s * 0.2, 0, 0.5], null, [1, 0.7, 1.3]));
+        a.add(mesh(cone(0.07, 0.3, 6), mL, [s * 0.28, 0, 0.72], [Math.PI / 2, 0, -s * 0.3]));
+        a.add(mesh(cone(0.06, 0.25, 6), mL, [s * 0.12, 0, 0.7], [Math.PI / 2, 0, s * 0.3]));
+        arms.push(a);
+      }
+      parts.arms = arms;
+      const tail = new THREE.Group(); tail.position.set(0, 0.5, -0.8); body.add(tail);
+      let p = tail;
+      for (let i = 0; i < 5; i++) {
+        const j = new THREE.Group(); j.position.set(0, i ? 0.24 : 0, i ? -0.06 : 0); j.rotation.x = -0.45; p.add(j);
+        j.add(mesh(sphere(0.15 - i * 0.015, 10, 8), m, [0, 0.12, 0], null, [1, 1.3, 1]));
+        p = j;
+      }
+      p.add(mesh(cone(0.09, 0.35, 8), glow(ac.clone().multiplyScalar(1.4)), [0, 0.35, 0.12], [0.9, 0, 0]));
+      parts.tail = tail;
+      break;
+    }
+    case 'mage': { // 魔術師: ローブとフード、光る杖、周りを回る紋様
+      const robe = toon(c), robeD = toon(c.clone().multiplyScalar(0.5));
+      body.add(mesh(cone(0.55, 1.5, 16), robe, [0, 0.75, 0]));
+      body.add(mesh(cyl(0.56, 0.58, 0.08, 16), toon(0xe0b04a), [0, 0.06, 0]));
+      const head = new THREE.Group(); head.position.y = 1.7; body.add(head);
+      head.add(mesh(sphere(0.3, 14, 10), robeD, [0, 0, 0], null, [1, 1.1, 1]));
+      head.add(mesh(cone(0.3, 0.6, 12), robe, [0, 0.28, -0.12], [-0.5, 0, 0]));
+      head.add(mesh(sphere(0.24, 12, 8), glow(0x050508), [0, -0.02, 0.1], null, [1, 0.9, 0.7]));
+      for (const s of [-1, 1]) head.add(mesh(sphere(0.045, 6, 4), eyeM, [s * 0.08, 0, 0.3]));
+      parts.head = head;
+      const arm = new THREE.Group(); arm.position.set(0.42, 1.3, 0.05); body.add(arm);
+      arm.add(mesh(capsule(0.08, 0.3, 6), robe, [0, -0.2, 0]));
+      arm.add(mesh(cyl(0.03, 0.035, 1.6, 6), toon(0x5a3a22), [0, -0.1, 0.12]));
+      arm.add(mesh(new THREE.OctahedronGeometry(0.14), glow(ac.clone().multiplyScalar(1.6)), [0, 0.75, 0.12]));
+      parts.arm = arm;
+      const orbit = new THREE.Group(); orbit.position.y = 1.0; body.add(orbit);
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; orbit.add(mesh(new THREE.BoxGeometry(0.12, 0.12, 0.02), glow(ac.clone().multiplyScalar(1.3)), [Math.sin(a) * 0.85, 0, Math.cos(a) * 0.85], [0, a, Math.PI / 4])); }
+      parts.shell = orbit; parts.hover = true;
+      break;
+    }
     default: { // knight
       const armor = toon(c), armorD = toon(c.clone().multiplyScalar(0.55)), trim = toon(boss ? 0xf2c14e : 0xb8c0cc);
       const cloth = toon(ac.clone().lerp(new THREE.Color(0x202020), 0.35), { side: THREE.DoubleSide });
@@ -720,7 +808,9 @@ export function animateMob(model, s) {
   if (u.legs2) { const w = moving ? Math.sin(t * 9) * 0.6 : 0; u.legs2[0].rotation.x = w; u.legs2[1].rotation.x = -w; }
   if (u.tail) { u.tail.rotation.y = Math.sin(t * (moving ? 10 : 3)) * 0.4; u.tail.rotation.x = -0.3; }
   if (u.head) u.head.rotation.x = wind ? -0.35 : atk ? 0.3 : Math.sin(t * 2) * 0.05;
-  if (u.wings) u.wings.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * (0.2 + Math.sin(t * (wind ? 14 : 4)) * 0.35); });
+  if (u.wings) u.wings.forEach((w, i) => { w.rotation.z = (i ? -1 : 1) * (0.2 + Math.sin(t * (u.flap ? (wind ? 26 : 16) : wind ? 14 : 4)) * (u.flap ? 0.7 : 0.35)); });
+  if (u.cap) { u.cap.scale.setScalar(wind ? 1.12 + Math.sin(t * 20) * 0.05 : 1 + Math.sin(t * 2) * 0.03); u.cap.rotation.z = Math.sin(t * 1.7) * 0.08; }
+  if (u.hover) { u.body.position.y = 0.15 + Math.sin(t * 2) * 0.1; if (u.shell) u.shell.rotation.y = t * (wind ? 6 : 1.5); }
   if (u.arms) u.arms.forEach((a, i) => { a.rotation.x = wind ? -2.2 : atk ? 0.4 : Math.sin(t * 2 + i) * 0.15; });
   if (u.arm) u.arm.rotation.x = wind ? -2.4 : atk ? 0.6 : -0.3 + Math.sin(t * 2) * 0.05;
   if (u.cape) u.cape.rotation.x = moving ? -0.3 : -0.08 + Math.sin(t * 1.5) * 0.04;

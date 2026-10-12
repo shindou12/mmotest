@@ -271,7 +271,10 @@ export const FLOORS = [
     props: [['tree', 70, 0x3f8f3a, 0x6b4a2a], ['rock', 30, 0x8a8f96], ['flower', 140, 0xffe36b, 0xff8fb3]],
     particles: 'pollen', amb: 'meadow',
     music: { root: 62, mode: 'major', bpm: 88, prog: [0, 4, 5, 3], feel: 'calm' },
-    mobs: [{ t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 }],
+    mobs: [
+      { t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 },
+      { t: 'bat', name: 'ケイブバット', color: 0x5a4a6a }, { t: 'mushroom', name: 'ドクキノコ', color: 0xc84a6a },
+    ],
     boss: { name: 'コボルド王 グラズ', t: 'knight', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, patterns: ['combo', 'cone', 'charge', 'sweep', 'slam', 'shot'], p3: ['chase', 'shock'] },
   },
   {
@@ -280,7 +283,10 @@ export const FLOORS = [
     props: [['pine', 110, 0x24553a, 0x4a3a2a], ['mushroom', 40, 0xd8584a, 0xf0e8d8], ['rock', 25, 0x6a7a74]],
     particles: 'firefly', amb: 'forest',
     music: { root: 57, mode: 'dorian', bpm: 80, prog: [0, 3, 6, 4], feel: 'mystic' },
-    mobs: [{ t: 'wisp', name: 'フォレストウィスプ', color: 0x8cffb0 }, { t: 'beast', name: 'ミストウルフ', color: 0x8a9a9a }],
+    mobs: [
+      { t: 'wisp', name: 'フォレストウィスプ', color: 0x8cffb0 }, { t: 'beast', name: 'ミストウルフ', color: 0x8a9a9a },
+      { t: 'mushroom', name: 'ミストマタンゴ', color: 0x7a8ad0 }, { t: 'mage', name: 'ゴブリンシャーマン', color: 0x4a7a3a },
+    ],
     boss: { name: '霧の大樹 ユグドラ', t: 'golem', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['rain', 'shock', 'combo', 'cage', 'summon', 'cone', 'shot', 'shot'], p3: ['spiral', 'nova'] },
   },
   {
@@ -289,7 +295,10 @@ export const FLOORS = [
     props: [['cactus', 50, 0x5a8a3a], ['rock', 60, 0xb07a4a], ['bones', 20, 0xeee8d8]],
     particles: 'dust', amb: 'desert',
     music: { root: 60, mode: 'phrygian', bpm: 92, prog: [0, 1, 0, 6], feel: 'exotic' },
-    mobs: [{ t: 'beast', name: 'デザートスコーピオン', color: 0xc08040 }, { t: 'golem', name: 'サンドゴーレム', color: 0xd0aa70 }],
+    mobs: [
+      { t: 'beast', name: 'デザートスコーピオン', color: 0xc08040 }, { t: 'golem', name: 'サンドゴーレム', color: 0xd0aa70 },
+      { t: 'scorpion', name: 'ジャイアントスコーピオン', color: 0x8a3a2a }, { t: 'mage', name: '砂漠の呪術師', color: 0xa0702a },
+    ],
     boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo', 'shot', 'charge'], p3: ['spiral', 'cross', 'cage'] },
   },
   {

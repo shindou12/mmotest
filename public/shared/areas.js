@@ -320,9 +320,18 @@ export const AREA_BIAS = {
   f3_canyon: { kinds: ['greatsword', 'axe'], affixes: ['crit', 'sv_giant'] },
   f3_lab: { kinds: ['sword', 'axe'], affixes: ['atkp', 'sv_blaze'] },
 };
+// エリアごとに出てくる敵（その階層の mobs の番号）。0・1 は元からの2種、2・3 は追加の2種
+//   第1層: 2 ケイブバット / 3 ドクキノコ   第2層: 2 ミストマタンゴ / 3 ゴブリンシャーマン
+//   第3層: 2 ジャイアントスコーピオン / 3 砂漠の呪術師
+export const MOB_POOL = {
+  f1_field: [0, 1, 3], f1_dun: [2, 0, 2], f1_lab: [2, 1],
+  f2_field: [0, 1, 2], f2_hunt: [2, 2, 0], f2_dun: [3, 1], f2_lab: [3, 0, 1],
+  f3_field: [0, 1], f3_hunt: [2, 2, 0], f3_canyon: [2, 3, 0], f3_dun: [3, 1], f3_lab: [2, 3],
+};
 // 踏破の条件: 迷宮区はボス、秘境はネームドを倒す。ほかは敵を15体倒す
 export const CLEAR_KILLS = 15;
 for (const [id, a] of Object.entries(AREAS)) {
+  if (a.mobs && MOB_POOL[id]) { a.mobs.pool = MOB_POOL[id]; delete a.mobs.only; }
   a.id = id;
   a.bias = AREA_BIAS[id]?.affixes || [];
   a.kinds = AREA_BIAS[id]?.kinds || [];

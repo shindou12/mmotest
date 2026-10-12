@@ -19,6 +19,10 @@ const ARCH = {
   golem: { speed: 2.4, hp: 1.7, dmg: 1.4, wind: 1.1, range: 2.8, aggro: 11 },
   wisp: { speed: 3.6, hp: 0.8, dmg: 0.9, wind: 1.1, range: 9, aggro: 15, ranged: true },
   knight: { speed: 4.0, hp: 1.3, dmg: 1.15, wind: 0.75, range: 4.0, aggro: 13 },
+  bat: { speed: 6.2, hp: 0.6, dmg: 0.8, wind: 0.5, range: 2.6, aggro: 16 },
+  mushroom: { speed: 1.6, hp: 1.25, dmg: 0.95, wind: 1.0, range: 3.2, aggro: 10 },
+  scorpion: { speed: 4.2, hp: 1.25, dmg: 1.2, wind: 0.8, range: 5.0, aggro: 13 },
+  mage: { speed: 2.8, hp: 0.8, dmg: 1.05, wind: 1.3, range: 11, aggro: 15, ranged: true },
 };
 const ELITE = { hp: 2.6, dmg: 1.35, xp: 2.5 };
 const CHEST_COOLDOWN = 300; // ダンジョン最奥の宝箱
@@ -457,7 +461,7 @@ export class World {
           if (exits.some((e) => dist(e, pos) < 10)) continue;
           if (def.gate && dist(def.gate, pos) < 14) continue;
           if (players.some((p) => dist(p, pos) < 12)) continue;
-          const d = def.mobs.only ?? (Math.random() < 0.55 ? 0 : 1);
+          const d = def.mobs.only ?? pick(def.mobs.pool || [0, 1]); // エリアごとの出現候補
           this.spawnMob(A, d, pos.x, pos.z, floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1)));
           break;
         }
@@ -473,7 +477,7 @@ export class World {
         if (players.some((p) => dist(p, pt) < 8)) { pt.t = 3; continue; }
         const lv = floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1)) + (pt.ch === 'G' ? 2 : 0);
         const elite = !!def.mobs.elite || pt.ch === 'G';
-        const mob = this.spawnMob(A, pt.ch === 'G' ? 1 : (Math.random() < 0.5 ? 0 : 1), pt.x, pt.z, lv, 'mob', elite);
+        const mob = this.spawnMob(A, pt.ch === 'G' ? 1 : pick(def.mobs.pool || [0, 1]), pt.x, pt.z, lv, 'mob', elite);
         if (pt.ch === 'G') { mob.gatekeeper = true; mob.name = '門番'; }
         pt.mobId = mob.id;
       }
@@ -671,6 +675,23 @@ export class World {
       case 'beast': sh = [{ k: 'cone', x: r2(m.x), z: r2(m.z), a: r2(ang), arc: 1.3, len: 3.6 * s }]; break;
       case 'golem': sh = [{ k: 'circle', x: r2(m.x), z: r2(m.z), r: 3.3 * s }]; break;
       case 'wisp': sh = [{ k: 'circle', x: r2(target.x), z: r2(target.z), r: 2.0 * s }]; break;
+      // コウモリ: 狭い扇で急降下
+      case 'bat': sh = [{ k: 'cone', x: r2(m.x), z: r2(m.z), a: r2(ang), arc: 0.9, len: 3.0 * s }]; break;
+      // キノコ: 自分の周りに胞子をまく（紫）
+      case 'mushroom': this.tele(A, m, [{ k: 'circle', x: r2(m.x), z: r2(m.z), r: 3.6 * s }], wind, dmg, '#b060ff'); return;
+      // サソリ: 細長い尾の突き刺し＋先端の毒だまり
+      case 'scorpion': {
+        const L = 5.2 * s;
+        sh = [{ k: 'line', x: r2(m.x), z: r2(m.z), a: r2(ang), len: L, w: 1.1 * s }, { k: 'circle', x: r2(m.x + fx * L), z: r2(m.z + fz * L), r: 1.4 * s }];
+        break;
+      }
+      // 魔術師: 狙った相手の周りに3つの魔法陣（三角形）
+      case 'mage': {
+        const base = Math.random() * Math.PI * 2;
+        const pts = [0, 1, 2].map((i) => { const a = base + i * 2.094; return { k: 'circle', x: r2(target.x + Math.sin(a) * 1.6), z: r2(target.z + Math.cos(a) * 1.6), r: 1.7 * s }; });
+        this.tele(A, m, pts, wind, dmg * 0.8, '#ff6ad0');
+        return;
+      }
       default: sh = [{ k: 'line', x: r2(m.x), z: r2(m.z), a: r2(ang), len: 4.6 * s, w: 1.8 * s }];
     }
     this.tele(A, m, sh, wind, dmg);
