@@ -38,35 +38,47 @@
 </div>
 
 <div id="hud" class="hidden">
-  <div id="me-frame" class="panel">
-    <div class="row"><span id="me-name"></span><span id="me-lv"></span></div>
-    <div class="bar hp"><div id="me-hp"></div><span id="me-hp-t"></span></div>
-    <div class="bar xp"><div id="me-xp"></div><span id="me-xp-t"></span></div>
+  <!-- 左上: ミニマップ・現在地・クエスト -->
+  <div id="nav">
+    <canvas id="minimap" width="180" height="180"></canvas>
     <div id="me-floor"></div>
-    <div id="buffs"></div>
+    <div id="quests" class="hidden"></div>
   </div>
+  <!-- 上中央: ボス -->
   <div id="boss" class="hidden">
     <div id="boss-name"></div>
     <div class="bar boss"><div id="boss-hp-lag"></div><div id="boss-hp"></div></div>
     <div class="bar stun" id="boss-stun-bar"><div id="boss-stun"></div><span id="boss-stun-t">スタン</span></div>
     <div id="boss-target"></div>
   </div>
-  <div id="party" class="panel"></div>
-  <div id="quests" class="panel hidden"></div>
-  <canvas id="minimap" width="180" height="180"></canvas>
-  <div id="charge" class="hidden"><div></div></div>
+  <!-- 右上: メニュー -->
+  <div id="topbar">
+    <div class="slot menu" id="s-inv" title="装備（I）"><div class="ic">🎒</div><kbd>I</kbd></div>
+    <div class="slot menu" id="s-tree" title="スキルツリー（K）"><div class="ic">✧</div><kbd>K</kbd><span id="sp-badge" class="hidden"></span></div>
+    <div class="slot menu" id="s-map" title="エリアマップ（M）"><div class="ic">🗺</div><kbd>M</kbd></div>
+    <div class="slot menu" id="s-set" title="設定（Esc）"><div class="ic">⚙</div><kbd>Esc</kbd></div>
+  </div>
+  <!-- 右: パーティ -->
+  <div id="party"></div>
+  <!-- 自キャラの横: スタミナ（回避の回復）の輪と、溜めゲージ -->
+  <svg id="stamina" class="hidden" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" class="bg"/><circle cx="20" cy="20" r="16" class="fg" id="stamina-fg" pathLength="100"/></svg>
+  <div id="charge" class="hidden"><div></div><span id="atk-name"></span></div>
+  <!-- 下中央: レベル・HP・経験値・バフ -->
+  <div id="vitals">
+    <div id="buffs"></div>
+    <div class="vrow"><span id="me-lv"></span><span id="me-name"></span><span id="me-hp-t"></span></div>
+    <div class="bar hp"><div id="me-hp"></div></div>
+    <div class="bar xp"><div id="me-xp"></div></div>
+    <span id="me-xp-t"></span>
+  </div>
+  <!-- 右下: スキル（丸いアイコン） -->
   <div id="hotbar">
-    <div class="slot" id="s-atk"><kbd>左 / 長押し</kbd><div class="ic">⚔</div><div class="nm">通常 / <span id="atk-name">強攻撃</span></div></div>
-    <div class="slot hidden" id="s-guard"><kbd>右 長押し</kbd><div class="ic">⛨</div><div class="nm">ガード</div></div>
-    <div class="slot wsk" id="s-skill"><kbd id="ws-key">右 / E</kbd><div class="ic">✦</div><div class="nm" id="skill-name">武器スキル</div><div class="cd"></div></div>
-    <div class="slot tsk" id="s-t1"><kbd>1</kbd><div class="ic">◆</div><div class="nm">未設定</div><div class="cd"></div></div>
-    <div class="slot tsk" id="s-t2"><kbd>2</kbd><div class="ic">◆</div><div class="nm">未設定</div><div class="cd"></div></div>
-    <div class="slot" id="s-dodge"><kbd>Space</kbd><div class="ic">↻</div><div class="nm">回避・<span id="dodge-w">普通</span></div><div class="cd"></div></div>
-    <div class="slot" id="s-pot"><kbd>Q</kbd><div class="ic">⚗</div><div class="nm">ポーション <b id="pot-n">3</b></div><div class="cd"></div></div>
-    <div class="slot small" id="s-inv"><kbd>I</kbd><div class="ic">🎒</div><div class="nm">装備</div></div>
-    <div class="slot small" id="s-map"><kbd>M</kbd><div class="ic">🗺</div><div class="nm">マップ</div></div>
-    <div class="slot small" id="s-tree"><kbd>K</kbd><div class="ic">✧</div><div class="nm">スキル</div><span id="sp-badge" class="hidden"></span></div>
-    <div class="slot small" id="s-set"><kbd>Esc</kbd><div class="ic">⚙</div><div class="nm">設定</div></div>
+    <div class="slot hidden" id="s-guard"><div class="ic">⛨</div><kbd>右長押し</kbd><div class="nm">ガード</div></div>
+    <div class="slot" id="s-pot"><div class="ic">⚗</div><b id="pot-n">3</b><kbd>Q</kbd><div class="nm">回復</div><div class="cd"></div></div>
+    <div class="slot" id="s-dodge"><div class="ic">↻</div><kbd>Space</kbd><div class="nm">回避・<span id="dodge-w">普通</span></div><div class="cd"></div></div>
+    <div class="slot tsk" id="s-t1"><div class="ic">◆</div><kbd>1</kbd><div class="nm">未設定</div><div class="cd"></div></div>
+    <div class="slot tsk" id="s-t2"><div class="ic">◆</div><kbd>2</kbd><div class="nm">未設定</div><div class="cd"></div></div>
+    <div class="slot wsk" id="s-skill"><div class="ic">✦</div><kbd id="ws-key">E</kbd><div class="nm" id="skill-name">武器スキル</div><div class="cd"></div></div>
   </div>
   <div id="chat">
     <div id="chat-log"></div>

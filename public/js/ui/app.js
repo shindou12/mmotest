@@ -88,19 +88,22 @@ export function createUI(game) {
     boss: '#boss', bossName: '#boss-name', bossHp: '#boss-hp', bossLag: '#boss-hp-lag', bossStunBar: '#boss-stun-bar', bossStun: '#boss-stun',
     bossStunT: '#boss-stun-t', bossTarget: '#boss-target', party: '#party', quests: '#quests', minimap: '#minimap', charge: '#charge',
     hotbar: '#hotbar', chat: '#chat', chatLog: '#chat-log', chatIn: '#chat-in', prompt: '#prompt', toasts: '#toasts', banner: '#banner',
-    mode: '#mode-tag', help: '#help',
+    mode: '#mode-tag', help: '#help', topbar: '#topbar', stamina: '#stamina', vitals: '#vitals',
   })) H[k] = hud.add(k, sel, k === 'minimap' ? CanvasView : View);
   H.hpBar = H.hp.parent.add('hpBar', H.hp.el.parentElement);
   H.chargeFill = H.charge.add('fill', H.charge.el.firstElementChild);
+  H.staminaFg = H.stamina.add('fg', '#stamina-fg');
   H.slots = {};
-  for (const el of H.hotbar.el.querySelectorAll('.slot')) {
-    const id = el.id.replace('s-', '');
-    const v = H.hotbar.add(id, el);
-    v.cd = el.querySelector('.cd') ? v.add('cd', '.cd') : null;
-    v.nm = v.add('nm', '.nm');
-    H.slots[id] = v;
+  for (const bar of [H.hotbar, H.topbar]) {
+    for (const el of bar.el.querySelectorAll('.slot')) {
+      const id = el.id.replace('s-', '');
+      const v = bar.add(id, el);
+      v.cd = el.querySelector('.cd') ? v.add('cd', '.cd') : null;
+      v.nm = el.querySelector('.nm') ? v.add('nm', '.nm') : null;
+      H.slots[id] = v;
+    }
   }
-  H.atkName = H.slots.atk.add('atkName', '#atk-name');
+  H.atkName = H.charge.add('atkName', '#atk-name');
   H.skillName = H.slots.skill.add('skillName', '#skill-name');
   H.wsKey = H.slots.skill.add('wsKey', '#ws-key');
   H.dodgeW = H.slots.dodge.add('dodgeW', '#dodge-w');
@@ -437,6 +440,7 @@ export function createUI(game) {
   P.party = () => {
     const roster = game.roster();
     H.party.set({
+      visible: roster.length > 1, // ソロのときは出さない
       html: '<div class="dim" style="margin-bottom:6px">オンライン ' + roster.length + '人</div>' + roster.map(([id, name, lv, floor, hp, mhp, color, aname]) => `
       <div class="pm"><div class="nm"><span style="color:${esc(color)}">${esc(name)}${id === game.me.id ? ' (自分)' : ''}</span><span class="dim">Lv${lv}</span></div>
       <div class="dim" style="font-size:10px">${floor}層 ${esc(aname || '')}</div>
@@ -444,7 +448,13 @@ export function createUI(game) {
     });
   };
 
-  const setCd = (v, val, max) => { v.cd?.set({ style: { height: clamp(max > 0 ? val / max * 100 : 0, 0, 100) + '%' } }); v.set({ cls: { ready: val <= 0 } }); };
+  let stamSeen = -9;
+  // クールタイムの影（--p: 残りの割合。丸いボタンは時計回りに減る扇形で表示）
+  const setCd = (v, val, max) => {
+    const p = clamp(max > 0 ? val / max * 100 : 0, 0, 100).toFixed(1) + '%';
+    v.cd?.set({ style: { height: p, '--p': p } });
+    v.set({ cls: { ready: val <= 0 } });
+  };
   P.hud = () => {
     const S = game.S, me = game.me, char = game.char, t = now();
     H.meName.set({ text: char.name });
@@ -461,7 +471,7 @@ export function createUI(game) {
     H.potN.set({ text: String(me.potions) });
     H.atkName.set({ text: HEAVY[S.wk].name });
     H.skillName.set({ text: S.ws.name });
-    H.wsKey.set({ text: S.W.guard ? 'E' : '右 / E' });
+    H.wsKey.set({ text: S.W.guard ? 'E' : 'E / 右' });
     H.slots.guard.set({ visible: !!S.W.guard, cls: { active: me.guarding } });
     setCd(H.slots.skill, me.wsCd, S.ws.cd * (1 - S.cdr / 100));
     for (let i = 0; i < 2; i++) {
@@ -473,6 +483,13 @@ export function createUI(game) {
     }
     setCd(H.slots.dodge, me.dodgeCd, S.dodgeCd);
     H.dodgeW.set({ text: S.wc.name, style: { color: S.wc.color } });
+    // 自キャラの横の輪: 回避の回復（原神のスタミナのように、減ったときだけ出る）
+    const q = game.project(me.x, 1.4, me.z);
+    const stam = S.dodgeCd > 0 ? 1 - clamp(me.dodgeCd / S.dodgeCd, 0, 1) : 1;
+    if (stam < 1) stamSeen = t;
+    H.stamina.set({ visible: t - stamSeen < 0.6 && !me.dead, cls: { full: stam >= 1 }, style: { left: q.x + 44 + 'px', top: q.y - 52 + 'px' } });
+    H.staminaFg.set({ attr: { 'stroke-dasharray': `${(stam * 100).toFixed(1)} 100` } });
+    H.charge.set({ style: { left: q.x + 'px', top: q.y + 34 + 'px' } });
     setCd(H.slots.pot, me.potions > 0 ? me.potCd : 1, 1);
     const left = spTotal(char.lv) - spSpent(char.tree);
     H.spBadge.set({ text: left > 0 ? String(left) : '', visible: left > 0 });

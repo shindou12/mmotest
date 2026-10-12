@@ -329,7 +329,6 @@ body.touch #prompt { bottom: auto; top: 26%; font-size: 12px; padding: 5px 10px;
 body.touch #toasts { top: 56px; }
 body.touch .toast { font-size: 11px; padding: 4px 10px; }
 body.touch #banner .b2 { font-size: 28px; }
-body.touch #charge { bottom: 30%; }
 body.touch .panel#inv, body.touch #tree, body.touch #box, body.touch #map, body.touch #dialog, body.touch #settings { max-height: 94vh; width: 96vw; padding: 8px; font-size: 12px; overflow: auto; }
 body.touch #tooltip { max-width: 46vw; font-size: 11px; }
 body.touch #inv-actions:not(.hidden) { display: flex; position: fixed; z-index: 40; gap: 8px; left: 50%; bottom: 5vh; transform: translateX(-50%); }
@@ -341,3 +340,92 @@ body.touch .inv-head .dim { display: none; }
 #rotate div { font-size: 48px; animation: rot 1.6s infinite ease-in-out; }
 @keyframes rot { 0%, 30% { transform: rotate(0) } 60%, 100% { transform: rotate(-90deg) } }
 @media (orientation: portrait) { body.touch.playing #rotate { display: flex; } }
+
+/* ===================================================================
+   HUD の配置（原神ふう）
+     左上: ミニマップ・現在地・クエスト   上中央: ボス   右上: メニュー   右: パーティ
+     下中央: Lv・HP・経験値・バフ        右下: スキル（丸アイコン）   自キャラの横: スタミナの輪
+   =================================================================== */
+#nav { position: absolute; top: 16px; left: 16px; width: 172px; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+#nav #minimap { position: static; width: 164px; height: 164px; border: 3px solid rgba(236, 226, 196, .75); box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.4); background: rgba(10,14,24,.5); }
+#nav #me-floor { margin: 0; font-size: 12px; color: #f2ead2; text-shadow: 0 1px 3px #000; text-align: center; }
+#nav #quests { position: static; width: 220px; align-self: flex-start; background: none; border: none; padding: 4px 0 0; box-shadow: none; text-shadow: 0 1px 3px #000, 0 0 6px rgba(0,0,0,.6); }
+#nav #quests .qi b::before { content: '◆ '; color: #ffd27a; font-size: 9px; }
+
+#boss { top: 16px; width: min(540px, 44vw); }
+#boss-name { font-size: 15px; letter-spacing: .08em; margin-bottom: 3px; }
+.bar.boss { height: 9px; border-radius: 5px; border: 1px solid rgba(0,0,0,.6); }
+#boss-stun-bar { height: 5px; margin-top: 3px; }
+#boss-stun-bar span { display: none; }
+#boss-target { font-size: 11px; }
+
+#topbar { position: absolute; top: 16px; right: 16px; display: flex; gap: 10px; }
+#topbar .slot { width: 42px; height: 42px; padding: 0; border-radius: 50%; overflow: visible; cursor: pointer; background: rgba(10,14,24,.45); border: 1px solid rgba(255,255,255,.3); display: flex; align-items: center; justify-content: center; }
+#topbar .slot .ic { font-size: 19px; line-height: 1; }
+#topbar .slot kbd { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); font-size: 9px; padding: 0 4px; background: rgba(0,0,0,.5); border-color: transparent; white-space: nowrap; }
+#topbar .slot:hover { border-color: var(--acc); }
+#sp-badge { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; border-radius: 8px; background: #ff5a4a; font-size: 10px; line-height: 16px; text-align: center; }
+
+#party { top: 50%; transform: translateY(-50%); right: 16px; width: 170px; background: none; border: none; box-shadow: none; padding: 0; text-shadow: 0 1px 3px #000; }
+#party .pm { background: rgba(10,14,24,.35); border-radius: 8px; padding: 5px 8px; }
+
+#vitals { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: min(380px, 30vw); pointer-events: none; text-shadow: 0 1px 3px #000; }
+#vitals .vrow { display: flex; align-items: baseline; gap: 6px; font-size: 12px; margin-bottom: 3px; }
+#vitals #me-lv { font-weight: bold; color: #f2ead2; }
+#vitals #me-name { color: #dfe6f2; flex: 1; }
+#vitals #me-hp-t { font-variant-numeric: tabular-nums; font-size: 11px; }
+#vitals .bar { margin-bottom: 3px; border: 1px solid rgba(0,0,0,.6); }
+#vitals .bar.hp { height: 9px; border-radius: 5px; }
+#vitals .bar.xp { height: 3px; border-radius: 2px; opacity: .8; }
+#vitals #me-xp-t { display: none; }
+#vitals #buffs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; font-size: 11px; margin-bottom: 4px; }
+
+/* 右下: スキル。丸アイコン、キーは下、クールタイムは時計回りに減る影 */
+#hotbar { left: auto; right: 22px; bottom: 36px; transform: none; gap: 10px; align-items: flex-end; }
+#hotbar .slot { width: 48px; height: 48px; padding: 0; border-radius: 50%; overflow: visible; background: rgba(10,14,24,.45); border: 2px solid rgba(255,255,255,.32); display: flex; align-items: center; justify-content: center; }
+#hotbar .slot.wsk { width: 60px; height: 60px; }
+#hotbar .slot.wsk .ic { font-size: 27px; }
+#hotbar .slot .ic { font-size: 20px; line-height: 1; z-index: 1; }
+#hotbar .slot kbd { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%); font-size: 9px; padding: 0 4px; background: rgba(0,0,0,.55); border-color: transparent; color: #e6e9f0; white-space: nowrap; }
+#hotbar .slot .nm { position: absolute; bottom: -31px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #c8cfdc; text-shadow: 0 1px 2px #000; max-width: 78px; }
+#hotbar .slot b { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; border-radius: 9px; background: #2e9a54; font-size: 11px; line-height: 18px; z-index: 2; }
+#hotbar .slot.ready { border-color: rgba(255, 236, 170, .75); box-shadow: 0 0 10px rgba(255, 220, 120, .35); }
+#hotbar .slot .cd, .tb .cd { inset: 0; height: 100% !important; border-radius: 50%; background: conic-gradient(rgba(0,0,0,.62) var(--p, 0%), transparent 0); }
+
+/* 自キャラの横: スタミナ（回避の回復） */
+#stamina { position: absolute; width: 34px; height: 34px; transform: translate(-50%, -50%) rotate(-90deg); pointer-events: none; }
+#stamina circle { fill: none; stroke-width: 5; }
+#stamina .bg { stroke: rgba(0,0,0,.4); }
+#stamina .fg { stroke: #ffd86a; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(255, 216, 106, .7)); }
+#stamina.full .fg { stroke: #fff4c4; }
+/* 溜めゲージ（自キャラの足元） */
+#charge { bottom: auto; width: 110px; height: 6px; transform: translateX(-50%); overflow: visible; }
+#charge > div { border-radius: 3px; }
+#charge span { position: absolute; top: 8px; left: 0; right: 0; text-align: center; font-size: 10px; color: #f2ead2; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+
+#chat { left: 16px; bottom: 20px; width: 290px; }
+#chat-log { max-height: 130px; }
+/* 調べる: 画面の右寄り中央 */
+#prompt { left: 60%; top: 54%; bottom: auto; transform: none; background: rgba(10,14,24,.7); border: none; border-radius: 20px; padding: 6px 16px 6px 8px; font-size: 13px; }
+#prompt kbd { background: #f2ead2; color: #1a1d26; border: none; font-weight: bold; margin-right: 6px; }
+#toasts { top: 96px; }
+#mode-tag { bottom: auto; top: 2px; right: auto; left: 50%; transform: translateX(-50%); font-size: 9px; opacity: .7; }
+#help { top: 300px; left: 16px; }
+
+/* スマホ */
+body.touch #nav { top: calc(6px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); width: 112px; }
+body.touch #nav #minimap { width: 100px; height: 100px; border-width: 2px; }
+body.touch #nav #me-floor { font-size: 9px; }
+body.touch #nav #quests { width: 170px; font-size: 9px; }
+body.touch #nav #quests small { display: none; }
+body.touch #boss { top: calc(6px + env(safe-area-inset-top)); left: calc(50% - 44px); width: min(320px, 34vw); }
+body.touch #topbar { display: none; }
+body.touch #t-menu { gap: 4px; }
+body.touch #t-menu button { width: 32px; height: 32px; font-size: 15px; border-radius: 50%; }
+body.touch #vitals { bottom: calc(8px + env(safe-area-inset-bottom)); left: calc(50% - 70px); width: min(280px, 30vw); }
+body.touch #vitals .vrow { font-size: 10px; }
+body.touch #vitals #buffs { font-size: 9px; }
+body.touch #nav #quests .qi:nth-child(n+3) { display: none; } /* スマホは見出し＋1件だけ */
+body.touch #chat { top: 172px; bottom: auto; left: calc(8px + env(safe-area-inset-left)); width: 200px; }
+body.touch #chat-log { max-height: 52px; }
+body.touch #prompt { left: 56%; top: 40%; }
