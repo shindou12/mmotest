@@ -495,7 +495,34 @@ export const TITLES = {
   t_hawk: { name: '鷹の眼', rarity: 3, req: 'bow', desc: '適性エリアに当たった矢は会心率 +30%', src: 'クエスト「砂の巨人」' },
   t_guard: { name: '不落の盾', rarity: 3, req: 'spear', desc: 'ジャストガードに成功すると4秒間 被ダメージ -40%', src: 'クエスト「スライム退治」' },
   t_phoenix: { name: '不死鳥', rarity: 4, desc: '倒れたとき、その場でHP30%で一度だけ復活する（5分に1回）', src: 'クエスト「砂塵の王」' },
+  // ---- クエスト報酬 ----
+  t_delver: { name: '井戸の探索者', rarity: 2, desc: 'ダンジョン・迷宮区の中で移動速度 +15%', src: 'クエスト「古井戸の調査」' },
+  t_mapper: { name: '地図職人', rarity: 2, desc: '迷宮・ダンジョンの自動マッピングの範囲が2倍。宝箱がミニマップに遠くから映る', src: 'クエスト「迷宮区の主」' },
+  t_traveler: { name: '旅人', rarity: 2, desc: 'エリアを移動・ワープした後の10秒間、移動速度 +30%', src: 'クエスト「霧の向こうへ」' },
+  t_treasure: { name: '宝探し', rarity: 3, desc: '宝箱を開けるとゴールドを追加で得て、HPが30%回復する', src: 'クエスト「樹洞の秘宝」' },
+  t_breaker: { name: '崩しの達人', rarity: 3, desc: 'ボスのスタン値の溜まり方 +30%。スタン中のボスへのダメージ +15%', src: 'クエスト「大樹の守り手」' },
+  t_relic: { name: '古代の守護', rarity: 3, desc: '被ダメージ -8%。ひるみにくくなる', src: 'クエスト「埋もれた神殿」' },
+  t_night: { name: '夜目', rarity: 2, desc: 'ダンジョン・迷宮区の中で会心率 +10%', src: 'クエスト「洞窟の羽音」' },
+  t_spore: { name: '薬師', rarity: 2, desc: 'ポーションの回復量 +40%', src: 'クエスト「毒キノコ採り」' },
+  t_spell: { name: '呪い返し', rarity: 3, desc: '弾（遠距離攻撃）から受けるダメージ -35%', src: 'クエスト「まじない師の影」' },
+  t_shell: { name: '甲殻の守り', rarity: 3, req: 'melee', desc: '近接のみ。被ダメージ -12%。正面から受けたときの割り増しがなくなる', src: 'クエスト「大蠍の尾」' },
+  // ---- ドロップ限定（倒したときにまれに落ちる）----
+  t_lucky: { name: '幸運の星', rarity: 4, desc: '会心率 +8%・ゴールド獲得 +15%', src: 'どの敵からも、ごくまれに落ちる', drop: true },
+  t_reaper: { name: '死神の影', rarity: 4, desc: 'HPが30%以下の敵へのダメージ +25%', src: '精鋭からまれに落ちる', drop: true },
+  t_berserk: { name: '狂戦士', rarity: 4, req: 'melee', desc: '近接のみ。与ダメージ +20%・被ダメージ +15%', src: 'ネームドからまれに落ちる', drop: true },
+  t_star: { name: '流星', rarity: 5, desc: '武器スキルのクールタイム -20%。武器スキルが当たると流れ星が降る', src: '階層ボスからまれに落ちる', drop: true },
+  t_storm: { name: '嵐を歩む者', rarity: 3, desc: '雨・霧・砂嵐のエリアで移動速度 +15%・攻撃速度 +10%', src: '天候のあるエリアの敵からまれに落ちる', drop: true },
+  t_hunter: { name: '百獣の狩人', rarity: 3, desc: '雑魚（精鋭でない敵）へのダメージ +15%', src: '狩場の敵からまれに落ちる', drop: true },
 };
+// ドロップ限定の称号の落ちる確率（倒した敵の種類ごと）
+export const TITLE_DROPS = [
+  { id: 't_lucky', chance: 0.002, when: () => true },
+  { id: 't_reaper', chance: 0.03, when: (k) => k.el === 1 },
+  { id: 't_berserk', chance: 0.12, when: (k) => k.el === 3 },
+  { id: 't_star', chance: 0.06, when: (k) => !!k.boss },
+  { id: 't_storm', chance: 0.006, when: (k) => !!k.weather },
+  { id: 't_hunter', chance: 0.005, when: (k) => k.type === 'hunt' },
+];
 export const TITLE_REQ = { melee: '近接武器のみ', bow: '弓のみ', spear: '盾槍のみ' };
 // 固有効果のうち、武器の動きに依存するもの（伝承化した称号に条件が付く）
 export const FX_REQ = { wave: 'melee' };

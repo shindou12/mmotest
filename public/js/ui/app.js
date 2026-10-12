@@ -506,7 +506,7 @@ export function createUI(game) {
     if (!qs.length) { DLG.list.list([], () => ({})).set({ html: '<div class="dim">今はお願いしたいことはないよ。</div>' }); return; }
     DLG.list.list(qs, (q) => {
       const s = questState(char, q.id);
-      const rw = [`経験値 ${q.reward.xp}`, q.reward.rarity != null ? `${RARITIES[q.reward.rarity].name}以上の${q.reward.slot ? { weapon: '武器', armor: '防具', acc: '装飾品' }[q.reward.slot] : '装備'}` : '', q.reward.potion ? `ポーション所持数 +${q.reward.potion}` : ''].filter(Boolean).join('・');
+      const rw = [`経験値 ${q.reward.xp}`, q.reward.rarity != null ? `${RARITIES[q.reward.rarity].name}以上の${q.reward.slot ? { weapon: '武器', armor: '防具', acc: '装飾品' }[q.reward.slot] : '装備'}` : '', q.reward.potion ? `ポーション所持数 +${q.reward.potion}` : '', q.reward.title ? `称号「${TITLES[q.reward.title].name}」（${TITLES[q.reward.title].desc}）` : ''].filter(Boolean).join('・');
       let btn;
       if (!s) btn = '<button data-act="accept">受ける</button>';
       else if (s.claimed) btn = '<span class="dim">完了</span>';
@@ -864,8 +864,9 @@ export function createUI(game) {
       for (const h of hazardsOf(def)) { const [x, y] = p(h.x, h.z); sh.push({ t: 'circle', x, y, r: Math.max(1.5, h.r * sc), fill: h.kind === 'poison' ? '#8a3ab0aa' : '#e0c890aa' }); }
       if (def.box) { const [x, y] = p(def.box.x, def.box.z); sh.push({ t: 'rect', x: x - 3.5 * k, y: y - 3.5 * k, w: 7 * k, h: 7 * k, fill: '#7ae0ff' }); label(def.box.x, def.box.z, '共有ボックス', '#7ae0ff'); }
     }
+    const mapper = !!game.S?.tfx?.has('t_mapper'); // 称号「地図職人」: 宝箱は歩く前から映る
     for (const c of chestsOf(def)) {
-      if (!known(c.x, c.z)) continue;
+      if (!known(c.x, c.z) && !mapper) continue;
       const [x, y] = p(c.x, c.z); sh.push({ t: 'rect', x: x - 3 * k, y: y - 3 * k, w: 6 * k, h: 6 * k, fill: game.chestOpen(c) ? '#6a6a6a' : '#ffd27a' });
     }
     if (def.gate) { const [x, y] = p(def.gate.x, def.gate.z); sh.push({ t: 'circle', x, y, r: 5 * k, fill: '#6ad0ff' }); label(def.gate.x, def.gate.z, '転移門', '#6ad0ff', -14); }

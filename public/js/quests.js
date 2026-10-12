@@ -16,22 +16,22 @@ export const QUESTS = [
   {
     id: 'q_well', npc: 'sage', name: '古井戸の調査',
     desc: '古井戸の洞窟の最奥にある宝箱を開ける', type: 'chest', target: 'f1_dun', n: 1,
-    reward: { xp: 450, rarity: 3, slot: 'acc' },
+    reward: { xp: 450, rarity: 3, slot: 'acc', title: 't_delver' },
   },
   {
     id: 'q_lab1', npc: 'captain', name: '迷宮区の主', after: 'q_slime',
     desc: '第1層 迷宮区のボス「コボルド王 グラズ」を倒す', type: 'boss', target: 1, n: 1,
-    reward: { xp: 900, rarity: 3 },
+    reward: { xp: 900, rarity: 3, title: 't_mapper' },
   },
   {
     id: 'q_mist', npc: 'sage', name: '霧の向こうへ', after: 'q_lab1',
     desc: '第2層の「霧の野営地」にたどり着く', type: 'visit', target: 'f2_camp', n: 1,
-    reward: { xp: 300, potion: 1 },
+    reward: { xp: 300, potion: 1, title: 't_traveler' },
   },
   {
     id: 'q_hollow', npc: 'ranger', name: '樹洞の秘宝',
     desc: '朽ちた樹洞の最奥にある宝箱を開ける', type: 'chest', target: 'f2_dun', n: 1,
-    reward: { xp: 900, rarity: 3 },
+    reward: { xp: 900, rarity: 3, title: 't_treasure' },
   },
   {
     id: 'q_wolf', npc: 'ranger', name: '霧の狼',
@@ -41,7 +41,7 @@ export const QUESTS = [
   {
     id: 'q_lab2', npc: 'ranger', name: '大樹の守り手', after: 'q_hollow',
     desc: '第2層 迷宮区のボス「霧の大樹 ユグドラ」を倒す', type: 'boss', target: 2, n: 1,
-    reward: { xp: 1800, rarity: 3 },
+    reward: { xp: 1800, rarity: 3, title: 't_breaker' },
   },
   {
     id: 'q_golem', npc: 'merchant', name: '砂の巨人',
@@ -51,12 +51,33 @@ export const QUESTS = [
   {
     id: 'q_temple', npc: 'merchant', name: '埋もれた神殿',
     desc: '埋もれた神殿の最奥にある宝箱を開ける', type: 'chest', target: 'f3_dun', n: 1,
-    reward: { xp: 1600, rarity: 3 },
+    reward: { xp: 1600, rarity: 3, title: 't_relic' },
   },
   {
     id: 'q_lab3', npc: 'merchant', name: '砂塵の王', after: 'q_temple',
     desc: '第3層 迷宮区のボス「砂塵の大蠍 スコルピオ」を倒す', type: 'boss', target: 3, n: 1,
     reward: { xp: 3000, rarity: 4, title: 't_phoenix' },
+  },
+  // ---- 新しい敵のクエスト（報酬は称号）----
+  {
+    id: 'q_bat', npc: 'hunter', name: '洞窟の羽音',
+    desc: '古井戸の洞窟でケイブバットを10体倒す', type: 'kill', target: 'ケイブバット', area: 'f1_dun', n: 10,
+    reward: { xp: 420, rarity: 2, title: 't_night' },
+  },
+  {
+    id: 'q_mush', npc: 'sage', name: '毒キノコ採り',
+    desc: 'ひだまりの草原でドクキノコを6体倒す', type: 'kill', target: 'ドクキノコ', area: 'f1_field', n: 6,
+    reward: { xp: 260, potion: 1, title: 't_spore' },
+  },
+  {
+    id: 'q_shaman', npc: 'ranger', name: 'まじない師の影',
+    desc: '朽ちた樹洞でゴブリンシャーマンを8体倒す', type: 'kill', target: 'ゴブリンシャーマン', area: 'f2_dun', n: 8,
+    reward: { xp: 1000, rarity: 3, slot: 'acc', title: 't_spell' },
+  },
+  {
+    id: 'q_scorp', npc: 'merchant', name: '大蠍の尾',
+    desc: '蠍の巣でジャイアントスコーピオンを10体倒す', type: 'kill', target: 'ジャイアントスコーピオン', area: 'f3_hunt', n: 10,
+    reward: { xp: 1500, rarity: 3, slot: 'weapon', title: 't_shell' },
   },
 ];
 export const QUEST_INDEX = Object.fromEntries(QUESTS.map((q) => [q.id, q]));

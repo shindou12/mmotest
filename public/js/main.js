@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
   FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE, SKILL_VARIANTS, isVariant, affixVal, enhMult, titleReqOk,
-  migrateItem, makeTitle, TITLES, salvageMats, affixName, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost,
+  migrateItem, makeTitle, TITLES, TITLE_DROPS, salvageMats, affixName, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost,
   CRAFT_MAX_TIER, weightedTier, loreTitle,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
 } from '../shared/data.js';
@@ -347,6 +347,7 @@ function onMsg(m) {
       // 称号: 階層ボスの初討伐・ネームドの討伐
       if (m.boss && TITLES['t_boss' + m.boss]) grantTitle('t_boss' + m.boss);
       if (!m.boss && AREAS[m.ar]?.named?.name === m.nm && AREAS[m.ar].named.title) grantTitle(AREAS[m.ar].named.title);
+      rollTitleDrop(m);
       // 踏破: 迷宮区はボス、秘境はネームド、ほかは敵を一定数倒す → マップに付きやすい特性が出る
       countClear(m.ar, m.boss ? 'boss' : AREAS[m.ar]?.named?.name === m.nm ? 'named' : 'kill');
       break;
@@ -357,6 +358,11 @@ function onMsg(m) {
         char.chests[m.cid || m.ar] = Date.now();
         questEvent({ type: 'chest', area: m.ar });
         audio.sfx('clear');
+        // 称号「宝探し」: 追加のゴールドと回復
+        if (tf('t_treasure')) {
+          spawnGold(Math.round(40 + floorLevel(world.floor) * 12), me.x + 1, me.z + 1, true);
+          heal(S.mhp * 0.3, true);
+        }
         saveChar();
       }
       break;
@@ -494,6 +500,7 @@ function enterArea(id, x, z) {
   clearBossProjs();
   buildNpcs(def);
   me.x = x; me.z = z; me.a = Math.PI; me.transit = false;
+  if (prev !== id && tf('t_traveler')) me.travelT = now() + 10; // 称号「旅人」
   for (const p of env.portals) p.armed = Math.hypot(p.x - x, p.z - z) > p.r + 1.5;
   if (S && (def.type === 'town' || def.type === 'camp')) me.potions = S.maxPot;
   audio.setMusic(fdef.music, false);
@@ -747,7 +754,7 @@ function resolveTele(te) {
   const srcMob = mobs.get(te.src);
   if (srcMob) {
     const off = Math.abs(angDiff(Math.atan2(me.x - srcMob.x, me.z - srcMob.z), srcMob.a));
-    if (off < THREE.MathUtils.degToRad(60)) raw *= 1.3;
+    if (off < THREE.MathUtils.degToRad(60)) raw *= tf('t_shell') ? 1 : 1.3; // 称号「甲殻の守り」は正面の割り増しなし
     else if (off > THREE.MathUtils.degToRad(120)) raw *= 0.7;
   }
   // 盾槍のガード（攻撃してきた方向が正面なら軽減）
@@ -778,7 +785,7 @@ function resolveTele(te) {
 
 // 被ダメージの共通処理（予兆・ボスの弾）
 function takeDamage(raw) {
-  const dr = clamp(buffMod('dr'), -100, 90);
+  const dr = clamp(buffMod('dr') + (tf('t_relic') ? 8 : 0) + (tf('t_shell') ? 12 : 0) - (tf('t_berserk') ? 15 : 0), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
   me.lastHurt = now();
@@ -787,7 +794,7 @@ function takeDamage(raw) {
   addShake(0.3);
   ui.hurt();
   // ひるみ（大剣の溜め中はひるまない）
-  if (dmg >= S.mhp * 0.1 && me.hp > 0) {
+  if (dmg >= S.mhp * (tf('t_relic') ? 0.2 : 0.1) && me.hp > 0) {
     const armor = S.wk === 'greatsword' && me.charging;
     if (armor) floatText(me.x, 2.8, me.z, 'スーパーアーマー', 'info');
     else { me.staggerT = 0.35; me.charging = false; me.guarding = false; me.queued = 0; }
@@ -885,7 +892,7 @@ function dealDamage(mb, mult, o = {}) {
   if (!mb || mb.hp <= 0) return;
   const skill = o.type === 'wskill' || o.type === 'tskill';
   const tough = mb.kind === 2 || !!mb.elite;
-  let crit = o.crit || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + (tough && tf('t_shark') ? 15 : 0) || (skill && S.fx.has('skillcrit'));
+  let crit = o.crit || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + (tough && tf('t_shark') ? 15 : 0) + (tf('t_night') && indoorNow() ? 10 : 0) + (tf('t_lucky') ? 8 : 0) || (skill && S.fx.has('skillcrit'));
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; }
   const typeMult = 1 + (S[TYPE_MOD[o.type]] || 0) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
@@ -893,7 +900,7 @@ function dealDamage(mb, mult, o = {}) {
   const exec = S.flags.has('execute') && mb.hp < mb.mhp * 0.3 ? 1.5 : 1;
   const guardBonus = now() < me.atkBonusT ? me.atkBonus : 1;
   const bossT = mb.kind === 2 && tf('t_boss1') ? 1.15 : 1;
-  let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus * bossT
+  let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus * bossT * titleDmg(mb)
     * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1);
   dmg = Math.max(1, Math.round(dmg));
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
@@ -903,6 +910,7 @@ function dealDamage(mb, mult, o = {}) {
     st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
     st *= S.W.stun * (S.W.melee ? 1 + S.stunp / 100 : 1);
     if (o.sv?.key === 'sv_quake') st *= 2 + o.sv.t * 0.5;
+    if (tf('t_breaker')) st *= 1.3;
     st = Math.round(st * 10) / 10;
   }
   net.send({ t: 'hit', id: mb.id, dmg, crit, st });
@@ -921,6 +929,16 @@ function dealDamage(mb, mult, o = {}) {
   const vamp = S.vamp + buffMod('vamp');
   if (vamp > 0) heal(dmg * vamp / 100, false);
   if (o.sv) onVariantHit(mb, dmg, o);
+  // 称号「流星」: 武器スキルが当たると流れ星が降る（0.6秒に1回）
+  if (o.type === 'wskill' && tf('t_star') && !o.noProc && now() - (me.starT || 0) > 0.6) {
+    me.starT = now();
+    const x = mb.x, z = mb.z;
+    fx.parts.burst(x, 7, z, 20, { color: 0xfff0a0, speed: 3, size: 0.5, life: 0.4, gravity: 30 });
+    later(0.25, () => {
+      fx.flash(x, 1, z, 0xfff0a0, 30, 0.25); fx.ringWave(x, z, 0xfff0a0, 2.6, 0.3);
+      combat.circle(x, z, 2.4, 0.35, { type: 'proc', noProc: true });
+    });
+  }
   if (o.noProc) return;
   if (hasBuff('poison')) mb.poisonUntil = now() + 4;
   if (crit && S.fx.has('thunder')) {
@@ -942,6 +960,22 @@ function later(sec, fn) { pending.push({ at: now() + sec, fn }); }
 // スキル変化（武器の特性）: 武器スキルの性質を大きく変える
 // ======================================================================
 const tf = (id) => !!S?.tfx?.has(id); // 称号の効果が有効か
+const indoorNow = () => world.def.shape === 'grid';
+const weatherNow = () => !!world.def.weather && !indoorNow();
+// 称号による移動速度・攻撃速度の上乗せ（%）
+function titleMove() {
+  return (tf('t_delver') && indoorNow() ? 15 : 0) + (tf('t_traveler') && now() < (me.travelT || 0) ? 30 : 0) + (tf('t_storm') && weatherNow() ? 15 : 0);
+}
+const titleAspd = () => (tf('t_storm') && weatherNow() ? 10 : 0);
+// 称号による与ダメージ倍率（敵に応じて）
+function titleDmg(mb) {
+  let k = 1;
+  if (tf('t_reaper') && mb.hp < mb.mhp * 0.3) k *= 1.25;
+  if (tf('t_berserk')) k *= 1.2;
+  if (tf('t_hunter') && mb.kind !== 2 && !mb.elite) k *= 1.15;
+  if (tf('t_breaker') && mb.stunT > 0) k *= 1.15;
+  return k;
+}
 const desperate = () => tf('t_boss3') && me.hp < S.mhp * 0.5; // 称号「砂王を屠りし者」
 function variantParams(v, second = false) {
   const t = v.t;
@@ -1153,7 +1187,7 @@ function doSwing() {
   me.combo = now() - me.lastSwing < W.speed * 2.2 ? (me.combo + 1) % 3 : 0;
   me.lastSwing = now();
   me.swingT = 0;
-  me.swingDur = W.speed * (1 - (S.aspd + buffMod('aspd') + me.dStack * 4 + (desperate() ? 15 : 0)) / 100) * (me.combo === 2 ? 1.25 : 1);
+  me.swingDur = W.speed * (1 - (S.aspd + buffMod('aspd') + me.dStack * 4 + (desperate() ? 15 : 0) + titleAspd()) / 100) * (me.combo === 2 ? 1.25 : 1);
   me.sw++;
   me.a = aimAngle();
   const mult = W.mult * [1, 1.1, 1.6][me.combo];
@@ -1210,7 +1244,7 @@ function doHeavy(lv) {
 function tryWeaponSkill() {
   if (!canAct() || me.wsCd > 0) return;
   const sk = S.ws;
-  me.wsCd = sk.cd * (1 - S.cdr / 100) * (S.sv ? variantParams(S.sv).cd : 1);
+  me.wsCd = sk.cd * (1 - S.cdr / 100) * (S.sv ? variantParams(S.sv).cd : 1) * (tf('t_star') ? 0.8 : 1);
   startSkill(sk);
 }
 
@@ -1311,7 +1345,7 @@ function updateBossProjs(dt) {
         if (!p.dodged) { p.dodged = true; onJustDodge(); }
       } else {
         net.send({ t: 'absorb', id: p.src });
-        takeDamage(p.dmg);
+        takeDamage(p.dmg * (tf('t_spell') ? 0.65 : 1));
         fx.parts.burst(p.x, 1.3, p.z, 20, { color: p.c, speed: 6, size: 0.5, life: 0.4 });
         gone = true;
       }
@@ -1342,7 +1376,7 @@ function tryDodge() {
 function usePotion() {
   if (!S || me.dead || me.potions <= 0 || me.potCd > 0 || me.hp >= S.mhp) return;
   me.potions--; me.potCd = 1;
-  heal(S.mhp * 0.45, true);
+  heal(S.mhp * 0.45 * (tf('t_spore') ? 1.4 : 1), true);
   audio.sfx('potion');
   fx.parts.burst(me.x, 1, me.z, 30, { color: 0x6aff8a, speed: 3, size: 0.4, life: 0.8, gravity: 3 });
 }
@@ -1416,6 +1450,23 @@ function grantTitle(id) {
   saveChar(); ui.refresh();
 }
 
+// ドロップ限定の称号: 倒した敵に応じてまれに落ちる（持っていない称号だけ。同じものは二度と落ちない）
+function rollTitleDrop(m) {
+  if (!char) return;
+  const A = AREAS[m.ar];
+  const k = { el: m.el | 0, boss: m.boss, weather: A?.shape === 'open' ? A.weather : null, type: A?.type };
+  for (const d of TITLE_DROPS) {
+    if (char.titles[d.id] || !d.when(k) || Math.random() >= d.chance) continue;
+    char.titles[d.id] = true;
+    const it = makeTitle(d.id);
+    spawnDrop(it, me.x + rnd(-1.5, 1.5), me.z + rnd(1, 2.5));
+    if (it.rarity < 4) banner('称号がドロップ！', it.name, RARITIES[it.rarity].color, 3);
+    toast(`称号${it.name}が落ちた：${TITLES[d.id].desc}`, RARITIES[it.rarity].color, true);
+    saveChar();
+    return;
+  }
+}
+
 function acceptQuest(id) {
   const q = QUEST_INDEX[id];
   if (!q || questState(char, id) || !questAvailable(char, q)) return;
@@ -1485,7 +1536,8 @@ function exploreTick() {
   const def = world.def;
   if (!char || def.shape !== 'grid') return;
   const g = grid(def), a = exploredOf(def.id), { c, r } = worldToCell(g, me.x, me.z);
-  for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+  const R = tf('t_mapper') ? 4 : 2; // 称号「地図職人」は2倍の範囲を記す
+  for (let dr = -R; dr <= R; dr++) for (let dc = -R; dc <= R; dc++) {
     const cc = c + dc, rr = r + dr;
     if (cc < 0 || rr < 0 || cc >= g.W || rr >= g.H || a[rr * g.W + cc]) continue;
     a[rr * g.W + cc] = 1; exploreDirty = true;
@@ -1512,7 +1564,7 @@ function spawnDrop(it, x, z) {
   fx.parts.burst(x, 1, z, 10 + r * 15, { color: col, speed: 4 + r, size: 0.4, life: 0.8 });
   audio.sfx('drop', { rarity: r });
   if (r >= 4) {
-    const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : '装飾品';
+    const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : it.slot === 'title' ? '称号' : '装飾品';
     banner(r === 5 ? '★★★ 神器ドロップ ★★★' : '★ 伝説の' + what + ' ★', it.name, col, r);
     fx.flash(x, 3, z, col, 120, 1.2, 40);
     fx.ringWave(x, z, col, 10, 1.0);
@@ -1579,6 +1631,7 @@ function spawnGold(n, x, z, bag = false) {
 }
 function addGold(n, bonus = true) {
   if (bonus && tf('t_lake')) n = Math.round(n * 1.3);
+  if (bonus && tf('t_lucky')) n = Math.round(n * 1.15);
   char.gold = (char.gold || 0) + n;
   goldGainBuf += n; goldGainT = 0.35;
 }
@@ -2021,7 +2074,7 @@ function update(dt) {
     } else if (l > 0) {
       const busy = me.swingT < me.swingDur || me.skillT >= 0;
       const slow = me.guarding ? 0.45 : busy ? 0.45 : me.charging && me.chargeT > CHARGE_MIN ? 0.4 : 1;
-      const sp = 7.2 * (1 + (S.move + buffMod('move') + (desperate() ? 25 : 0)) / 100) * slow * analog * (hazardAt(me.x, me.z)?.kind === 'sand' ? 0.5 : 1);
+      const sp = 7.2 * (1 + (S.move + buffMod('move') + (desperate() ? 25 : 0) + titleMove()) / 100) * slow * analog * (hazardAt(me.x, me.z)?.kind === 'sand' ? 0.5 : 1);
       moveMe(dx / l * sp * dt, dz / l * sp * dt);
       me.moving = true;
       if (!busy && !me.charging && !me.guarding) me.a = Math.atan2(dx, dz);
