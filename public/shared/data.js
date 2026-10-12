@@ -124,7 +124,7 @@ export const FLOORS = [
   },
   {
     n: 4, name: '水晶洞窟', ground: 0x2a2a44, ground2: 0x3a3a60, fog: 0x1a1a38, skyTop: 0x0a0a1a, skyBot: 0x202048,
-    sun: 0xa0b0ff, sunI: 0.9, hemi: [0x6070ff, 0x101020], fogNear: 15, fogFar: 80,
+    sun: 0xa0b0ff, sunI: 1.6, hemi: [0x8090ff, 0x2a2a48], fogNear: 18, fogFar: 85,
     props: [['crystal', 90, 0x7ae0ff, 0xd08cff], ['rock', 40, 0x3a3a50], ['stalag', 40, 0x4a4a66]],
     particles: 'sparkle', amb: 'cave',
     music: { root: 64, mode: 'lydian', bpm: 76, prog: [0, 1, 4, 5], feel: 'crystal' },
@@ -132,8 +132,8 @@ export const FLOORS = [
     boss: { name: '水晶巨兵 クリスタロス', t: 'golem', color: 0x66ccff, accent: 0xff8cff, scale: 3.4, patterns: ['slam', 'nova', 'rain', 'cross'] },
   },
   {
-    n: 5, name: '溶岩地帯', ground: 0x2a1a16, ground2: 0x4a2a20, fog: 0x401810, skyTop: 0x200806, skyBot: 0x802010,
-    sun: 0xff9060, sunI: 1.5, hemi: [0xff8040, 0x200000], fogNear: 20, fogFar: 95,
+    n: 5, name: '溶岩地帯', ground: 0x4a2c24, ground2: 0x6a3a2a, fog: 0x401810, skyTop: 0x200806, skyBot: 0x802010,
+    sun: 0xffa070, sunI: 2.2, hemi: [0xff9060, 0x3a1810], fogNear: 22, fogFar: 100,
     props: [['lavarock', 60, 0x2a1a1a, 0xff4a10], ['spike', 40, 0x3a2420], ['lavapool', 18, 0xff5a10]],
     particles: 'ember', amb: 'lava',
     music: { root: 52, mode: 'minor', bpm: 100, prog: [0, 5, 6, 4], feel: 'heavy' },
@@ -168,13 +168,13 @@ export const FLOORS = [
     boss: { name: '嵐神の化身 テンペスト', t: 'wisp', color: 0x8ab0ff, accent: 0xffffff, scale: 3.4, patterns: ['rain', 'charge', 'cross', 'nova', 'ring', 'spiral'] },
   },
   {
-    n: 9, name: '虚無の庭', ground: 0x14101e, ground2: 0x241a34, fog: 0x0a0612, skyTop: 0x000000, skyBot: 0x2a1040,
-    sun: 0xb080ff, sunI: 1.0, hemi: [0x8050ff, 0x000000], fogNear: 15, fogFar: 80,
+    n: 9, name: '虚無の庭', ground: 0x2a2040, ground2: 0x3a2c56, fog: 0x0a0612, skyTop: 0x000000, skyBot: 0x2a1040,
+    sun: 0xc0a0ff, sunI: 1.9, hemi: [0x9a70ff, 0x201030], fogNear: 18, fogFar: 85,
     props: [['voidcube', 50, 0x1a1028, 0xb060ff], ['spike', 40, 0x201830], ['crystal', 30, 0xb060ff, 0xff40a0]],
     particles: 'void', amb: 'void',
     music: { root: 53, mode: 'phrygian', bpm: 84, prog: [0, 1, 6, 1], feel: 'dark' },
-    mobs: [{ t: 'knight', name: 'ヴォイドナイト', color: 0x2a1a3a }, { t: 'wisp', name: 'ナイトメア', color: 0xb060ff }],
-    boss: { name: '虚無の騎士 ノクス', t: 'knight', color: 0x1a1024, accent: 0xb060ff, scale: 3.2, patterns: ['spiral', 'cross', 'nova', 'charge', 'ring', 'rain'] },
+    mobs: [{ t: 'knight', name: 'ヴォイドナイト', color: 0x52407a }, { t: 'wisp', name: 'ナイトメア', color: 0xb060ff }],
+    boss: { name: '虚無の騎士 ノクス', t: 'knight', color: 0x3a2a5a, accent: 0xb060ff, scale: 3.2, patterns: ['spiral', 'cross', 'nova', 'charge', 'ring', 'rain'] },
   },
   {
     n: 10, name: '天空の玉座', ground: 0xf0e8d0, ground2: 0xfff6e0, fog: 0xfff0d8, skyTop: 0x7ab0ff, skyBot: 0xffe8c0,

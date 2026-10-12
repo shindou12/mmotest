@@ -180,8 +180,11 @@ export class FX {
   }
 
   dispose(obj) {
-    this.scene.remove(obj);
-    obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    if (obj.parent) obj.parent.remove(obj);
+    obj.traverse((o) => {
+      if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
+      if (o.material && !o.material.userData.shared) o.material.dispose();
+    });
   }
 }
 

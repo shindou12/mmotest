@@ -55,7 +55,7 @@ scene.add(sun, sun.target);
 const LOW = new URLSearchParams(location.search).has('low');
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-if (!LOW) composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.5, 0.82));
+if (!LOW) composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.45, 0.95));
 composer.addPass(new OutputPass());
 if (LOW) { renderer.shadowMap.enabled = false; renderer.setPixelRatio(1); }
 
@@ -1010,6 +1010,7 @@ function update(dt) {
     mb.model.position.set(mb.x, groundHeight(mb.x, mb.z), mb.z);
     mb.model.rotation.y = mb.a;
     animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged });
+    if (mb.model.userData.float && Math.random() < 0.25) fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.kind === 2 && mb.enraged && Math.random() < 0.5) fx.parts.emit(mb.x + rnd(-2, 2), rnd(0.5, 5), mb.z + rnd(-2, 2), { color: 0xff3a20, size: 0.6, life: 0.8, speed: 1, gravity: 3 });
   }
 
@@ -1043,9 +1044,9 @@ function update(dt) {
   sun.target.position.set(me.x, 0, me.z);
 
   if (env) {
-    env.gate.userData.anim(t); env.lair.userData.anim(t);
+    env.gate.userData.anim(t); env.lair.userData.anim(t); env.update(t, me.x, me.z);
     const fighting = world.bossState === 'fight';
-    for (const m of env.ringMats) m.opacity = fighting ? 0.6 + Math.sin(t * 6) * 0.3 : 0.45;
+    for (const m of env.ringMats) m.opacity = fighting ? 0.28 + Math.sin(t * 4) * 0.1 : 0.4;
     if (Math.random() < 0.3) fx.parts.emit(GATE_POS.x + rnd(-3, 3), 0.5, GATE_POS.z + rnd(-0.5, 0.5), { color: 0x6ad0ff, size: 0.3, life: 1.5, speed: 0.5, gravity: 2 });
   }
   ambient.update(dt, me.x, me.z, t);
