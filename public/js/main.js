@@ -431,7 +431,7 @@ function onMobDie(m) {
 // ======================================================================
 function onTele(m) {
   const color = m.c || '#ff3030';
-  const meshes = m.sh.map((s) => { const g = makeTelegraph(s, color); scene.add(g); return g; });
+  const meshes = m.sh.map((s) => { const g = makeTelegraph(s, color, groundHeight); scene.add(g); return g; });
   teles.push({ meshes, sh: m.sh, start: now(), dur: m.d / 1000, dmg: m.dmg, color, src: m.src });
   const near = m.sh.some((s) => Math.hypot(s.x - me.x, s.z - me.z) < 25);
   if (near) audio.sfx('telegraph');

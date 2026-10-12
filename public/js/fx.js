@@ -189,35 +189,123 @@ export class FX {
 }
 
 // ---- 予兆（地面の赤いエリア） ----
-function shapeGeo(s) {
-  let g;
-  switch (s.k) {
-    case 'circle': g = new THREE.CircleGeometry(s.r, 48); break;
-    case 'ring': g = new THREE.RingGeometry(s.r0, s.r1, 64); break;
-    case 'cone': g = new THREE.CircleGeometry(s.len, 32, -Math.PI / 2 - s.arc / 2, s.arc); break;
-    case 'line': g = new THREE.PlaneGeometry(s.w, s.len); g.translate(0, -s.len / 2, 0); break;
+// 地面の起伏に沿うよう、細かく分割した形を頂点ごとに地面の高さへ貼り付ける。
+// 塗りの進み具合はシェーダーで描く（属性 p: 0〜1 の進行方向の座標）
+const LIFT = 0.14;
+
+const TELE_VS = `attribute float p; varying float vP;
+void main(){ vP = p; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const TELE_FS = `uniform vec3 uColor; uniform float uProg; uniform float uPulse; varying float vP;
+void main(){
+  float fill = step(vP, uProg);
+  float front = smoothstep(0.06, 0.0, abs(vP - uProg)) * step(0.001, uProg);
+  float a = 0.16 + uPulse * 0.08 + fill * 0.3 + front * 0.45;
+  gl_FragColor = vec4(uColor * (1.0 + front * 0.6), a);
+}`;
+
+// 局所座標（前方 = +z）→ ワールド座標（向き a で回転、中心 s.x/s.z）
+function toWorld(s, lx, lz, rot) {
+  const c = Math.cos(rot), n = Math.sin(rot);
+  return [s.x + lx * c + lz * n, s.z - lx * n + lz * c];
+}
+
+// 極座標のグリッド（円・リング・扇）を作る
+function polarGrid(s, r0, r1, a0, a1, rot, heightAt, progOf) {
+  const rs = Math.max(4, Math.ceil((r1 - r0) / 0.8)), as = Math.max(12, Math.ceil(Math.abs(a1 - a0) * Math.max(r1, 1) / 0.9));
+  const pos = [], pr = [], idx = [];
+  for (let i = 0; i <= rs; i++) {
+    const r = r0 + (r1 - r0) * i / rs;
+    for (let j = 0; j <= as; j++) {
+      const t = a0 + (a1 - a0) * j / as;
+      const [x, z] = toWorld(s, Math.sin(t) * r, Math.cos(t) * r, rot);
+      pos.push(x, heightAt(x, z) + LIFT, z); pr.push(progOf(r));
+    }
   }
-  g.rotateX(-Math.PI / 2);
+  for (let i = 0; i < rs; i++) for (let j = 0; j < as; j++) {
+    const a = i * (as + 1) + j, b = a + as + 1;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  return { pos, pr, idx };
+}
+
+function teleGeometry(s, heightAt) {
+  let d;
+  switch (s.k) {
+    case 'circle': d = polarGrid(s, 0, s.r, 0, Math.PI * 2, 0, heightAt, (r) => r / s.r); break;
+    case 'ring': d = polarGrid(s, Math.max(0.01, s.r0), s.r1, 0, Math.PI * 2, 0, heightAt, (r) => (r - s.r0) / Math.max(0.01, s.r1 - s.r0)); break;
+    case 'cone': d = polarGrid(s, 0, s.len, -s.arc / 2, s.arc / 2, s.a, heightAt, (r) => r / s.len); break;
+    case 'line': {
+      const ls = Math.max(2, Math.ceil(s.len / 0.8)), ws = Math.max(2, Math.ceil(s.w / 0.8));
+      const pos = [], pr = [], idx = [];
+      for (let i = 0; i <= ls; i++) for (let j = 0; j <= ws; j++) {
+        const [x, z] = toWorld(s, -s.w / 2 + s.w * j / ws, s.len * i / ls, s.a);
+        pos.push(x, heightAt(x, z) + LIFT, z); pr.push(i / ls);
+      }
+      for (let i = 0; i < ls; i++) for (let j = 0; j < ws; j++) {
+        const a = i * (ws + 1) + j, b = a + ws + 1;
+        idx.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+      d = { pos, pr, idx };
+      break;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(d.pos, 3));
+  g.setAttribute('p', new THREE.Float32BufferAttribute(d.pr, 1));
+  g.setIndex(d.idx);
   return g;
 }
 
-export function makeTelegraph(s, color) {
+// 外枠（地面に沿った線）。草や起伏に隠れないよう常に手前に描く
+function teleOutline(s, heightAt) {
+  const pts = [];
+  const seg = (list) => { for (let i = 0; i < list.length - 1; i++) pts.push(list[i], list[i + 1]); };
+  const P = (lx, lz, rot) => { const [x, z] = toWorld(s, lx, lz, rot); return new THREE.Vector3(x, heightAt(x, z) + LIFT + 0.02, z); };
+  const arc = (r, a0, a1, rot) => {
+    const n = Math.max(16, Math.ceil(Math.abs(a1 - a0) * r / 0.6));
+    return Array.from({ length: n + 1 }, (_, i) => { const t = a0 + (a1 - a0) * i / n; return P(Math.sin(t) * r, Math.cos(t) * r, rot); });
+  };
+  const straight = (x0, z0, x1, z1, rot) => {
+    const n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.6));
+    return Array.from({ length: n + 1 }, (_, i) => P(x0 + (x1 - x0) * i / n, z0 + (z1 - z0) * i / n, rot));
+  };
+  switch (s.k) {
+    case 'circle': seg(arc(s.r, 0, Math.PI * 2, 0)); break;
+    case 'ring': seg(arc(s.r1, 0, Math.PI * 2, 0)); if (s.r0 > 0.3) seg(arc(s.r0, 0, Math.PI * 2, 0)); break;
+    case 'cone': {
+      const h = s.arc / 2;
+      seg(arc(s.len, -h, h, s.a));
+      seg(straight(0, 0, Math.sin(-h) * s.len, Math.cos(-h) * s.len, s.a));
+      seg(straight(0, 0, Math.sin(h) * s.len, Math.cos(h) * s.len, s.a));
+      break;
+    }
+    case 'line': {
+      const w = s.w / 2;
+      seg(straight(-w, 0, -w, s.len, s.a)); seg(straight(w, 0, w, s.len, s.a));
+      seg(straight(-w, 0, w, 0, s.a)); seg(straight(-w, s.len, w, s.len, s.a));
+      break;
+    }
+  }
+  return new THREE.BufferGeometry().setFromPoints(pts);
+}
+
+export function makeTelegraph(s, color, heightAt = () => 0) {
   const group = new THREE.Group();
-  const geo = shapeGeo(s);
-  const base = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
-  const fill = new THREE.Mesh(geo.clone(), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 1), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 }));
-  fill.position.y = 0.01; edge.position.y = 0.02;
-  group.add(base, fill, edge);
-  group.position.set(s.x, 0.06, s.z);
-  if (s.k === 'cone' || s.k === 'line') group.rotation.y = s.a;
-  group.userData = { s, fill, base };
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uProg: { value: 0 }, uPulse: { value: 0 } },
+    vertexShader: TELE_VS, fragmentShader: TELE_FS,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+  });
+  const area = new THREE.Mesh(teleGeometry(s, heightAt), mat);
+  area.renderOrder = 5;
+  const edge = new THREE.LineSegments(teleOutline(s, heightAt), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95, depthTest: false }));
+  edge.renderOrder = 6;
+  group.add(area, edge);
+  group.userData = { s };
   group.setProgress = (k) => {
-    if (s.k === 'circle') fill.scale.set(k, 1, k);
-    else if (s.k === 'cone') fill.scale.set(k, 1, k);
-    else if (s.k === 'line') fill.scale.set(1, 1, k);
-    else fill.material.opacity = 0.1 + k * 0.4;
-    base.material.opacity = 0.18 + 0.12 * Math.sin(k * 30) * k;
+    mat.uniforms.uProg.value = k;
+    mat.uniforms.uPulse.value = Math.max(0, Math.sin(k * 30)) * k;
   };
   return group;
 }
