@@ -13,7 +13,9 @@ import { AREAS, AREA_TYPES, HAZARDS, CLEAR_KILLS, grid, collide, spawnPoint, haz
 import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
-import { makePlayer, setPlayerWeapon, animatePlayer, makeMob, animateMob, makeLootOrb, makeCoin, makeGoldBag } from './models.js';
+import {
+  makePlayer, setPlayerWeapon, setPlayerArmor, weaponStyle, armorLook, animatePlayer, makeMob, animateMob, makeLootOrb, makeCoin, makeGoldBag,
+} from './models.js';
 import { Net } from './net.js';
 import { OCC } from './toon.js';
 import {
@@ -213,7 +215,9 @@ function calcStats() {
     iframeBonus: P.iframe, stunp: m('stunp'), optimal: W.optimal || 0, zoneMax: BOW_ZONE.max + m('zone'),
   };
   me.hp = Math.min(me.hp, S.mhp);
-  if (me.model) setPlayerWeapon(me.model, S.wk, S.wr);
+  S.wst = weaponStyle(eq.weapon);
+  S.arm = armorLook(eq.armor);
+  if (me.model) { setPlayerWeapon(me.model, S.wk, S.wr, S.wst); setPlayerArmor(me.model, S.arm); }
   ui?.refresh();
 }
 
@@ -539,7 +543,7 @@ function onSnap(m) {
   world.plates = m.pl || [];
   const seenP = new Set();
   for (const p of m.p) {
-    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd] = p;
+    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm] = p;
     if (id === me.id) continue;
     seenP.add(id);
     let o = others.get(id);
@@ -549,7 +553,8 @@ function onSnap(m) {
       others.set(id, o);
     }
     Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd });
-    setPlayerWeapon(o.model, wk, wr);
+    setPlayerWeapon(o.model, wk, wr, wst | 0);
+    setPlayerArmor(o.model, arm | 0);
     if (sw !== o.sw) {
       o.sw = sw; o.swingT = 0; o.combo++;
       const W = WEAPONS[wk];
@@ -2054,7 +2059,7 @@ function update(dt) {
   sendT -= dt;
   if (sendT <= 0) {
     sendT = 0.066;
-    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0 });
+    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm });
   }
   saveT -= dt;
   if (saveT <= 0) { saveT = 10; saveChar(); }
