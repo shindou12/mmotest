@@ -213,7 +213,8 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 
 /* エリアマップ */
 #map { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(760px, 96vw); padding: 12px; z-index: 20; display: flex; flex-direction: column; gap: 8px; }
-#map-svg { width: 100%; height: auto; background: radial-gradient(ellipse, rgba(60,90,140,.25), rgba(0,0,0,.2)); border-radius: 8px; }
+#map { max-height: 96vh; overflow-y: auto; }
+#map-svg { width: 100%; height: auto; max-height: 50vh; background: radial-gradient(ellipse, rgba(60,90,140,.25), rgba(0,0,0,.2)); border-radius: 8px; }
 #map-svg .edge { stroke: rgba(190, 220, 255, .35); stroke-width: 4; stroke-dasharray: 8 6; }
 #map-svg .node circle { fill: rgba(10, 16, 30, .85); stroke-width: 3; }
 #map-svg .node.cur circle { fill: rgba(60, 110, 180, .6); stroke-width: 5; }
@@ -223,11 +224,19 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 #map-svg .ty { fill: #9fb0c8; font-size: 12px; }
 #map-svg .ex { fill: #ffd27a; font-size: 11px; }
 #map-svg .you { fill: #6ad0ff; font-size: 13px; font-weight: bold; }
+#map-svg .wp { font-size: 16px; fill: #4a5464; }
+#map-svg .wp.on { fill: #6ad8ff; }
+#map-svg .wx { font-size: 16px; }
+#map-svg .done { font-size: 15px; fill: #4ae09a; font-weight: bold; }
+#map-svg .node.warp { cursor: pointer; }
+#map-svg .node text { pointer-events: none; }
+#map-svg .node.warp:hover circle { fill: rgba(60, 140, 200, .55); stroke-width: 5; }
+#map-svg .node.warp:hover .nm { fill: #9ae8ff; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--dim); }
 .map-legend i { font-style: normal; }
 #map-area-wrap, #map-floor-wrap { display: flex; flex-direction: column; gap: 8px; }
 #map.t-area #map-floor-wrap, #map.t-floor #map-area-wrap { display: none; }
-#map-area { width: 100%; height: auto; border-radius: 8px; background: #06080e; }
+#map-area { width: 100%; height: auto; max-height: 64vh; object-fit: contain; border-radius: 8px; background: #06080e; }
 .map-tabs { display: flex; gap: 6px; }
 .map-tabs button { padding: 6px 16px; background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
 .map-tabs button.on { background: linear-gradient(180deg, rgba(255, 216, 106, .28), rgba(255, 216, 106, .05)); border-color: rgba(255, 216, 106, .55); color: #fff4d0; }

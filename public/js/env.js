@@ -1,7 +1,7 @@
 // エリアの地形・建物・プロップ・草・空・遠景（トゥーン調）
 import * as THREE from 'three';
 import {
-  CELL, AREAS, grid, exitsOf, lairOf, boundR, maxR, angOf, insideOpen, obstaclesOf, hazardsOf, chestsOf,
+  CELL, AREAS, grid, exitsOf, lairOf, boundR, maxR, angOf, insideOpen, obstaclesOf, hazardsOf, chestsOf, waypointOf,
 } from '../shared/areas.js';
 import { toon, glow, outline, Batch } from './toon.js';
 
@@ -118,6 +118,28 @@ function makeGate() {
   gate.add(at(textSprite('転移門', '#9ae8ff', 4, '[F] 階層移動'), 0, 10, 0));
   gate.userData.anim = (t) => { ring.rotation.z = t * 0.4; runes.rotation.z = -t * 0.25; inner.material.opacity = 0.1 + Math.sin(t * 2) * 0.05; rune.rotation.z = t * 0.2; };
   return gate;
+}
+
+// ワープポイント（触れると解放。解放前は暗く、解放後は水晶が青く光って回る）
+function makeWaypoint() {
+  const g = new THREE.Group();
+  const stone = toon(0x8a93a6), stoneD = toon(0x4a5264);
+  const offMat = toon(0x5a6a7a), onMat = glow(new THREE.Color(0x6ad8ff).multiplyScalar(1.5));
+  g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.9, 0.4, 6), stoneD), 0, 0.2, 0));
+  g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 2.2, 6), stone), 0, 1.5, 0));
+  g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.55, 0.35, 6), stoneD), 0, 2.75, 0));
+  const crystal = at(new THREE.Mesh(new THREE.OctahedronGeometry(0.55), offMat), 0, 3.7, 0);
+  crystal.scale.y = 1.6; g.add(crystal);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.9, 2.1, 6), new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.45; g.add(ring);
+  g.traverse((o) => { if (o.isMesh && o !== ring) o.castShadow = true; });
+  outline(g, 1);
+  const label = at(textSprite('ワープポイント', '#9ae8ff', 2.6, '触れると解放'), 0, 5.4, 0);
+  g.add(label);
+  let on = false;
+  g.userData.setOn = (v) => { on = v; crystal.material = v ? onMat : offMat; ring.material.opacity = v ? 0.7 : 0; label.visible = !v; };
+  g.userData.anim = (t) => { crystal.rotation.y = t * (on ? 1.6 : 0.3); crystal.position.y = 3.7 + Math.sin(t * 2) * (on ? 0.15 : 0.03); ring.rotation.z = t * 0.3; };
+  return g;
 }
 
 // エリア間の出口（光る門）
@@ -264,7 +286,19 @@ export function buildArea(def, fdef, opts = {}) {
     fd.fogNear = fdef.fogNear * W.near; fd.fogFar = fdef.fogFar * W.far; fd.sunI = fdef.sunI * W.sun;
     fd.sun = tint(fdef.sun, W.mix * 0.5);
   }
-  return def.shape === 'grid' ? buildGrid(def, fd) : buildOpen(def, fd, opts);
+  const env = def.shape === 'grid' ? buildGrid(def, fd) : buildOpen(def, fd, opts);
+  // ワープポイント（町・野営地は転移門が兼ねるので置かない）
+  const w = waypointOf(def);
+  env.waypoint = null;
+  if (!w.hub) {
+    const obj = makeWaypoint();
+    obj.position.set(w.x, env.heightAt(w.x, w.z), w.z);
+    env.group.add(obj);
+    env.waypoint = { x: w.x, z: w.z, obj, setOn: obj.userData.setOn };
+    const up = env.update;
+    env.update = (t, ...rest) => { up(t, ...rest); obj.userData.anim(t); };
+  }
+  return env;
 }
 
 function buildOpen(def, fdef, opts) {

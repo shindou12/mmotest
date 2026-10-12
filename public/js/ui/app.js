@@ -155,7 +155,7 @@ export function createUI(game) {
   for (const k of ['shake', 'dmgnum', 'occlusion']) SET[k] = panels.settings.add(k, '#set-' + k).on('change', 'set:change', (e) => ({ key: k, value: e.target.checked }));
   const MAP = {
     title: panels.map.add('title', '#map-title'), sub: panels.map.add('sub', '#map-sub'), tabs: panels.map.add('tabs', '#map-tabs'),
-    svg: panels.map.add('svg', '#map-svg'), info: panels.map.add('info', '#map-info'), area: panels.map.add('area', '#map-area', CanvasView),
+    floors: panels.map.add('floors', '#map-floors'), svg: panels.map.add('svg', '#map-svg'), info: panels.map.add('info', '#map-info'), area: panels.map.add('area', '#map-area', CanvasView),
   };
   MAP.area.round = false;
   for (const b of MAP.tabs.el.querySelectorAll('button')) MAP.tabs.add(b.dataset.tab, b).on('click', 'map:tab', () => ({ tab: b.dataset.tab }));
@@ -404,9 +404,9 @@ export function createUI(game) {
     SET.shake.set({ checked: s.shake }); SET.dmgnum.set({ checked: s.dmgnum }); SET.occlusion.set({ checked: s.occlusion !== false });
   };
 
-  let mapTab = 'area', mapT = 0;
+  let mapTab = 'area', mapT = 0, mapFloor = 1;
   P.map = () => {
-    const world = game.world, f = world.floor, roster = game.roster(), def = world.def;
+    const world = game.world, f = world.floor, def = world.def;
     panels.map.set({ cls: { 't-area': mapTab === 'area', 't-floor': mapTab === 'floor' } });
     for (const [t, v] of MAP.tabs.children) v.set({ cls: { on: mapTab === t } });
     if (mapTab === 'area') {
@@ -424,7 +424,15 @@ export function createUI(game) {
       P.mapArea();
       return;
     }
-    MAP.sub.set({ text: '出口（光る門）を通ると隣のエリアへ移動します' });
+    MAP.sub.set({ text: '◇ 解放したワープポイント・転移門のあるエリアをクリックすると、そこへワープします' });
+    // 階層の切り替え（解放済みの階層だけ）
+    const top = Math.max(1, Math.min(world.unlocked || 1, 3));
+    MAP.floors.set({ html: Array.from({ length: top }, (_, i) => `<button data-f="${i + 1}" class="${i + 1 === mapFloor ? 'on' : ''}">第${i + 1}層</button>`).join('') });
+    for (const b of MAP.floors.el.querySelectorAll('button')) MAP.floors.add('f' + b.dataset.f, b).on('click', 'map:floor', () => ({ floor: +b.dataset.f }));
+    renderFloor(mapFloor);
+  };
+  const renderFloor = (f) => {
+    const world = game.world, roster = game.roster();
     const list = Object.values(AREAS).filter((a) => a.floor === f);
     const pos = (a) => [a.mapPos[0] * 6, a.mapPos[1] * 4];
     let svg = '';
@@ -442,17 +450,23 @@ export function createUI(game) {
       const extra = a.unique ? `宝：${a.unique.name}` : a.named ? `ネームド：${a.named.name}` : a.type === 'hunt' ? '経験値 1.6倍'
         : a.type === 'labyrinth' ? `ボス：${FLOORS[f - 1].boss.name}` : a.box ? `共有ボックス・NPC ${a.npcs?.length || 0}人` : '';
       const haz = a.hazard ? HAZARDS[a.hazard.kind].name : '';
-      svg += `<g class="node ${cur ? 'cur' : ''}" transform="translate(${x},${y})">
+      const W = WEATHERS[a.weather], done = game.char.areas?.[a.id]?.done;
+      const wp = game.waypointOk(a.id), warp = wp && !cur;
+      svg += `<g class="node ${cur ? 'cur' : ''} ${warp ? 'warp' : ''}" data-wp="${warp ? a.id : ''}" transform="translate(${x},${y})">
         <circle r="30" style="stroke:${T.color}"/>
         <text class="ic" y="8" style="fill:${T.color}">${T.icon}</text>
+        <text class="wp ${wp ? 'on' : ''}" x="-30" y="-22">${a.gate ? '⛩' : '◇'}</text>
+        ${W ? `<text class="wx" x="30" y="-22">${W.icon}</text>` : ''}
+        ${done ? '<text class="done" x="28" y="26">✔</text>' : ''}
         <text class="nm" y="50">${esc(a.name)}</text>
         <text class="ty" y="66">${T.name}${haz ? '・' + haz : ''}${here ? `・仲間${here}人` : ''}</text>
         ${extra ? `<text class="ex" y="81">${esc(extra)}</text>` : ''}
-        ${cur ? '<text class="you" x="38" y="-22" style="text-anchor:start">◀ 現在地</text>' : ''}
+        ${cur ? '<text class="you" x="38" y="-6" style="text-anchor:start">◀ 現在地</text>' : ''}
       </g>`;
     }
     MAP.title.set({ text: `第${f}層 ${FLOORS[f - 1].name}` });
     MAP.svg.set({ html: svg });
+    for (const n of MAP.svg.el.querySelectorAll('g.node.warp')) MAP.svg.add('wp_' + n.dataset.wp, n).on('click', 'map:warp', () => ({ area: n.dataset.wp }));
     // エリアの傾向（踏破すると、出やすい武器種と付きやすい特性がわかる）
     const st = game.char.areas || {};
     const rows = list.filter((a) => a.bias.length || a.kinds.length).map((a) => {
@@ -838,6 +852,12 @@ export function createUI(game) {
       const [x, y] = p(c.x, c.z); sh.push({ t: 'rect', x: x - 3 * k, y: y - 3 * k, w: 6 * k, h: 6 * k, fill: game.chestOpen(c) ? '#6a6a6a' : '#ffd27a' });
     }
     if (def.gate) { const [x, y] = p(def.gate.x, def.gate.z); sh.push({ t: 'circle', x, y, r: 5 * k, fill: '#6ad0ff' }); label(def.gate.x, def.gate.z, '転移門', '#6ad0ff', -14); }
+    const wp = env?.waypoint;
+    if (wp && known(wp.x, wp.z)) {
+      const on = game.waypointOk(def.id), [x, y] = p(wp.x, wp.z), r = 5 * k;
+      sh.push({ t: 'poly', pts: [[x, y - r], [x + r * 0.7, y], [x, y + r], [x - r * 0.7, y]], close: true, fill: on ? '#6ad8ff' : '#4a5464', stroke: '#e8f6ff', lw: 1 });
+      label(wp.x, wp.z, on ? 'ワープポイント' : 'ワープポイント（未解放）', on ? '#9ae8ff' : '#8a96a8', -14);
+    }
     if (env?.lair && known(env.lair.x, env.lair.z)) {
       const [x, y] = p(env.lair.x, env.lair.z); sh.push({ t: 'circle', x, y, r: env.lair.r * sc, stroke: hex(FLOORS[world.floor - 1].boss.accent), lw: 2 });
       label(env.lair.x, env.lair.z, `♜ ${FLOORS[world.floor - 1].boss.name}`, hex(FLOORS[world.floor - 1].boss.accent), 0);
@@ -1207,9 +1227,15 @@ export function createUI(game) {
     settings: panelState('settings', {
       'set:change'(ev) { game.setSetting(ev.payload.key, ev.payload.value); P.settings(); },
     }),
-    map: panelState('map', {
-      'map:tab'(ev) { mapTab = ev.payload.tab; game.sfx('ui'); P.map(); },
-    }),
+    // マップ: 開くたびに今いる階層を表示。ワープできたら閉じる
+    map: {
+      ...panelState('map', {
+        'map:tab'(ev) { mapTab = ev.payload.tab; game.sfx('ui'); P.map(); },
+        'map:floor'(ev) { mapFloor = ev.payload.floor; game.sfx('ui'); P.map(); },
+        'map:warp'(ev) { return game.waypointWarp(ev.payload.area) ? 'play' : undefined; },
+      }),
+      enter() { mapFloor = game.world.floor; showPanel('map'); game.sfx('ui'); },
+    },
     dialog: panelState('dialog', {
       'quest:accept'(ev) { game.acceptQuest(ev.payload.quest); P.dialog(this.data.npc); },
       'quest:claim'(ev) { game.claimQuest(ev.payload.quest); P.dialog(this.data.npc); },

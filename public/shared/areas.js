@@ -617,6 +617,22 @@ export function spawnPoint(def) {
   if (def.gate) return { x: def.gate.x, z: def.gate.z + 7 };
   return arrival(def, def.exits[0].to);
 }
+// ワープポイント: 触れると解放され、マップからそこへ飛べる。町・野営地は転移門がその役目（最初から使える）
+export function waypointOf(def) {
+  if (def.gate) return { ...spawnPoint(def), hub: true };
+  if (def.shape === 'grid') return spawnPoint(def);
+  // 屋外: 中央付近で、障害物・毒沼・流砂・出口から離れた所
+  const obs = obstaclesOf(def), haz = hazardsOf(def), ex = exitsOf(def);
+  for (let k = 0; k < 40; k++) {
+    const a = k * 2.4, r = k * 1.5;
+    const x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (!insideOpen(def, x, z, 4)) continue;
+    if (obs.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 3) || haz.some((h) => Math.hypot(h.x - x, h.z - z) < h.r + 3)) continue;
+    if (ex.some((e) => Math.hypot(e.x - x, e.z - z) < 8) || (def.box && Math.hypot(def.box.x - x, def.box.z - z) < 5)) continue;
+    return { x, z };
+  }
+  return spawnPoint(def);
+}
 export function lairOf(def) {
   if (def.type !== 'labyrinth') return null;
   const b = grid(def).pts.B[0];

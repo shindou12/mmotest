@@ -506,7 +506,35 @@ function enterArea(id, x, z) {
   fx.beam(me.x, me.z, 0x6ad0ff, 12, 1.2, 1.2);
   cam.focus.set(x, 1.2, z); cam.back = null;
   if (prev !== id) questEvent({ type: 'visit', area: id });
+  env.waypoint?.setOn(!!char?.waypoints?.[id]);
   ui.close();
+}
+
+// ---- ワープポイント ----
+// 近づくと解放。マップ（M の階層タブ）から、解放済みの所と町・野営地へ飛べる
+function waypointTick() {
+  const w = env?.waypoint;
+  if (!w || !char || char.waypoints?.[world.area] || Math.hypot(me.x - w.x, me.z - w.z) > 3) return;
+  char.waypoints = { ...(char.waypoints || {}), [world.area]: true };
+  w.setOn(true);
+  saveChar();
+  audio.sfx('levelup');
+  fx.beam(w.x, w.z, 0x6ad8ff, 10, 1.4, 1.2);
+  fx.ringWave(w.x, w.z, 0x6ad8ff, 5, 0.6);
+  toast(`◇ ワープポイントを解放した（${world.def.name}）`, '#9ae8ff');
+  ui.refresh();
+}
+function waypointOk(id) { const d = AREAS[id]; return !!d && (!!d.gate || !!char?.waypoints?.[id]); }
+function waypointWarp(id) {
+  if (!waypointOk(id) || AREAS[id].floor > (world.unlocked || 1)) { toast('まだ解放されていないワープポイントだ', '#ff9a8a'); return false; }
+  if (me.dead) return false;
+  const lair = env?.lair;
+  if (world.bossState === 'fight' && lair && Math.hypot(me.x - lair.x, me.z - lair.z) < lair.r + 2) { toast('ボス戦の最中はワープできない', '#ff9a8a'); return false; }
+  if (id === world.area) return false;
+  me.transit = true;
+  fx.beam(me.x, me.z, 0x6ad8ff, 12, 1.2, 0.8);
+  net.send({ t: 'wp', to: id });
+  return true;
 }
 
 // ---- NPC ----
@@ -2182,6 +2210,7 @@ function update(dt) {
   ambient.update(dt, me.x, me.z, t);
   if (weatherParts.kind) weatherParts.update(dt, me.x, me.z, t);
   exploreTick();
+  waypointTick();
   fx.update(dt);
   updateMobLabels();
   ui.frame(dt);
@@ -2246,6 +2275,7 @@ const game = {
   },
   nearestInteract, chestOpen, itemPower, findItem,
   explored: exploredOf,
+  waypointOk, waypointWarp,
   sfx: (n) => audio.sfx(n),
   loginInfo() { const c = loadChar(); return c && { name: c.name, color: c.color, lv: c.lv, kind: c.eq?.weapon?.kind || 'sword' }; },
   resetChar() {

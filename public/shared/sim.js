@@ -5,7 +5,7 @@ import {
 } from './data.js';
 import {
   AREAS, FLOOR_HUB, PLATE_WINDOW, grid, collide, pathStep, exitsOf, arrival, spawnPoint, lairOf,
-  obstaclesOf, hazardsOf, chestsOf, namedSpot, insideOpen, boundR, dirOf,
+  obstaclesOf, hazardsOf, chestsOf, namedSpot, insideOpen, boundR, dirOf, waypointOf,
 } from './areas.js';
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -187,6 +187,15 @@ export class World {
         const n = m.floor | 0;
         if (n < 1 || n > this.unlocked || n > MAX_FLOOR) return;
         this.movePlayer(p, FLOOR_HUB[n], spawnPoint(AREAS[FLOOR_HUB[n]]));
+        break;
+      }
+      case 'wp': {
+        // ワープポイントへ飛ぶ（解放済みかどうかはキャラデータを持つクライアントが確かめる）
+        const to = String(m.to || ''), def = AREAS[to];
+        if (!def || def.floor > this.unlocked || p.dead) return;
+        if (A.bossState === 'fight' && A.lair && dist(p, A.lair) < A.lair.r + 2) return; // ボス戦の最中は飛べない
+        const w = waypointOf(def);
+        this.movePlayer(p, to, { x: w.x, z: w.z + (def.shape === 'grid' ? 0 : 2.5) });
         break;
       }
       case 'move': {
