@@ -1,6 +1,6 @@
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 import {
-  FLOORS, GATE_POS, LAIR_POS, LAIR_RADIUS, FIELD_RADIUS, RARITIES,
+  FLOORS, GATE_POS, LAIR_POS, LAIR_RADIUS, FIELD_RADIUS, RARITIES, MAX_FLOOR,
   floorLevel, bossLevel, mobHp, mobDmg, mobXp, makeItem, rollRarity,
 } from './data.js';
 
@@ -21,7 +21,7 @@ export class World {
   constructor(opts = {}) {
     this.players = new Map();
     this.floors = new Map();
-    this.unlocked = opts.unlocked || 1;
+    this.unlocked = Math.min(MAX_FLOOR, opts.unlocked || 1);
     this.onSave = opts.onSave || (() => {});
     this.seq = 1;
     this.time = 0;
@@ -96,7 +96,7 @@ export class World {
       }
       case 'warp': {
         const n = m.floor | 0;
-        if (n < 1 || n > this.unlocked || n > FLOORS.length) return;
+        if (n < 1 || n > this.unlocked || n > MAX_FLOOR) return;
         p.floor = n; p.x = GATE_POS.x; p.z = GATE_POS.z;
         this.send(p, { t: 'warped', floor: n });
         break;
@@ -182,13 +182,13 @@ export class World {
       f.timers = [];
       for (const m of [...f.mobs.values()]) if (m.kind === 'add') f.mobs.delete(m.id);
       this.broadcastFloor(f.n, { t: 'bossClear', n: f.n, name: f.def.boss.name });
-      if (f.n === this.unlocked && f.n < FLOORS.length) {
+      if (f.n === this.unlocked && f.n < MAX_FLOOR) {
         this.unlocked++;
         this.onSave({ unlocked: this.unlocked });
         this.broadcast({ t: 'unlock', unlocked: this.unlocked });
         this.sys(`第${f.n}層 攻略！ 第${f.n + 1}層「${FLOORS[f.n].name}」への転移門が開放された`, '#7fffd4');
-      } else if (f.n === FLOORS.length) {
-        this.sys('★★★ 浮遊城エテルナ完全攻略！ おめでとう！ ★★★', '#ffd700');
+      } else if (f.n === MAX_FLOOR) {
+        this.sys(`★★★ 現在の最上層・第${MAX_FLOOR}層を攻略！ おめでとう！ ★★★`, '#ffd700');
       }
     }
   }
@@ -358,10 +358,18 @@ export class World {
       if (f.noTargetT > 8) { this.resetBoss(f); return; }
     } else f.noTargetT = 0;
 
+    // フェーズ: 1 → 激昂(50%) → 最終形態(25%)。移行時は大技で割り込む
     if (!b.enraged && b.hp < b.mhp * 0.5) {
-      b.enraged = true;
-      b.arch.speed = 4.4;
-      this.broadcastFloor(f.n, { t: 'enrage', id: b.id });
+      b.enraged = true; b.phase = 2;
+      b.arch.speed = 4.6;
+      this.broadcastFloor(f.n, { t: 'enrage', id: b.id, p: 2 });
+      b.dash = null; b.busyT = 0; b.actT = 0.4; b.forced = 'shock';
+    }
+    if (b.phase === 2 && b.hp < b.mhp * 0.25) {
+      b.phase = 3;
+      b.arch.speed = 5.2;
+      this.broadcastFloor(f.n, { t: 'enrage', id: b.id, p: 3 });
+      b.dash = null; b.busyT = 0; b.actT = 0.6; b.forced = 'ultimate';
     }
 
     if (b.dash) {
@@ -393,14 +401,19 @@ export class World {
     } else b.st = 0;
 
     if (b.actT <= 0) {
-      const pats = f.def.boss.patterns;
-      let pat = pick(pats);
+      const bd = f.def.boss;
+      const pats = b.phase === 3 ? [...bd.patterns, ...(bd.p3 || [])] : bd.patterns;
+      let pat = b.forced || pick(pats);
+      b.forced = null;
       if (pat === b.last && pats.length > 1) pat = pick(pats.filter((p) => p !== b.last));
       b.last = pat;
       const busy = this.bossPattern(f, b, pat, target, inArena);
       b.busyT = busy;
-      b.actT = busy + rnd(1.2, 2.2) * (b.enraged ? 0.6 : 1);
-      if (b.enraged && Math.random() < 0.35) b.actT = busy + 0.2;
+      // 攻撃の間隔は短め。フェーズが進むほど詰めてきて、連続攻撃も増える
+      const gap = [0, rnd(0.6, 1.1), rnd(0.35, 0.7), rnd(0.15, 0.45)][b.phase || 1];
+      b.actT = busy + gap;
+      const chain = [0, 0.15, 0.4, 0.6][b.phase || 1];
+      if (Math.random() < chain) b.actT = busy + 0.05;
       b.target = target.id;
       if (Math.random() < 0.5) b.target = null;
     }
@@ -412,13 +425,94 @@ export class World {
     if (d > max) { o.x = LAIR_POS.x + dx / d * max; o.z = LAIR_POS.z + dz / d * max; }
   }
 
+  // 突進（予兆の直線 → 遅れて高速移動）
+  bossCharge(f, b, tx, tz, delay, dmg, col) {
+    const ang = Math.atan2(tx - b.x, tz - b.z);
+    const len = Math.min(30, Math.hypot(tx - b.x, tz - b.z) + 6);
+    const sx = b.x, sz = b.z;
+    this.tele(f, b, [{ k: 'line', x: r2(sx), z: r2(sz), a: r2(ang), len: r2(len), w: 4.2 }], delay, dmg, col);
+    this.later(f, delay, () => {
+      if (f.boss !== b) return;
+      const end = { x: sx + Math.sin(ang) * (len - 1), z: sz + Math.cos(ang) * (len - 1) };
+      this.clampArena(end);
+      b.a = ang;
+      b.dash = { fx: b.x, fz: b.z, tx: end.x, tz: end.z, t: 0, dur: 0.25 };
+    });
+  }
+
+  // 生存中の対象プレイヤー（後から位置を読み直す用）
+  livePlayer(f, id) {
+    return this.floorPlayers(f.n).find((p) => p.id === id && !p.dead);
+  }
+
   bossPattern(f, b, pat, target, inArena) {
-    const sp = b.enraged ? 0.82 : 1;
-    const base = mobDmg(b.lv) * 3.0;
-    const col = b.enraged ? '#ff2a6a' : '#ff3a3a';
+    const sp = [1, 0.9, 0.78, 0.68][b.phase || 1];
+    const base = mobDmg(b.lv) * 3.3;
+    const col = b.phase === 3 ? '#ff1a8a' : b.enraged ? '#ff2a6a' : '#ff3a3a';
     const ang = Math.atan2(target.x - b.x, target.z - b.z);
+    const tid = target.id;
     this.broadcastFloor(f.n, { t: 'bossAct', id: b.id, p: pat });
     switch (pat) {
+      case 'combo': {
+        // 狙った相手を追いかける3〜5連叩きつけ
+        const n = 3 + (b.phase || 1) - 1;
+        for (let i = 0; i < n; i++) {
+          this.later(f, i * 0.42 * sp, () => {
+            const p = this.livePlayer(f, tid) || target;
+            this.tele(f, b, [{ k: 'circle', x: r2(p.x), z: r2(p.z), r: 3.2 }], 0.75 * sp, base * 0.85, col);
+          });
+        }
+        return (0.42 * n + 0.5) * sp;
+      }
+      case 'sweep': {
+        // 扇が回転しながら連続で薙ぎ払う。回り込むと危険
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        const n = b.phase === 3 ? 6 : 4;
+        for (let i = 0; i < n; i++) {
+          this.later(f, i * 0.28 * sp, () => this.tele(f, b, [{ k: 'cone', x: r2(b.x), z: r2(b.z), a: r2(ang + dir * i * 1.05), arc: 1.2, len: 12 }], 0.7 * sp, base, col));
+        }
+        return (0.28 * n + 0.6) * sp;
+      }
+      case 'shock': {
+        // 外へ広がる衝撃波。輪と輪の隙間で回避する
+        const waves = b.phase >= 2 ? 5 : 4;
+        const cx = b.x, cz = b.z;
+        for (let i = 0; i < waves; i++) {
+          this.later(f, i * 0.45 * sp, () => this.tele(f, b, [{ k: 'ring', x: r2(cx), z: r2(cz), r0: i * 4.2, r1: i * 4.2 + 3 }], 0.8 * sp, base * 0.9, col));
+        }
+        return (0.45 * waves + 0.5) * sp;
+      }
+      case 'chase': {
+        // 狙いを付け直しながら連続突進
+        const n = b.phase === 3 ? 4 : 3;
+        for (let i = 0; i < n; i++) {
+          this.later(f, i * 0.85 * sp, () => {
+            if (f.boss !== b) return;
+            const p = this.livePlayer(f, tid) || target;
+            this.bossCharge(f, b, p.x, p.z, 0.6 * sp, base * 1.1, col);
+          });
+        }
+        return (0.85 * n + 0.4) * sp;
+      }
+      case 'cage': {
+        // 外周と足元が同時に爆発。安全地帯はドーナツ状の狭い帯だけ
+        const cx = b.x, cz = b.z;
+        this.tele(f, b, [{ k: 'ring', x: r2(cx), z: r2(cz), r0: 8, r1: 26 }, { k: 'circle', x: r2(cx), z: r2(cz), r: 4 }], 1.25 * sp, base * 1.3, col);
+        this.later(f, 1.0 * sp, () => this.tele(f, b, [{ k: 'ring', x: r2(cx), z: r2(cz), r0: 3.5, r1: 7 }], 0.9 * sp, base, col));
+        return 2.2 * sp;
+      }
+      case 'ultimate': {
+        // 最終形態の大技: 衝撃波 → 十字 → 全員の足元へ雨
+        const cx = b.x, cz = b.z;
+        for (let i = 0; i < 5; i++) this.later(f, i * 0.35, () => this.tele(f, b, [{ k: 'ring', x: r2(cx), z: r2(cz), r0: i * 4.5, r1: i * 4.5 + 3.2 }], 0.75, base, '#ff1a8a'));
+        const mk = (a) => [0, Math.PI / 2].map((o) => ({ k: 'line', x: r2(cx - Math.sin(a + o) * 24), z: r2(cz - Math.cos(a + o) * 24), a: r2(a + o), len: 48, w: 3.6 }));
+        this.later(f, 2.0, () => this.tele(f, b, mk(Math.PI / 4), 0.9, base * 1.2, '#ff1a8a'));
+        this.later(f, 2.6, () => this.tele(f, b, mk(0), 0.9, base * 1.2, '#ff1a8a'));
+        this.later(f, 3.2, () => {
+          for (const p of this.floorPlayers(f.n)) if (!p.dead) for (let k = 0; k < 3; k++) this.later(f, k * 0.3, () => this.tele(f, b, [{ k: 'circle', x: r2(p.x), z: r2(p.z), r: 2.8 }], 0.7, base * 0.8, '#ff1a8a'));
+        });
+        return 4.6;
+      }
       case 'slam': {
         this.tele(f, b, [{ k: 'circle', x: r2(target.x), z: r2(target.z), r: 4.5 }], 1.1 * sp, base, col);
         if (b.enraged) this.later(f, 0.5, () => this.tele(f, b, [{ k: 'circle', x: r2(target.x), z: r2(target.z), r: 4.5 }], 1.0 * sp, base, col));

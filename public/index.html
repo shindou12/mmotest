@@ -48,12 +48,17 @@
   </div>
   <div id="party" class="panel"></div>
   <canvas id="minimap" width="180" height="180"></canvas>
+  <div id="charge" class="hidden"><div></div></div>
   <div id="hotbar">
-    <div class="slot" id="s-atk"><kbd>左クリック</kbd><div class="ic">⚔</div><div class="nm">通常攻撃</div></div>
-    <div class="slot" id="s-skill"><kbd>右クリック</kbd><div class="ic">✦</div><div class="nm" id="skill-name">スキル</div><div class="cd"></div></div>
+    <div class="slot" id="s-atk"><kbd>左 / 長押し</kbd><div class="ic">⚔</div><div class="nm">通常 / <span id="atk-name">強攻撃</span></div></div>
+    <div class="slot wsk" id="s-skill"><kbd>右 / E</kbd><div class="ic">✦</div><div class="nm" id="skill-name">武器スキル</div><div class="cd"></div></div>
+    <div class="slot tsk" id="s-t1"><kbd>1</kbd><div class="ic">◆</div><div class="nm">未設定</div><div class="cd"></div></div>
+    <div class="slot tsk" id="s-t2"><kbd>2</kbd><div class="ic">◆</div><div class="nm">未設定</div><div class="cd"></div></div>
     <div class="slot" id="s-dodge"><kbd>Space</kbd><div class="ic">↻</div><div class="nm">回避</div><div class="cd"></div></div>
     <div class="slot" id="s-pot"><kbd>Q</kbd><div class="ic">⚗</div><div class="nm">ポーション <b id="pot-n">3</b></div><div class="cd"></div></div>
     <div class="slot small" id="s-inv"><kbd>I</kbd><div class="ic">🎒</div><div class="nm">装備</div></div>
+    <div class="slot small" id="s-tree"><kbd>K</kbd><div class="ic">✧</div><div class="nm">スキル</div><span id="sp-badge" class="hidden"></span></div>
+    <div class="slot small" id="s-set"><kbd>Esc</kbd><div class="ic">⚙</div><div class="nm">設定</div></div>
   </div>
   <div id="chat">
     <div id="chat-log"></div>
@@ -66,11 +71,13 @@
   <div id="help" class="panel">
     <b>操作</b><br>
     WASD 移動 / マウス 向き<br>
-    左クリック長押し 攻撃（3段コンボ）<br>
-    右クリック ソードスキル<br>
+    左クリック 通常攻撃（3段コンボ）<br>
+    左クリック長押し→離す 強攻撃（溜めるほど強い）<br>
+    右クリック / E 武器スキル<br>
+    1 / 2 スキルツリーで覚えたスキル<br>
     Space 回避（無敵時間あり）<br>
-    Q ポーション / I 装備 / F 転移門<br>
-    Enter チャット / M ミュート / H このヘルプ<br>
+    Q ポーション / I 装備 / K スキルツリー / F 転移門<br>
+    Esc 設定 / Enter チャット / M ミュート / H ヘルプ<br>
     <span class="dim">赤い予兆の中にいると被弾。回避の無敵で抜けると「JUST回避」</span>
   </div>
 </div>
@@ -86,6 +93,31 @@
     </div>
     <div class="inv-right"><div id="inv-grid"></div></div>
   </div>
+</div>
+
+<div id="tree" class="panel hidden">
+  <div class="inv-head"><b>スキルツリー</b><span id="sp-left"></span><span class="dim">クリックで習得 ／ ◆は使うスキル（[1][2]でスロットに入れる）</span><button id="tree-reset">振り直し</button><button id="tree-close">×</button></div>
+  <div id="tree-tabs"></div>
+  <div id="tree-body"></div>
+</div>
+
+<div id="settings" class="panel hidden">
+  <div class="inv-head"><b>設定</b><button id="settings-close">×</button></div>
+  <div class="set-group">
+    <div class="set-h">サウンド</div>
+    <label class="set-row" for="set-master"><span>全体の音量</span><input id="set-master" type="range" min="0" max="100"><output></output></label>
+    <label class="set-row" for="set-music"><span>BGM</span><input id="set-music" type="range" min="0" max="100"><output></output></label>
+    <label class="set-row" for="set-sfx"><span>効果音</span><input id="set-sfx" type="range" min="0" max="100"><output></output></label>
+    <label class="set-row" for="set-amb"><span>環境音</span><input id="set-amb" type="range" min="0" max="100"><output></output></label>
+  </div>
+  <div class="set-group">
+    <div class="set-h">表示</div>
+    <label class="set-row" for="set-quality"><span>画質</span>
+      <select id="set-quality"><option value="high">高（光の演出・影・草すべて）</option><option value="mid">標準（草を半分に）</option><option value="low">軽量（光の演出と影なし・草少なめ）</option></select></label>
+    <label class="set-row" for="set-shake"><span>画面の揺れ</span><input id="set-shake" type="checkbox"></label>
+    <label class="set-row" for="set-dmgnum"><span>ダメージの数字</span><input id="set-dmgnum" type="checkbox"></label>
+  </div>
+  <div class="dim">設定はこのブラウザに保存されます</div>
 </div>
 
 <div id="gate-menu" class="panel hidden">

@@ -39,7 +39,7 @@ function local(base, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = s
   return base.clone().multiply(tmpM.compose(tmpP, tmpQ, tmpS));
 }
 
-export function buildFloor(def) {
+export function buildFloor(def, opts = {}) {
   const group = new THREE.Group();
   const R = seeded(def.n * 7919);
   const fogC = new THREE.Color(def.fog);
@@ -128,7 +128,7 @@ export function buildFloor(def) {
   // ---- 草（インスタンス描画＋風と踏み分け） ----
   let grassU = null;
   const gcfg = GRASS[def.n];
-  if (gcfg) {
+  if (gcfg && (opts.grass ?? 1) > 0) {
     const [cb, ct, dens, hgt] = gcfg;
     const blade = new THREE.BufferGeometry();
     const hs = [0, 0.35, 0.7, 1], ws = [0.07, 0.055, 0.03, 0];
@@ -142,7 +142,7 @@ export function buildFloor(def) {
     blade.setAttribute('normal', new THREE.Float32BufferAttribute(vp.map(() => 0).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
     blade.setAttribute('color', new THREE.Float32BufferAttribute(vc, 3));
     blade.setIndex(idx);
-    const count = Math.min(42000, Math.round(Math.PI * FIELD_RADIUS * FIELD_RADIUS * dens));
+    const count = Math.min(42000, Math.round(Math.PI * FIELD_RADIUS * FIELD_RADIUS * dens * (opts.grass ?? 1)));
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
     grassU = { uTime: { value: 0 }, uPlayer: { value: new THREE.Vector2() } };
     mat.onBeforeCompile = (sh) => {

@@ -45,6 +45,15 @@ export const WEAPONS = {
   },
 };
 export const WEAPON_KINDS = Object.keys(WEAPONS);
+// 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
+export const WEAPON_SKILL_POOL = {
+  sword: ['vorpal', 'square', 'leap'],
+  greatsword: ['cyclone', 'breaker'],
+  spear: ['lance', 'helix'],
+  dagger: ['shadow', 'phantom'],
+};
+// 品質を固めるまでは3階層で運用
+export const MAX_FLOOR = 3;
 
 const TIER_PREFIX = ['木の', '青銅の', '鉄の', '鋼の', '銀の', 'ミスリルの', '魔鋼の', 'アダマンの', '星鉄の', '天鋼の', '神鉄の'];
 const ARMOR_BASE = ['布の服', '革の鎧', '鎖帷子', '鋼の胸当て', '騎士の鎧', '魔導の外套', '竜革の鎧', '星衣', '天衣'];
@@ -102,7 +111,7 @@ export const FLOORS = [
     particles: 'pollen', amb: 'meadow',
     music: { root: 62, mode: 'major', bpm: 88, prog: [0, 4, 5, 3], feel: 'calm' },
     mobs: [{ t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 }],
-    boss: { name: 'コボルド王 グラズ', t: 'knight', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, patterns: ['slam', 'cone', 'charge'] },
+    boss: { name: 'コボルド王 グラズ', t: 'knight', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, patterns: ['combo', 'cone', 'charge', 'sweep', 'slam'], p3: ['chase', 'shock'] },
   },
   {
     n: 2, name: '霧の森', ground: 0x2f5a3a, ground2: 0x3f6f4a, fog: 0x9ab8b0, skyTop: 0x6a8a90, skyBot: 0xb7cfc8,
@@ -111,7 +120,7 @@ export const FLOORS = [
     particles: 'firefly', amb: 'forest',
     music: { root: 57, mode: 'dorian', bpm: 80, prog: [0, 3, 6, 4], feel: 'mystic' },
     mobs: [{ t: 'wisp', name: 'フォレストウィスプ', color: 0x8cffb0 }, { t: 'beast', name: 'ミストウルフ', color: 0x8a9a9a }],
-    boss: { name: '霧の大樹 ユグドラ', t: 'golem', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['slam', 'rain', 'cone', 'summon'] },
+    boss: { name: '霧の大樹 ユグドラ', t: 'golem', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['rain', 'shock', 'combo', 'cage', 'summon', 'cone'], p3: ['spiral', 'nova'] },
   },
   {
     n: 3, name: '砂塵の荒野', ground: 0xc9a066, ground2: 0xe0bf86, fog: 0xf0d6a8, skyTop: 0xf0b070, skyBot: 0xffe6c0,
@@ -120,7 +129,7 @@ export const FLOORS = [
     particles: 'dust', amb: 'desert',
     music: { root: 60, mode: 'phrygian', bpm: 92, prog: [0, 1, 0, 6], feel: 'exotic' },
     mobs: [{ t: 'beast', name: 'デザートスコーピオン', color: 0xc08040 }, { t: 'golem', name: 'サンドゴーレム', color: 0xd0aa70 }],
-    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['cone', 'charge', 'ring', 'slam'] },
+    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo'], p3: ['spiral', 'cross', 'cage'] },
   },
   {
     n: 4, name: '水晶洞窟', ground: 0x2a2a44, ground2: 0x3a3a60, fog: 0x1a1a38, skyTop: 0x0a0a1a, skyBot: 0x202048,
@@ -264,6 +273,7 @@ export function makeItem(ilvl, rarity, opts = {}) {
   if (slot === 'weapon') {
     it.atk = Math.round(7 * g);
     it.name = unique ? unique.name : TIER_PREFIX[tier] + WEAPONS[kind].name;
+    it.skill = pick(WEAPON_SKILL_POOL[kind]);
   } else if (slot === 'armor') {
     it.hp = Math.round(45 * g);
     it.name = unique ? unique.name : ARMOR_BASE[Math.min(ARMOR_BASE.length - 1, Math.floor((ilvl - 1) / 6))];
@@ -282,5 +292,6 @@ export function starterWeapon(kind) {
   const it = makeItem(1, 0, { slot: 'weapon', kind });
   it.name = '初心者の' + WEAPONS[kind].name;
   it.atk = 6;
+  it.skill = WEAPON_SKILL_POOL[kind][0];
   return it;
 }

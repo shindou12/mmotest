@@ -23,9 +23,10 @@ export class AudioEngine {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 4;
     this.master.connect(comp).connect(ctx.destination);
-    this.musicBus = ctx.createGain(); this.musicBus.gain.value = 0.42; this.musicBus.connect(this.master);
-    this.sfxBus = ctx.createGain(); this.sfxBus.gain.value = 0.7; this.sfxBus.connect(this.master);
-    this.ambBus = ctx.createGain(); this.ambBus.gain.value = 0.5; this.ambBus.connect(this.master);
+    this.musicBus = ctx.createGain(); this.musicBus.gain.value = this.level('music'); this.musicBus.connect(this.master);
+    this.sfxBus = ctx.createGain(); this.sfxBus.gain.value = this.level('sfx'); this.sfxBus.connect(this.master);
+    this.ambBus = ctx.createGain(); this.ambBus.gain.value = this.level('amb'); this.ambBus.connect(this.master);
+    this.master.gain.value = this.level('master');
 
     // リバーブ（生成インパルス）
     this.reverb = ctx.createConvolver();
@@ -61,7 +62,22 @@ export class AudioEngine {
     setInterval(() => this.ambientEvents(), 200);
   }
 
-  setVolume(v) { if (this.master) this.master.gain.value = v; }
+  // 音量設定（0〜1）。各バスの基準値に掛け合わせる
+  level(k) {
+    const base = { master: 0.8, music: 0.42, sfx: 0.7, amb: 0.5 }[k];
+    const v = this.vol?.[k] ?? 1;
+    return base * v * (k === 'master' && this.muted ? 0 : 1);
+  }
+  setVolumes(vol) {
+    this.vol = { ...vol };
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this.master.gain.setTargetAtTime(this.level('master'), t, 0.05);
+    this.musicBus.gain.setTargetAtTime(this.level('music'), t, 0.05);
+    this.sfxBus.gain.setTargetAtTime(this.level('sfx'), t, 0.05);
+    this.ambBus.gain.setTargetAtTime(this.level('amb'), t, 0.05);
+  }
+  setMuted(m) { this.muted = m; if (this.master) this.master.gain.setTargetAtTime(this.level('master'), this.ctx.currentTime, 0.05); }
 
   // ===================== BGM =====================
   setMusic(cfg, boss = false) {
@@ -76,7 +92,7 @@ export class AudioEngine {
       this.song = this.makeSong(cfg, boss);
       this.step = 0;
       this.nextTime = this.ctx.currentTime + 0.05;
-      this.musicBus.gain.setTargetAtTime(0.42, this.ctx.currentTime, 0.4);
+      this.musicBus.gain.setTargetAtTime(this.level('music'), this.ctx.currentTime, 0.4);
     }, 900);
   }
 
@@ -442,6 +458,20 @@ export class AudioEngine {
       case 'warp': {
         const g = tone('sine', 200, 1600, 1.2, 0.15); g.connect(this.revSend);
         this.noiseHit(t, 0.2, 'bandpass', 2000, 1.2, B, 4).f.frequency.exponentialRampToValueAtTime(6000, t + 1.2);
+        break;
+      }
+      case 'charge': tone('sine', 300 + (opt.lv || 0) * 200, 600 + (opt.lv || 0) * 300, 0.25, 0.06).connect(this.revSend); break;
+      case 'charged': [0, 7, 12].forEach((s, i) => tone('triangle', mtof(79 + s), 0, 0.25, 0.08, i * 0.03).connect(this.revSend)); break;
+      case 'heavy': {
+        tone('sine', 140, 40, 0.45, 0.5);
+        const n = this.noiseHit(t, 0.45, 'lowpass', 2500, 0.4, B); n.f.frequency.exponentialRampToValueAtTime(200, t + 0.4);
+        break;
+      }
+      case 'buff': [0, 4, 7, 11].forEach((s, i) => tone('sine', mtof(72 + s), 0, 0.5, 0.07, i * 0.05).connect(this.revSend)); break;
+      case 'phase': {
+        tone('sawtooth', 60, 220, 1.6, 0.3).connect(this.revSend);
+        tone('sawtooth', 61, 223, 1.6, 0.2).connect(this.revSend);
+        this.noiseHit(t, 0.4, 'lowpass', 600, 1.8, B);
         break;
       }
       case 'ui': tone('sine', 1000, 0, 0.05, 0.05); break;

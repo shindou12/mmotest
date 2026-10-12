@@ -62,15 +62,15 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 #party .pm .nm { display: flex; justify-content: space-between; }
 #minimap { position: absolute; top: 12px; right: 12px; width: 180px; height: 180px; border-radius: 50%; border: 2px solid var(--line); background: rgba(0,0,0,.4); }
 
-#hotbar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
-.slot { position: relative; width: 86px; height: 74px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; text-align: center; padding-top: 4px; overflow: hidden; cursor: default; }
-.slot.small { width: 60px; cursor: pointer; }
+#hotbar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+.slot { position: relative; width: 76px; height: 74px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; text-align: center; padding-top: 4px; overflow: hidden; cursor: default; }
+.slot.small { width: 54px; cursor: pointer; }
 .slot .ic { font-size: 24px; line-height: 30px; }
 .slot .nm { font-size: 10px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
 .slot .cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(0,0,0,.6); }
 .slot.ready { box-shadow: 0 0 12px rgba(120, 200, 255, .6) inset; }
 
-#chat { position: absolute; bottom: 14px; left: 12px; width: 360px; }
+#chat { position: absolute; bottom: 14px; left: 12px; width: 280px; }
 #chat-log { max-height: 180px; overflow-y: auto; font-size: 12px; text-shadow: 0 1px 2px #000; padding: 4px; display: flex; flex-direction: column; gap: 2px; }
 #chat-log::-webkit-scrollbar { width: 4px; }
 #chat-in { width: 100%; background: rgba(0,0,0,.45); border: 1px solid var(--line); color: var(--txt); padding: 6px 8px; border-radius: 6px; font-family: inherit; opacity: .5; }
@@ -116,6 +116,60 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 #tooltip .fx { color: #ffd27a; }
 #tooltip .lore { color: var(--dim); font-style: italic; }
 #tooltip .cmp { margin-top: 4px; }
+
+/* ホットバー追加分 */
+.slot.tsk .ic { color: #b9a0ff; }
+.slot.wsk .ic { color: #8fd8ff; }
+.slot.off { opacity: .45; }
+#sp-badge { position: absolute; top: 3px; right: 4px; min-width: 18px; height: 18px; border-radius: 9px; background: #ffb52e; color: #1a1205; font-size: 11px; font-weight: bold; line-height: 18px; animation: pulse .7s infinite alternate; }
+#charge { position: absolute; bottom: 104px; left: 50%; transform: translateX(-50%); width: 180px; height: 8px; border-radius: 4px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.25); overflow: hidden; pointer-events: none; }
+#charge > div { height: 100%; width: 0; background: linear-gradient(90deg, #6ad0ff, #b9a0ff); }
+#charge.max > div { background: #ffd84a; box-shadow: 0 0 12px #ffd84a; }
+.dmg.poison { color: #9aff6a; font-size: 14px; }
+#tooltip .wsk { margin-top: 4px; color: #8fd8ff; }
+
+/* スキルツリー */
+#tree { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(900px, 96vw); max-height: 90vh; padding: 12px; z-index: 20; display: flex; flex-direction: column; }
+#tree .inv-head { flex-wrap: wrap; }
+#sp-left b { color: #ffd84a; font-size: 18px; }
+#tree-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; align-items: stretch; }
+#tree-tabs button { display: flex; flex-direction: column; align-items: center; min-width: 84px; }
+#tree-tabs button small { color: var(--dim); font-size: 10px; }
+#tree-tabs button.on { background: rgba(100, 190, 255, .5); border-color: #9ad8ff; }
+#tree-tabs .tsep { width: 12px; }
+#tree-body { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.tree-note { font-size: 12px; color: #ffcf7a; padding: 6px 10px; background: rgba(255,180,60,.1); border-radius: 6px; }
+.tree-cols { display: grid; grid-template-columns: 70px repeat(3, 1fr); gap: 8px; font-size: 12px; color: var(--acc); text-align: center; }
+.tree-cols::before { content: ''; }
+.tier { display: grid; grid-template-columns: 70px 1fr; gap: 8px; align-items: stretch; }
+.tier.locked .node { filter: grayscale(.8); opacity: .5; }
+.tier-l { font-size: 12px; color: var(--dim); display: flex; flex-direction: column; justify-content: center; }
+.tier-l small { font-size: 10px; }
+.tier-n { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.tier-n.cols3 { grid-template-columns: repeat(3, 1fr); }
+.node { position: relative; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.35); cursor: pointer; min-width: 0; }
+.node.can { border-color: #ffd84a; box-shadow: 0 0 10px rgba(255,216,74,.25) inset; }
+.node.can:hover { background: rgba(255,216,74,.12); }
+.node.have { background: rgba(80,160,255,.18); }
+.node.active .nn { color: #c9b4ff; }
+.node .nn { font-weight: bold; font-size: 13px; }
+.node .nd { font-size: 11px; color: #c8d4e4; margin-top: 3px; line-height: 1.5; }
+.pips { display: flex; gap: 3px; margin-top: 4px; }
+.pips i { width: 14px; height: 5px; border-radius: 2px; background: rgba(255,255,255,.15); }
+.pips i.on { background: #ffd84a; }
+.slotbtns { position: absolute; top: 6px; right: 6px; display: flex; gap: 3px; }
+.slotbtns button { padding: 1px 7px; font-size: 11px; }
+.slotbtns button.on { background: #8a6aff; border-color: #c9b4ff; }
+
+/* 設定 */
+#settings { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, 94vw); padding: 14px; z-index: 20; display: flex; flex-direction: column; gap: 12px; }
+.set-group { display: flex; flex-direction: column; gap: 8px; }
+.set-h { font-size: 12px; color: var(--acc); letter-spacing: .1em; }
+.set-row { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 10px; font-size: 13px; }
+.set-row select { grid-column: 2 / 4; background: rgba(0,0,0,.45); color: var(--txt); border: 1px solid var(--line); border-radius: 6px; padding: 6px; font-family: inherit; }
+.set-row input[type=checkbox] { justify-self: start; width: 18px; height: 18px; }
+.set-row output { font-variant-numeric: tabular-nums; text-align: right; color: var(--dim); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 
 #gate-menu { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(380px, 94vw); padding: 12px; z-index: 20; }
 #gate-list button { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }

@@ -36,8 +36,8 @@ export function makeWeapon(kind, rarity = 0) {
   const grip = toon(0x3a2418);
   const gem = glow(rc.clone().multiplyScalar(rarity >= 2 ? 1.6 : 1));
   const edge = (pts, depth) => {
-    if (rarity < 2) return;
-    const e = mesh(extrude(pts, depth * 0.4, 0), glow(rc.clone().multiplyScalar(1.2 + rarity * 0.25)));
+    if (rarity < 3) return;
+    const e = mesh(extrude(pts, depth * 0.4, 0), glow(rc.clone().multiplyScalar(0.9 + (rarity - 3) * 0.2)));
     e.scale.set(1.18, 1.03, 1); e.position.y = -0.02; e.userData.noOutline = true; e.userData.keep = true;
     g.add(e);
   };
@@ -172,7 +172,11 @@ export function setPlayerWeapon(model, kind, rarity) {
   if (u.wKey === key) return;
   u.wKey = key;
   if (u.weapon) u.hand.remove(u.weapon);
-  u.weapon = makeWeapon(kind, rarity);
+  // 見下ろし視点で刃が「線」に見えないよう、刃の平らな面を上に向けて持つ
+  const w = makeWeapon(kind, rarity);
+  w.rotation.y = Math.PI / 2;
+  u.weapon = new THREE.Group();
+  u.weapon.add(w);
   u.weapon.rotation.x = Math.PI / 2;
   if (kind === 'spear') u.weapon.position.z = -0.7;
   u.hand.add(u.weapon);
@@ -352,7 +356,7 @@ export function makeMob(t, color, scale = 1, accent = null, boss = false) {
       const arm = new THREE.Group(); arm.position.set(0.55, 1.55, 0);
       arm.add(mesh(capsule(0.1, 0.25, 8), armorD, [0, -0.18, 0]));
       arm.add(mesh(capsule(0.11, 0.2, 8), armor, [0, -0.45, 0]));
-      const sw = makeWeapon(boss ? 'greatsword' : 'sword', boss ? 3 : 1); sw.rotation.x = Math.PI / 2; sw.position.y = -0.62;
+      const sw = makeWeapon(boss ? 'greatsword' : 'sword', boss ? 3 : 1); sw.rotation.set(Math.PI / 2, Math.PI / 2, 0); sw.position.y = -0.62;
       arm.add(sw); body.add(arm); parts.arm = arm;
       const sh = new THREE.Group(); sh.position.set(-0.62, 1.25, 0.15); sh.rotation.y = -0.4; body.add(sh);
       sh.add(mesh(extrude([[-0.32, 0.35], [0.32, 0.35], [0.3, -0.1], [0, -0.5], [-0.3, -0.1]], 0.08), armor, null, [0, Math.PI / 2, 0]));
