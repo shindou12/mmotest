@@ -507,7 +507,28 @@ function enterArea(id, x, z) {
   cam.focus.set(x, 1.2, z); cam.back = null;
   if (prev !== id) questEvent({ type: 'visit', area: id });
   env.waypoint?.setOn(!!char?.waypoints?.[id]);
+  refreshPin();
   ui.close();
+}
+
+// ---- マップのピン（目的地の印）----
+// エリアマップをクリックして1つだけ立てられる。そのエリアでは光の柱が立ち、着くと消える
+let pinBeam = null;
+function setPin(p) {
+  char.pin = p; saveChar(); refreshPin();
+  audio.sfx('ui');
+  if (p) toast(`📍 ピンを立てた（${AREAS[p.area].name}）`, '#ffd84a');
+}
+function refreshPin() {
+  if (pinBeam) { fx.dispose(pinBeam); pinBeam = null; }
+  const p = char?.pin;
+  if (p && p.area === world.area) pinBeam = fx.beam(p.x, p.z, 0xffd84a, 30, 0.35);
+}
+function pinTick() {
+  const p = char?.pin;
+  if (!p || p.area !== world.area || Math.hypot(me.x - p.x, me.z - p.z) > 3.5) return;
+  setPin(null);
+  toast('📍 目的地に着いた', '#ffd84a');
 }
 
 // ---- ワープポイント ----
@@ -2211,6 +2232,7 @@ function update(dt) {
   if (weatherParts.kind) weatherParts.update(dt, me.x, me.z, t);
   exploreTick();
   waypointTick();
+  pinTick();
   fx.update(dt);
   updateMobLabels();
   ui.frame(dt);
@@ -2275,7 +2297,7 @@ const game = {
   },
   nearestInteract, chestOpen, itemPower, findItem,
   explored: exploredOf,
-  waypointOk, waypointWarp,
+  waypointOk, waypointWarp, setPin,
   sfx: (n) => audio.sfx(n),
   loginInfo() { const c = loadChar(); return c && { name: c.name, color: c.color, lv: c.lv, kind: c.eq?.weapon?.kind || 'sword' }; },
   resetChar() {

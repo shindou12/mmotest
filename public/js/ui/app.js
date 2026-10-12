@@ -158,6 +158,10 @@ export function createUI(game) {
     floors: panels.map.add('floors', '#map-floors'), svg: panels.map.add('svg', '#map-svg'), info: panels.map.add('info', '#map-info'), area: panels.map.add('area', '#map-area', CanvasView),
   };
   MAP.area.round = false;
+  MAP.area.on('click', 'map:pin', (e) => {
+    const r = MAP.area.el.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * MAP.area.el.width / r.width, y: (e.clientY - r.top) * MAP.area.el.height / r.height };
+  });
   for (const b of MAP.tabs.el.querySelectorAll('button')) MAP.tabs.add(b.dataset.tab, b).on('click', 'map:tab', () => ({ tab: b.dataset.tab }));
   const DLG = { title: panels.dialog.add('title', '#dialog-title'), line: panels.dialog.add('line', '#dialog-line'), list: panels.dialog.add('list', '#dialog-quests') };
   const GATE = { list: panels.gate.add('list', '#gate-list') };
@@ -420,7 +424,8 @@ export function createUI(game) {
         for (let i = 0; i < seen.length; i++) if (g.rows[Math.floor(i / g.W)][i % g.W] !== '#') { tot++; n += seen[i]; }
         rate = `　探索率 ${Math.round(n / tot * 100)}%（歩いた場所が地図に記されます）`;
       }
-      MAP.sub.set({ text: `第${f}層 ${T.name}${W ? `　${W.icon} ${W.name}` : ''}${st?.done ? '　✔ 踏破' : ''}${rate}` });
+      const qs = questTargets()[def.id];
+      MAP.sub.set({ text: `第${f}層 ${T.name}${W ? `　${W.icon} ${W.name}` : ''}${st?.done ? '　✔ 踏破' : ''}${rate}${qs ? `　！${qs.join('、')}` : ''}` });
       P.mapArea();
       return;
     }
@@ -431,8 +436,19 @@ export function createUI(game) {
     for (const b of MAP.floors.el.querySelectorAll('button')) MAP.floors.add('f' + b.dataset.f, b).on('click', 'map:floor', () => ({ floor: +b.dataset.f }));
     renderFloor(mapFloor);
   };
+  // 進行中のクエストの目的地（エリアID → クエスト名の一覧）
+  const questTargets = () => {
+    const out = {};
+    for (const q of QUESTS) {
+      const s = questState(game.char, q.id);
+      if (!s || s.claimed) continue;
+      const ar = q.type === 'kill' ? q.area : q.type === 'boss' ? Object.values(AREAS).find((a) => a.type === 'labyrinth' && a.floor === q.target)?.id : q.target;
+      if (ar) (out[ar] = out[ar] || []).push(q.name + (s.done ? '（報告できる）' : ''));
+    }
+    return out;
+  };
   const renderFloor = (f) => {
-    const world = game.world, roster = game.roster();
+    const world = game.world, roster = game.roster(), qt = questTargets();
     const list = Object.values(AREAS).filter((a) => a.floor === f);
     const pos = (a) => [a.mapPos[0] * 6, a.mapPos[1] * 4];
     let svg = '';
@@ -458,6 +474,7 @@ export function createUI(game) {
         <text class="wp ${wp ? 'on' : ''}" x="-30" y="-22">${a.gate ? '⛩' : '◇'}</text>
         ${W ? `<text class="wx" x="30" y="-22">${W.icon}</text>` : ''}
         ${done ? '<text class="done" x="28" y="26">✔</text>' : ''}
+        ${qt[a.id] ? `<text class="qm" x="-28" y="26">！</text><title>クエスト：${esc(qt[a.id].join('、'))}</title>` : ''}
         <text class="nm" y="50">${esc(a.name)}</text>
         <text class="ty" y="66">${T.name}${haz ? '・' + haz : ''}${here ? `・仲間${here}人` : ''}</text>
         ${extra ? `<text class="ex" y="81">${esc(extra)}</text>` : ''}
@@ -879,6 +896,17 @@ export function createUI(game) {
       if (mb.elite === 3) label(mb.x, mb.z, mb.name, '#ff6ad0');
     }
     for (const o of game.others.values()) { const [x, y] = p(o.x, o.z); sh.push({ t: 'circle', x, y, r: 3.5 * k, fill: '#7f7' }); label(o.x, o.z, o.name || '', '#7f7'); }
+    // ピン（ミニマップでは範囲外なら縁に寄せて向きを示す）
+    const pin = game.char?.pin;
+    if (pin && pin.area === def.id) {
+      let [x, y] = p(pin.x, pin.z);
+      const dx = x - v.W / 2, dy = y - v.H / 2, d = Math.hypot(dx, dy), max = v.W / 2 - 9;
+      if (!v.full && d > max) { x = v.W / 2 + dx / d * max; y = v.H / 2 + dy / d * max; }
+      sh.push({ t: 'circle', x, y: y - 6 * k, r: 5 * k, fill: '#ffd84a', stroke: '#000', lw: 1.5 });
+      sh.push({ t: 'poly', pts: [[x - 3 * k, y - 4 * k], [x + 3 * k, y - 4 * k], [x, y + 2 * k]], close: true, fill: '#ffd84a' });
+      if (v.full) { const m = Math.round(Math.hypot(pin.x - me.x, pin.z - me.z)); sh.push({ t: 'text', x, y: y - 20, text: `📍 ${m}m`, fill: '#ffd84a', size: 12 }); }
+    }
+    v.tf = { cx, cz, sc };
     const [x, y] = p(me.x, me.z);
     if (v.full) sh.push({ t: 'circle', x, y, r: 11, stroke: '#ffffff88', lw: 2 });
     sh.push({ t: 'arrow', x, y, a: -me.a + Math.PI, fill: '#fff' });
@@ -887,7 +915,18 @@ export function createUI(game) {
   // ミニマップ
   P.minimap = () => { const el = H.minimap.el; H.minimap.draw(areaShapes({ W: el.width, H: el.height })); };
   // エリアマップ（M の「エリア」タブ）: エリア全体を大きく描く
-  P.mapArea = () => { const el = MAP.area.el; MAP.area.draw(areaShapes({ W: el.width, H: el.height, full: true })); };
+  let areaTf = null;
+  P.mapArea = () => { const el = MAP.area.el, v = { W: el.width, H: el.height, full: true }; MAP.area.draw(areaShapes(v)); areaTf = v.tf; };
+  // エリアマップをクリックした所（キャンバスの座標）にピンを立てる。今のピンの近くなら外す
+  P.mapPin = (px, py) => {
+    if (!areaTf) return;
+    const el = MAP.area.el, def = game.world.def;
+    const x = (px - el.width / 2) / areaTf.sc + areaTf.cx, z = (py - el.height / 2) / areaTf.sc + areaTf.cz;
+    const old = game.char.pin;
+    if (old && old.area === def.id && Math.hypot(old.x - x, old.z - z) < 14 / areaTf.sc) game.setPin(null);
+    else game.setPin({ area: def.id, x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10 });
+    P.mapArea();
+  };
 
   // ---- 浮かぶ文字・仲間の名札（ゲーム空間の位置 → 画面の位置） ----
   const floats = [];
@@ -1232,6 +1271,7 @@ export function createUI(game) {
       ...panelState('map', {
         'map:tab'(ev) { mapTab = ev.payload.tab; game.sfx('ui'); P.map(); },
         'map:floor'(ev) { mapFloor = ev.payload.floor; game.sfx('ui'); P.map(); },
+        'map:pin'(ev) { P.mapPin(ev.payload.x, ev.payload.y); },
         'map:warp'(ev) { return game.waypointWarp(ev.payload.area) ? 'play' : undefined; },
       }),
       enter() { mapFloor = game.world.floor; showPanel('map'); game.sfx('ui'); },

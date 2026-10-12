@@ -228,6 +228,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 #map-svg .wp.on { fill: #6ad8ff; }
 #map-svg .wx { font-size: 16px; }
 #map-svg .done { font-size: 15px; fill: #4ae09a; font-weight: bold; }
+#map-svg .qm { font-size: 20px; fill: #ffd84a; font-weight: bold; paint-order: stroke; stroke: #000; stroke-width: 3px; }
 #map-svg .node.warp { cursor: pointer; }
 #map-svg .node text { pointer-events: none; }
 #map-svg .node.warp:hover circle { fill: rgba(60, 140, 200, .55); stroke-width: 5; }
@@ -236,7 +237,7 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .map-legend i { font-style: normal; }
 #map-area-wrap, #map-floor-wrap { display: flex; flex-direction: column; gap: 8px; }
 #map.t-area #map-floor-wrap, #map.t-floor #map-area-wrap { display: none; }
-#map-area { width: 100%; height: auto; max-height: 64vh; object-fit: contain; border-radius: 8px; background: #06080e; }
+#map-area { width: auto; height: auto; max-width: 100%; max-height: 64vh; align-self: center; cursor: crosshair; border-radius: 8px; background: #06080e; }
 .map-tabs { display: flex; gap: 6px; }
 .map-tabs button { padding: 6px 16px; background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
 .map-tabs button.on { background: linear-gradient(180deg, rgba(255, 216, 106, .28), rgba(255, 216, 106, .05)); border-color: rgba(255, 216, 106, .55); color: #fff4d0; }
