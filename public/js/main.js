@@ -850,8 +850,14 @@ function equip(it) {
   calcStats(); saveChar(); renderInv();
   $('tooltip').classList.add('hidden');
 }
+let salvageArm = null;
 function salvage(it) {
-  if (it.rarity >= 4 && !confirm(`${RARITIES[it.rarity].name}「${it.name}」を本当に分解しますか？`)) return;
+  // 伝説以上は2回右クリックで分解（誤操作防止）
+  if (it.rarity >= 4 && (salvageArm?.id !== it.id || now() - salvageArm.t > 2)) {
+    salvageArm = { id: it.id, t: now() };
+    toast(`もう一度右クリックで「${it.name}」を分解`, RARITIES[it.rarity].color);
+    return;
+  }
   char.inv.splice(char.inv.indexOf(it), 1);
   audio.sfx('ui'); saveChar(); renderInv();
   $('tooltip').classList.add('hidden');
@@ -1081,7 +1087,7 @@ $('lstart').onclick = async () => {
   $('lstart').disabled = true; $('lstart').textContent = '接続中…';
   const params = new URLSearchParams(location.search);
   const wsUrl = params.get('server') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
-  const ok = params.has('solo') || location.protocol === 'file:' ? false : await net.connect(wsUrl);
+  const ok = params.has('solo') || window.ETERNA_SOLO || location.protocol === 'file:' ? false : await net.connect(wsUrl);
   if (!ok) await net.startSolo();
   $('mode-tag').textContent = ok ? 'ONLINE' : 'SOLO MODE（サーバー未接続）';
   me.model = makePlayer(char.color);
