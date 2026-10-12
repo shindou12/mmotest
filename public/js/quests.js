@@ -6,12 +6,12 @@ export const QUESTS = [
   {
     id: 'q_slime', npc: 'captain', name: 'スライム退治',
     desc: 'ひだまりの草原でグリーンスライムを8体倒す', type: 'kill', target: 'グリーンスライム', area: 'f1_field', n: 8,
-    reward: { xp: 180, rarity: 2 },
+    reward: { xp: 180, rarity: 2, title: 't_guard' },
   },
   {
     id: 'q_boar', npc: 'hunter', name: '猪狩り',
     desc: 'イノシシの丘でフレンジーボアを15体倒す', type: 'kill', target: 'フレンジーボア', area: 'f1_hunt', n: 15,
-    reward: { xp: 380, rarity: 2, slot: 'armor' },
+    reward: { xp: 380, rarity: 2, slot: 'armor', title: 't_wind' },
   },
   {
     id: 'q_well', npc: 'sage', name: '古井戸の調査',
@@ -36,7 +36,7 @@ export const QUESTS = [
   {
     id: 'q_wolf', npc: 'ranger', name: '霧の狼',
     desc: '霧の森でミストウルフを12体倒す', type: 'kill', target: 'ミストウルフ', area: 'f2_field', n: 12,
-    reward: { xp: 800, rarity: 2, slot: 'weapon' },
+    reward: { xp: 800, rarity: 2, slot: 'weapon', title: 't_blood' },
   },
   {
     id: 'q_lab2', npc: 'ranger', name: '大樹の守り手', after: 'q_hollow',
@@ -46,7 +46,7 @@ export const QUESTS = [
   {
     id: 'q_golem', npc: 'merchant', name: '砂の巨人',
     desc: '砂塵の荒野でサンドゴーレムを10体倒す', type: 'kill', target: 'サンドゴーレム', area: 'f3_field', n: 10,
-    reward: { xp: 1400, rarity: 2, slot: 'armor' },
+    reward: { xp: 1400, rarity: 2, slot: 'armor', title: 't_hawk' },
   },
   {
     id: 'q_temple', npc: 'merchant', name: '埋もれた神殿',
@@ -56,7 +56,7 @@ export const QUESTS = [
   {
     id: 'q_lab3', npc: 'merchant', name: '砂塵の王', after: 'q_temple',
     desc: '第3層 迷宮区のボス「砂塵の大蠍 スコルピオ」を倒す', type: 'boss', target: 3, n: 1,
-    reward: { xp: 3000, rarity: 4 },
+    reward: { xp: 3000, rarity: 4, title: 't_phoenix' },
   },
 ];
 export const QUEST_INDEX = Object.fromEntries(QUESTS.map((q) => [q.id, q]));

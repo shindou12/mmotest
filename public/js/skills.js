@@ -246,6 +246,148 @@ Object.assign(WEAPON_SKILLS, {
   },
 });
 
+// 追加の武器スキル（各武器種4つずつ）
+Object.assign(WEAPON_SKILLS, {
+  horizon: {
+    name: 'ホリゾンタル・アーク', kind: 'sword', cd: 5, desc: '大きく弧を描く往復の二連撃',
+    run(c) {
+      const a = c.aim();
+      c.fx.slash(c.me.x, c.me.z, a, 3.8, 220, c.col(), 1.2);
+      c.later(0.05, () => c.arc(3.8, 220, 1.4, { type: 'wskill', a }));
+      c.later(0.2, () => {
+        c.fx.slash(c.me.x, c.me.z, a, 3.8, 220, c.col(), 1.2, true);
+        c.arc(3.8, 220, 1.5, { type: 'wskill', a });
+        c.sfx('swing');
+      });
+      c.sfx('swing');
+    },
+  },
+  avalanche: {
+    name: 'アバランシュ', kind: 'greatsword', cd: 8, desc: '大きく跳び込み、着地の衝撃で周りを叩き潰す（無敵あり）',
+    run(c) {
+      const a = c.aim();
+      c.dash(a, 7, 0.3, 0.35);
+      c.later(0.32, () => {
+        c.circle(c.me.x, c.me.z, 3.8, 3.2, { type: 'wskill', stun: 12 });
+        c.fx.ringWave(c.me.x, c.me.z, c.col(), 4.5, 0.4);
+        c.fx.parts.burst(c.me.x, 0.3, c.me.z, 60, { color: 0xc8b090, speed: 9, size: 0.7, life: 0.7, up: 3 });
+        c.shake(0.6); c.sfx('impact');
+      });
+    },
+  },
+  meteor: {
+    name: 'メテオブレイク', kind: 'greatsword', cd: 9, desc: '前方へ3回、遠くへ進むように衝撃を叩き込む',
+    run(c) {
+      const a = c.aim(), sx = c.me.x, sz = c.me.z;
+      [3, 5.5, 8].forEach((d, i) => c.later(0.1 + i * 0.16, () => {
+        const [dx, dz] = fwd(a, d), x = sx + dx, z = sz + dz;
+        c.circle(x, z, 2.6, 1.8, { type: 'wskill', stun: 4 });
+        c.fx.ringWave(x, z, c.col(), 3, 0.35);
+        c.fx.parts.burst(x, 0.3, z, 30, { color: c.col(), speed: 7, size: 0.6, life: 0.5, up: 2 });
+        c.shake(0.3); c.sfx('impact');
+      }));
+    },
+  },
+  piercer: {
+    name: 'ソニック・ピアス', kind: 'spear', cd: 7, desc: '一直線に突進し、通り道の敵をまとめて貫く（無敵あり・ヘイト大）',
+    run(c) {
+      const a = c.aim(), sx = c.me.x, sz = c.me.z;
+      c.dash(a, 8, 0.22, 0.3);
+      c.later(0.2, () => {
+        c.line(8.5, 2.4, 2.6, { type: 'wskill', a, sx, sz, threat: 3 });
+        for (let d = 0; d < 8; d += 0.5) c.fx.parts.emit(sx + Math.sin(a) * d, 1.1, sz + Math.cos(a) * d, { color: c.col(), size: 0.6, life: 0.4, speed: 1, gravity: 0 });
+        c.sfx('wave');
+      });
+    },
+  },
+  whirlspear: {
+    name: '旋風槍', kind: 'spear', cd: 6, desc: '槍を3回振り回して周りを薙ぎ、近くの敵の注意を引きつける',
+    spin: true,
+    run(c) {
+      c.taunt(9);
+      for (let i = 0; i < 3; i++) {
+        c.later(i * 0.16, () => {
+          c.circle(c.me.x, c.me.z, 3.4, 1.0, { type: 'wskill', threat: 2 });
+          c.fx.ringWave(c.me.x, c.me.z, c.col(), 3.4, 0.25);
+          c.sfx('swing');
+        });
+      }
+    },
+  },
+  fan: {
+    name: '扇投げ', kind: 'dagger', cd: 5, desc: '扇状に7本のナイフを投げる（距離でダメージが落ちない）',
+    run(c) {
+      const a = c.aim();
+      for (let i = -3; i <= 3; i++) c.arrow({ a: a + i * 0.12, mult: 0.62, type: 'wskill', noZone: true, speed: 36, rad: 0.55, color: 0xd8e0f0 });
+    },
+  },
+  venom: {
+    name: 'ヴェノム・ファング', kind: 'dagger', cd: 8, desc: '素早く三度斬りつけ、6秒間 攻撃に毒が乗るようになる',
+    run(c) {
+      c.buff('poison', '毒刃', 6, {}, 0x8aff5a);
+      for (let i = 0; i < 3; i++) {
+        c.later(i * 0.1, () => {
+          c.arc(2.9, 140, 0.9, { type: 'wskill' });
+          c.fx.slash(c.me.x, c.me.z, c.me.a + (i - 1) * 0.3, 2.9, 120, 0x8aff5a, 0.9, i % 2 === 1);
+          c.sfx('swing');
+        });
+      }
+    },
+  },
+  earthsplit: {
+    name: '大地割り', kind: 'axe', cd: 8, desc: '地面を叩き割り、前方へ一直線に地割れを走らせる',
+    run(c) {
+      const a = c.aim(), sx = c.me.x, sz = c.me.z;
+      c.shake(0.3); c.sfx('heavy');
+      for (let i = 0; i < 5; i++) {
+        c.later(0.08 + i * 0.08, () => {
+          const [dx, dz] = fwd(a, 2 + i * 2.2), x = sx + dx, z = sz + dz;
+          c.circle(x, z, 2, 1.3, { type: 'wskill', stun: 3 });
+          c.fx.parts.burst(x, 0.2, z, 22, { color: 0xb89870, speed: 6, size: 0.6, life: 0.5, up: 3 });
+          if (i % 2 === 0) c.sfx('impact');
+        });
+      }
+    },
+  },
+  bloodaxe: {
+    name: 'ブラッドアクス', kind: 'axe', cd: 10, desc: '自分のHPを8%削り、渾身の一撃を叩き込む（威力とスタン値が非常に高い）',
+    run(c) {
+      const S = c.S(), a = c.aim();
+      c.me.hp = Math.max(1, c.me.hp - S.mhp * 0.08);
+      c.fx.parts.burst(c.me.x, 1.2, c.me.z, 30, { color: 0xff3040, speed: 4, size: 0.5, life: 0.6 });
+      c.later(0.25, () => {
+        c.arc(4.2, 120, 5.0, { type: 'wskill', a, stun: 14 });
+        c.fx.slash(c.me.x, c.me.z, a, 4.2, 120, 0xff3040, 2.2);
+        c.fx.ringWave(c.me.x + Math.sin(a) * 2.5, c.me.z + Math.cos(a) * 2.5, 0xff3040, 3, 0.35);
+        c.shake(0.7); c.sfx('impact');
+      });
+    },
+  },
+  snipe: {
+    name: 'スナイプ', kind: 'bow', cd: 8, desc: '一瞬狙いを定め、遠くまで貫く強力な一矢を放つ（距離でダメージが落ちない）',
+    run(c) {
+      const a = c.aim();
+      c.fx.parts.burst(c.me.x, 1.3, c.me.z, 16, { color: c.col(), speed: 2, size: 0.4, life: 0.35, gravity: 0 });
+      c.later(0.3, () => c.arrow({ a, mult: 3.0, type: 'wskill', pierce: true, noZone: true, speed: 75, big: true, rad: 0.9 }));
+    },
+  },
+  blast: {
+    name: 'ボムアロー', kind: 'bow', cd: 7, desc: '狙った場所で爆発する矢を放つ',
+    run(c) {
+      const a = c.aim(), p = c.point();
+      const d = Math.min(16, Math.hypot(p.x - c.me.x, p.z - c.me.z));
+      const x = c.me.x + Math.sin(a) * d, z = c.me.z + Math.cos(a) * d;
+      c.arrow({ a, mult: 0.5, type: 'wskill', noZone: true, speed: 40 });
+      c.later(d / 40 + 0.05, () => {
+        c.circle(x, z, 3.4, 2.2, { type: 'wskill', stun: 3 });
+        c.fx.ringWave(x, z, 0xffa040, 3.8, 0.4);
+        c.fx.parts.burst(x, 0.8, z, 60, { color: 0xffa040, speed: 9, size: 0.7, life: 0.6, gravity: -2 });
+        c.shake(0.35); c.sfx('impact');
+      });
+    },
+  },
+});
+
 // ---------------------------------------------------------------------------
 // ツリーで覚えるスキル（1 / 2 キー）
 // ---------------------------------------------------------------------------

@@ -68,12 +68,12 @@ export const BOW_ZONE = { min: 2, max: 8, outside: 0.35 };
 export const INSTINCT = { hp: 0.35, dr: 50, sec: 6, cd: 90 };
 // 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
 export const WEAPON_SKILL_POOL = {
-  sword: ['vorpal', 'square', 'leap'],
-  greatsword: ['cyclone', 'breaker'],
-  spear: ['lance', 'helix'],
-  dagger: ['shadow', 'phantom'],
-  axe: ['rampage', 'tomahawk'],
-  bow: ['multishot', 'arrowrain'],
+  sword: ['vorpal', 'square', 'leap', 'horizon'],
+  greatsword: ['cyclone', 'breaker', 'avalanche', 'meteor'],
+  spear: ['lance', 'helix', 'piercer', 'whirlspear'],
+  dagger: ['shadow', 'phantom', 'fan', 'venom'],
+  axe: ['rampage', 'tomahawk', 'earthsplit', 'bloodaxe'],
+  bow: ['multishot', 'arrowrain', 'snipe', 'blast'],
 };
 // 品質を固めるまでは3階層で運用
 export const MAX_FLOOR = 3;
@@ -131,17 +131,102 @@ export const salvageValue = (it) => Math.round(SALVAGE_BASE[it.rarity] * (1 + (i
 
 const ACC_BASE = ['お守り', '銅の指輪', '銀の首飾り', '翠玉の指輪', '紅玉の護符', '星の耳飾り', '天球の指輪'];
 
+// ---------------------------------------------------------------------------
+// 特性（装備にランダムで付く効果）。ティアで値が決まる
+//   T1〜T5: ドロップでも鍛冶屋の特性変更でも付く
+//   T6「超越 I」・T7「超越 II」: 後半の高いアイテムレベルの装備に、ドロップでだけ付く（鍛冶屋では付けられない）
+// ---------------------------------------------------------------------------
 export const AFFIXES = {
-  atkp: { name: '攻撃力', unit: '%', min: 4, max: 11 },
-  crit: { name: '会心率', unit: '%', min: 2, max: 6 },
-  critd: { name: '会心ダメージ', unit: '%', min: 10, max: 28 },
-  hpp: { name: '最大HP', unit: '%', min: 5, max: 14 },
-  aspd: { name: '攻撃速度', unit: '%', min: 3, max: 9 },
-  move: { name: '移動速度', unit: '%', min: 3, max: 7 },
-  vamp: { name: 'HP吸収', unit: '%', min: 0.5, max: 2 },
-  cdr: { name: 'スキル短縮', unit: '%', min: 4, max: 12 },
-  def: { name: '被ダメ軽減', unit: '%', min: 2, max: 6 },
+  atkp: { name: '攻撃力', unit: '%', tiers: [3, 5, 7, 9, 12, 15, 19] },
+  crit: { name: '会心率', unit: '%', tiers: [2, 3, 4, 5, 7, 9, 11] },
+  critd: { name: '会心ダメージ', unit: '%', tiers: [8, 12, 16, 22, 30, 38, 48] },
+  hpp: { name: '最大HP', unit: '%', tiers: [4, 6, 9, 12, 16, 20, 25] },
+  aspd: { name: '攻撃速度', unit: '%', tiers: [2, 4, 6, 8, 10, 13, 16] },
+  move: { name: '移動速度', unit: '%', tiers: [2, 3, 5, 6, 8, 10, 12] },
+  vamp: { name: 'HP吸収', unit: '%', tiers: [0.5, 1, 1.5, 2, 3, 4, 5] },
+  cdr: { name: 'スキル短縮', unit: '%', tiers: [3, 5, 8, 10, 14, 17, 20] },
+  def: { name: '被ダメ軽減', unit: '%', tiers: [1.5, 2.5, 3.5, 4.5, 6, 7.5, 9] },
 };
+export const MAX_TIER = 7; // ドロップの上限（超越 II）
+export const CRAFT_MAX_TIER = 5; // 鍛冶屋で付けられる上限
+export const tierLabel = (t) => (t >= 7 ? '超越 II' : t === 6 ? '超越 I' : `T${t}`);
+export const tierColor = (t) => (t >= 6 ? '#ff7ab0' : ['#9aa3b5', '#9fd8ff', '#7ab8ff', '#c8a0ff', '#ffc060'][t - 1]);
+
+// 特性「スキル変化」: 武器にだけ付き、武器スキルの性質を大きく変える（1つの武器に1つまで）
+// t はティア（1〜5）。数値はティアで強くなる
+export const SKILL_VARIANTS = {
+  sv_twin: { name: '二連', icon: '⟳', desc: (t) => `武器スキルが少し後にもう一度発動する（2回目の威力 ${40 + t * 10}%）` },
+  sv_giant: { name: '巨大化', icon: '⬣', desc: (t) => `武器スキルの範囲・射程 +${30 + t * 10}%、威力 +${t * 5}%。クールタイム +30%` },
+  sv_rapid: { name: '迅速', icon: '⚡', desc: (t) => `武器スキルのクールタイム -${35 + t * 5}%。威力 -30%` },
+  sv_blaze: { name: '爆炎', icon: '🔥', color: 0xff6a20, desc: (t) => `炎属性になる。当たった敵を3秒間燃やす（毎秒 威力${10 + t * 4}%）。最初に当たった所で爆発する` },
+  sv_storm: { name: '雷鳴', icon: '⚡', color: 0xffe040, desc: (t) => `雷属性になる。当たった敵から近くの敵${1 + Math.ceil(t / 2)}体へ雷が連鎖する（威力${30 + t * 8}%）` },
+  sv_drain: { name: '吸命', icon: '♥', color: 0xc060ff, desc: (t) => `武器スキルで与えたダメージの${8 + t * 3}%を回復する` },
+  sv_blink: { name: '瞬身', icon: '➶', color: 0x9affff, desc: (t) => `発動の直前に、狙った方向へ${4 + t}m瞬間移動する（無敵あり）` },
+  sv_quake: { name: '崩撃', icon: '◎', color: 0xd8b080, desc: (t) => `ボスのスタン値が${(2 + t * 0.5).toFixed(1)}倍。当たった所に衝撃波が走る` },
+};
+export const isVariant = (key) => key.startsWith('sv_');
+export const affixName = (key) => (isVariant(key) ? `スキル変化「${SKILL_VARIANTS[key].name}」` : AFFIXES[key].name);
+export const affixVal = (key, tier) => (isVariant(key) ? tier : AFFIXES[key].tiers[tier - 1]);
+// 特性の説明文（例: 攻撃力 +7%）
+export function affixText(a) {
+  const [key, tier] = a;
+  if (isVariant(key)) return `${SKILL_VARIANTS[key].name}：${SKILL_VARIANTS[key].desc(tier)}`;
+  const A = AFFIXES[key];
+  return `${A.name} +${affixVal(key, tier)}${A.unit}`;
+}
+// ドロップ時のティア: アイテムレベルとレアリティで上限が決まり、上限に近いほど出やすい
+// 超越（T6・T7）はアイテムレベル25・30から。さらに出る確率を絞る
+export function rollTier(ilvl, rarity) {
+  const max = Math.max(1, Math.min(MAX_TIER, 1 + Math.floor(ilvl / 5) + (rarity >= 4 ? 1 : 0)));
+  let t = weightedTier(Math.min(max, CRAFT_MAX_TIER), true);
+  if (max >= 6 && t === CRAFT_MAX_TIER && Math.random() < 0.25 + rarity * 0.05) t = 6;
+  if (max >= 7 && t === 6 && Math.random() < 0.2 + rarity * 0.04) t = 7;
+  return t;
+}
+// 1〜max から抽選。high=true なら上が出やすく、false なら下が出やすい（鍛冶屋の特性変更）
+export function weightedTier(max, high) {
+  const ws = Array.from({ length: max }, (_, i) => Math.pow(0.6, high ? max - 1 - i : i));
+  let r = Math.random() * ws.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < max; i++) { r -= ws[i]; if (r <= 0) return i + 1; }
+  return 1;
+}
+// 古いセーブの特性 [種類, 値] を [種類, ティア, 値] に直す
+export function migrateItem(it) {
+  if (!it || it.v === 2) return it;
+  it.affixes = (it.affixes || []).map((a) => {
+    if (a.length === 3) return a;
+    const [key, val] = a;
+    if (!AFFIXES[key]) return null;
+    const ts = AFFIXES[key].tiers;
+    let tier = 1;
+    ts.slice(0, CRAFT_MAX_TIER).forEach((v, i) => { if (val >= v * 0.9) tier = i + 1; });
+    return [key, tier, ts[tier - 1]];
+  }).filter(Boolean);
+  if (it.armor && it.trait) { it.base = it.trait; delete it.trait; } // 防具の種類ごとの効果は「基本効果」に改名
+  it.enh = it.enh || 0;
+  it.v = 2;
+  return it;
+}
+
+// ---------------------------------------------------------------------------
+// 鍛冶屋: 強化（+10まで。+5までは必ず成功、+6からは確率。失敗しても下がらない）
+// ---------------------------------------------------------------------------
+export const ENH_MAX = 10;
+export const ENH_RATE = [1, 1, 1, 1, 1, 0.8, 0.65, 0.5, 0.4, 0.3];
+export const enhMult = (it) => 1 + (it?.enh || 0) * 0.08;
+export function enhCost(it) {
+  const e = it.enh || 0;
+  return { gold: Math.round((20 + it.ilvl * 6) * Math.pow(1.55, e)), shard: [1, 1, 2, 2, 3, 4, 6, 8, 10, 12][e] };
+}
+export const affixCost = (it) => ({ gold: 50 + it.ilvl * 10, gem: 1 });
+export const skillCost = (it) => ({ gold: 40 + it.ilvl * 8 });
+export const loreCost = (it) => ({ gold: 300 + it.ilvl * 20, shard: 10 });
+// 分解で手に入る素材: 強化の欠片（レアリティで数が決まる）と、付いていた特性ごとの宝石
+const SHARDS = [1, 2, 4, 8, 16, 30];
+export function salvageMats(it) {
+  // 超越の特性を分解しても、特性リストに記録されるのは鍛冶屋の上限（T5）まで
+  return { shard: SHARDS[it.rarity] + (it.enh || 0), gems: (it.affixes || []).map(([key, tier]) => [key, Math.min(tier, CRAFT_MAX_TIER)]) };
+}
 
 export const UNIQUE_FX = {
   wave: 'コンボ3段目が光の斬撃波となって飛ぶ',
@@ -322,11 +407,6 @@ export function rollRarity(boost = 0, minRarity = 0) {
   return 0;
 }
 
-function affixValue(key, rmult) {
-  const a = AFFIXES[key];
-  const v = rnd(a.min, a.max) * (0.7 + rmult * 0.3);
-  return Math.round(v * 10) / 10;
-}
 
 export function makeItem(ilvl, rarity, opts = {}) {
   const r = RARITIES[rarity];
@@ -344,12 +424,13 @@ export function makeItem(ilvl, rarity, opts = {}) {
     slot = unique.slot;
     kind = unique.kind || null;
   }
-  if (slot === 'weapon' && !kind) kind = pick(WEAPON_KINDS);
+  // エリアの出やすい武器種（opts.kinds）は25%でそこから選ぶ（全体では1種あたり約2倍）
+  if (slot === 'weapon' && !kind) kind = opts.kinds?.length && Math.random() < 0.25 ? pick(opts.kinds) : pick(WEAPON_KINDS);
   const tier = Math.min(TIER_PREFIX.length - 1, Math.floor((ilvl - 1) / 5));
   const g = growth(ilvl) * r.mult * rnd(0.92, 1.08);
   const it = {
     id: `${Date.now().toString(36)}${(itemSeq++).toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`,
-    slot, kind, rarity, ilvl, affixes: [],
+    slot, kind, rarity, ilvl, affixes: [], enh: 0, v: 2,
   };
   if (slot === 'weapon') {
     it.atk = Math.round(7 * g);
@@ -362,7 +443,7 @@ export function makeItem(ilvl, rarity, opts = {}) {
     const A = ARMOR_CLASSES[type.cls];
     it.armor = type.cls;
     it.atype = type.id;
-    it.trait = type.trait.slice();
+    it.base = type.trait.slice(); // 防具の種類ごとの基本効果
     it.hp = Math.round(45 * g * A.hp);
     it.def = A.def;
     it.name = unique ? unique.name : type.name;
@@ -373,9 +454,54 @@ export function makeItem(ilvl, rarity, opts = {}) {
   }
   if (unique) { it.unique = unique.key; it.fx = unique.fx.slice(); it.lore = unique.lore; }
   it.weight = itemWeight(it);
-  const keys = Object.keys(AFFIXES).sort(() => Math.random() - 0.5);
-  for (let i = 0; i < r.affixes; i++) it.affixes.push([keys[i], affixValue(keys[i], r.mult)]);
+  // エリアごとの「付きやすい特性」（opts.bias）は2倍くらい出やすい
+  const bias = opts.bias || [];
+  const keys = Object.keys(AFFIXES).map((k) => [k, Math.random() / (bias.includes(k) ? 2 : 1)]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
+  for (let i = 0; i < r.affixes; i++) { const t = rollTier(ilvl, rarity); it.affixes.push([keys[i], t, affixVal(keys[i], t)]); }
+  // 武器はレア以上でときどき「スキル変化」が付く（特性1つと入れ替わる）
+  if (slot === 'weapon' && it.affixes.length && Math.random() < [0, 0, 0.2, 0.35, 0.6, 0.8][rarity]) {
+    const local = bias.filter(isVariant);
+    const sv = local.length && Math.random() < 0.35 ? pick(local) : pick(Object.keys(SKILL_VARIANTS)), t = rollTier(ilvl, rarity);
+    it.affixes[it.affixes.length - 1] = [sv, t, t];
+  }
   return it;
+}
+
+// ---------------------------------------------------------------------------
+// 称号（4つ目の装備枠）。ステータスは持たず、短く強い効果が1つ。
+// req: 'melee'（近接武器のみ）/ 'bow' / 'spear' など、条件を満たす武器のときだけ効く
+// ---------------------------------------------------------------------------
+export const TITLES = {
+  t_boss1: { name: 'コボルド王を討つ者', rarity: 3, desc: 'ボスへのダメージ +15%', src: '第1層ボスの初討伐' },
+  t_boss2: { name: '霧を越えし者', rarity: 3, desc: '毒沼・流砂の影響を受けない。継続ダメージ -50%', src: '第2層ボスの初討伐' },
+  t_boss3: { name: '砂王を屠りし者', rarity: 4, desc: 'HPが50%以下の間、移動速度 +25%・攻撃速度 +15%', src: '第3層ボスの初討伐' },
+  t_lake: { name: '湖のヌシ殺し', rarity: 3, desc: 'ゴールド獲得 +30%。硬貨を吸い寄せる範囲が2倍', src: 'ヌシ・ギガスライムの討伐' },
+  t_shark: { name: '砂鮫狩り', rarity: 4, desc: '精鋭・ネームド・ボスへの会心率 +15%', src: '砂鮫ギルガの討伐' },
+  t_wind: { name: '疾風', rarity: 2, desc: '回避した後の1.5秒間、移動速度 +40%', src: 'クエスト「猪狩り」' },
+  t_blood: { name: '血の渇き', rarity: 3, req: 'melee', desc: '敵を倒すとHPを6%回復する', src: 'クエスト「霧の狼」' },
+  t_hawk: { name: '鷹の眼', rarity: 3, req: 'bow', desc: '適性エリアに当たった矢は会心率 +30%', src: 'クエスト「砂の巨人」' },
+  t_guard: { name: '不落の盾', rarity: 3, req: 'spear', desc: 'ジャストガードに成功すると4秒間 被ダメージ -40%', src: 'クエスト「スライム退治」' },
+  t_phoenix: { name: '不死鳥', rarity: 4, desc: '倒れたとき、その場でHP30%で一度だけ復活する（5分に1回）', src: 'クエスト「砂塵の王」' },
+};
+export const TITLE_REQ = { melee: '近接武器のみ', bow: '弓のみ', spear: '盾槍のみ' };
+// 固有効果のうち、武器の動きに依存するもの（伝承化した称号に条件が付く）
+export const FX_REQ = { wave: 'melee' };
+export const titleReqOk = (req, wk) => !req || (req === 'melee' ? WEAPONS[wk]?.melee : req === wk);
+
+export function makeTitle(id) {
+  const T = TITLES[id];
+  return {
+    id: `t${Date.now().toString(36)}${(itemSeq++).toString(36)}`, slot: 'title', kind: null, rarity: T.rarity, ilvl: 1,
+    affixes: [], enh: 0, v: 2, weight: 0, name: `「${T.name}」`, title: id, req: T.req || null,
+  };
+}
+// 伝承化: 伝説・神器の装備を、その固有効果を持つ称号に変える
+export function loreTitle(it) {
+  const req = (it.fx || []).map((f) => FX_REQ[f]).find(Boolean) || null;
+  return {
+    id: `t${Date.now().toString(36)}${(itemSeq++).toString(36)}`, slot: 'title', kind: null, rarity: it.rarity, ilvl: it.ilvl,
+    affixes: [], enh: 0, v: 2, weight: 0, name: `「${it.name}」の伝承`, fx: (it.fx || []).slice(), lore: it.lore, req, from: it.name,
+  };
 }
 
 export function starterWeapon(kind) {

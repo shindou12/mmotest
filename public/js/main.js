@@ -4,10 +4,12 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
-  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE,
+  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE, SKILL_VARIANTS, isVariant, affixVal, enhMult, titleReqOk,
+  migrateItem, makeTitle, TITLES, salvageMats, affixName, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost,
+  CRAFT_MAX_TIER, weightedTier, loreTitle,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
 } from '../shared/data.js';
-import { AREAS, AREA_TYPES, HAZARDS, grid, collide, spawnPoint, hazardsOf, chestsOf, insideOpen } from '../shared/areas.js';
+import { AREAS, AREA_TYPES, HAZARDS, CLEAR_KILLS, grid, collide, spawnPoint, hazardsOf, chestsOf, insideOpen } from '../shared/areas.js';
 import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
@@ -164,16 +166,29 @@ function calcStats() {
   const eq = char.eq;
   const items = [eq.weapon, eq.armor, eq.acc].filter(Boolean);
   const aff = {};
-  for (const it of items) for (const [k, v] of it.affixes) aff[k] = (aff[k] || 0) + v;
-  // 防具の種類ごとの特性
-  if (eq.armor?.trait) { const [k, v] = eq.armor.trait; aff[k] = (aff[k] || 0) + v; }
+  let sv = null; // 武器のスキル変化
+  for (const it of items) {
+    for (const [k, t] of it.affixes) {
+      if (isVariant(k)) { if (it.slot === 'weapon') sv = { key: k, t, ...SKILL_VARIANTS[k] }; continue; }
+      aff[k] = (aff[k] || 0) + affixVal(k, t);
+    }
+  }
+  // 防具の基本効果
+  if (eq.armor?.base) { const [k, v] = eq.armor.base; aff[k] = (aff[k] || 0) + v; }
   const fxs = new Set(items.flatMap((i) => i.fx || []));
   const wk = eq.weapon ? eq.weapon.kind : 'sword';
+  // 称号: 条件（近接のみ など）を満たすときだけ効く。同じ固有効果は重ならない（Set）
+  const title = eq.title;
+  const titleOn = !!title && titleReqOk(title.req, wk);
+  const tfx = new Set();
+  if (titleOn) { if (title.title) tfx.add(title.title); for (const f of title.fx || []) fxs.add(f); }
   const T = treeEffects(char, wk);
   const m = (k) => (aff[k] || 0) + (T.mods[k] || 0);
   for (const f of T.flags) fxs.add(f);
-  const atk = (baseAtk(char.lv) + (eq.weapon?.atk || 0) + (eq.acc?.atk || 0)) * (1 + m('atkp') / 100);
-  const mhp = (baseHp(char.lv) + (eq.armor?.hp || 0) + (eq.acc?.hp || 0)) * (1 + m('hpp') / 100);
+  // 強化値は基礎値（攻撃力・HP・被ダメ軽減）を伸ばす
+  const base = (it, k) => (it?.[k] || 0) * enhMult(it);
+  const atk = (baseAtk(char.lv) + base(eq.weapon, 'atk') + base(eq.acc, 'atk')) * (1 + m('atkp') / 100);
+  const mhp = (baseHp(char.lv) + base(eq.armor, 'hp') + base(eq.acc, 'hp')) * (1 + m('hpp') / 100);
   const weight = items.reduce((a, it) => a + itemWeight(it), 0);
   const wc = weightClass(weight);
   const W = WEAPONS[wk];
@@ -189,7 +204,8 @@ function calcStats() {
     wk, W, atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: T.actives,
     crit: 5 + m('crit'), critd: 150 + m('critd'), aspd: m('aspd'), move: m('move'),
     vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0) + P.vamp, cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
-    def: Math.min(65, m('def') + (eq.armor?.def || 0) + P.def), wr: eq.weapon ? eq.weapon.rarity : 0,
+    def: Math.min(65, m('def') + base(eq.armor, 'def') + P.def), wr: eq.weapon ? eq.weapon.rarity : 0,
+    sv, title, titleOn, tfx,
     normp: m('normp'), heavyp: m('heavyp') + P.heavy, wskillp: m('wskillp'), dodgecd: Math.min(60, m('dodgecd')),
     justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion') + (char.potBonus || 0),
     ws: WEAPON_SKILLS[weaponSkillId()], weight, wc,
@@ -211,9 +227,11 @@ function bowZone(w = BOW_ZONE.min) { const outer = S.optimal; return [Math.max(0
 
 function itemPower(it) {
   if (!it) return 0;
-  let p = (it.atk || 0) * 3 + (it.hp || 0) * 0.5 + (it.def || 0) * 4;
-  for (const [, v] of it.affixes) p += v * (it.atk || 10) * 0.15 + v * 0.5;
+  const e = enhMult(it);
+  let p = (it.atk || 0) * 3 * e + (it.hp || 0) * 0.5 * e + (it.def || 0) * 4 * e;
+  for (const [k, t] of it.affixes) p += isVariant(k) ? 40 + t * 10 : t * ((it.atk || 10) * 0.6 + 2);
   if (it.fx) p *= 1 + it.fx.length * 0.25;
+  if (it.slot === 'title') p = 100 + it.rarity * 20;
   return Math.round(p);
 }
 
@@ -321,6 +339,11 @@ function onMsg(m) {
     case 'xp':
       gainXp(m.n);
       questEvent(m.boss ? { type: 'boss', floor: m.boss } : { type: 'kill', name: m.nm, area: m.ar });
+      // 称号: 階層ボスの初討伐・ネームドの討伐
+      if (m.boss && TITLES['t_boss' + m.boss]) grantTitle('t_boss' + m.boss);
+      if (!m.boss && AREAS[m.ar]?.named?.name === m.nm && AREAS[m.ar].named.title) grantTitle(AREAS[m.ar].named.title);
+      // 踏破: 迷宮区はボス、秘境はネームド、ほかは敵を一定数倒す → マップに付きやすい特性が出る
+      countClear(m.ar, m.boss ? 'boss' : AREAS[m.ar]?.named?.name === m.nm ? 'named' : 'kill');
       break;
     case 'loot':
       for (const d of m.items) spawnDrop(d.it, d.x, d.z);
@@ -343,7 +366,7 @@ function onMsg(m) {
     }
     case 'boxTake': {
       if (char.inv.length >= 60) { toast('インベントリがいっぱいです', '#f88'); net.send({ t: 'box', op: 'put', item: m.item }); break; }
-      char.inv.unshift(m.item);
+      char.inv.unshift(migrateItem(m.item));
       toast(`「${m.item.name}」を共有ボックスから取り出した`, RARITIES[m.item.rarity].color);
       audio.sfx('pickup'); saveChar(); ui.refresh();
       break;
@@ -591,6 +614,8 @@ function removeOther(id) {
 
 function onMobDie(m) {
   const mb = mobs.get(m.id);
+  // 称号「血の渇き」: 自分がとどめを刺した（直前に当てた）敵ならHP回復
+  if (mb && tf('t_blood') && now() - mb.localT < 1.2 && S) { heal(S.mhp * 0.06, true); fx.parts.burst(me.x, 1, me.z, 14, { color: 0xff4a5a, speed: 3, size: 0.4, life: 0.5 }); }
   const fdef = FLOORS[world.floor - 1];
   const col = mb ? (m.boss ? fdef.boss.accent : fdef.mobs[0].color) : 0xffffff;
   // ポリゴン片が砕け散る演出
@@ -674,6 +699,7 @@ function resolveTele(te) {
       if (te.src) net.send({ t: 'threat', id: te.src, n: Math.round(te.dmg * 3) });
       if (now() - me.guardStart <= justWin) {
         floatText(me.x, 2.8, me.z, 'JUST GUARD!', 'just');
+        if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
         audio.sfx('perfect'); audio.sfx('block');
         fx.ringWave(me.x, me.z, 0xbfe0ff, 4, 0.35);
         combat.circle(me.x, me.z, 4, 1.6, { type: 'proc', noProc: true, threat: 3 });
@@ -740,6 +766,16 @@ function onJustDodge() {
 }
 
 function die() {
+  // 称号「不死鳥」: その場で一度だけ復活
+  if (tf('t_phoenix') && now() - (me.phoenixT ?? -1e9) > 300) {
+    me.phoenixT = now();
+    me.hp = Math.round(S.mhp * 0.3); me.iframe = 1.5; me.staggerT = 0;
+    banner('不死鳥', '炎の中からよみがえった', '#ff9a4a', 3);
+    fx.beam(me.x, me.z, 0xff8a30, 14, 1.0, 1.2);
+    fx.parts.burst(me.x, 1, me.z, 120, { color: 0xff8a30, speed: 9, size: 0.6, life: 1.1, gravity: -3 });
+    audio.sfx('phase');
+    return;
+  }
   me.hp = 0; me.dead = true; me.deadT = 5; me.charging = false; me.guarding = false; me.buffs = [];
   audio.sfx('death');
   fx.parts.burst(me.x, 1, me.z, 80, { color: 0x9ad8ff, speed: 8, size: 0.5, life: 1.2 });
@@ -786,14 +822,16 @@ const TYPE_MOD = { normal: 'normp', heavy: 'heavyp', wskill: 'wskillp' };
 function dealDamage(mb, mult, o = {}) {
   if (!mb || mb.hp <= 0) return;
   const skill = o.type === 'wskill' || o.type === 'tskill';
-  let crit = o.crit || Math.random() * 100 < S.crit + buffMod('crit') || (skill && S.fx.has('skillcrit'));
+  const tough = mb.kind === 2 || !!mb.elite;
+  let crit = o.crit || Math.random() * 100 < S.crit + buffMod('crit') + (tough && tf('t_shark') ? 15 : 0) || (skill && S.fx.has('skillcrit'));
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; }
   const typeMult = 1 + (S[TYPE_MOD[o.type]] || 0) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
   const stunned = mb.stunT > 0 ? 1.3 : 1;
   const exec = S.flags.has('execute') && mb.hp < mb.mhp * 0.3 ? 1.5 : 1;
   const guardBonus = now() < me.atkBonusT ? me.atkBonus : 1;
-  let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus
+  const bossT = mb.kind === 2 && tf('t_boss1') ? 1.15 : 1;
+  let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus * bossT
     * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1);
   dmg = Math.max(1, Math.round(dmg));
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
@@ -802,6 +840,7 @@ function dealDamage(mb, mult, o = {}) {
   if (mb.kind === 2 && !(mb.stunT > 0)) {
     st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
     st *= S.W.stun * (S.W.melee ? 1 + S.stunp / 100 : 1);
+    if (o.sv?.key === 'sv_quake') st *= 2 + o.sv.t * 0.5;
     st = Math.round(st * 10) / 10;
   }
   net.send({ t: 'hit', id: mb.id, dmg, crit, st });
@@ -819,6 +858,7 @@ function dealDamage(mb, mult, o = {}) {
   }
   const vamp = S.vamp + buffMod('vamp');
   if (vamp > 0) heal(dmg * vamp / 100, false);
+  if (o.sv) onVariantHit(mb, dmg, o);
   if (o.noProc) return;
   if (hasBuff('poison')) mb.poisonUntil = now() + 4;
   if (crit && S.fx.has('thunder')) {
@@ -835,6 +875,96 @@ function dealDamage(mb, mult, o = {}) {
 }
 
 function later(sec, fn) { pending.push({ at: now() + sec, fn }); }
+
+// ======================================================================
+// スキル変化（武器の特性）: 武器スキルの性質を大きく変える
+// ======================================================================
+const tf = (id) => !!S?.tfx?.has(id); // 称号の効果が有効か
+const desperate = () => tf('t_boss3') && me.hp < S.mhp * 0.5; // 称号「砂王を屠りし者」
+function variantParams(v, second = false) {
+  const t = v.t;
+  const P = { mult: 1, range: 1, cd: 1 };
+  if (v.key === 'sv_giant') { P.range = 1.3 + t * 0.1; P.mult = 1 + t * 0.05; P.cd = 1.3; }
+  if (v.key === 'sv_rapid') { P.mult = 0.7; P.cd = 1 - (0.35 + t * 0.05); }
+  if (second) P.mult *= 0.4 + t * 0.1; // 二連の2回目
+  return P;
+}
+// スキルに渡すコンテキストを包んで、威力・範囲・色・当たったときの効果を差し込む
+function variantCtx(v, second = false) {
+  const P = variantParams(v, second);
+  const cast = { left: 1 + Math.ceil(v.t / 2), hitSet: new Set(), exploded: false, quakeT: 0 };
+  const tag = (o = {}) => ({ ...o, sv: v, cast });
+  const c = Object.create(combat);
+  const color = () => v.color ?? combat.col();
+  c.col = color;
+  c.hit = (mb, mult, o) => combat.hit(mb, mult * P.mult, tag(o));
+  c.arc = (range, deg, mult, o) => combat.arc(range * P.range, deg, mult * P.mult, tag(o));
+  c.line = (len, w, mult, o) => combat.line(len * P.range, w * P.range, mult * P.mult, tag(o));
+  c.circle = (x, z, r, mult, o) => combat.circle(x, z, r * P.range, mult * P.mult, tag(o));
+  c.proj = (o) => combat.proj({ ...tag(o), mult: (o.mult ?? 1.4) * P.mult, rad: (o.rad ?? 1.8) * P.range, life: (o.life ?? 0.7) * P.range, color: v.color ?? o.color });
+  c.arrow = (o) => combat.arrow({ ...tag(o), mult: (o.mult ?? 1) * P.mult, rad: (o.rad ?? 0.7) * P.range, color: v.color ?? o.color });
+  // 見た目も大きさと色を合わせる
+  const f = Object.create(fx);
+  f.slash = (x, z, a, r, arc, col, ...rest) => fx.slash(x, z, a, r * P.range, arc, v.color ?? col, ...rest);
+  f.ringWave = (x, z, col, r, ...rest) => fx.ringWave(x, z, v.color ?? col, r * P.range, ...rest);
+  c.fx = f;
+  return c;
+}
+function castWeaponSkill(sk) {
+  const v = S.sv;
+  if (!v) { sk.run(combat); return; }
+  const go = () => {
+    sk.run(variantCtx(v));
+    if (v.key === 'sv_twin') later(0.42, () => { if (!me.dead) { me.a = aimAngle(); sk.run(variantCtx(v, true)); fx.ringWave(me.x, me.z, 0xffffff, 2.5, 0.25); } });
+  };
+  if (v.key === 'sv_blink') {
+    // 瞬身: 狙った方向へ一瞬で移動してから発動
+    const a = aimAngle(), d = 4 + v.t;
+    fx.parts.burst(me.x, 1, me.z, 25, { color: 0x9affff, speed: 4, size: 0.5, life: 0.4 });
+    combat.dash(a, d, 0.1, 0.35);
+    later(0.12, () => { fx.parts.burst(me.x, 1, me.z, 25, { color: 0x9affff, speed: 4, size: 0.5, life: 0.4 }); go(); });
+  } else go();
+  if (v.color) fx.flash(me.x, 1.5, me.z, v.color, 30, 0.3);
+}
+function onVariantHit(mb, dmg, o) {
+  const v = o.sv, c = o.cast;
+  if (v.key === 'sv_blaze') {
+    mb.burnUntil = now() + 3; mb.burnPow = 0.1 + v.t * 0.04;
+    if (!c.exploded) {
+      c.exploded = true;
+      fx.parts.burst(mb.x, 1, mb.z, 50, { color: 0xff7a20, speed: 8, size: 0.7, life: 0.6, gravity: -2 });
+      fx.ringWave(mb.x, mb.z, 0xff6a20, 3, 0.35); fx.flash(mb.x, 1.5, mb.z, 0xff6a20, 40, 0.3);
+      audio.sfx('flame'); addShake(0.2);
+      later(0.05, () => combat.circle(mb.x, mb.z, 2.6, 0.6, { type: 'dot', noProc: true }));
+    }
+  }
+  if (v.key === 'sv_storm' && c.left > 0) {
+    c.hitSet.add(mb.id);
+    let best = null, bd = 7;
+    for (const m2 of mobs.values()) {
+      if (c.hitSet.has(m2.id) || m2 === mb) continue;
+      const d = Math.hypot(m2.x - mb.x, m2.z - mb.z);
+      if (d < bd) { bd = d; best = m2; }
+    }
+    if (best) {
+      c.left--; c.hitSet.add(best.id);
+      const from = mb, to = best, pow = 0.3 + v.t * 0.08;
+      later(0.08, () => {
+        fx.lightning(to.x, to.z, 0xffe040);
+        for (let k = 0; k <= 8; k++) fx.parts.emit(from.x + (to.x - from.x) * k / 8, 1.3, from.z + (to.z - from.z) * k / 8, { color: 0xfff080, size: 0.5, life: 0.25, speed: 1, gravity: 0 });
+        audio.sfx('thunder');
+        dealDamage(to, pow, { type: 'wskill', noProc: true, sv: v, cast: c });
+      });
+    }
+  }
+  if (v.key === 'sv_drain') heal(dmg * (0.08 + v.t * 0.03), true);
+  if (v.key === 'sv_quake' && now() - c.quakeT > 0.2) {
+    c.quakeT = now();
+    fx.ringWave(mb.x, mb.z, 0xd8b080, 3.5, 0.35);
+    fx.parts.burst(mb.x, 0.3, mb.z, 20, { color: 0xb89870, speed: 6, size: 0.6, life: 0.5, up: 2 });
+    addShake(0.15);
+  }
+}
 
 // スキルから使う戦闘コンテキスト（skills.js の c）
 const combat = {
@@ -857,7 +987,7 @@ const combat = {
     const color = o.color ?? RARITIES[S.wr].color;
     const mesh = arrowMesh(color, o.big);
     mesh.position.set(me.x, 1.2, me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), zone: o.zone ?? bowZone(), color });
+    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), zone: o.noZone ? null : o.zone ?? bowZone(), color, sv: o.sv, cast: o.cast });
     // 射出の閃光
     const fx0 = me.x + Math.sin(o.a) * 0.9, fz0 = me.z + Math.cos(o.a) * 0.9;
     fx.flash(fx0, 1.3, fz0, color, o.big ? 14 : 8, 0.15, 6);
@@ -888,7 +1018,7 @@ const combat = {
     const color = o.color ?? RARITIES[S.wr].color;
     const mesh = fx.waveMesh(color);
     mesh.position.set(me.x, 1, me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, x: me.x, z: me.z, a: o.a, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set() });
+    projs.push({ mesh, x: me.x, z: me.z, a: o.a, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast });
     audio.sfx('wave');
   },
   dash(a, dist, dur, iframe) {
@@ -917,7 +1047,7 @@ function doSwing() {
   me.combo = now() - me.lastSwing < W.speed * 2.2 ? (me.combo + 1) % 3 : 0;
   me.lastSwing = now();
   me.swingT = 0;
-  me.swingDur = W.speed * (1 - (S.aspd + buffMod('aspd') + me.dStack * 4) / 100) * (me.combo === 2 ? 1.25 : 1);
+  me.swingDur = W.speed * (1 - (S.aspd + buffMod('aspd') + me.dStack * 4 + (desperate() ? 15 : 0)) / 100) * (me.combo === 2 ? 1.25 : 1);
   me.sw++;
   me.a = aimAngle();
   const mult = W.mult * [1, 1.1, 1.6][me.combo];
@@ -974,7 +1104,7 @@ function doHeavy(lv) {
 function tryWeaponSkill() {
   if (!canAct() || me.wsCd > 0) return;
   const sk = S.ws;
-  me.wsCd = sk.cd * (1 - S.cdr / 100);
+  me.wsCd = sk.cd * (1 - S.cdr / 100) * (S.sv ? variantParams(S.sv).cd : 1);
   startSkill(sk);
 }
 
@@ -997,7 +1127,7 @@ function startSkill(sk) {
   audio.sfx('skill');
   floatText(me.x, 3, me.z, sk.name, 'info');
   fx.flash(me.x, 2, me.z, RARITIES[S.wr].color, 25, 0.4);
-  sk.run(combat);
+  if (sk === S.ws) castWeaponSkill(sk); else sk.run(combat);
 }
 
 function updateProjs(dt) {
@@ -1014,9 +1144,11 @@ function updateProjs(dt) {
         if (w.hit.has(mb.id) || Math.hypot(mb.x - w.x, mb.z - w.z) > w.rad + mb.rad) continue;
         w.hit.add(mb.id);
         const d = Math.hypot(mb.x - w.sx, mb.z - w.sz);
-        const inZone = d >= w.zone[0] - mb.rad && d <= w.zone[1] + mb.rad;
-        dealDamage(mb, w.mult, { type: w.type, falloff: inZone ? 1 : BOW_ZONE.outside });
-        if (inZone) {
+        // 投げナイフなど（zone なし）は距離に関係なく本来のダメージ
+        const inZone = !w.zone || (d >= w.zone[0] - mb.rad && d <= w.zone[1] + mb.rad);
+        const hawk = w.zone && inZone && tf('t_hawk') && Math.random() < 0.3;
+        dealDamage(mb, w.mult, { type: w.type, falloff: inZone ? 1 : BOW_ZONE.outside, sv: w.sv, cast: w.cast, crit: hawk || undefined });
+        if (!w.zone) { /* 表示なし */ } else if (inZone) {
           floatText(mb.x, 3.4, mb.z, '適性!', 'info');
           fx.ringWave(mb.x, mb.z, 0x9affc8, 1.6, 0.25);
         } else floatText(mb.x, 3.4, mb.z, d < w.zone[0] ? '近い' : '遠い', 'info');
@@ -1033,7 +1165,7 @@ function updateProjs(dt) {
     fx.parts.emit(w.x, 1, w.z, { color: w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
     for (const mb of [...mobs.values()]) {
       if (w.hit.has(mb.id)) continue;
-      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, noProc: true }); }
+      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, noProc: true, sv: w.sv, cast: w.cast }); }
     }
     const c = collide(world.def, w.x, w.z, 0.1, world.door);
     if (w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fx.dispose(w.mesh); projs.splice(i, 1); }
@@ -1097,6 +1229,7 @@ function tryDodge() {
   me.iframe = (after ? 0.6 : 0.32) + S.iframeBonus;
   me.swingT = 9; me.skillT = -1; me.charging = false; me.guarding = false;
   audio.sfx('dodge');
+  if (tf('t_wind')) { me.buffs = me.buffs.filter((b) => b.id !== 'wind'); me.buffs.push({ id: 'wind', label: '疾風', t: 1.9, max: 1.9, mods: { move: 40 }, color: 0x9affc8 }); }
   fx.parts.burst(me.x, 0.3, me.z, 12, { color: after ? 0x9affff : 0xdddddd, speed: 3, size: 0.4, life: 0.4, gravity: 1 });
 }
 
@@ -1148,6 +1281,35 @@ function questEvent(ev) {
   if (changed.length) { saveChar(); renderQuests(); refreshNpcMarks(); }
 }
 
+// エリアの踏破（付きやすい特性がマップでわかるようになる）
+function countClear(ar, how) {
+  const def = AREAS[ar];
+  if (!def || !char || (!def.bias?.length && !def.kinds?.length)) return;
+  char.areas = char.areas || {};
+  const st = char.areas[ar] = char.areas[ar] || { k: 0, done: false };
+  if (st.done) return;
+  st.k++;
+  const done = def.type === 'labyrinth' ? how === 'boss' : def.type === 'secret' ? how === 'named' : st.k >= CLEAR_KILLS;
+  if (done) {
+    st.done = true;
+    toast(`${def.name} を踏破！ 出やすい装備と付きやすい特性がマップでわかるようになった`, '#9affc8', true);
+    audio.sfx('clear');
+  }
+}
+
+// 称号を手に入れる（同じ報酬称号は一度だけ）
+function grantTitle(id) {
+  if (!char || char.titles[id] || !TITLES[id]) return;
+  char.titles[id] = true;
+  const it = makeTitle(id);
+  char.inv.unshift(it);
+  banner('称号を獲得', it.name, RARITIES[it.rarity].color, 3);
+  toast(`称号${it.name}：${TITLES[id].desc}`, RARITIES[it.rarity].color, true);
+  audio.sfx('clear');
+  fx.beam(me.x, me.z, 0xffd84a, 14, 0.9, 1.2);
+  saveChar(); ui.refresh();
+}
+
 function acceptQuest(id) {
   const q = QUEST_INDEX[id];
   if (!q || questState(char, id) || !questAvailable(char, q)) return;
@@ -1169,6 +1331,7 @@ function claimQuest(q) {
     const it = makeItem(ilvl, Math.min(5, rar), r.slot ? { slot: r.slot } : {});
     spawnDrop(it, me.x + rnd(-1, 1), me.z + rnd(1, 2));
   }
+  if (r.title) grantTitle(r.title);
   if (r.potion) { char.potBonus = (char.potBonus || 0) + r.potion; calcStats(); me.potions = S.maxPot; toast(`ポーションの所持数が ${S.maxPot} になった`, '#6aff8a'); }
   banner('クエスト完了', q.name, '#ffd84a', 2);
   audio.sfx('levelup');
@@ -1184,7 +1347,11 @@ function nearestInteract() {
   const def = world.def;
   const d = (p) => Math.hypot(p.x - me.x, p.z - me.z);
   if (def.gate && d(def.gate) < 6) return { kind: 'gate', label: '<kbd>F</kbd> 転移門を使う（ポーション補充済み）' };
-  for (const n of npcs) if (d(n) < 3.2) return { kind: 'npc', npc: n, label: `<kbd>F</kbd> ${esc(n.name)}と話す` };
+  for (const n of npcs) {
+    if (d(n) >= 3.2) continue;
+    if (n.role === 'smith') return { kind: 'smith', npc: n, label: `<kbd>F</kbd> ${esc(n.name)}（鍛冶屋）` };
+    return { kind: 'npc', npc: n, label: `<kbd>F</kbd> ${esc(n.name)}と話す` };
+  }
   if (def.box && d(def.box) < 3.8) return { kind: 'box', label: '<kbd>F</kbd> 共有ボックスを開く（装備の受け渡し）' };
   if (def.shape === 'grid') {
     const g = grid(def);
@@ -1277,7 +1444,8 @@ function spawnGold(n, x, z, bag = false) {
     coins.push({ model, value: each + (i === 0 ? n - each * k : 0), x, z, y: 1.0, vx: Math.sin(a) * sp, vz: Math.cos(a) * sp, vy: rnd(5, 8.5), t: 0, spin: rnd(8, 16), bounces: 0 });
   }
 }
-function addGold(n) {
+function addGold(n, bonus = true) {
+  if (bonus && tf('t_lake')) n = Math.round(n * 1.3);
   char.gold = (char.gold || 0) + n;
   goldGainBuf += n; goldGainT = 0.35;
 }
@@ -1302,7 +1470,7 @@ function updateCoins(dt) {
     const ground = heightAt(c.x, c.z) + (c.bag ? 0 : 0.17);
     const dx = me.x - c.x, dz = me.z - c.z, d = Math.hypot(dx, dz);
     const settled = c.t > (c.bag ? 0.7 : 0.45);
-    if (settled && !me.dead && d < (c.bag ? 2.6 : GOLD_MAGNET)) {
+    if (settled && !me.dead && d < (c.bag ? 2.6 : GOLD_MAGNET) * (tf('t_lake') ? 2 : 1)) {
       // 吸い寄せ: 近いほど速く、少し浮き上がって飛んでくる
       const sp = (c.bag ? 9 : 14) + (GOLD_MAGNET - d) * 4;
       c.x += dx / (d || 1) * Math.min(d, sp * dt); c.z += dz / (d || 1) * Math.min(d, sp * dt);
@@ -1410,10 +1578,20 @@ function equip(id) {
   audio.sfx('equip');
   calcStats(); saveChar();
 }
+// 装備を外す（武器は外せない）
+function unequip(slot) {
+  if (slot === 'weapon' || !char.eq[slot]) return;
+  if (char.inv.length >= 60) { toast('インベントリがいっぱいです', '#f88'); return; }
+  char.inv.unshift(char.eq[slot]);
+  char.eq[slot] = null;
+  audio.sfx('equip');
+  calcStats(); saveChar();
+}
 let salvageArm = null;
 function salvage(id) {
   const it = char.inv.find((i) => i.id === id);
   if (!it) return;
+  if (it.slot === 'title') { toast('称号は分解できません', '#f99'); return; }
   // 伝説以上は2回右クリックで分解（誤操作防止）
   if (it.rarity >= 4 && (salvageArm?.id !== it.id || now() - salvageArm.t > 2)) {
     salvageArm = { id: it.id, t: now() };
@@ -1422,15 +1600,30 @@ function salvage(id) {
   }
   char.inv.splice(char.inv.indexOf(it), 1);
   salvageGold(salvageValue(it));
+  harvest(it);
   saveChar(); ui.refresh();
 }
 function salvageCommon() {
-  const junk = char.inv.filter((i) => i.rarity < 2);
+  const junk = char.inv.filter((i) => i.rarity < 2 && i.slot !== 'title');
   if (!junk.length) return;
-  char.inv = char.inv.filter((i) => i.rarity >= 2);
+  char.inv = char.inv.filter((i) => !junk.includes(i));
   salvageGold(junk.reduce((a, i) => a + salvageValue(i), 0));
+  for (const it of junk) harvest(it);
   toast(`${junk.length}個を分解した`, '#ffd84a');
   saveChar(); ui.refresh();
+}
+// 分解で素材を得る: 強化の欠片と、特性ごとの宝石。特性リストに記録（鍛冶屋で付けられるようになる）
+function harvest(it) {
+  const M = salvageMats(it);
+  char.mats.shard = (char.mats.shard || 0) + M.shard;
+  for (const [key, tier] of M.gems) {
+    char.mats.gems[key] = (char.mats.gems[key] || 0) + 1;
+    const before = char.codex[key] || 0;
+    if (tier > before) {
+      char.codex[key] = tier;
+      toast(`特性リストに追加：${affixName(key)}（${before ? `T${before} → ` : ''}T${tier} まで付与可能）`, '#c8a0ff', true);
+    }
+  }
 }
 // 分解したゴールドは足元から噴き出して、そのまま吸い寄せられる
 function salvageGold(n) {
@@ -1464,6 +1657,75 @@ function resetTree() {
   audio.sfx('ui'); calcStats(); saveChar();
   toast('スキルポイントを振り直しました', '#9fe');
 }
+// ======================================================================
+// 鍛冶屋: 強化 / 特性変更 / スキル変更 / 伝承化。結果は { ok, msg, ... } で返し、画面側が表示する
+// ======================================================================
+const fail = (msg) => { audio.sfx('ui'); return { ok: false, msg }; };
+function pay(cost) {
+  if ((char.gold || 0) < (cost.gold || 0)) return 'ゴールドが足りません';
+  if ((char.mats.shard || 0) < (cost.shard || 0)) return '強化の欠片が足りません';
+  if (cost.gemKey && (char.mats.gems[cost.gemKey] || 0) < (cost.gem || 0)) return '宝石が足りません';
+  char.gold -= cost.gold || 0;
+  char.mats.shard -= cost.shard || 0;
+  if (cost.gemKey) char.mats.gems[cost.gemKey] -= cost.gem || 0;
+  return null;
+}
+function smithEnhance(id) {
+  const it = findItem(id);
+  if (!it || it.slot === 'title') return fail('強化できない装備です');
+  if ((it.enh || 0) >= ENH_MAX) return fail('これ以上は強化できません');
+  const err = pay(enhCost(it));
+  if (err) return fail(err);
+  const rate = ENH_RATE[it.enh || 0];
+  const ok = Math.random() < rate;
+  if (ok) {
+    it.enh = (it.enh || 0) + 1;
+    audio.sfx(it.enh >= 6 ? 'perfect' : 'levelup');
+    fx.beam(me.x, me.z, it.enh >= 6 ? 0xffa236 : 0xffd84a, 10, 0.6, 0.8);
+  } else audio.sfx('block');
+  calcStats(); saveChar();
+  return { ok, msg: ok ? `+${it.enh} に強化した！` : `強化に失敗した…（+${it.enh || 0} のまま）`, enh: it.enh };
+}
+function smithAffix(id, idx, key) {
+  const it = findItem(id);
+  if (!it || !it.affixes[idx]) return fail('特性を選んでください');
+  if (!char.codex[key]) return fail('まだ特性リストにない特性です（その特性の付いた装備を分解すると追加されます）');
+  if (it.affixes.some((a, i) => i !== idx && a[0] === key)) return fail('同じ特性はひとつの装備に1つまでです');
+  if (isVariant(key) && (it.slot !== 'weapon' || it.affixes.some((a, i) => i !== idx && isVariant(a[0])))) return fail('スキル変化は武器に1つまでです');
+  const err = pay({ ...affixCost(it), gemKey: key });
+  if (err) return fail(err);
+  const tier = weightedTier(Math.min(char.codex[key], CRAFT_MAX_TIER), false);
+  it.affixes[idx] = [key, tier, affixVal(key, tier)];
+  audio.sfx('buff'); fx.ringWave(me.x, me.z, 0xc8a0ff, 3, 0.4);
+  calcStats(); saveChar();
+  return { ok: true, msg: `${affixName(key)} T${tier} を付与した`, tier };
+}
+function smithSkill(id, skillId) {
+  const it = findItem(id);
+  if (!it || it.slot !== 'weapon' || WEAPON_SKILLS[skillId]?.kind !== it.kind) return fail('変更できないスキルです');
+  if (it.skill === skillId) return fail('すでにそのスキルです');
+  const err = pay(skillCost(it));
+  if (err) return fail(err);
+  it.skill = skillId;
+  audio.sfx('skill');
+  calcStats(); saveChar();
+  return { ok: true, msg: `武器スキルを「${WEAPON_SKILLS[skillId].name}」に変えた` };
+}
+function smithLore(id) {
+  const it = findItem(id);
+  if (!it || it.rarity < 4 || !it.fx?.length || it.slot === 'title') return fail('伝説・神器の装備だけが伝承化できます');
+  const err = pay(loreCost(it));
+  if (err) return fail(err);
+  const t = loreTitle(it);
+  const i = char.inv.indexOf(it);
+  if (i >= 0) char.inv.splice(i, 1); else for (const k of Object.keys(char.eq)) if (char.eq[k] === it) char.eq[k] = null;
+  char.inv.unshift(t);
+  banner('伝承化', t.name, RARITIES[t.rarity].color, 3);
+  audio.sfx('clear'); fx.beam(me.x, me.z, 0xffa236, 16, 1, 1.4);
+  calcStats(); saveChar();
+  return { ok: true, msg: `${t.name} を手に入れた`, id: t.id };
+}
+
 function setSetting(k, v) {
   settings[k] = v;
   saveSettings();
@@ -1565,7 +1827,7 @@ function updateTouchAim(t) {
 
 // ---- ハザード / 宝箱 ----
 function hazardAt(x, z) {
-  if (world.def.shape !== 'open') return null;
+  if (world.def.shape !== 'open' || tf('t_boss2')) return null; // 称号「霧を越えし者」は影響を受けない
   return hazardsOf(world.def).find((h) => Math.hypot(h.x - x, h.z - z) < h.r - 0.3) || null;
 }
 
@@ -1626,7 +1888,7 @@ function update(dt) {
     } else if (l > 0) {
       const busy = me.swingT < me.swingDur || me.skillT >= 0;
       const slow = me.guarding ? 0.45 : busy ? 0.45 : me.charging && me.chargeT > CHARGE_MIN ? 0.4 : 1;
-      const sp = 7.2 * (1 + (S.move + buffMod('move')) / 100) * slow * analog * (hazardAt(me.x, me.z)?.kind === 'sand' ? 0.5 : 1);
+      const sp = 7.2 * (1 + (S.move + buffMod('move') + (desperate() ? 25 : 0)) / 100) * slow * analog * (hazardAt(me.x, me.z)?.kind === 'sand' ? 0.5 : 1);
       moveMe(dx / l * sp * dt, dz / l * sp * dt);
       me.moving = true;
       if (!busy && !me.charging && !me.guarding) me.a = Math.atan2(dx, dz);
@@ -1700,6 +1962,12 @@ function update(dt) {
     if (mb.poisonUntil > t) {
       mb.poisonT -= dt;
       if (mb.poisonT <= 0) { mb.poisonT = 0.5; dealDamage(mb, 0.12, { type: 'dot', noProc: true }); fx.parts.emit(mb.x, 1.2, mb.z, { color: 0x8aff5a, size: 0.4, life: 0.5, speed: 1, gravity: 1 }); }
+    }
+    // 燃焼（スキル変化「爆炎」）
+    if (mb.burnUntil > t) {
+      if (Math.random() < 0.5) fx.parts.emit(mb.x + rnd(-0.4, 0.4), rnd(0.5, 1.8), mb.z + rnd(-0.4, 0.4), { color: Math.random() < 0.5 ? 0xff7a20 : 0xffc040, size: 0.45, life: 0.5, speed: 0.6, gravity: -3 });
+      mb.burnT = (mb.burnT ?? 1) - dt;
+      if (mb.burnT <= 0) { mb.burnT = 1; dealDamage(mb, mb.burnPow, { type: 'dot', noProc: true }); }
     }
   }
 
@@ -1851,6 +2119,12 @@ async function startGame({ name, color, kind }) {
   char = loadChar() || { name, color, lv: 1, xp: 0, inv: [], eq: { weapon: starterWeapon(kind), armor: null, acc: null } };
   char.name = name; char.color = color;
   char.tree = char.tree || {}; char.slots = char.slots || [null, null]; char.quests = char.quests || {};
+  // セーブデータの変換（特性のティア化・強化値・称号枠・素材と特性リスト）
+  char.eq.title = char.eq.title || null;
+  for (const it of [...char.inv, ...Object.values(char.eq)]) migrateItem(it);
+  char.mats = char.mats || { shard: 0, gems: {} };
+  char.codex = char.codex || {};
+  char.titles = char.titles || {};
   saveChar();
   const wsUrl = params.get('server') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   const ok = params.has('solo') || window.ETERNA_SOLO || location.protocol === 'file:' ? false : await net.connect(wsUrl);
@@ -1905,7 +2179,8 @@ const game = {
     if (it.kind === 'lever') { net.send({ t: 'interact', what: 'lever' }); audio.sfx('equip'); }
     if (it.kind === 'chest' && !chestOpen(it.chest)) net.send({ t: 'interact', what: 'chest', id: it.chest.id });
   },
-  equip, salvage, salvageCommon, learn, setSlot, resetTree, setSetting, acceptQuest,
+  equip, unequip, salvage, salvageCommon, learn, setSlot, resetTree, setSetting, acceptQuest,
+  smithEnhance, smithAffix, smithSkill, smithLore,
   claimQuest: (id) => claimQuest(QUEST_INDEX[id]),
   warp: (n) => net.send({ t: 'warp', floor: n }),
   chat: (text) => net.send({ t: 'chat', text }),
@@ -1944,4 +2219,4 @@ function enterPreview() {
 }
 loop();
 
-window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, coins };
+window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, coins, api: game };

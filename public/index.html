@@ -130,6 +130,7 @@
       <div class="eq" data-slot="weapon"><div class="eq-l">武器</div><div class="cell"></div></div>
       <div class="eq" data-slot="armor"><div class="eq-l">防具</div><div class="cell"></div></div>
       <div class="eq" data-slot="acc"><div class="eq-l">装飾</div><div class="cell"></div></div>
+      <div class="eq title" data-slot="title"><div class="eq-l">称号</div><div class="cell"></div></div>
       <div id="stats"></div>
     </div>
     <div class="inv-right"><div id="inv-grid"></div></div>
@@ -165,6 +166,7 @@
 <div id="map" class="panel hidden">
   <div class="inv-head"><b id="map-title">エリアマップ</b><span class="dim">出口（光る門）を通ると隣のエリアへ移動します</span><button id="map-close" data-close>×</button></div>
   <svg id="map-svg" viewBox="-40 -10 680 420" role="img" aria-label="エリアマップ"></svg>
+  <div id="map-info"></div>
   <div class="map-legend"><span>⌂ 町・野営地：転移門とNPC</span><span>✿ フィールド</span><span>⚔ 狩場：経験値1.6倍</span><span>◈ ダンジョン：最奥にユニーク装備</span><span>♜ 迷宮区：ギミックと階層ボス</span></div>
 </div>
 
@@ -178,6 +180,21 @@
   <div class="inv-head"><b>転移門</b><button id="gate-close" data-close>×</button></div>
   <div id="gate-list"></div>
   <div class="dim" style="text-align:center;margin-top:4px">第4層以降は準備中</div>
+</div>
+
+<div id="smith" class="panel hidden">
+  <div class="inv-head"><b id="smith-title">鍛冶屋</b><span id="smith-mats" class="mats"></span><button data-close>×</button></div>
+  <div class="smith-body">
+    <div id="smith-tabs" class="smith-tabs">
+      <button data-tab="enh"><i>⚒</i>強化</button>
+      <button data-tab="affix"><i>◈</i>特性変更</button>
+      <button data-tab="skill"><i>✦</i>スキル変更</button>
+      <button data-tab="lore"><i>❖</i>伝承化</button>
+      <button data-tab="codex"><i>☰</i>特性リスト</button>
+    </div>
+    <div id="smith-list" class="cells"></div>
+    <div id="smith-detail"></div>
+  </div>
 </div>
 
 <div id="box" class="panel hidden">

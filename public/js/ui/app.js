@@ -13,9 +13,10 @@
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
 import {
   FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT, BOW_ZONE,
-  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue,
+  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, affixText, tierLabel, tierColor,
+  enhMult, TITLES, TITLE_REQ, titleReqOk, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost, CRAFT_MAX_TIER, affixName, FX_REQ,
 } from '../../shared/data.js';
-import { AREAS, AREA_TYPES, CELL, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
+import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
 import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, TREES, STYLE_COLS, spTotal, spSpent, treeSpent, canLearn } from '../skills.js';
 import { QUESTS, questState, questAvailable } from '../quests.js';
 import { View, Root, Mediator } from './core.js';
@@ -24,8 +25,8 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const now = () => performance.now() / 1000;
-const PANELS = ['inv', 'tree', 'settings', 'map', 'dialog', 'gate', 'box'];
-const GLYPH = { sword: '剣', greatsword: '大', spear: '盾', dagger: '短', axe: '斧', bow: '弓', light: '衣', medium: '鎧', heavy: '甲', acc: '飾' };
+const PANELS = ['inv', 'tree', 'settings', 'map', 'dialog', 'gate', 'box', 'smith'];
+const GLYPH = { sword: '剣', greatsword: '大', spear: '盾', dagger: '短', axe: '斧', bow: '弓', light: '衣', medium: '鎧', heavy: '甲', acc: '飾', title: '銘' };
 
 // ミニマップ: 図形の一覧を受け取って描くだけの View
 class CanvasView extends View {
@@ -130,8 +131,9 @@ export function createUI(game) {
   INV.salvage.on('click', 'inv:salvageCommon');
   for (const el of panels.inv.el.querySelectorAll('.eq')) INV.eq[el.dataset.slot] = panels.inv.add('eq_' + el.dataset.slot, el.querySelector('.cell'));
   INV.grid.link((ev) => { ev.ctx.source = 'inv'; });
-  for (const v of Object.values(INV.eq)) {
-    v.link((ev) => { ev.ctx.source = 'equipped'; ev.payload.id = v.data; });
+  for (const [slot, v] of Object.entries(INV.eq)) {
+    v.link((ev) => { ev.ctx.source = 'equipped'; ev.payload.id = v.data; ev.payload.slot = slot; });
+    v.on('click', 'item:click', (e) => ({ x: e.clientX, y: e.clientY }));
     v.on('mouseenter', 'item:hover', (e) => ({ x: e.clientX, y: e.clientY })).on('mousemove', 'item:move', (e) => ({ x: e.clientX, y: e.clientY })).on('mouseleave', 'item:leave');
   }
   const TREE = { tabs: panels.tree.add('tabs', '#tree-tabs'), body: panels.tree.add('body', '#tree-body'), sp: panels.tree.add('sp', '#sp-left'), reset: panels.tree.add('reset', '#tree-reset') };
@@ -145,10 +147,16 @@ export function createUI(game) {
   }
   SET.quality = panels.settings.add('quality', '#set-quality').on('change', 'set:change', (e) => ({ key: 'quality', value: e.target.value }));
   for (const k of ['shake', 'dmgnum', 'occlusion']) SET[k] = panels.settings.add(k, '#set-' + k).on('change', 'set:change', (e) => ({ key: k, value: e.target.checked }));
-  const MAP = { title: panels.map.add('title', '#map-title'), svg: panels.map.add('svg', '#map-svg') };
+  const MAP = { title: panels.map.add('title', '#map-title'), svg: panels.map.add('svg', '#map-svg'), info: panels.map.add('info', '#map-info') };
   const DLG = { title: panels.dialog.add('title', '#dialog-title'), line: panels.dialog.add('line', '#dialog-line'), list: panels.dialog.add('list', '#dialog-quests') };
   const GATE = { list: panels.gate.add('list', '#gate-list') };
   const BOX = { mine: panels.box.add('mine', '#box-mine'), shared: panels.box.add('shared', '#box-shared'), count: panels.box.add('count', '#box-count') };
+  const SM = {
+    title: panels.smith.add('title', '#smith-title'), mats: panels.smith.add('mats', '#smith-mats'), tabs: panels.smith.add('tabs', '#smith-tabs'),
+    list: panels.smith.add('list', '#smith-list'), detail: panels.smith.add('detail', '#smith-detail'),
+  };
+  for (const b of SM.tabs.el.querySelectorAll('button')) SM.tabs.add(b.dataset.tab, b).on('click', 'smith:tab', () => ({ tab: b.dataset.tab }));
+  SM.list.link((ev) => { ev.ctx.source = 'smith'; });
   BOX.mine.link((ev) => { ev.ctx.source = 'inv'; });
   BOX.shared.link((ev) => { ev.ctx.source = 'box'; });
   const deathT = death.add('t', '#death-t');
@@ -216,12 +224,29 @@ export function createUI(game) {
   const P = {};
   let boxItems = [], boxMax = 60;
 
-  P.itemCell = (it, { showUp = false, eq = false } = {}) => {
+  const glyphOf = (it) => GLYPH[it.slot === 'title' ? 'title' : it.slot === 'armor' ? (it.armor || 'medium') : it.slot === 'acc' ? 'acc' : it.kind];
+  const enhTag = (it) => (it.enh ? `<span class="enh">+${it.enh}</span>` : '');
+  P.itemCell = (it, { showUp = false, eq = false, sel = false } = {}) => {
     const c = RARITIES[it.rarity].color;
-    const up = showUp && game.itemPower(it) > game.itemPower(game.char.eq[it.slot]) ? '<span class="up">▲</span>' : '';
-    const g = GLYPH[it.slot === 'armor' ? (it.armor || 'medium') : it.slot === 'acc' ? 'acc' : it.kind];
-    if (eq) return `<div class="cell r${it.rarity}" style="border-color:${c};color:${c}"><span class="gi">${g}</span><span>${esc(it.name)}<br><small class="dim">iLv${it.ilvl}・重さ${itemWeight(it)}</small></span></div>`;
-    return `<div class="cell r${it.rarity}" style="border-color:${c};color:${c}">${up}<span class="lv">${it.ilvl}</span><span class="gi">${g}</span><span style="font-size:9px;max-width:58px;overflow:hidden;white-space:nowrap">${esc(it.name)}</span>${it.by ? `<span class="by">${esc(it.by)}</span>` : ''}</div>`;
+    const up = showUp && it.slot !== 'title' && game.itemPower(it) > game.itemPower(game.char.eq[it.slot]) ? '<span class="up">▲</span>' : '';
+    const sv = it.affixes.some(([k]) => isVariant(k)) ? '<span class="svb" title="スキル変化">✧</span>' : '';
+    const tr = it.affixes.some(([, t]) => t >= 6) ? ' trans' : '';
+    if (eq) return `<div class="cell r${it.rarity}${tr}" style="border-color:${c};color:${c}"><span class="gi">${glyphOf(it)}</span><span>${esc(it.name)}${enhTag(it)}<br><small class="dim">${it.slot === 'title' ? '称号' : `iLv${it.ilvl}・重さ${itemWeight(it)}`}</small></span></div>`;
+    return `<div class="cell r${it.rarity}${tr}${sel ? ' sel' : ''}" style="border-color:${c};color:${c}">${up}${sv}<span class="lv">${it.slot === 'title' ? '' : it.ilvl}</span><span class="gi">${glyphOf(it)}</span><span style="font-size:9px;max-width:58px;overflow:hidden;white-space:nowrap">${esc(it.name)}</span>${enhTag(it)}${it.by ? `<span class="by">${esc(it.by)}</span>` : ''}</div>`;
+  };
+  // 特性の1行（ティアのバッジ付き）
+  const affixRow = (a) => {
+    const [k, t] = a;
+    const sv = isVariant(k);
+    return `<div class="afx${sv ? ' sv' : ''}${t >= 6 ? ' trans' : ''}"><span class="tier" style="--tc:${tierColor(t)}">${tierLabel(t)}</span><span>${sv ? `<b>${SKILL_VARIANTS[k].icon} スキル変化「${SKILL_VARIANTS[k].name}」</b><br>${esc(SKILL_VARIANTS[k].desc(t))}` : esc(affixText(a))}</span></div>`;
+  };
+  // 称号の効果（説明と条件）
+  const titleInfo = (it) => {
+    const lines = it.title ? [TITLES[it.title].desc] : (it.fx || []).map((f) => UNIQUE_FX[f]);
+    const ok = titleReqOk(it.req, game.S?.wk);
+    return `<div class="ttl-fx">${lines.map((l) => `<div>✦ ${esc(l)}</div>`).join('')}</div>`
+      + (it.req ? `<div class="req${ok ? '' : ' ng'}">${TITLE_REQ[it.req]}${ok ? '' : '（今の武器では効かない）'}</div>` : '')
+      + (it.title ? `<div class="dim">入手：${esc(TITLES[it.title].src)}</div>` : it.from ? `<div class="dim">${esc(it.from)}を伝承化したもの</div>` : '');
   };
   // 項目のセル（Passive View）。どの項目かは data に持たせ、親へ伝わる途中で文脈として付く
   const cellSetup = (v) => {
@@ -236,20 +261,26 @@ export function createUI(game) {
     const S = game.S, char = game.char;
     const r = RARITIES[it.rarity];
     const atype = it.slot === 'armor' ? ARMOR_TYPES.find((t) => t.id === it.atype) : null;
+    if (it.slot === 'title') {
+      return `<div class="tn" style="color:${r.color}">${esc(it.name)}</div><div class="dim">${r.name} 称号（ステータスなし）</div>${titleInfo(it)}`
+        + (it.lore ? `<div class="lore">${esc(it.lore)}</div>` : '');
+    }
     const type = it.slot === 'weapon' ? WEAPONS[it.kind].name : it.slot === 'armor' ? `防具（${ARMOR_CLASSES[it.armor || 'medium'].name}${atype ? '・' + atype.name : ''}）` : '装飾品';
-    let h = `<div class="tn" style="color:${r.color}">${esc(it.name)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
-    if (it.atk) h += `<div>攻撃力 +${it.atk}</div>`;
-    if (it.hp) h += `<div>HP +${it.hp}</div>`;
-    if (it.def) h += `<div>被ダメ軽減 +${it.def}%</div>`;
-    if (it.trait) h += `<div style="color:#ffe0a0">特性：${AFFIXES[it.trait[0]].name} +${it.trait[1]}${AFFIXES[it.trait[0]].unit}</div>`;
-    for (const [k, v] of it.affixes) h += `<div style="color:#9fd8ff">${AFFIXES[k].name} +${v}${AFFIXES[k].unit}</div>`;
+    let h = `<div class="tn" style="color:${r.color}">${esc(it.name)}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
+    const e = enhMult(it), ev = (v) => Math.round(v * e * 10) / 10;
+    h += '<div class="base">';
+    if (it.atk) h += `<div>攻撃力 <b>+${ev(it.atk)}</b></div>`;
+    if (it.hp) h += `<div>HP <b>+${ev(it.hp)}</b></div>`;
+    if (it.def) h += `<div>被ダメ軽減 <b>+${ev(it.def)}%</b></div>`;
+    h += '</div>';
+    if (it.base) h += `<div class="basefx">基本効果：${AFFIXES[it.base[0]].name} +${it.base[1]}${AFFIXES[it.base[0]].unit}</div>`;
+    if (it.affixes.length) h += `<div class="afxs">${it.affixes.map(affixRow).join('')}</div>`;
     if (it.fx) for (const f of it.fx) h += `<div class="fx">✦ ${UNIQUE_FX[f]}</div>`;
     if (it.slot === 'weapon') {
       const sid = it.skill && WEAPON_SKILLS[it.skill]?.kind === it.kind ? it.skill : WEAPON_SKILL_POOL[it.kind][0];
       const ws = WEAPON_SKILLS[sid];
       h += `<div class="wsk">武器スキル「${ws.name}」<br><span class="dim">${ws.desc}（CT ${ws.cd}秒）</span></div>`;
       if (WEAPONS[it.kind].guard) h += '<div class="dim">右クリック長押しでガード</div>';
-      h += passiveLines(it.kind).map((t) => `<div style="color:#bfe0ff">◇ ${esc(t)}</div>`).join('');
     }
     if (it.lore) h += `<div class="lore">${esc(it.lore)}</div>`;
     if (it.by) h += `<div class="dim">入れた人：${esc(it.by)}</div>`;
@@ -292,9 +323,11 @@ export function createUI(game) {
         + `<div class="wbar"><i style="width:${clamp(S.weight / 22 * 100, 0, 100)}%;background:${S.wc.color}"></i></div>`
         + `<div><span class="dim">回避のクールタイム</span><span>${S.dodgeCd.toFixed(2)}秒</span></div>`
         + st.map(([k, v]) => `<div><span class="dim">${k}</span><span>${v}</span></div>`).join('')
-        + `<div class="dim" style="margin-top:4px">武器パッシブ（${S.W.name}）</div>`
-        + passiveLines(S.wk).map((t) => `<div style="color:#bfe0ff;font-size:11px">◇ ${esc(t)}</div>`).join('')
-        + [...S.fx].filter((f) => UNIQUE_FX[f]).map((f) => `<div style="color:#ffd27a;font-size:11px">✦ ${UNIQUE_FX[f]}</div>`).join(''),
+        + `<div><span class="dim">強化の欠片</span><span>${char.mats.shard || 0}</span></div>`
+        + (S.sv ? `<div class="dim" style="margin-top:4px">スキル変化</div><div style="color:#c8a0ff;font-size:11px">${SKILL_VARIANTS[S.sv.key].icon} ${SKILL_VARIANTS[S.sv.key].name}（${tierLabel(S.sv.t)}）</div>` : '')
+        + (S.title ? `<div class="dim" style="margin-top:4px">称号</div><div style="font-size:11px;color:${S.titleOn ? '#ffe7a0' : '#888'}">${esc(S.title.name)}${S.titleOn ? '' : '（今の武器では無効）'}</div>` : '')
+        + [...S.fx].filter((f) => UNIQUE_FX[f]).map((f) => `<div style="color:#ffd27a;font-size:11px">✦ ${UNIQUE_FX[f]}</div>`).join('')
+        + '<div class="dim" style="margin-top:6px;font-size:10px">武器パッシブはスキルツリー（K）の武器タブ最上段に表示されます</div>',
     });
   };
 
@@ -311,10 +344,18 @@ export function createUI(game) {
     const T = TREES[treeTab], spent = treeSpent(tree, treeTab);
     const isWeapon = !['stat', 'style'].includes(treeTab);
     const rows = [];
+    // 武器ツリーの最上段: その武器を装備しているだけで効く武器パッシブ
+    if (isWeapon) rows.push({ passive: passiveLines(treeTab), on: treeTab === S.wk });
     if (isWeapon && treeTab !== S.wk) rows.push({ note: `このツリーの効果は「${T.name}」を装備しているときだけ有効です` });
     if (treeTab === 'style') rows.push({ cols: true });
     for (let tier = 0; tier < 4; tier++) rows.push({ tier, need: tier * 2, open: spent >= tier * 2, nodes: T.nodes.filter((n) => n.tier === tier) });
     TREE.body.list(rows, (row, ri) => {
+      if (row.passive) {
+        return {
+          html: `<div class="tree-passive ${row.on ? 'on' : ''}"><div class="tp-h"><span>武器パッシブ</span><small>${row.on ? '装備中・常に有効' : '装備すると有効'}</small></div>`
+            + `<div class="tp-list">${row.passive.map((t) => `<div class="tp">◇ ${esc(t)}</div>`).join('')}</div></div>`,
+        };
+      }
       if (row.note) return { html: `<div class="tree-note">${esc(row.note)}</div>` };
       if (row.cols) return { html: `<div class="tree-cols">${STYLE_COLS.map((c) => `<div>${c}</div>`).join('')}</div>` };
       return {
@@ -382,6 +423,18 @@ export function createUI(game) {
     }
     MAP.title.set({ text: `第${f}層 ${FLOORS[f - 1].name}` });
     MAP.svg.set({ html: svg });
+    // エリアの傾向（踏破すると、出やすい武器種と付きやすい特性がわかる）
+    const st = game.char.areas || {};
+    const rows = list.filter((a) => a.bias.length || a.kinds.length).map((a) => {
+      const s = st[a.id] || { k: 0 };
+      const T = AREA_TYPES[a.type];
+      const how = a.type === 'labyrinth' ? 'ボスを倒すと判明' : a.type === 'secret' ? 'ネームドを倒すと判明' : `敵を${CLEAR_KILLS}体倒すと判明（${Math.min(s.k, CLEAR_KILLS)}/${CLEAR_KILLS}）`;
+      const body = s.done
+        ? `<span class="mi-k">出やすい：${a.kinds.map((k) => WEAPONS[k].name).join('・')}</span><span class="mi-a">付きやすい：${a.bias.map((k) => (isVariant(k) ? `<b class="sv">${SKILL_VARIANTS[k].icon}${SKILL_VARIANTS[k].name}</b>` : AFFIXES[k].name)).join('・')}</span>`
+        : `<span class="dim">？？？　${how}</span>`;
+      return `<div class="mi${s.done ? ' done' : ''}"><span class="mi-n" style="color:${T.color}">${T.icon} ${esc(a.name)}${s.done ? ' <i>踏破</i>' : ''}</span>${body}</div>`;
+    });
+    MAP.info.set({ html: rows.join('') });
   };
 
   P.dialog = (npc) => {
@@ -426,6 +479,125 @@ export function createUI(game) {
     if (!char.inv.length) BOX.mine.set({ html: '<div class="dim">インベントリは空です</div>' });
     BOX.shared.list(boxItems, (it) => ({ html: P.itemCell(it), data: it.uid, setup: cellSetup }));
     if (!boxItems.length) BOX.shared.set({ html: '<div class="dim">共有ボックスは空です。装備をクリックして入れよう</div>' });
+  };
+
+  // ---- 鍛冶屋（原神の武器強化・FF14の禁断/マテリア画面ふう: 左にタブ、中央に装備一覧、右に詳細と実行ボタン） ----
+  const sm = { tab: 'enh', id: null, slot: null, key: null, skill: null, msg: '', ok: null, npc: '鍛冶屋' };
+  const SMITH_FILTER = {
+    enh: (it) => it.slot !== 'title',
+    affix: (it) => it.slot !== 'title' && it.affixes.length > 0,
+    skill: (it) => it.slot === 'weapon',
+    lore: (it) => it.rarity >= 4 && it.fx?.length && it.slot !== 'title',
+    codex: () => false,
+  };
+  const smithItems = () => {
+    const c = game.char;
+    const worn = ['weapon', 'armor', 'acc'].map((s) => c.eq[s]).filter(Boolean);
+    return [...worn, ...c.inv].filter(SMITH_FILTER[sm.tab]);
+  };
+  // 費用の表示（足りないものは赤）
+  const costRow = (cost) => {
+    const c = game.char, chips = [];
+    if (cost.gold) chips.push([`◎ ${cost.gold.toLocaleString()} G`, (c.gold || 0) >= cost.gold, `所持 ${(c.gold || 0).toLocaleString()}`]);
+    if (cost.shard) chips.push([`◆ 強化の欠片 ×${cost.shard}`, (c.mats.shard || 0) >= cost.shard, `所持 ${c.mats.shard || 0}`]);
+    if (cost.gemKey) chips.push([`◇ ${affixName(cost.gemKey)}の宝石 ×${cost.gem}`, (c.mats.gems[cost.gemKey] || 0) >= cost.gem, `所持 ${c.mats.gems[cost.gemKey] || 0}`]);
+    return `<div class="cost">${chips.map(([t, ok, have]) => `<span class="chip ${ok ? '' : 'short'}">${t}<small>${have}</small></span>`).join('')}</div>`;
+  };
+  const canPay = (cost) => {
+    const c = game.char;
+    return (c.gold || 0) >= (cost.gold || 0) && (c.mats.shard || 0) >= (cost.shard || 0) && (!cost.gemKey || (c.mats.gems[cost.gemKey] || 0) >= (cost.gem || 0));
+  };
+  const head = (it) => `<div class="sd-head" style="--rc:${RARITIES[it.rarity].color}"><span class="gi">${glyphOf(it)}</span><div><b>${esc(it.name)}${enhTag(it)}</b><small>${RARITIES[it.rarity].name}・iLv${it.ilvl}${game.char.inv.includes(it) ? '' : '・装備中'}</small></div></div>`;
+  const doBtn = (label, enabled) => ({ html: `<button class="sd-do" ${enabled ? '' : 'disabled'}>${label}</button>`, setup: (v) => v.on('click', 'smith:do') });
+  const msgBlock = () => (sm.msg ? [{ html: `<div class="sd-msg ${sm.ok ? 'ok' : 'ng'}">${esc(sm.msg)}</div>` }] : []);
+
+  P.smith = () => {
+    const c = game.char;
+    SM.title.set({ text: sm.npc });
+    SM.mats.set({ html: `<span>◎ ${(c.gold || 0).toLocaleString()} G</span><span>◆ 強化の欠片 ${c.mats.shard || 0}</span>` });
+    for (const [k, v] of SM.tabs.children) v.set({ cls: { on: k === sm.tab } });
+    panels.smith.set({ cls: { codex: sm.tab === 'codex' } });
+    const items = smithItems();
+    if (!items.some((i) => i.id === sm.id)) sm.id = items[0]?.id ?? null;
+    SM.list.list(items, (it) => ({ html: P.itemCell(it, { sel: it.id === sm.id }).replace('class="cell', `class="cell${c.inv.includes(it) ? '' : ' worn'}`), data: it.id, setup: cellSetup }));
+    if (!items.length && sm.tab !== 'codex') SM.list.set({ html: `<div class="dim">${{ enh: '強化できる装備がありません', affix: '特性の付いた装備がありません', skill: '武器がありません', lore: '伝説・神器の装備がありません' }[sm.tab]}</div>` });
+    const it = items.find((i) => i.id === sm.id);
+    const blocks = [];
+    if (sm.tab === 'codex') {
+      // 特性リスト: 分解で解放した特性と、付与できる最高ティア
+      blocks.push({ html: '<div class="sd-h">特性リスト<small>装備を分解すると、付いていた特性とティアがここに追加されます。鍛冶屋で付けられるのは T5 まで（超越はドロップのみ）</small></div>' });
+      const keys = [...Object.keys(AFFIXES), ...Object.keys(SKILL_VARIANTS)];
+      blocks.push({
+        html: `<div class="codex">${keys.map((k) => {
+          const t = c.codex[k] || 0, gems = c.mats.gems[k] || 0, sv = isVariant(k);
+          const pips = Array.from({ length: CRAFT_MAX_TIER }, (_, i) => `<i class="${i < t ? 'on' : ''}" style="--tc:${tierColor(i + 1)}"></i>`).join('');
+          return `<div class="cx ${t ? '' : 'locked'} ${sv ? 'sv' : ''}"><span class="cx-n">${t ? (sv ? `${SKILL_VARIANTS[k].icon} ${SKILL_VARIANTS[k].name}` : AFFIXES[k].name) : '？？？'}</span><span class="pips">${pips}</span><span class="cx-g">◇ ${gems}</span>${sv && t ? `<small>${esc(SKILL_VARIANTS[k].desc(t))}</small>` : ''}</div>`;
+        }).join('')}</div>`,
+      });
+    } else if (!it) {
+      blocks.push({ html: '<div class="dim sd-empty">左の一覧から装備を選んでください</div>' });
+    } else if (sm.tab === 'enh') {
+      const e = it.enh || 0, max = e >= ENH_MAX, cost = enhCost(it), rate = ENH_RATE[e] ?? 0;
+      const pips = Array.from({ length: ENH_MAX }, (_, i) => `<i class="${i < e ? 'on' : ''} ${i >= 5 ? 'hi' : ''}"></i>`).join('');
+      const m0 = enhMult(it), m1 = enhMult({ enh: e + 1 });
+      const stat = (label, v, unit = '') => (v ? `<div class="sd-stat"><span>${label}</span><b>${Math.round(v * m0 * 10) / 10}${unit}</b>${max ? '' : `<span class="arrow">→</span><b class="up">${Math.round(v * m1 * 10) / 10}${unit}</b>`}</div>` : '');
+      blocks.push({ html: head(it) });
+      blocks.push({ html: `<div class="enh-pips">${pips}<span>+${e} / +${ENH_MAX}</span></div>` });
+      blocks.push({ html: `<div class="sd-stats">${stat('攻撃力', it.atk)}${stat('HP', it.hp)}${stat('被ダメ軽減', it.def, '%')}</div>` });
+      if (!max) {
+        blocks.push({ html: `<div class="sd-rate ${rate < 1 ? 'risk' : ''}">成功率 <b>${Math.round(rate * 100)}%</b>${rate < 1 ? '<small>失敗しても強化値は下がりません（素材とゴールドは消費）</small>' : '<small>+5 までは必ず成功します</small>'}</div>` });
+        blocks.push({ html: costRow(cost) });
+      }
+      blocks.push(doBtn(max ? '最大まで強化済み' : `強化する（+${e} → +${e + 1}）`, !max && canPay(cost)));
+    } else if (sm.tab === 'affix') {
+      blocks.push({ html: head(it) });
+      blocks.push({ html: '<div class="sd-h">付け替える特性<small>置き換える枠を選びます</small></div>' });
+      it.affixes.forEach((a, idx) => blocks.push({
+        html: `<div class="slotrow ${sm.slot === idx ? 'sel' : ''}">${affixRow(a)}</div>`,
+        setup: (v) => v.on('click', 'smith:slot', () => ({ idx })),
+      }));
+      const keys = [...Object.keys(AFFIXES), ...(it.slot === 'weapon' ? Object.keys(SKILL_VARIANTS) : [])];
+      blocks.push({ html: '<div class="sd-h">付ける特性<small>特性リストで解放したものだけ。ティアはランダム（低いほど出やすい）</small></div>' });
+      blocks.push({
+        html: `<div class="keys">${keys.map((k) => {
+          const t = c.codex[k] || 0, gems = c.mats.gems[k] || 0;
+          const dup = it.affixes.some((a, i) => i !== sm.slot && a[0] === k) || (isVariant(k) && it.affixes.some((a, i) => i !== sm.slot && isVariant(a[0])));
+          const off = !t || !gems || dup;
+          return `<button class="key ${sm.key === k ? 'sel' : ''} ${isVariant(k) ? 'sv' : ''}" data-k="${k}" ${off ? 'disabled' : ''}>${t ? affixName(k).replace('スキル変化', '') : '？？？'}<small>${t ? `T1〜T${t}・◇${gems}` : '未解放'}${dup ? '・重複' : ''}</small></button>`;
+        }).join('')}</div>`,
+        setup: (v) => { for (const b of v.el.querySelectorAll('button.key')) v.add('k_' + b.dataset.k, b).on('click', 'smith:key', () => ({ key: b.dataset.k })); },
+      });
+      const cur = it.affixes[sm.slot];
+      if (cur && cur[1] >= 6) blocks.push({ html: `<div class="sd-warn">⚠ ${tierLabel(cur[1])} の特性が消えます（超越は鍛冶屋では付け直せません）</div>` });
+      const cost = { ...affixCost(it), gemKey: sm.key };
+      if (sm.key) blocks.push({ html: costRow(cost) });
+      blocks.push(doBtn('特性を付け替える', sm.slot != null && !!sm.key && canPay(cost)));
+    } else if (sm.tab === 'skill') {
+      blocks.push({ html: head(it) });
+      blocks.push({ html: '<div class="sd-h">武器スキル<small>この武器種のスキルから選べます</small></div>' });
+      for (const id of WEAPON_SKILL_POOL[it.kind]) {
+        const s = WEAPON_SKILLS[id], curr = it.skill === id;
+        blocks.push({
+          html: `<div class="skrow ${sm.skill === id ? 'sel' : ''} ${curr ? 'cur' : ''}"><b>${s.name}</b>${curr ? '<i>現在</i>' : ''}<small>${esc(s.desc)}（CT ${s.cd}秒）</small></div>`,
+          setup: (v) => { if (!curr) v.on('click', 'smith:skill', () => ({ id })); },
+        });
+      }
+      const cost = skillCost(it);
+      blocks.push({ html: costRow(cost) });
+      blocks.push(doBtn('スキルを変更する', !!sm.skill && canPay(cost)));
+    } else if (sm.tab === 'lore') {
+      const req = (it.fx || []).map((f) => FX_REQ[f]).find(Boolean);
+      blocks.push({ html: head(it) });
+      blocks.push({
+        html: `<div class="lore-prev"><div class="lp-arrow">▼ 伝承化</div><div class="lp-t" style="color:${RARITIES[it.rarity].color}">「${esc(it.name)}」の伝承</div><div class="dim">称号（4つ目の装備枠・ステータスなし）</div>`
+          + `${(it.fx || []).map((f) => `<div class="fx">✦ ${UNIQUE_FX[f]}</div>`).join('')}${req ? `<div class="req">${TITLE_REQ[req]}</div>` : ''}</div>`,
+      });
+      blocks.push({ html: '<div class="sd-warn">⚠ 元の装備はなくなります（ステータスと特性は失われ、固有効果だけが称号として残ります）</div>' });
+      const cost = loreCost(it);
+      blocks.push({ html: costRow(cost) });
+      blocks.push(doBtn('伝承化する', canPay(cost)));
+    }
+    SM.detail.list([...blocks, ...msgBlock()], (b, i) => ({ html: `<div class="sd-b">${b.html}</div>`, name: 'b' + i, setup: b.setup }));
   };
 
   P.quests = () => {
@@ -554,7 +726,7 @@ export function createUI(game) {
     T.stick.set({ cls: { active: !!tc.stick }, style: { left: (o.ox - zr.left) + 'px', top: (o.oy - zr.top) + 'px' } });
     T.knob.set({ style: { transform: `translate(${dx}px, ${dy}px)` } });
   };
-  const USE_LABEL = { gate: '転移門', npc: '話す', box: 'ボックス', lever: 'レバー', chest: '宝箱' };
+  const USE_LABEL = { gate: '転移門', npc: '話す', box: 'ボックス', lever: 'レバー', chest: '宝箱', smith: '鍛冶屋' };
   P.touch = () => {
     root.set({ cls: { touch: tc.on, playing: !mediator.is('login'), chatting: mediator.is('chat') } });
     if (!tc.on) return;
@@ -697,7 +869,7 @@ export function createUI(game) {
   };
 
   // パネルの再描画（開いているものだけ）
-  const panelPresenter = { inv: P.inv, tree: P.tree, settings: P.settings, map: P.map, gate: P.gate, box: P.box, dialog: (d) => P.dialog(d.npc) };
+  const panelPresenter = { inv: P.inv, tree: P.tree, settings: P.settings, map: P.map, gate: P.gate, box: P.box, dialog: (d) => P.dialog(d.npc), smith: P.smith };
   const showPanel = (name, data) => {
     for (const p of PANELS) panels[p].set({ visible: p === name });
     P.hideTip();
@@ -913,6 +1085,8 @@ export function createUI(game) {
     },
     inv: panelState('inv', {
       'item:click'(ev) {
+        // 装備中の欄をクリックすると外す（武器以外）
+        if (ev.ctx.source === 'equipped') { game.unequip(ev.payload.slot); P.hideTip(); return; }
         if (ev.ctx.source !== 'inv') return;
         if (touchSelect(this, ev)) { invActions.set({ visible: true }); return; }
         game.equip(ev.payload.id); this.sel = null; P.hideTip(); invActions.set({ visible: false });
@@ -923,6 +1097,33 @@ export function createUI(game) {
         if (!this.sel) return;
         if (ev.payload.what === 'use') game.equip(this.sel); else game.salvage(this.sel);
         this.sel = null; P.hideTip(); invActions.set({ visible: false });
+      },
+    }),
+    // 鍛冶屋: タブ → 装備 → （特性の枠・付ける特性・スキル）を選んで実行
+    smith: panelState('smith', {
+      'smith:tab'(ev) { sm.tab = ev.payload.tab; sm.slot = sm.key = sm.skill = null; sm.msg = ''; game.sfx('ui'); P.smith(); },
+      'item:click'(ev) {
+        if (ev.ctx.source !== 'smith') return;
+        sm.id = ev.payload.id; sm.slot = sm.key = sm.skill = null; sm.msg = '';
+        game.sfx('ui'); P.hideTip(); P.smith();
+      },
+      'item:context': () => undefined,
+      'smith:slot'(ev) { sm.slot = ev.payload.idx; sm.msg = ''; P.smith(); },
+      'smith:key'(ev) { sm.key = ev.payload.key; sm.msg = ''; P.smith(); },
+      'smith:skill'(ev) { sm.skill = ev.payload.id; sm.msg = ''; P.smith(); },
+      'smith:do'() {
+        let r;
+        if (sm.tab === 'enh') r = game.smithEnhance(sm.id);
+        if (sm.tab === 'affix') r = game.smithAffix(sm.id, sm.slot, sm.key);
+        if (sm.tab === 'skill') { r = game.smithSkill(sm.id, sm.skill); if (r.ok) sm.skill = null; }
+        if (sm.tab === 'lore') { r = game.smithLore(sm.id); if (r.ok) sm.id = null; }
+        if (!r) return;
+        sm.msg = r.msg; sm.ok = r.ok;
+        P.smith();
+        // 結果の演出（詳細欄が光る）
+        SM.detail.set({ cls: { 'fx-ok': false, 'fx-ng': false } });
+        void SM.detail.el.offsetWidth;
+        SM.detail.set({ cls: { 'fx-ok': r.ok, 'fx-ng': !r.ok } });
       },
     }),
     tree: panelState('tree', {
@@ -963,6 +1164,7 @@ export function createUI(game) {
     if (!it) return undefined;
     if (it.kind === 'gate') return 'gate';
     if (it.kind === 'npc') return ['dialog', { npc: it.npc }];
+    if (it.kind === 'smith') { sm.npc = it.npc.name; sm.msg = ''; return 'smith'; }
     if (it.kind === 'box') { game.boxOpen(); return 'box'; }
     game.interact(it);
     return undefined;

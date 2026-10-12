@@ -194,6 +194,7 @@ export const AREAS = {
       { id: 'captain', name: '衛兵隊長 ガレス', x: -9, z: -6, color: '#c0504a', line: '迷宮区を越えねば、上の層へは行けん。腕を磨いてこい。' },
       { id: 'hunter', name: '狩人 ミラ', x: 10, z: -4, color: '#5aa060', line: '北東の丘はイノシシだらけ。狩りの練習にはもってこいよ。' },
       { id: 'sage', name: '賢者 オルド', x: 6, z: 10, color: '#7a6ad0', line: '草原の西、古井戸の底に古い宝が眠っているという噂じゃ。' },
+      { id: 'smith1', role: 'smith', name: '鍛冶屋 グラム', x: 12, z: 6, color: '#8a5a3a', line: '' },
     ],
   },
   f1_field: {
@@ -212,7 +213,7 @@ export const AREAS = {
     floor: 1, type: 'secret', name: '静かな湖畔', shape: 'open', R: 30, ell: [1.2, 1], wob: 0.1, mapPos: [14, 86],
     exits: [{ to: 'f1_town', ang: 80 }],
     obst: { n: 1, kinds: ['pond'], big: true }, chests: 1,
-    named: { name: 'ヌシ・ギガスライム', d: 0, lv: 8 },
+    named: { name: 'ヌシ・ギガスライム', d: 0, lv: 8, title: 't_lake' },
   },
   f1_dun: {
     floor: 1, type: 'dungeon', name: '古井戸の洞窟', shape: 'grid', map: MAPS.dun1, mapPos: [14, 46],
@@ -229,7 +230,10 @@ export const AREAS = {
   f2_camp: {
     floor: 2, type: 'camp', name: '霧の野営地', shape: 'open', R: 22, wob: 0.12, gate: { x: 0, z: 2 }, box: { x: -8, z: 6 }, mapPos: [50, 90],
     exits: [{ to: 'f2_field', ang: 0 }],
-    npcs: [{ id: 'ranger', name: '森番 セイル', x: 7, z: -5, color: '#4a8a7a', line: '霧の森の奥、朽ちた大樹の洞には近づくな…と言っても行くんだろう？ 毒沼には気をつけろ。' }],
+    npcs: [
+      { id: 'ranger', name: '森番 セイル', x: 7, z: -5, color: '#4a8a7a', line: '霧の森の奥、朽ちた大樹の洞には近づくな…と言っても行くんだろう？ 毒沼には気をつけろ。' },
+      { id: 'smith2', role: 'smith', name: '旅の鍛冶屋 ボルグ', x: -7, z: -5, color: '#8a5a3a', line: '' },
+    ],
   },
   f2_field: {
     floor: 2, type: 'field', name: '霧の森', shape: 'open', R: 44, ell: [0.62, 1.55], wob: 0.18, mapPos: [50, 64],
@@ -259,7 +263,10 @@ export const AREAS = {
     floor: 3, type: 'camp', name: 'オアシスの野営地', shape: 'open', R: 28, wob: 0.15, gate: { x: 0, z: 6 }, box: { x: -9, z: 10 }, mapPos: [50, 52],
     exits: [{ to: 'f3_field', ang: 0 }, { to: 'f3_hunt', ang: 95 }, { to: 'f3_canyon', ang: 265 }],
     obst: { n: 1, kinds: ['pond'], at: [0, -8] },
-    npcs: [{ id: 'merchant', name: '行商人 ハサン', x: -7, z: 2, color: '#c08a3a', line: '北の荒野は流砂だらけ、西の谷の奥には迷宮区。砂の下の神殿？ あそこの宝はとびきりだって話さ。' }],
+    npcs: [
+      { id: 'merchant', name: '行商人 ハサン', x: -7, z: 2, color: '#c08a3a', line: '北の荒野は流砂だらけ、西の谷の奥には迷宮区。砂の下の神殿？ あそこの宝はとびきりだって話さ。' },
+      { id: 'smith3', role: 'smith', name: '砂漠の鍛冶屋 ナディア', x: 10, z: 11, color: '#8a5a3a', line: '' },
+    ],
   },
   f3_field: {
     floor: 3, type: 'field', name: '砂塵の荒野', shape: 'open', R: 54, ell: [1.25, 1], wob: 0.25, mapPos: [50, 22],
@@ -283,7 +290,7 @@ export const AREAS = {
     floor: 3, type: 'secret', name: '流砂の谷', shape: 'open', R: 40, ell: [0.55, 1.7], wob: 0.12, mapPos: [16, 52],
     exits: [{ to: 'f3_camp', ang: 90 }, { to: 'f3_lab', ang: 0 }],
     obst: { n: 10, kinds: ['rock'] }, hazard: { kind: 'sand', n: 8, r: [3, 5] }, chests: 1,
-    named: { name: '砂鮫ギルガ', d: 0, lv: 18 },
+    named: { name: '砂鮫ギルガ', d: 0, lv: 18, title: 't_shark' },
     mobs: { count: 6, perPlayer: 2, lv: [2, 4] },
   },
   f3_lab: {
@@ -295,7 +302,31 @@ export const AREAS = {
 export const FLOOR_HUB = { 1: 'f1_town', 2: 'f2_camp', 3: 'f3_camp' };
 export const PLATE_WINDOW = 50; // 2つの感圧板は迷路の端と端（約290m）。ソロでも走れば間に合う長さ
 
-for (const [id, a] of Object.entries(AREAS)) a.id = id;
+// エリアごとの傾向: 出やすい武器種（kinds）と付きやすい特性（affixes）。
+// 偏りはゆるめ（武器種は25%でそのエリアの種類から、特性は2倍出やすい）。踏破するとマップに表示される
+export const AREA_BIAS = {
+  f1_field: { kinds: ['sword', 'bow'], affixes: ['atkp', 'hpp'] },
+  f1_hunt: { kinds: ['axe', 'greatsword'], affixes: ['aspd', 'move'] },
+  f1_lake: { kinds: ['dagger'], affixes: ['vamp', 'sv_drain'] },
+  f1_dun: { kinds: ['dagger', 'sword'], affixes: ['crit', 'critd'] },
+  f1_lab: { kinds: ['spear', 'greatsword'], affixes: ['def', 'sv_quake'] },
+  f2_field: { kinds: ['bow', 'spear'], affixes: ['cdr', 'hpp'] },
+  f2_hunt: { kinds: ['dagger', 'axe'], affixes: ['aspd', 'crit', 'sv_rapid'] },
+  f2_dun: { kinds: ['bow'], affixes: ['def', 'sv_blink'] },
+  f2_lab: { kinds: ['sword', 'greatsword'], affixes: ['critd', 'sv_twin'] },
+  f3_field: { kinds: ['axe', 'spear'], affixes: ['atkp', 'def'] },
+  f3_hunt: { kinds: ['dagger', 'bow'], affixes: ['move', 'critd'] },
+  f3_dun: { kinds: ['spear'], affixes: ['cdr', 'sv_storm'] },
+  f3_canyon: { kinds: ['greatsword', 'axe'], affixes: ['crit', 'sv_giant'] },
+  f3_lab: { kinds: ['sword', 'axe'], affixes: ['atkp', 'sv_blaze'] },
+};
+// 踏破の条件: 迷宮区はボス、秘境はネームドを倒す。ほかは敵を15体倒す
+export const CLEAR_KILLS = 15;
+for (const [id, a] of Object.entries(AREAS)) {
+  a.id = id;
+  a.bias = AREA_BIAS[id]?.affixes || [];
+  a.kinds = AREA_BIAS[id]?.kinds || [];
+}
 
 // ---------------------------------------------------------------------------
 // 共通

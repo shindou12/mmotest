@@ -225,10 +225,11 @@ export class World {
       if (C.big && A.def.unique) {
         const t = Math.random();
         const rar = t < 0.05 ? 5 : t < 0.3 ? 4 : 3;
-        items = [makeItem(ilvl, rar, { uniqueDef: A.def.unique }), makeItem(ilvl, rollRarity(1, 2))];
+        const B = { bias: A.def.bias, kinds: A.def.kinds };
+        items = [makeItem(ilvl, rar, { uniqueDef: A.def.unique, ...B }), makeItem(ilvl, rollRarity(1, 2), B)];
       } else {
         // 小さな宝箱: レア以上を1つ
-        items = [makeItem(ilvl, Math.max(2, rollRarity(1, 1)))];
+        items = [makeItem(ilvl, Math.max(2, rollRarity(1, 1)), { bias: A.def.bias, kinds: A.def.kinds })];
       }
       this.send(p, { t: 'gold', n: Math.round((C.big ? 80 + ilvl * 12 : 20 + ilvl * 4) * rnd(0.85, 1.15)), x: r2(C.x), z: r2(C.z + 1.2), bag: C.big });
       this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
@@ -334,16 +335,17 @@ export class World {
       // 個人ドロップ（友達と取り合いにならない）
       const items = [];
       const ilvl = mob.lv;
+      const B = { bias: A.def.bias, kinds: A.def.kinds }; // エリアの出やすい武器種・付きやすい特性
       if (isBoss) {
-        items.push(makeItem(ilvl + 1, rollRarity(1, 2)));
-        items.push(makeItem(ilvl + 1, rollRarity(1, 1)));
-        if (Math.random() < 0.5) items.push(makeItem(ilvl, rollRarity(1, 0)));
+        items.push(makeItem(ilvl + 1, rollRarity(1, 2), B));
+        items.push(makeItem(ilvl + 1, rollRarity(1, 1), B));
+        if (Math.random() < 0.5) items.push(makeItem(ilvl, rollRarity(1, 0), B));
       } else if (mob.named) {
         // ネームド: 良いものが必ず出る
-        items.push(makeItem(ilvl + 2, Math.max(3, rollRarity(1, 2))));
-        items.push(makeItem(ilvl, Math.max(2, rollRarity(1, 1))));
+        items.push(makeItem(ilvl + 2, Math.max(3, rollRarity(1, 2)), B));
+        items.push(makeItem(ilvl, Math.max(2, rollRarity(1, 1)), B));
       } else if (Math.random() < (mob.elite ? 0.6 : mob.kind === 'add' ? 0.08 : 0.34)) {
-        items.push(makeItem(ilvl, rollRarity(mob.elite ? 0.4 : 0, mob.elite ? 1 : 0)));
+        items.push(makeItem(ilvl, rollRarity(mob.elite ? 0.4 : 0, mob.elite ? 1 : 0), B));
       }
       if (items.length) {
         this.send(p, { t: 'loot', items: items.map((it) => ({ it, x: r2(mob.x + rnd(-1.6, 1.6)), z: r2(mob.z + rnd(-1.6, 1.6)) })) });
