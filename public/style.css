@@ -224,6 +224,13 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 #map-svg .ex { fill: #ffd27a; font-size: 11px; }
 #map-svg .you { fill: #6ad0ff; font-size: 13px; font-weight: bold; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--dim); }
+.map-legend i { font-style: normal; }
+#map-area-wrap, #map-floor-wrap { display: flex; flex-direction: column; gap: 8px; }
+#map.t-area #map-floor-wrap, #map.t-floor #map-area-wrap { display: none; }
+#map-area { width: 100%; height: auto; border-radius: 8px; background: #06080e; }
+.map-tabs { display: flex; gap: 6px; }
+.map-tabs button { padding: 6px 16px; background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
+.map-tabs button.on { background: linear-gradient(180deg, rgba(255, 216, 106, .28), rgba(255, 216, 106, .05)); border-color: rgba(255, 216, 106, .55); color: #fff4d0; }
 
 #gate-menu { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(380px, 94vw); padding: 12px; z-index: 20; }
 #gate-list button { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }

@@ -16,7 +16,7 @@ import {
   WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, affixText, tierLabel, tierColor,
   enhMult, TITLES, TITLE_REQ, titleReqOk, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost, CRAFT_MAX_TIER, affixName, FX_REQ,
 } from '../../shared/data.js';
-import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
+import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, WEATHERS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
 import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, TREES, STYLE_COLS, spTotal, spSpent, treeSpent, canLearn } from '../skills.js';
 import { QUESTS, questState, questAvailable } from '../quests.js';
 import { View, Root, Mediator } from './core.js';
@@ -29,16 +29,22 @@ const PANELS = ['inv', 'tree', 'settings', 'map', 'dialog', 'gate', 'box', 'smit
 const GLYPH = { sword: '剣', greatsword: '大', spear: '盾', dagger: '短', axe: '斧', bow: '弓', light: '衣', medium: '鎧', heavy: '甲', acc: '飾', title: '銘' };
 
 // ミニマップ: 図形の一覧を受け取って描くだけの View
+// 図形の一覧を描くだけの Passive View（round: 円形に切り抜く＝ミニマップ）
 class CanvasView extends View {
   draw(shapes) {
-    const g = this.el.getContext('2d'), W = this.el.width;
-    g.clearRect(0, 0, W, W);
+    const g = this.el.getContext('2d'), W = this.el.width, H = this.el.height;
+    g.clearRect(0, 0, W, H);
     g.save();
-    g.beginPath(); g.arc(W / 2, W / 2, W / 2, 0, Math.PI * 2); g.clip();
+    if (this.round !== false) { g.beginPath(); g.arc(W / 2, H / 2, Math.min(W, H) / 2, 0, Math.PI * 2); g.clip(); }
     for (const s of shapes) {
       g.fillStyle = s.fill || 'transparent'; g.strokeStyle = s.stroke || 'transparent'; g.lineWidth = s.lw || 1;
       g.beginPath();
-      if (s.t === 'bg') { g.fillRect(0, 0, W, W); continue; }
+      if (s.t === 'bg') { g.fillRect(0, 0, W, H); continue; }
+      if (s.t === 'text') {
+        g.font = `bold ${s.size || 12}px sans-serif`; g.textAlign = s.align || 'center'; g.textBaseline = 'middle';
+        g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.85)'; g.strokeText(s.text, s.x, s.y); g.fillText(s.text, s.x, s.y);
+        continue;
+      }
       if (s.t === 'rect') { g.fillRect(s.x, s.y, s.w, s.h); continue; }
       if (s.t === 'circle') g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
       if (s.t === 'poly') s.pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
@@ -147,7 +153,12 @@ export function createUI(game) {
   }
   SET.quality = panels.settings.add('quality', '#set-quality').on('change', 'set:change', (e) => ({ key: 'quality', value: e.target.value }));
   for (const k of ['shake', 'dmgnum', 'occlusion']) SET[k] = panels.settings.add(k, '#set-' + k).on('change', 'set:change', (e) => ({ key: k, value: e.target.checked }));
-  const MAP = { title: panels.map.add('title', '#map-title'), svg: panels.map.add('svg', '#map-svg'), info: panels.map.add('info', '#map-info') };
+  const MAP = {
+    title: panels.map.add('title', '#map-title'), sub: panels.map.add('sub', '#map-sub'), tabs: panels.map.add('tabs', '#map-tabs'),
+    svg: panels.map.add('svg', '#map-svg'), info: panels.map.add('info', '#map-info'), area: panels.map.add('area', '#map-area', CanvasView),
+  };
+  MAP.area.round = false;
+  for (const b of MAP.tabs.el.querySelectorAll('button')) MAP.tabs.add(b.dataset.tab, b).on('click', 'map:tab', () => ({ tab: b.dataset.tab }));
   const DLG = { title: panels.dialog.add('title', '#dialog-title'), line: panels.dialog.add('line', '#dialog-line'), list: panels.dialog.add('list', '#dialog-quests') };
   const GATE = { list: panels.gate.add('list', '#gate-list') };
   const BOX = { mine: panels.box.add('mine', '#box-mine'), shared: panels.box.add('shared', '#box-shared'), count: panels.box.add('count', '#box-count') };
@@ -393,8 +404,27 @@ export function createUI(game) {
     SET.shake.set({ checked: s.shake }); SET.dmgnum.set({ checked: s.dmgnum }); SET.occlusion.set({ checked: s.occlusion !== false });
   };
 
+  let mapTab = 'area', mapT = 0;
   P.map = () => {
-    const world = game.world, f = world.floor, roster = game.roster();
+    const world = game.world, f = world.floor, roster = game.roster(), def = world.def;
+    panels.map.set({ cls: { 't-area': mapTab === 'area', 't-floor': mapTab === 'floor' } });
+    for (const [t, v] of MAP.tabs.children) v.set({ cls: { on: mapTab === t } });
+    if (mapTab === 'area') {
+      const T = AREA_TYPES[def.type], W = WEATHERS[def.weather];
+      MAP.title.set({ text: `${T.icon} ${def.name}` });
+      const st = game.char.areas?.[def.id];
+      let rate = '';
+      if (def.shape === 'grid') {
+        const g = grid(def), seen = game.explored(def.id);
+        let n = 0, tot = 0;
+        for (let i = 0; i < seen.length; i++) if (g.rows[Math.floor(i / g.W)][i % g.W] !== '#') { tot++; n += seen[i]; }
+        rate = `　探索率 ${Math.round(n / tot * 100)}%（歩いた場所が地図に記されます）`;
+      }
+      MAP.sub.set({ text: `第${f}層 ${T.name}${W ? `　${W.icon} ${W.name}` : ''}${st?.done ? '　✔ 踏破' : ''}${rate}` });
+      P.mapArea();
+      return;
+    }
+    MAP.sub.set({ text: '出口（光る門）を通ると隣のエリアへ移動します' });
     const list = Object.values(AREAS).filter((a) => a.floor === f);
     const pos = (a) => [a.mapPos[0] * 6, a.mapPos[1] * 4];
     let svg = '';
@@ -755,47 +785,89 @@ export function createUI(game) {
     T.sp.set({ text: left > 0 ? String(left) : '' });
   };
 
-  // ミニマップ: 図形の一覧を作って View に渡す
-  P.minimap = () => {
-    const W = H.minimap.el.width, me = game.me, world = game.world, def = world.def, env = game.env();
-    const indoor = def.shape === 'grid';
-    const extent = indoor ? 30 : Math.max(...Array.from({ length: 32 }, (_, i) => boundR(def, i / 32 * Math.PI * 2))) + 4;
-    const sc = W / 2 / extent;
-    const cx = indoor ? me.x : 0, cz = indoor ? me.z : 0;
-    const p = (x, z) => [W / 2 + (x - cx) * sc, W / 2 + (z - cz) * sc];
+  // エリアの図形の一覧（ミニマップとエリアマップで共通）
+  //   v: { W, H, full }  full = エリア全体を収める（エリアマップ）。屋内は歩いたマスだけ描く（自動マッピング）
+  const areaShapes = (v) => {
+    const me = game.me, world = game.world, def = world.def, env = game.env();
+    const indoor = def.shape === 'grid', g = indoor ? grid(def) : null;
+    const seen = indoor ? game.explored(def.id) : null;
+    const known = (x, z) => {
+      if (!indoor) return true;
+      const c = Math.floor(x / CELL + g.W / 2), r = Math.floor(z / CELL + g.H / 2);
+      return c >= 0 && r >= 0 && c < g.W && r < g.H && !!seen[r * g.W + c];
+    };
+    const outR = indoor ? 0 : Math.max(...Array.from({ length: 32 }, (_, i) => boundR(def, i / 32 * Math.PI * 2))) + 4;
+    let sc, cx = 0, cz = 0;
+    if (v.full && indoor) sc = Math.min(v.W / (g.W * CELL + 8), v.H / (g.H * CELL + 8));
+    else if (v.full) {
+      // 屋外は輪郭の外接矩形に合わせて拡大する
+      const bx = [], bz = [];
+      for (let i = 0; i < 64; i++) { const a = i / 64 * Math.PI * 2, r = boundR(def, a); bx.push(Math.sin(a) * r); bz.push(-Math.cos(a) * r); }
+      const x0 = Math.min(...bx), x1 = Math.max(...bx), z0 = Math.min(...bz), z1 = Math.max(...bz);
+      cx = (x0 + x1) / 2; cz = (z0 + z1) / 2;
+      sc = Math.min(v.W / (x1 - x0 + 16), v.H / (z1 - z0 + 16));
+    } else { sc = v.W / 2 / (indoor ? 30 : outR); if (indoor) { cx = me.x; cz = me.z; } }
+    const p = (x, z) => [v.W / 2 + (x - cx) * sc, v.H / 2 + (z - cz) * sc];
+    const k = v.full ? 1.5 : 1; // 大きな地図では記号も大きく
+    const label = (x, z, text, fill, dy = -12) => { if (v.full) { const [px, py] = p(x, z); sh.push({ t: 'text', x: px, y: py + dy, text, fill, size: 12 }); } };
     const sh = [{ t: 'bg', fill: indoor ? '#0c0e16dd' : '#0a0c14aa' }];
     if (indoor) {
-      const g = grid(def);
       for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++) {
         const ch = g.rows[r][c];
-        if (ch === '#') continue;
+        if (ch === '#' || !seen[r * g.W + c]) continue;
         const [x, y] = p((c - g.W / 2) * CELL, (r - g.H / 2) * CELL);
         sh.push({ t: 'rect', x, y, w: CELL * sc + 0.5, h: CELL * sc + 0.5, fill: ch === 'D' ? (world.door ? '#6a8a6a' : '#c04a4a') : ch === 'T' || ch === 't' ? '#6a4a3a' : '#4a5064' });
       }
-      for (const [ch, col] of [['L', '#ff9a4a'], ['P', '#6ad0ff']]) for (const q of g.pts[ch] || []) { const [x, y] = p(q.x, q.z); sh.push({ t: 'rect', x: x - 3, y: y - 3, w: 6, h: 6, fill: col }); }
+      for (const [ch, col, nm] of [['L', '#ff9a4a', 'レバー'], ['P', '#6ad0ff', '感圧板']]) {
+        for (const q of g.pts[ch] || []) {
+          if (!known(q.x, q.z)) continue;
+          const [x, y] = p(q.x, q.z); sh.push({ t: 'rect', x: x - 3 * k, y: y - 3 * k, w: 6 * k, h: 6 * k, fill: col });
+          label(q.x, q.z, nm, col);
+        }
+      }
     } else {
       // 輪郭（いびつな形）
       const pts = Array.from({ length: 64 }, (_, i) => { const a = i / 64 * Math.PI * 2, r = boundR(def, a); return p(Math.sin(a) * r, -Math.cos(a) * r); });
       sh.push({ t: 'poly', pts, close: true, fill: hex(FLOORS[world.floor - 1].ground) + 'aa', stroke: 'rgba(255,255,255,.35)', lw: 2 });
       for (const o of obstaclesOf(def)) { const [x, y] = p(o.x, o.z); sh.push({ t: 'circle', x, y, r: Math.max(1.5, o.r * sc), fill: o.kind === 'pond' ? '#3a8ad0cc' : '#20242ecc' }); }
       for (const h of hazardsOf(def)) { const [x, y] = p(h.x, h.z); sh.push({ t: 'circle', x, y, r: Math.max(1.5, h.r * sc), fill: h.kind === 'poison' ? '#8a3ab0aa' : '#e0c890aa' }); }
-      if (def.box) { const [x, y] = p(def.box.x, def.box.z); sh.push({ t: 'rect', x: x - 3.5, y: y - 3.5, w: 7, h: 7, fill: '#7ae0ff' }); }
+      if (def.box) { const [x, y] = p(def.box.x, def.box.z); sh.push({ t: 'rect', x: x - 3.5 * k, y: y - 3.5 * k, w: 7 * k, h: 7 * k, fill: '#7ae0ff' }); label(def.box.x, def.box.z, '共有ボックス', '#7ae0ff'); }
     }
-    for (const c of chestsOf(def)) { const [x, y] = p(c.x, c.z); sh.push({ t: 'rect', x: x - 3, y: y - 3, w: 6, h: 6, fill: game.chestOpen(c) ? '#6a6a6a' : '#ffd27a' }); }
-    if (def.gate) { const [x, y] = p(def.gate.x, def.gate.z); sh.push({ t: 'circle', x, y, r: 5, fill: '#6ad0ff' }); }
-    if (env?.lair) { const [x, y] = p(env.lair.x, env.lair.z); sh.push({ t: 'circle', x, y, r: env.lair.r * sc, stroke: hex(FLOORS[world.floor - 1].boss.accent), lw: 2 }); }
-    for (const q of env?.portals || []) { const [x, y] = p(q.x, q.z); sh.push({ t: 'poly', pts: [[x, y - 5], [x + 5, y + 4], [x - 5, y + 4]], close: true, fill: '#bfe6ff' }); }
-    for (const n of game.npcs) { const [x, y] = p(n.x, n.z); sh.push({ t: 'circle', x, y, r: 3.5, fill: n.mark ? '#ffd84a' : '#e0e0e0' }); }
-    for (const d of game.drops) { const [x, y] = p(d.x, d.z); sh.push({ t: 'rect', x: x - 2, y: y - 2, w: 4, h: 4, fill: RARITIES[d.it.rarity].color }); }
+    for (const c of chestsOf(def)) {
+      if (!known(c.x, c.z)) continue;
+      const [x, y] = p(c.x, c.z); sh.push({ t: 'rect', x: x - 3 * k, y: y - 3 * k, w: 6 * k, h: 6 * k, fill: game.chestOpen(c) ? '#6a6a6a' : '#ffd27a' });
+    }
+    if (def.gate) { const [x, y] = p(def.gate.x, def.gate.z); sh.push({ t: 'circle', x, y, r: 5 * k, fill: '#6ad0ff' }); label(def.gate.x, def.gate.z, '転移門', '#6ad0ff', -14); }
+    if (env?.lair && known(env.lair.x, env.lair.z)) {
+      const [x, y] = p(env.lair.x, env.lair.z); sh.push({ t: 'circle', x, y, r: env.lair.r * sc, stroke: hex(FLOORS[world.floor - 1].boss.accent), lw: 2 });
+      label(env.lair.x, env.lair.z, `♜ ${FLOORS[world.floor - 1].boss.name}`, hex(FLOORS[world.floor - 1].boss.accent), 0);
+    }
+    for (const q of env?.portals || []) {
+      if (!known(q.x, q.z)) continue;
+      const [x, y] = p(q.x, q.z); sh.push({ t: 'poly', pts: [[x, y - 5 * k], [x + 5 * k, y + 4 * k], [x - 5 * k, y + 4 * k]], close: true, fill: '#bfe6ff' });
+      label(q.x, q.z, `→ ${AREAS[q.to]?.name || ''}`, '#bfe6ff', -14);
+    }
+    for (const n of game.npcs) {
+      const [x, y] = p(n.x, n.z); sh.push({ t: 'circle', x, y, r: 3.5 * k, fill: n.mark ? '#ffd84a' : '#e0e0e0' });
+      label(n.x, n.z, n.role === 'smith' ? `⚒ ${n.name}` : n.name, n.mark ? '#ffd84a' : '#e0e0e0');
+    }
+    for (const d of game.drops) { const [x, y] = p(d.x, d.z); sh.push({ t: 'rect', x: x - 2 * k, y: y - 2 * k, w: 4 * k, h: 4 * k, fill: RARITIES[d.it.rarity].color }); }
     for (const mb of game.mobs.values()) {
+      if (!known(mb.x, mb.z)) continue;
       const [x, y] = p(mb.x, mb.z);
-      sh.push({ t: 'circle', x, y, r: mb.kind === 2 ? 6 : mb.elite === 3 ? 5 : mb.elite ? 3 : 2, fill: mb.kind === 2 ? '#ff2a2a' : mb.elite === 3 ? '#ff6ad0' : mb.elite ? '#ffb030' : '#ff7a6a' });
+      sh.push({ t: 'circle', x, y, r: (mb.kind === 2 ? 6 : mb.elite === 3 ? 5 : mb.elite ? 3 : 2) * k, fill: mb.kind === 2 ? '#ff2a2a' : mb.elite === 3 ? '#ff6ad0' : mb.elite ? '#ffb030' : '#ff7a6a' });
+      if (mb.elite === 3) label(mb.x, mb.z, mb.name, '#ff6ad0');
     }
-    for (const o of game.others.values()) { const [x, y] = p(o.x, o.z); sh.push({ t: 'circle', x, y, r: 3.5, fill: '#7f7' }); }
+    for (const o of game.others.values()) { const [x, y] = p(o.x, o.z); sh.push({ t: 'circle', x, y, r: 3.5 * k, fill: '#7f7' }); label(o.x, o.z, o.name || '', '#7f7'); }
     const [x, y] = p(me.x, me.z);
+    if (v.full) sh.push({ t: 'circle', x, y, r: 11, stroke: '#ffffff88', lw: 2 });
     sh.push({ t: 'arrow', x, y, a: -me.a + Math.PI, fill: '#fff' });
-    H.minimap.draw(sh);
+    return sh;
   };
+  // ミニマップ
+  P.minimap = () => { const el = H.minimap.el; H.minimap.draw(areaShapes({ W: el.width, H: el.height })); };
+  // エリアマップ（M の「エリア」タブ）: エリア全体を大きく描く
+  P.mapArea = () => { const el = MAP.area.el; MAP.area.draw(areaShapes({ W: el.width, H: el.height, full: true })); };
 
   // ---- 浮かぶ文字・仲間の名札（ゲーム空間の位置 → 画面の位置） ----
   const floats = [];
@@ -1135,7 +1207,9 @@ export function createUI(game) {
     settings: panelState('settings', {
       'set:change'(ev) { game.setSetting(ev.payload.key, ev.payload.value); P.settings(); },
     }),
-    map: panelState('map'),
+    map: panelState('map', {
+      'map:tab'(ev) { mapTab = ev.payload.tab; game.sfx('ui'); P.map(); },
+    }),
     dialog: panelState('dialog', {
       'quest:accept'(ev) { game.acceptQuest(ev.payload.quest); P.dialog(this.data.npc); },
       'quest:claim'(ev) { game.claimQuest(ev.payload.quest); P.dialog(this.data.npc); },
@@ -1178,7 +1252,11 @@ export function createUI(game) {
   return {
     root, mediator,
     get state() { return mediator.state; },
-    frame(dt) { P.hud(); P.touch(); P.minimap(); P.floats(dt); },
+    frame(dt) {
+      P.hud(); P.touch(); P.minimap(); P.floats(dt);
+      // 開いているエリアマップは動きに合わせて描き直す（4回/秒）
+      if (mediator.state === 'map' && mapTab === 'area' && (mapT += dt) > 0.25) { mapT = 0; P.mapArea(); }
+    },
     // データが変わったので、開いているパネルとクエスト表示を描き直す
     refresh() {
       if (mediator.is(...PANELS)) panelPresenter[mediator.state](mediator.data);

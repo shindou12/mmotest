@@ -9,7 +9,7 @@ import {
   CRAFT_MAX_TIER, weightedTier, loreTitle,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
 } from '../shared/data.js';
-import { AREAS, AREA_TYPES, HAZARDS, CLEAR_KILLS, WEATHERS, grid, collide, spawnPoint, hazardsOf, chestsOf, insideOpen } from '../shared/areas.js';
+import { AREAS, AREA_TYPES, HAZARDS, CLEAR_KILLS, WEATHERS, grid, worldToCell, collide, spawnPoint, hazardsOf, chestsOf, insideOpen } from '../shared/areas.js';
 import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
@@ -1421,6 +1421,33 @@ function nearestInteract() {
   return null;
 }
 const chestCd = (C) => (C.big ? 300 : 600) * 1000;
+// 屋内（迷宮区・ダンジョン）の自動マッピング: 歩いた周りのマスを記録し、キャラごとに保存する
+const explored = new Map();
+let exploreDirty = false, exploreSaveT = 0;
+function exploredOf(id) {
+  if (!explored.has(id)) {
+    const g = grid(AREAS[id]), a = new Uint8Array(g.W * g.H), s = char?.explored?.[id] || '';
+    for (let i = 0; i < a.length && i < s.length; i++) a[i] = s.charCodeAt(i) === 49 ? 1 : 0;
+    explored.set(id, a);
+  }
+  return explored.get(id);
+}
+function exploreTick() {
+  const def = world.def;
+  if (!char || def.shape !== 'grid') return;
+  const g = grid(def), a = exploredOf(def.id), { c, r } = worldToCell(g, me.x, me.z);
+  for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+    const cc = c + dc, rr = r + dr;
+    if (cc < 0 || rr < 0 || cc >= g.W || rr >= g.H || a[rr * g.W + cc]) continue;
+    a[rr * g.W + cc] = 1; exploreDirty = true;
+  }
+  if (exploreDirty && now() - exploreSaveT > 4) {
+    exploreDirty = false; exploreSaveT = now();
+    char.explored = char.explored || {};
+    for (const [id, arr] of explored) char.explored[id] = arr.join('');
+    saveChar();
+  }
+}
 function chestOpen(C) { return Date.now() - (char.chests?.[C.id] || 0) < chestCd(C); }
 
 // ======================================================================
@@ -2154,6 +2181,7 @@ function update(dt) {
   if (world.def.gate && Math.random() < 0.3) fx.parts.emit(world.def.gate.x + rnd(-3, 3), 0.5, world.def.gate.z + rnd(-0.5, 0.5), { color: 0x6ad0ff, size: 0.3, life: 1.5, speed: 0.5, gravity: 2 });
   ambient.update(dt, me.x, me.z, t);
   if (weatherParts.kind) weatherParts.update(dt, me.x, me.z, t);
+  exploreTick();
   fx.update(dt);
   updateMobLabels();
   ui.frame(dt);
@@ -2217,6 +2245,7 @@ const game = {
     return { x: (tmpV.x + 1) / 2 * innerWidth, y: (1 - tmpV.y) / 2 * innerHeight, vis: tmpV.z < 1 };
   },
   nearestInteract, chestOpen, itemPower, findItem,
+  explored: exploredOf,
   sfx: (n) => audio.sfx(n),
   loginInfo() { const c = loadChar(); return c && { name: c.name, color: c.color, lv: c.lv, kind: c.eq?.weapon?.kind || 'sword' }; },
   resetChar() {
