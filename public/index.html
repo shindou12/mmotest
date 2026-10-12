@@ -25,7 +25,7 @@
     <div id="lweapon-wrap">
       <div class="lbl">初期武器（新規キャラのみ）</div>
       <div id="lweapon" class="seg">
-        <button data-k="sword" class="on">片手剣</button><button data-k="greatsword">大剣</button><button data-k="spear">槍</button><button data-k="dagger">短剣</button>
+        <button data-k="sword" class="on">片手剣</button><button data-k="greatsword">大剣</button><button data-k="spear">盾槍</button><button data-k="dagger">短剣</button>
       </div>
     </div>
     <div id="lexisting"></div>
@@ -46,18 +46,22 @@
   <div id="boss" class="hidden">
     <div id="boss-name"></div>
     <div class="bar boss"><div id="boss-hp-lag"></div><div id="boss-hp"></div></div>
+    <div id="boss-target"></div>
   </div>
   <div id="party" class="panel"></div>
+  <div id="quests" class="panel hidden"></div>
   <canvas id="minimap" width="180" height="180"></canvas>
   <div id="charge" class="hidden"><div></div></div>
   <div id="hotbar">
     <div class="slot" id="s-atk"><kbd>左 / 長押し</kbd><div class="ic">⚔</div><div class="nm">通常 / <span id="atk-name">強攻撃</span></div></div>
-    <div class="slot wsk" id="s-skill"><kbd>右 / E</kbd><div class="ic">✦</div><div class="nm" id="skill-name">武器スキル</div><div class="cd"></div></div>
+    <div class="slot hidden" id="s-guard"><kbd>右 長押し</kbd><div class="ic">⛨</div><div class="nm">ガード</div></div>
+    <div class="slot wsk" id="s-skill"><kbd id="ws-key">右 / E</kbd><div class="ic">✦</div><div class="nm" id="skill-name">武器スキル</div><div class="cd"></div></div>
     <div class="slot tsk" id="s-t1"><kbd>1</kbd><div class="ic">◆</div><div class="nm">未設定</div><div class="cd"></div></div>
     <div class="slot tsk" id="s-t2"><kbd>2</kbd><div class="ic">◆</div><div class="nm">未設定</div><div class="cd"></div></div>
-    <div class="slot" id="s-dodge"><kbd>Space</kbd><div class="ic">↻</div><div class="nm">回避</div><div class="cd"></div></div>
+    <div class="slot" id="s-dodge"><kbd>Space</kbd><div class="ic">↻</div><div class="nm">回避・<span id="dodge-w">普通</span></div><div class="cd"></div></div>
     <div class="slot" id="s-pot"><kbd>Q</kbd><div class="ic">⚗</div><div class="nm">ポーション <b id="pot-n">3</b></div><div class="cd"></div></div>
     <div class="slot small" id="s-inv"><kbd>I</kbd><div class="ic">🎒</div><div class="nm">装備</div></div>
+    <div class="slot small" id="s-map"><kbd>M</kbd><div class="ic">🗺</div><div class="nm">マップ</div></div>
     <div class="slot small" id="s-tree"><kbd>K</kbd><div class="ic">✧</div><div class="nm">スキル</div><span id="sp-badge" class="hidden"></span></div>
     <div class="slot small" id="s-set"><kbd>Esc</kbd><div class="ic">⚙</div><div class="nm">設定</div></div>
   </div>
@@ -77,8 +81,10 @@
     右クリック / E 武器スキル<br>
     1 / 2 スキルツリーで覚えたスキル<br>
     Space 回避（無敵時間あり）<br>
-    Q ポーション / I 装備 / K スキルツリー / F 転移門<br>
-    Esc 設定 / Enter チャット / M ミュート / H ヘルプ<br>
+    盾槍：右クリック長押しでガード（構えた直後はジャストガード）<br>
+    Q ポーション / I 装備 / K スキルツリー / M エリアマップ<br>
+    F 調べる（転移門・NPC・レバー・宝箱）<br>
+    Esc 設定 / Enter チャット / H ヘルプ<br>
     <span class="dim">赤い予兆の中にいると被弾。回避の無敵で抜けると「JUST回避」</span>
   </div>
 </div>
@@ -120,6 +126,14 @@
   </div>
   <div class="dim">設定はこのブラウザに保存されます</div>
 </div>
+
+<div id="map" class="panel hidden">
+  <div class="inv-head"><b id="map-title">エリアマップ</b><span class="dim">出口（光る門）を通ると隣のエリアへ移動します</span><button id="map-close">×</button></div>
+  <svg id="map-svg" viewBox="-40 -10 680 420" role="img" aria-label="エリアマップ"></svg>
+  <div class="map-legend"><span>⌂ 町・野営地：転移門とNPC</span><span>✿ フィールド</span><span>⚔ 狩場：経験値1.6倍</span><span>◈ ダンジョン：最奥にユニーク装備</span><span>♜ 迷宮区：ギミックと階層ボス</span></div>
+</div>
+
+<div id="dialog" class="panel hidden"></div>
 
 <div id="gate-menu" class="panel hidden">
   <div class="inv-head"><b>転移門</b><button id="gate-close">×</button></div>

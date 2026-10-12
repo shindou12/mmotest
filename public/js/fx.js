@@ -182,6 +182,7 @@ export class FX {
   dispose(obj) {
     if (obj.parent) obj.parent.remove(obj);
     obj.traverse((o) => {
+      if (o.userData.disposeMap && o.material?.map) o.material.map.dispose();
       if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
       if (o.material && !o.material.userData.shared) o.material.dispose();
     });

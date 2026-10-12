@@ -4,18 +4,20 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
-  FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, FIELD_RADIUS, GATE_POS, LAIR_POS, LAIR_RADIUS,
-  WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon,
+  FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES,
+  WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass,
 } from '../shared/data.js';
+import { AREAS, AREA_TYPES, CELL, grid, collide, exitsOf, spawnPoint } from '../shared/areas.js';
 import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
-import { buildFloor, groundHeight, AmbientParticles } from './env.js';
+import { buildArea, textSprite, AmbientParticles } from './env.js';
 import { makePlayer, setPlayerWeapon, animatePlayer, makeMob, animateMob, makeLootOrb } from './models.js';
 import { Net } from './net.js';
 import {
   HEAVY, WEAPON_SKILLS, TREE_SKILLS, TREES, STYLE_COLS, NODE_INDEX,
   spTotal, spSpent, treeSpent, canLearn, treeEffects,
 } from './skills.js';
+import { QUESTS, QUEST_INDEX, questState, questAvailable, questProgress } from './quests.js';
 
 const $ = (id) => document.getElementById(id);
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -23,6 +25,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const now = () => performance.now() / 1000;
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
 
 // ======================================================================
 // セーブデータ / 設定
@@ -92,21 +95,23 @@ audio.setVolumes(settings);
 // ゲーム状態
 // ======================================================================
 const CHARGE_MIN = 0.22, CHARGE_MAX = 0.9;
+const DODGE_CD = 0.75;
 const me = {
-  id: 0, x: GATE_POS.x, z: GATE_POS.z + 3, a: Math.PI, hp: 100, dead: false, deadT: 0,
+  id: 0, x: 0, z: 0, a: Math.PI, hp: 100, dead: false, deadT: 0,
   swingT: 9, swingDur: 0.4, combo: 0, lastSwing: 0, sw: 0, sk: 0, queued: 0,
-  charging: false, chargeT: 0, chargeLv: 0,
+  charging: false, chargeT: 0, chargeLv: 0, guarding: false, guardStart: 0,
   dodgeT: 0, dodgeCd: 0, dodgeDir: [0, 1], iframe: 0,
   wsCd: 0, tcd: {}, skillT: -1, spin: false, dashT: 0, dashA: 0, dashSpeed: 0,
   potions: 3, potCd: 0, lastHurt: -99, walkT: 0, moving: false, stepT: 0,
-  buffs: [], ambush: 0, lastStandT: -999,
+  buffs: [], ambush: 0, lastStandT: -999, transit: false,
   model: null,
 };
-let world = { floor: 1, unlocked: 1, bossState: 'idle' };
+const world = { area: 'f1_town', def: AREAS.f1_town, floor: 1, unlocked: 1, bossState: 'idle', door: false, plates: [] };
 let env = null;
 let S = null; // 計算済みステータス
 const mobs = new Map();
 const others = new Map();
+const npcs = [];
 const teles = [];
 const drops = [];
 const projs = [];
@@ -117,6 +122,7 @@ let shake = 0;
 let camZoom = 1;
 const keys = new Set();
 const mouse = { x: 0, y: 0, l: false, r: false, world: new THREE.Vector3() };
+const heightAt = (x, z) => (env ? env.heightAt(x, z) : 0);
 
 // ======================================================================
 // バフ
@@ -132,7 +138,7 @@ const hasBuff = (id) => me.buffs.some((b) => b.id === id);
 const buffMod = (k) => me.buffs.reduce((a, b) => a + (b.mods[k] || 0), 0);
 
 // ======================================================================
-// ステータス計算（装備 + スキルツリー）
+// ステータス計算（装備 + スキルツリー + 重量）
 // ======================================================================
 function weaponSkillId() {
   const w = char.eq.weapon;
@@ -153,23 +159,27 @@ function calcStats() {
   for (const f of T.flags) fxs.add(f);
   const atk = (baseAtk(char.lv) + (eq.weapon?.atk || 0) + (eq.acc?.atk || 0)) * (1 + m('atkp') / 100);
   const mhp = (baseHp(char.lv) + (eq.armor?.hp || 0) + (eq.acc?.hp || 0)) * (1 + m('hpp') / 100);
+  const weight = items.reduce((a, it) => a + itemWeight(it), 0);
+  const wc = weightClass(weight);
   S = {
     wk, W: WEAPONS[wk], atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: T.actives,
     crit: 5 + m('crit'), critd: 150 + m('critd'), aspd: m('aspd'), move: m('move'),
     vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0), cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
-    def: Math.min(60, m('def')), wr: eq.weapon ? eq.weapon.rarity : 0,
+    def: Math.min(65, m('def') + (eq.armor?.def || 0)), wr: eq.weapon ? eq.weapon.rarity : 0,
     normp: m('normp'), heavyp: m('heavyp'), wskillp: m('wskillp'), dodgecd: Math.min(60, m('dodgecd')),
-    justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion'),
-    ws: WEAPON_SKILLS[weaponSkillId()],
+    justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion') + (char.potBonus || 0),
+    ws: WEAPON_SKILLS[weaponSkillId()], weight, wc,
+    dodgeCd: DODGE_CD * wc.cd * (1 - Math.min(60, m('dodgecd')) / 100),
   };
   me.hp = Math.min(me.hp, S.mhp);
   if (me.model) setPlayerWeapon(me.model, S.wk, S.wr);
-  // スロットに入っているスキルが使えなくなっていても、設定自体は残す（武器を持ち替えれば戻る）
+  $('s-guard').classList.toggle('hidden', !S.W.guard);
+  $('ws-key').textContent = S.W.guard ? 'E' : '右 / E';
 }
 
 function itemPower(it) {
   if (!it) return 0;
-  let p = (it.atk || 0) * 3 + (it.hp || 0) * 0.5;
+  let p = (it.atk || 0) * 3 + (it.hp || 0) * 0.5 + (it.def || 0) * 4;
   for (const [, v] of it.affixes) p += v * (it.atk || 10) * 0.15 + v * 0.5;
   if (it.fx) p *= 1 + it.fx.length * 0.25;
   return Math.round(p);
@@ -179,7 +189,7 @@ function itemPower(it) {
 // 入力
 // ======================================================================
 const chatIn = $('chat-in');
-const PANELS = ['inv', 'gate-menu', 'tree', 'settings'];
+const PANELS = ['inv', 'gate-menu', 'tree', 'settings', 'map', 'dialog'];
 const anyPanel = () => PANELS.some((p) => !$(p).classList.contains('hidden'));
 addEventListener('keydown', (e) => {
   if (!started) return;
@@ -199,23 +209,28 @@ addEventListener('keydown', (e) => {
   if (k === '2') tryTreeSkill(1);
   if (k === 'i' || k === 'tab') { togglePanel('inv'); e.preventDefault(); }
   if (k === 'k') togglePanel('tree');
+  if (k === 'm') togglePanel('map');
   if (k === 'o') togglePanel('settings');
-  if (k === 'f') tryGate();
+  if (k === 'f') interact();
   if (k === 'h') $('help').classList.toggle('hidden');
-  if (k === 'm') { audio.setMuted(!audio.muted); toast(audio.muted ? 'ミュート' : 'サウンドON', '#aaa'); }
   if (k === 'escape') {
     if (anyPanel()) { PANELS.forEach((p) => $(p).classList.add('hidden')); $('tooltip').classList.add('hidden'); }
     else togglePanel('settings');
   }
 });
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; me.charging = false; });
+addEventListener('blur', () => { keys.clear(); mouse.l = mouse.r = false; me.charging = false; me.guarding = false; });
 canvas.addEventListener('mousemove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; });
 canvas.addEventListener('mousedown', (e) => {
   audio.init();
   if (!started) return;
   if (e.button === 0) { mouse.l = true; me.charging = true; me.chargeT = 0; me.chargeLv = 0; }
-  if (e.button === 2) { mouse.r = true; tryWeaponSkill(); }
+  if (e.button === 2) {
+    mouse.r = true;
+    // 盾槍は右クリック長押しでガード。それ以外は武器スキル
+    if (S?.W.guard) { if (!me.dead) { me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip'); } }
+    else tryWeaponSkill();
+  }
 });
 addEventListener('mouseup', (e) => {
   if (e.button === 0) {
@@ -226,13 +241,14 @@ addEventListener('mouseup', (e) => {
       else doHeavy(me.chargeLv);
     }
   }
-  if (e.button === 2) mouse.r = false;
+  if (e.button === 2) { mouse.r = false; me.guarding = false; }
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('wheel', (e) => { camZoom = clamp(camZoom + e.deltaY * 0.001, 0.6, 1.6); });
 $('s-inv').addEventListener('click', () => togglePanel('inv'));
 $('s-tree').addEventListener('click', () => togglePanel('tree'));
 $('s-set').addEventListener('click', () => togglePanel('settings'));
+$('s-map').addEventListener('click', () => togglePanel('map'));
 
 function togglePanel(id) {
   const el = $(id);
@@ -245,6 +261,7 @@ function togglePanel(id) {
   if (id === 'inv') renderInv();
   if (id === 'tree') renderTree();
   if (id === 'settings') renderSettings();
+  if (id === 'map') renderMap();
 }
 
 const raycaster = new THREE.Raycaster();
@@ -265,15 +282,28 @@ function onMsg(m) {
   switch (m.t) {
     case 'welcome':
       me.id = m.id; world.unlocked = m.unlocked;
-      enterFloor(m.floor);
+      enterArea(m.area, m.x, m.z);
       break;
-    case 'warped': enterFloor(m.floor); break;
+    case 'warped': enterArea(m.area, m.x, m.z); break;
     case 'snap': onSnap(m); break;
     case 'roster': roster = m.r; world.unlocked = m.unlocked; renderParty(); break;
     case 'tele': onTele(m); break;
     case 'die': onMobDie(m); break;
-    case 'xp': gainXp(m.n); break;
-    case 'loot': for (const d of m.items) spawnDrop(d.it, d.x, d.z); break;
+    case 'xp':
+      gainXp(m.n);
+      questEvent(m.boss ? { type: 'boss', floor: m.boss } : { type: 'kill', name: m.nm, area: m.ar });
+      break;
+    case 'loot':
+      for (const d of m.items) spawnDrop(d.it, d.x, d.z);
+      if (m.src === 'chest') {
+        char.chests = char.chests || {};
+        char.chests[m.ar] = Date.now();
+        questEvent({ type: 'chest', area: m.ar });
+        audio.sfx('clear');
+        saveChar();
+      }
+      break;
+    case 'door': if (m.open) { world.door = true; audio.sfx('impact'); addShake(0.4); } break;
     case 'chat': addChat(m.from, m.text, m.color); break;
     case 'leave': removeOther(m.id); break;
     case 'unlock': world.unlocked = m.unlocked; break;
@@ -296,7 +326,8 @@ function onMsg(m) {
     case 'bossClear': {
       banner(`第${m.n}層 攻略`, 'CONGRATULATIONS!', '#ffd84a', 3);
       audio.sfx('clear');
-      for (let i = 0; i < 6; i++) setTimeout(() => fx.parts.burst(LAIR_POS.x + rnd(-8, 8), rnd(4, 10), LAIR_POS.z + rnd(-8, 8), 80, { color: [0xffd84a, 0x6ad0ff, 0xff6ab0][i % 3], size: 0.6, speed: 10, life: 1.5, gravity: -4 }), i * 250);
+      const L = env?.lair || { x: 0, z: 0 };
+      for (let i = 0; i < 6; i++) setTimeout(() => fx.parts.burst(L.x + rnd(-8, 8), rnd(4, 10), L.z + rnd(-8, 8), 80, { color: [0xffd84a, 0x6ad0ff, 0xff6ab0][i % 3], size: 0.6, speed: 10, life: 1.5, gravity: -4 }), i * 250);
       break;
     }
     case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); break;
@@ -305,45 +336,91 @@ function onMsg(m) {
 }
 
 // ======================================================================
-// 階層
+// エリア
 // ======================================================================
-function buildEnv(n) {
+function buildEnv(id) {
   if (env) fx.dispose(env.group);
-  env = buildFloor(FLOORS[n - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1 });
+  const def = AREAS[id];
+  env = buildArea(def, FLOORS[def.floor - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1 });
   scene.add(env.group);
+  const L = env.light;
+  scene.fog = new THREE.Fog(L.fog, L.fogNear, L.fogFar);
+  hemi.intensity = L.hemi; sun.intensity = L.sun;
 }
 
-function enterFloor(n) {
-  world.floor = n;
-  const def = FLOORS[n - 1];
-  buildEnv(n);
-  scene.fog = new THREE.Fog(def.fog, def.fogNear, def.fogFar);
-  hemi.color.set(def.hemi[0]); hemi.groundColor.set(def.hemi[1]); hemi.intensity = 1.1;
-  sun.color.set(def.sun); sun.intensity = def.sunI;
-  ambient.setKind(def.particles);
-  for (const id of [...mobs.keys()]) removeMob(id);
-  for (const id of [...others.keys()]) removeOther(id);
+function enterArea(id, x, z) {
+  const def = AREAS[id];
+  const prev = world.area;
+  world.area = id; world.def = def; world.floor = def.floor;
+  world.door = false; world.plates = []; world.bossState = 'idle';
+  const fdef = FLOORS[def.floor - 1];
+  buildEnv(id);
+  hemi.color.set(fdef.hemi[0]); hemi.groundColor.set(fdef.hemi[1]);
+  sun.color.set(fdef.sun);
+  const indoor = def.shape === 'grid';
+  ambient.setKind(indoor ? 'dust' : fdef.particles);
+  for (const mid of [...mobs.keys()]) removeMob(mid);
+  for (const oid of [...others.keys()]) removeOther(oid);
   for (const t of teles.splice(0)) t.meshes.forEach((mm) => fx.dispose(mm));
   for (const d of drops.splice(0)) disposeDrop(d);
-  me.x = GATE_POS.x + rnd(-2, 2); me.z = GATE_POS.z - 6; me.a = Math.PI;
-  me.potions = S ? S.maxPot : 3;
-  audio.setMusic(def.music, false);
-  audio.setAmbient(def.amb);
-  banner(`第${n}層`, def.name, '#bfe6ff');
-  $('me-floor').textContent = `第${n}層 ${def.name}`;
+  buildNpcs(def);
+  me.x = x; me.z = z; me.a = Math.PI; me.transit = false;
+  for (const p of env.portals) p.armed = Math.hypot(p.x - x, p.z - z) > p.r + 1.5;
+  if (S && (def.type === 'town' || def.type === 'camp')) me.potions = S.maxPot;
+  audio.setMusic(fdef.music, false);
+  audio.setAmbient(indoor ? 'cave' : fdef.amb);
+  const T = AREA_TYPES[def.type];
+  banner(`第${def.floor}層 ・ ${T.name}`, def.name, T.color);
+  $('me-floor').textContent = `第${def.floor}層 ${def.name}`;
   audio.sfx('warp');
   fx.beam(me.x, me.z, 0x6ad0ff, 12, 1.2, 1.2);
+  if (prev !== id) questEvent({ type: 'visit', area: id });
+  if (!$('map').classList.contains('hidden')) renderMap();
+}
+
+// ---- NPC ----
+function buildNpcs(def) {
+  for (const n of npcs.splice(0)) fx.dispose(n.model);
+  for (const d of def.npcs || []) {
+    const model = makePlayer(d.color);
+    model.userData.ring.visible = false;
+    model.position.set(d.x, heightAt(d.x, d.z), d.z);
+    scene.add(model);
+    const n = { ...d, model, label: null, mark: '' };
+    npcs.push(n);
+  }
+  refreshNpcMarks();
+}
+function npcMark(id) {
+  const qs = QUESTS.filter((q) => q.npc === id);
+  if (qs.some((q) => questState(char, q.id)?.done && !questState(char, q.id)?.claimed)) return '？ 報告できる';
+  if (qs.some((q) => questAvailable(char, q))) return '！ 依頼あり';
+  return '';
+}
+function refreshNpcMarks() {
+  if (!char) return;
+  for (const n of npcs) {
+    const mark = npcMark(n.id);
+    if (n.label && mark === n.mark) continue;
+    if (n.label) { n.model.remove(n.label); n.label.material.map.dispose(); }
+    n.mark = mark;
+    n.label = textSprite(n.name, mark ? '#ffd84a' : '#ffffff', 4, mark);
+    n.label.position.y = 3.1;
+    n.model.add(n.label);
+  }
 }
 
 // ======================================================================
 // スナップショット適用
 // ======================================================================
 function onSnap(m) {
-  if (m.n !== world.floor) return;
+  if (m.ar !== world.area) return;
   world.bossState = m.bs;
+  world.door = !!m.door;
+  world.plates = m.pl || [];
   const seenP = new Set();
   for (const p of m.p) {
-    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg] = p;
+    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd] = p;
     if (id === me.id) continue;
     seenP.add(id);
     let o = others.get(id);
@@ -352,7 +429,7 @@ function onSnap(m) {
       scene.add(o.model);
       others.set(id, o);
     }
-    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr });
+    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd });
     setPlayerWeapon(o.model, wk, wr);
     if (sw !== o.sw) {
       o.sw = sw; o.swingT = 0; o.combo++;
@@ -364,35 +441,36 @@ function onSnap(m) {
   for (const id of [...others.keys()]) if (!seenP.has(id)) removeOther(id);
 
   const seenM = new Set();
+  const fdef = FLOORS[world.floor - 1];
   for (const r of m.m) {
-    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr] = r;
+    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr, elite, target] = r;
     seenM.add(id);
     let mb = mobs.get(id);
     if (!mb) {
-      const def = FLOORS[world.floor - 1];
       let model, name, rad;
       if (kind === 2) {
-        const b = def.boss;
+        const b = fdef.boss;
         model = makeMob(b.t, b.color, b.scale, b.accent, true);
         name = b.name; rad = 0.9 * b.scale;
       } else {
-        const md = def.mobs[d];
-        const sc = kind === 1 ? 0.8 : 1;
-        model = makeMob(md.t, md.color, sc);
-        name = md.name; rad = 0.75 * sc;
+        const md = fdef.mobs[d];
+        const sc = kind === 1 ? 0.8 : elite ? 1.3 : 1;
+        model = makeMob(md.t, md.color, sc, elite ? 0xffb030 : null);
+        name = elite === 2 ? '門番' : (elite ? '精鋭 ' : '') + md.name;
+        rad = 0.75 * sc;
       }
-      mb = { id, model, name, rad, kind, x, z, a, hp, mhp, lv, st, flash: 0, label: null, localT: 0, poisonUntil: 0, poisonT: 0 };
+      mb = { id, model, name, rad, kind, elite, x, z, a, hp, mhp, lv, st, flash: 0, label: null, localT: 0, poisonUntil: 0, poisonT: 0 };
       if (kind !== 2) mb.label = makeMobLabel(mb);
-      model.position.set(x, groundHeight(x, z), z);
+      model.position.set(x, heightAt(x, z), z);
       scene.add(model);
       mobs.set(id, mb);
       if (kind === 2) {
-        fx.parts.burst(x, 2, z, 120, { color: def.boss.accent, size: 1, speed: 14, life: 1.2 });
-        fx.ringWave(x, z, def.boss.accent, 14, 0.8);
-        fx.flash(x, 4, z, def.boss.accent, 80, 0.6, 30);
+        fx.parts.burst(x, 2, z, 120, { color: fdef.boss.accent, size: 1, speed: 14, life: 1.2 });
+        fx.ringWave(x, z, fdef.boss.accent, 14, 0.8);
+        fx.flash(x, 4, z, fdef.boss.accent, 80, 0.6, 30);
       }
     }
-    Object.assign(mb, { tx: x, tz: z, ta: a, mhp, lv, st, enraged: !!enr });
+    Object.assign(mb, { tx: x, tz: z, ta: a, mhp, lv, st, enraged: !!enr, target });
     // ローカル予測ダメージを少しの間優先
     if (now() - mb.localT > 0.4) mb.hp = hp; else mb.hp = Math.min(mb.hp, hp);
   }
@@ -416,7 +494,8 @@ function removeOther(id) {
 
 function onMobDie(m) {
   const mb = mobs.get(m.id);
-  const col = mb ? (m.boss ? FLOORS[world.floor - 1].boss.accent : FLOORS[world.floor - 1].mobs[0].color) : 0xffffff;
+  const fdef = FLOORS[world.floor - 1];
+  const col = mb ? (m.boss ? fdef.boss.accent : fdef.mobs[0].color) : 0xffffff;
   // ポリゴン片が砕け散る演出
   fx.parts.burst(m.x, 1.2, m.z, m.boss ? 300 : 40, { color: 0x9ad8ff, size: m.boss ? 0.9 : 0.45, speed: m.boss ? 16 : 7, life: m.boss ? 2 : 0.9, gravity: -3 });
   fx.parts.burst(m.x, 1.2, m.z, m.boss ? 100 : 15, { color: col, size: 0.6, speed: 5, life: 1 });
@@ -431,7 +510,7 @@ function onMobDie(m) {
 // ======================================================================
 function onTele(m) {
   const color = m.c || '#ff3030';
-  const meshes = m.sh.map((s) => { const g = makeTelegraph(s, color, groundHeight); scene.add(g); return g; });
+  const meshes = m.sh.map((s) => { const g = makeTelegraph(s, color, heightAt); scene.add(g); return g; });
   teles.push({ meshes, sh: m.sh, start: now(), dur: m.d / 1000, dmg: m.dmg, color, src: m.src });
   const near = m.sh.some((s) => Math.hypot(s.x - me.x, s.z - me.z) < 25);
   if (near) audio.sfx('telegraph');
@@ -478,8 +557,31 @@ function resolveTele(te) {
     fx.ringWave(me.x, me.z, 0xffd84a, 2, 0.3, 1);
     return;
   }
+  let raw = te.dmg;
+  // 盾槍のガード（攻撃してきた方向が正面なら軽減）
+  if (me.guarding && S.W.guard) {
+    const src = mobs.get(te.src) || { x: te.sh[0].x, z: te.sh[0].z };
+    const dirTo = Math.atan2(src.x - me.x, src.z - me.z);
+    const centered = Math.hypot(src.x - me.x, src.z - me.z) < 0.5;
+    if (centered || Math.abs(angDiff(dirTo, me.a)) < THREE.MathUtils.degToRad(80)) {
+      const bulwark = S.flags.has('bulwark');
+      const justWin = 0.28 + (bulwark ? 0.15 : 0);
+      if (te.src) net.send({ t: 'threat', id: te.src, n: Math.round(te.dmg * 3) });
+      if (now() - me.guardStart <= justWin) {
+        floatText(me.x, 2.8, me.z, 'JUST GUARD!', 'just');
+        audio.sfx('perfect'); audio.sfx('block');
+        fx.ringWave(me.x, me.z, 0xbfe0ff, 4, 0.35);
+        combat.circle(me.x, me.z, 4, 1.6, { type: 'proc', noProc: true, threat: 3 });
+        return;
+      }
+      raw *= bulwark ? 0 : 0.25;
+      audio.sfx('block');
+      fx.parts.burst(me.x + Math.sin(me.a) * 0.8, 1.2, me.z + Math.cos(me.a) * 0.8, 14, { color: 0xbfe0ff, speed: 5, size: 0.4, life: 0.35 });
+      if (raw <= 0) { floatText(me.x, 2.4, me.z, '防御', 'info'); return; }
+    }
+  }
   const dr = clamp(buffMod('dr'), -100, 90);
-  const dmg = Math.max(1, Math.round(te.dmg * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
+  const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
   me.lastHurt = now();
   floatText(me.x, 2.2, me.z, dmg, 'me');
@@ -515,7 +617,7 @@ function onJustDodge() {
 }
 
 function die() {
-  me.hp = 0; me.dead = true; me.deadT = 5; me.charging = false; me.buffs = [];
+  me.hp = 0; me.dead = true; me.deadT = 5; me.charging = false; me.guarding = false; me.buffs = [];
   audio.sfx('death');
   fx.parts.burst(me.x, 1, me.z, 80, { color: 0x9ad8ff, speed: 8, size: 0.5, life: 1.2 });
   $('death').classList.remove('hidden');
@@ -539,6 +641,7 @@ function dealDamage(mb, mult, o = {}) {
   dmg = Math.max(1, Math.round(dmg));
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
   net.send({ t: 'hit', id: mb.id, dmg, crit });
+  if (o.threat > 1) net.send({ t: 'threat', id: mb.id, n: Math.round(dmg * (o.threat - 1)) });
   floatText(mb.x, 2.2 * (mb.kind === 2 ? 2.5 : 1), mb.z, dmg, o.type === 'dot' ? 'poison' : crit ? 'crit' : '');
   if (o.type !== 'dot') {
     const wc = RARITIES[S.wr].color;
@@ -577,15 +680,13 @@ const combat = {
   hit: (mb, mult, o) => dealDamage(mb, mult, o),
   heal: (frac) => heal(S.mhp * frac, true),
   buff: addBuff,
+  taunt: (r) => net.send({ t: 'taunt', r }),
   arc(range, deg, mult, o = {}) {
     const a = o.a ?? me.a, arc = THREE.MathUtils.degToRad(deg) / 2;
     for (const mb of [...mobs.values()]) {
       const dx = mb.x - me.x, dz = mb.z - me.z, d = Math.hypot(dx, dz);
       if (d > range + mb.rad) continue;
-      let diff = Math.atan2(dx, dz) - a;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      if (Math.abs(diff) <= arc + mb.rad / Math.max(d, 0.5) || d < mb.rad + 0.6) dealDamage(mb, mult, o);
+      if (Math.abs(angDiff(Math.atan2(dx, dz), a)) <= arc + mb.rad / Math.max(d, 0.5) || d < mb.rad + 0.6) dealDamage(mb, mult, o);
     }
   },
   line(len, w, mult, o = {}) {
@@ -618,7 +719,7 @@ const combat = {
   },
 };
 
-function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0; }
+function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding; }
 
 function doSwing() {
   const W = S.W;
@@ -687,7 +788,8 @@ function updateProjs(dt) {
       if (w.hit.has(mb.id)) continue;
       if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, noProc: true }); }
     }
-    if (w.t > w.life) { fx.dispose(w.mesh); projs.splice(i, 1); }
+    const c = collide(world.def, w.x, w.z, 0.1, world.door);
+    if (w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fx.dispose(w.mesh); projs.splice(i, 1); }
   }
 }
 
@@ -701,9 +803,9 @@ function tryDodge() {
   const after = hasBuff('afterimage');
   me.dodgeDir = [dx / l, dz / l];
   me.dodgeT = 0.38;
-  me.dodgeCd = 0.75 * (1 - S.dodgecd / 100) * (after ? 0.25 : 1);
+  me.dodgeCd = S.dodgeCd * (after ? 0.25 : 1);
   me.iframe = after ? 0.6 : 0.32;
-  me.swingT = 9; me.skillT = -1; me.charging = false;
+  me.swingT = 9; me.skillT = -1; me.charging = false; me.guarding = false;
   audio.sfx('dodge');
   fx.parts.burst(me.x, 0.3, me.z, 12, { color: after ? 0x9affff : 0xdddddd, speed: 3, size: 0.4, life: 0.4, gravity: 1 });
 }
@@ -743,11 +845,111 @@ function gainXp(n) {
 }
 
 // ======================================================================
+// クエスト
+// ======================================================================
+function questEvent(ev) {
+  if (!char) return;
+  const changed = questProgress(char, ev);
+  for (const q of changed) {
+    const st = questState(char, q.id);
+    if (st.done) { toast(`クエスト達成：「${q.name}」 依頼人に報告しよう`, '#ffd84a', true); audio.sfx('clear'); }
+    else toast(`${q.name} ${st.p} / ${q.n}`, '#bfe6ff');
+  }
+  if (changed.length) { saveChar(); renderQuests(); refreshNpcMarks(); }
+}
+
+function renderQuests() {
+  const active = QUESTS.filter((q) => { const s = questState(char, q.id); return s && !s.claimed; });
+  $('quests').classList.toggle('hidden', !active.length);
+  $('quests').innerHTML = '<div class="dim">クエスト</div>' + active.map((q) => {
+    const s = questState(char, q.id);
+    return `<div class="qi ${s.done ? 'done' : ''}"><b>${esc(q.name)}</b><span>${s.done ? '達成！報告しよう' : `${s.p} / ${q.n}`}</span><small>${esc(q.desc)}</small></div>`;
+  }).join('');
+}
+
+function openDialog(n) {
+  const qs = QUESTS.filter((q) => q.npc === n.id);
+  let h = `<div class="inv-head"><b>${esc(n.name)}</b><button id="dialog-close">×</button></div><p class="npc-line">「${esc(n.line)}」</p>`;
+  for (const q of qs) {
+    const s = questState(char, q.id);
+    const avail = questAvailable(char, q);
+    if (!s && !avail) continue;
+    const rw = [`経験値 ${q.reward.xp}`, q.reward.rarity != null ? `${RARITIES[q.reward.rarity].name}以上の${q.reward.slot ? { weapon: '武器', armor: '防具', acc: '装飾品' }[q.reward.slot] : '装備'}` : '', q.reward.potion ? `ポーション所持数 +${q.reward.potion}` : ''].filter(Boolean).join('・');
+    let btn = '';
+    if (!s) btn = `<button data-acc="${q.id}">受ける</button>`;
+    else if (s.claimed) btn = '<span class="dim">完了</span>';
+    else if (s.done) btn = `<button class="claim" data-claim="${q.id}">報告する</button>`;
+    else btn = `<span class="dim">${s.p} / ${q.n}</span>`;
+    h += `<div class="quest ${s?.claimed ? 'claimed' : ''}"><div><b>${esc(q.name)}</b><div class="dim">${esc(q.desc)}</div><div class="rw">報酬：${rw}</div></div>${btn}</div>`;
+  }
+  if (!qs.some((q) => questState(char, q.id) || questAvailable(char, q))) h += '<div class="dim">今はお願いしたいことはないよ。</div>';
+  $('dialog').innerHTML = h;
+  PANELS.forEach((p) => $(p).classList.add('hidden'));
+  $('dialog').classList.remove('hidden');
+  $('dialog-close').onclick = () => $('dialog').classList.add('hidden');
+  for (const b of $('dialog').querySelectorAll('[data-acc]')) b.onclick = () => {
+    char.quests = char.quests || {};
+    char.quests[b.dataset.acc] = { p: 0 };
+    audio.sfx('equip'); saveChar(); renderQuests(); refreshNpcMarks(); openDialog(n);
+    // すでに条件を満たしているもの（到達など）
+    const q = QUEST_INDEX[b.dataset.acc];
+    if (q.type === 'visit' && world.area === q.target) questEvent({ type: 'visit', area: q.target });
+  };
+  for (const b of $('dialog').querySelectorAll('[data-claim]')) b.onclick = () => { claimQuest(QUEST_INDEX[b.dataset.claim]); openDialog(n); };
+}
+
+function claimQuest(q) {
+  const s = questState(char, q.id);
+  if (!s?.done || s.claimed) return;
+  s.claimed = true;
+  const r = q.reward;
+  if (r.rarity != null) {
+    const ilvl = Math.max(char.lv, floorLevel(world.floor) + 3);
+    const rar = Math.max(r.rarity, Math.random() < 0.15 ? r.rarity + 1 : r.rarity);
+    const it = makeItem(ilvl, Math.min(5, rar), r.slot ? { slot: r.slot } : {});
+    spawnDrop(it, me.x + rnd(-1, 1), me.z + rnd(1, 2));
+  }
+  if (r.potion) { char.potBonus = (char.potBonus || 0) + r.potion; calcStats(); me.potions = S.maxPot; toast(`ポーションの所持数が ${S.maxPot} になった`, '#6aff8a'); }
+  banner('クエスト完了', q.name, '#ffd84a', 2);
+  audio.sfx('levelup');
+  gainXp(r.xp);
+  saveChar(); renderQuests(); refreshNpcMarks();
+}
+
+// ======================================================================
+// 調べる（F）: 転移門 / NPC / レバー / 宝箱
+// ======================================================================
+function nearestInteract() {
+  if (me.dead) return null;
+  const def = world.def;
+  const d = (p) => Math.hypot(p.x - me.x, p.z - me.z);
+  if (def.gate && d(def.gate) < 6) return { kind: 'gate', label: '<kbd>F</kbd> 転移門を使う（ポーション補充済み）' };
+  for (const n of npcs) if (d(n) < 3.2) return { kind: 'npc', npc: n, label: `<kbd>F</kbd> ${esc(n.name)}と話す` };
+  if (def.shape === 'grid') {
+    const g = grid(def);
+    const L = g.pts.L?.[0];
+    if (L && d(L) < 3.5 && !world.door) return { kind: 'lever', label: '<kbd>F</kbd> レバーを引く' };
+    const C = g.pts.C?.[0];
+    if (C && d(C) < 3.5) return { kind: 'chest', label: chestOpen() ? '宝箱は空っぽだ（しばらくすると中身が戻る）' : '<kbd>F</kbd> 宝箱を開ける' };
+  }
+  return null;
+}
+function chestOpen() { return Date.now() - (char.chests?.[world.area] || 0) < 300000; }
+function interact() {
+  const it = nearestInteract();
+  if (!it) return;
+  if (it.kind === 'gate') tryGate();
+  if (it.kind === 'npc') { openDialog(it.npc); audio.sfx('ui'); }
+  if (it.kind === 'lever') { net.send({ t: 'interact', what: 'lever' }); audio.sfx('equip'); }
+  if (it.kind === 'chest' && !chestOpen()) net.send({ t: 'interact', what: 'chest' });
+}
+
+// ======================================================================
 // ドロップ
 // ======================================================================
 function spawnDrop(it, x, z) {
   const model = makeLootOrb(it.rarity);
-  model.position.set(x, groundHeight(x, z), z);
+  model.position.set(x, heightAt(x, z), z);
   scene.add(model);
   const r = it.rarity, col = RARITIES[r].color;
   const beam = r >= 2 ? fx.beam(x, z, col, 6 + r * 4, 0.25 + r * 0.08) : null;
@@ -821,7 +1023,7 @@ function makeMobLabel(mb) {
   sp.geometry.userData.shared = true; // Sprite のジオメトリは three.js 内で共有されている
   const s = mb.model.scale.x;
   sp.scale.set(3.2 / s, 0.8 / s, 1);
-  sp.position.y = (2.75 + (mb.model.userData.float ? 0.6 : 0)) / s;
+  sp.position.y = (2.75 + (mb.model.userData.float ? 0.6 : 0)) / s * (mb.elite ? 1.1 : 1);
   sp.userData.cv = cv;
   mb.model.add(sp);
   mb.label = sp;
@@ -829,14 +1031,15 @@ function makeMobLabel(mb) {
   return sp;
 }
 function drawMobLabel(mb, pct) {
-  mb.labelPct = pct; mb.labelLv = mb.lv;
+  const aggro = mb.target === me.id;
+  mb.labelPct = pct; mb.labelLv = mb.lv; mb.labelAggro = aggro;
   const cv = mb.label.userData.cv, g = cv.getContext('2d');
   g.clearRect(0, 0, 256, 64);
   g.font = 'bold 22px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.85)';
-  const txt = `Lv${mb.lv} ${mb.name}`;
-  g.strokeText(txt, 128, 20); g.fillStyle = '#ffffff'; g.fillText(txt, 128, 20);
+  const txt = `${aggro ? '! ' : ''}Lv${mb.lv} ${mb.name}`;
+  g.strokeText(txt, 128, 20); g.fillStyle = aggro ? '#ff6a5a' : mb.elite ? '#ffc04a' : '#ffffff'; g.fillText(txt, 128, 20);
   g.fillStyle = 'rgba(0,0,0,.7)'; g.fillRect(48, 40, 160, 12);
   g.fillStyle = pct > 30 ? '#e8443a' : '#ff9a3a'; g.fillRect(50, 42, 156 * pct / 100, 8);
   mb.label.material.map.needsUpdate = true;
@@ -860,7 +1063,7 @@ function updateFloat(dt) {
     if (!mb.label) continue;
     mb.label.visible = Math.hypot(mb.x - me.x, mb.z - me.z) < 30;
     const pct = Math.round(clamp(mb.hp / mb.mhp, 0, 1) * 100);
-    if (pct !== mb.labelPct || mb.lv !== mb.labelLv) drawMobLabel(mb, pct);
+    if (pct !== mb.labelPct || mb.lv !== mb.labelLv || (mb.target === me.id) !== mb.labelAggro) drawMobLabel(mb, pct);
   }
   for (const o of others.values()) {
     const p = project(o.x, 2.6, o.z);
@@ -898,8 +1101,9 @@ function addChat(from, text, color) {
   log.scrollTop = log.scrollHeight;
 }
 function renderParty() {
-  $('party').innerHTML = '<div class="dim" style="margin-bottom:6px">オンライン ' + roster.length + '人</div>' + roster.map(([id, name, lv, floor, hp, mhp, color]) => `
-    <div class="pm"><div class="nm"><span style="color:${esc(color)}">${esc(name)}${id === me.id ? ' (自分)' : ''}</span><span class="dim">Lv${lv} / ${floor}層</span></div>
+  $('party').innerHTML = '<div class="dim" style="margin-bottom:6px">オンライン ' + roster.length + '人</div>' + roster.map(([id, name, lv, floor, hp, mhp, color, aname]) => `
+    <div class="pm"><div class="nm"><span style="color:${esc(color)}">${esc(name)}${id === me.id ? ' (自分)' : ''}</span><span class="dim">Lv${lv}</span></div>
+    <div class="dim" style="font-size:10px">${floor}層 ${esc(aname || '')}</div>
     <div class="bar hp"><div style="width:${clamp(hp / mhp * 100, 0, 100)}%"></div></div></div>`).join('');
 }
 
@@ -931,8 +1135,11 @@ function updateHud() {
     el.classList.toggle('off', !usable);
     setCd('s-t' + (i + 1), usable ? (me.tcd[id] || 0) : 1, usable ? TREE_SKILLS[id].cd * (1 - S.cdr / 100) : 1);
   }
-  setCd('s-dodge', me.dodgeCd, 0.75 * (1 - S.dodgecd / 100));
+  setCd('s-dodge', me.dodgeCd, S.dodgeCd);
+  $('dodge-w').textContent = S.wc.name;
+  $('dodge-w').style.color = S.wc.color;
   setCd('s-pot', me.potions > 0 ? me.potCd : 1, 1);
+  $('s-guard').classList.toggle('active', me.guarding);
   const left = spTotal(char.lv) - spSpent(char.tree);
   $('sp-badge').textContent = left > 0 ? left : '';
   $('sp-badge').classList.toggle('hidden', left <= 0);
@@ -953,40 +1160,104 @@ function updateHud() {
     $('boss-name').classList.toggle('enraged', !!boss.enraged);
     const pct = clamp(boss.hp / boss.mhp * 100, 0, 100) + '%';
     $('boss-hp').style.width = pct; $('boss-hp-lag').style.width = pct;
+    const tname = boss.target === me.id ? 'あなた' : others.get(boss.target)?.name;
+    $('boss-target').textContent = tname ? `ターゲット：${tname}` : '';
+    $('boss-target').classList.toggle('me', boss.target === me.id);
   }
-  const nearGate = Math.hypot(me.x - GATE_POS.x, me.z - GATE_POS.z) < 6;
-  const nearLair = !boss && world.bossState !== 'fight' && Math.hypot(me.x - LAIR_POS.x, me.z - LAIR_POS.z) < LAIR_RADIUS + 6;
   const pr = $('prompt');
-  if (nearGate && !me.dead) { pr.classList.remove('hidden'); pr.innerHTML = '<kbd>F</kbd> 転移門を使う（ポーション補充済み）'; }
+  const it = nearestInteract();
+  const lair = env?.lair;
+  const nearLair = lair && !boss && world.bossState !== 'fight' && Math.hypot(me.x - lair.x, me.z - lair.z) < lair.r + 4;
+  if (it) { pr.classList.remove('hidden'); pr.innerHTML = it.label; }
   else if (nearLair && world.bossState === 'cleared') { pr.classList.remove('hidden'); pr.textContent = 'ボスは討伐済み。しばらくすると再挑戦できます'; }
   else if (nearLair) { pr.classList.remove('hidden'); pr.textContent = '⚠ ボス部屋：魔法陣の中に入ると戦闘開始'; }
   else pr.classList.add('hidden');
 }
 
-// ミニマップ
-const mm = $('minimap').getContext('2d');
+// ---- ミニマップ ----
+const mmCanvas = $('minimap');
+const mm = mmCanvas.getContext('2d');
+let gridImage = null;
 function drawMinimap() {
-  const W = 180, sc = W / 2 / (FIELD_RADIUS + 4);
-  const P = (x, z) => [W / 2 + x * sc, W / 2 + z * sc];
+  const W = 180;
+  const def = world.def;
+  const extent = def.shape === 'open' ? def.R + 4 : Math.max(grid(def).W, grid(def).H) * CELL / 2 + 2;
+  // 屋内は自分を中心にして少し拡大
+  const indoor = def.shape === 'grid';
+  const sc = indoor ? W / 2 / 30 : W / 2 / extent;
+  const cx = indoor ? me.x : 0, cz = indoor ? me.z : 0;
+  const P = (x, z) => [W / 2 + (x - cx) * sc, W / 2 + (z - cz) * sc];
   mm.clearRect(0, 0, W, W);
   mm.save();
   mm.beginPath(); mm.arc(W / 2, W / 2, W / 2, 0, Math.PI * 2); mm.clip();
-  mm.fillStyle = hex(FLOORS[world.floor - 1].ground) + '99'; mm.fillRect(0, 0, W, W);
-  let [x, y] = P(GATE_POS.x, GATE_POS.z);
-  mm.fillStyle = '#6ad0ff'; mm.beginPath(); mm.arc(x, y, 5, 0, 7); mm.fill();
-  [x, y] = P(LAIR_POS.x, LAIR_POS.z);
-  mm.strokeStyle = hex(FLOORS[world.floor - 1].boss.accent); mm.lineWidth = 2; mm.beginPath(); mm.arc(x, y, LAIR_RADIUS * sc, 0, 7); mm.stroke();
-  for (const d of drops) { [x, y] = P(d.x, d.z); mm.fillStyle = RARITIES[d.it.rarity].color; mm.fillRect(x - 2, y - 2, 4, 4); }
-  for (const mb of mobs.values()) { [x, y] = P(mb.x, mb.z); mm.fillStyle = mb.kind === 2 ? '#ff2a2a' : '#ff7a6a'; mm.beginPath(); mm.arc(x, y, mb.kind === 2 ? 6 : 2, 0, 7); mm.fill(); }
-  for (const o of others.values()) { [x, y] = P(o.x, o.z); mm.fillStyle = '#7f7'; mm.beginPath(); mm.arc(x, y, 3.5, 0, 7); mm.fill(); }
-  [x, y] = P(me.x, me.z);
+  mm.fillStyle = indoor ? '#0c0e16dd' : hex(FLOORS[world.floor - 1].ground) + '99'; mm.fillRect(0, 0, W, W);
+  if (indoor) {
+    const g = grid(def);
+    for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++) {
+      const ch = g.rows[r][c];
+      if (ch === '#') continue;
+      const x = (c - g.W / 2) * CELL, z = (r - g.H / 2) * CELL;
+      const [px, pz] = P(x, z);
+      mm.fillStyle = ch === 'D' ? (world.door ? '#6a8a6a' : '#c04a4a') : ch === 'T' || ch === 't' ? '#6a4a3a' : '#4a5064';
+      mm.fillRect(px, pz, CELL * sc + 0.5, CELL * sc + 0.5);
+    }
+    const g2 = grid(def);
+    for (const [ch, col] of [['C', '#ffd27a'], ['L', '#ff9a4a'], ['P', '#6ad0ff']]) for (const p of g2.pts[ch] || []) { const [x, y] = P(p.x, p.z); mm.fillStyle = col; mm.fillRect(x - 3, y - 3, 6, 6); }
+  } else {
+    mm.strokeStyle = 'rgba(255,255,255,.25)'; mm.lineWidth = 2;
+    mm.beginPath(); mm.arc(W / 2, W / 2, def.R * sc, 0, Math.PI * 2); mm.stroke();
+  }
+  if (def.gate) { const [x, y] = P(def.gate.x, def.gate.z); mm.fillStyle = '#6ad0ff'; mm.beginPath(); mm.arc(x, y, 5, 0, 7); mm.fill(); }
+  if (env?.lair) { const [x, y] = P(env.lair.x, env.lair.z); mm.strokeStyle = hex(FLOORS[world.floor - 1].boss.accent); mm.lineWidth = 2; mm.beginPath(); mm.arc(x, y, env.lair.r * sc, 0, 7); mm.stroke(); }
+  for (const p of env?.portals || []) { const [x, y] = P(p.x, p.z); mm.fillStyle = '#bfe6ff'; mm.beginPath(); mm.moveTo(x, y - 5); mm.lineTo(x + 5, y + 4); mm.lineTo(x - 5, y + 4); mm.closePath(); mm.fill(); }
+  for (const n of npcs) { const [x, y] = P(n.x, n.z); mm.fillStyle = n.mark ? '#ffd84a' : '#e0e0e0'; mm.beginPath(); mm.arc(x, y, 3.5, 0, 7); mm.fill(); }
+  for (const d of drops) { const [x, y] = P(d.x, d.z); mm.fillStyle = RARITIES[d.it.rarity].color; mm.fillRect(x - 2, y - 2, 4, 4); }
+  for (const mb of mobs.values()) { const [x, y] = P(mb.x, mb.z); mm.fillStyle = mb.kind === 2 ? '#ff2a2a' : mb.elite ? '#ffb030' : '#ff7a6a'; mm.beginPath(); mm.arc(x, y, mb.kind === 2 ? 6 : mb.elite ? 3 : 2, 0, 7); mm.fill(); }
+  for (const o of others.values()) { const [x, y] = P(o.x, o.z); mm.fillStyle = '#7f7'; mm.beginPath(); mm.arc(x, y, 3.5, 0, 7); mm.fill(); }
+  const [x, y] = P(me.x, me.z);
   mm.translate(x, y); mm.rotate(-me.a + Math.PI);
   mm.fillStyle = '#fff'; mm.beginPath(); mm.moveTo(0, -6); mm.lineTo(4, 5); mm.lineTo(-4, 5); mm.closePath(); mm.fill();
   mm.restore();
+  void gridImage;
 }
 
+// ---- エリアマップ（M） ----
+function renderMap() {
+  const f = world.floor;
+  const list = Object.values(AREAS).filter((a) => a.floor === f);
+  const P = (a) => [a.mapPos[0] * 6, a.mapPos[1] * 4];
+  let svg = '';
+  const seen = new Set();
+  for (const a of list) for (const e of a.exits) {
+    const key = [a.id, e.to].sort().join('-');
+    const b = AREAS[e.to];
+    if (seen.has(key) || !b || b.floor !== f) continue;
+    seen.add(key);
+    const [x1, y1] = P(a), [x2, y2] = P(b);
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="edge"/>`;
+  }
+  for (const a of list) {
+    const [x, y] = P(a);
+    const T = AREA_TYPES[a.type];
+    const cur = a.id === world.area;
+    const here = roster.filter((r) => r[7] === a.name && r[0] !== me.id).length;
+    const extra = a.unique ? `宝：${a.unique.name}` : a.type === 'hunt' ? '経験値 1.6倍' : a.type === 'labyrinth' ? `ボス：${FLOORS[f - 1].boss.name}` : a.npcs ? `NPC ${a.npcs.length}人` : '';
+    svg += `<g class="node ${cur ? 'cur' : ''}" transform="translate(${x},${y})">
+      <circle r="30" style="stroke:${T.color}"/>
+      <text class="ic" y="8" style="fill:${T.color}">${T.icon}</text>
+      <text class="nm" y="50">${esc(a.name)}</text>
+      <text class="ty" y="66">${T.name}${here ? `・仲間${here}人` : ''}</text>
+      ${extra ? `<text class="ex" y="81">${esc(extra)}</text>` : ''}
+      ${cur ? '<text class="you" x="38" y="-22" style="text-anchor:start">◀ 現在地</text>' : ''}
+    </g>`;
+  }
+  $('map-title').textContent = `第${f}層 ${FLOORS[f - 1].name}`;
+  $('map-svg').innerHTML = svg;
+}
+$('map-close').onclick = () => togglePanel('map');
+
 // ---- インベントリ ----
-const GLYPH = { sword: '剣', greatsword: '大', spear: '槍', dagger: '短', armor: '鎧', acc: '飾' };
+const GLYPH = { sword: '剣', greatsword: '大', spear: '盾', dagger: '短', armor: '鎧', acc: '飾' };
 function cellHtml(it, showUp) {
   const c = RARITIES[it.rarity].color;
   const up = showUp && itemPower(it) > itemPower(char.eq[it.slot]) ? '<span class="up">▲</span>' : '';
@@ -998,7 +1269,7 @@ function renderInv() {
     const cell = el.querySelector('.cell');
     if (it) {
       const c = RARITIES[it.rarity].color;
-      cell.outerHTML = `<div class="cell r${it.rarity}" data-id="${it.id}" data-eq="1" style="border-color:${c};color:${c}"><span class="gi">${GLYPH[it.kind || it.slot]}</span><span>${esc(it.name)}<br><small class="dim">iLv${it.ilvl}</small></span></div>`;
+      cell.outerHTML = `<div class="cell r${it.rarity}" data-id="${it.id}" data-eq="1" style="border-color:${c};color:${c}"><span class="gi">${GLYPH[it.kind || it.slot]}</span><span>${esc(it.name)}<br><small class="dim">iLv${it.ilvl}・重さ${itemWeight(it)}</small></span></div>`;
     } else cell.outerHTML = '<div class="cell" style="color:#666">なし</div>';
   }
   $('inv-grid').innerHTML = char.inv.map((it) => cellHtml(it, true)).join('') || '<div class="dim">アイテムなし。モンスターを倒そう！</div>';
@@ -1007,7 +1278,11 @@ function renderInv() {
     ['攻撃速度', '+' + S.aspd.toFixed(1) + '%'], ['移動速度', '+' + S.move.toFixed(1) + '%'], ['被ダメ軽減', S.def.toFixed(1) + '%'],
     ['HP吸収', S.vamp.toFixed(1) + '%'], ['スキル短縮', S.cdr.toFixed(0) + '%'],
   ];
-  $('stats').innerHTML = `<b>Lv${char.lv} ${esc(char.name)}</b> <span class="dim">${S.W.name}</span>` + st.map(([k, v]) => `<div><span class="dim">${k}</span><span>${v}</span></div>`).join('')
+  $('stats').innerHTML = `<b>Lv${char.lv} ${esc(char.name)}</b> <span class="dim">${S.W.name}</span>`
+    + `<div class="wrow"><span class="dim">装備重量</span><span><b style="color:${S.wc.color}">${S.weight.toFixed(1)}（${S.wc.name}）</b></span></div>`
+    + `<div class="wbar"><i style="width:${clamp(S.weight / 22 * 100, 0, 100)}%;background:${S.wc.color}"></i></div>`
+    + `<div><span class="dim">回避のクールタイム</span><span>${S.dodgeCd.toFixed(2)}秒</span></div>`
+    + st.map(([k, v]) => `<div><span class="dim">${k}</span><span>${v}</span></div>`).join('')
     + [...S.fx].filter((f) => UNIQUE_FX[f]).map((f) => `<div style="color:#ffd27a;font-size:11px">✦ ${UNIQUE_FX[f]}</div>`).join('');
   bindCells();
 }
@@ -1050,22 +1325,29 @@ $('inv-salvage').onclick = () => { char.inv = char.inv.filter((i) => i.rarity >=
 $('inv-close').onclick = () => togglePanel('inv');
 function itemLines(it, compare) {
   const r = RARITIES[it.rarity];
-  const type = it.slot === 'weapon' ? WEAPONS[it.kind].name : it.slot === 'armor' ? '防具' : '装飾品';
-  let h = `<div class="tn" style="color:${r.color}">${esc(it.name)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl}</div>`;
+  const type = it.slot === 'weapon' ? WEAPONS[it.kind].name : it.slot === 'armor' ? `防具（${ARMOR_CLASSES[it.armor || 'medium'].name}）` : '装飾品';
+  let h = `<div class="tn" style="color:${r.color}">${esc(it.name)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
   if (it.atk) h += `<div>攻撃力 +${it.atk}</div>`;
   if (it.hp) h += `<div>HP +${it.hp}</div>`;
+  if (it.def) h += `<div>被ダメ軽減 +${it.def}%</div>`;
   for (const [k, v] of it.affixes) h += `<div style="color:#9fd8ff">${AFFIXES[k].name} +${v}${AFFIXES[k].unit}</div>`;
   if (it.fx) for (const f of it.fx) h += `<div class="fx">✦ ${UNIQUE_FX[f]}</div>`;
   if (it.slot === 'weapon') {
     const sid = it.skill && WEAPON_SKILLS[it.skill]?.kind === it.kind ? it.skill : WEAPON_SKILL_POOL[it.kind][0];
     const ws = WEAPON_SKILLS[sid];
     h += `<div class="wsk">武器スキル「${ws.name}」<br><span class="dim">${ws.desc}（CT ${ws.cd}秒）</span></div>`;
+    if (WEAPONS[it.kind].guard) h += '<div class="dim">右クリック長押しでガード</div>';
   }
   if (it.lore) h += `<div class="lore">${esc(it.lore)}</div>`;
   const cur = char.eq[it.slot];
   if (compare && cur && cur !== it) {
     const d = itemPower(it) - itemPower(cur);
     h += `<div class="cmp" style="color:${d >= 0 ? '#6f6' : '#f77'}">装備中と比較: 戦力 ${d >= 0 ? '+' : ''}${d}</div>`;
+    const dw = itemWeight(it) - itemWeight(cur);
+    if (dw) {
+      const after = weightClass(S.weight + dw);
+      h += `<div class="cmp" style="color:${dw < 0 ? '#6f6' : '#fc8'}">重さ ${dw > 0 ? '+' : ''}${dw.toFixed(1)} → ${after.name}</div>`;
+    }
   }
   return h;
 }
@@ -1086,7 +1368,7 @@ function renderTree() {
   const tree = char.tree || (char.tree = {});
   const left = spTotal(char.lv) - spSpent(tree);
   $('sp-left').innerHTML = `残りスキルポイント <b>${left}</b>`;
-  const tabs = [['sword', '片手剣'], ['greatsword', '大剣'], ['spear', '槍'], ['dagger', '短剣'], ['stat', 'ステータス'], ['style', 'プレイスタイル']];
+  const tabs = [['sword', '片手剣'], ['greatsword', '大剣'], ['spear', '盾槍'], ['dagger', '短剣'], ['stat', 'ステータス'], ['style', 'プレイスタイル']];
   $('tree-tabs').innerHTML = tabs.map(([id, nm], i) => `${i === 4 ? '<span class="tsep"></span>' : ''}<button data-t="${id}" class="${treeTab === id ? 'on' : ''}">${nm}<small>${id === S.wk ? '装備中・' : ''}${treeSpent(tree, id)}pt</small></button>`).join('');
   for (const b of $('tree-tabs').querySelectorAll('button')) b.onclick = () => { treeTab = b.dataset.t; audio.sfx('ui'); renderTree(); };
 
@@ -1170,7 +1452,7 @@ for (const k of ['master', 'music', 'sfx', 'amb']) {
 }
 $('set-quality').addEventListener('change', (e) => {
   settings.quality = e.target.value; saveSettings(); applyQuality();
-  if (started) buildEnv(world.floor);
+  if (started) buildEnv(world.area);
 });
 $('set-shake').addEventListener('change', (e) => { settings.shake = e.target.checked; saveSettings(); });
 $('set-dmgnum').addEventListener('change', (e) => { settings.dmgnum = e.target.checked; saveSettings(); });
@@ -1178,7 +1460,6 @@ $('settings-close').onclick = () => togglePanel('settings');
 
 // ---- 転移門 ----
 function tryGate() {
-  if (Math.hypot(me.x - GATE_POS.x, me.z - GATE_POS.z) > 6 || me.dead) return;
   const list = $('gate-list');
   list.innerHTML = FLOORS.slice(0, MAX_FLOOR).map((f) => `<button data-n="${f.n}" ${f.n > world.unlocked ? 'disabled' : ''} class="${f.n === world.floor ? 'cur' : ''}">
     <b>第${f.n}層</b> ${f.n <= world.unlocked ? f.name : '？？？'} <span class="dim" style="float:right">推奨Lv${1 + (f.n - 1) * 5}〜</span></button>`).join('')
@@ -1198,6 +1479,12 @@ let sendT = 0;
 let saveT = 0;
 const camPos = new THREE.Vector3();
 
+function moveMe(dx, dz) {
+  me.x += dx; me.z += dz;
+  const c = collide(world.def, me.x, me.z, 0.45, world.door);
+  me.x = c.x; me.z = c.z;
+}
+
 function update(dt) {
   const t = now();
   updateMouseWorld();
@@ -1208,13 +1495,15 @@ function update(dt) {
   for (const k in me.tcd) me.tcd[k] -= dt;
   for (const b of me.buffs) b.t -= dt;
   me.buffs = me.buffs.filter((b) => b.t > 0);
+  const safe = world.def.type === 'town' || world.def.type === 'camp';
 
   if (me.dead) {
     me.deadT -= dt;
-    $('death-t').textContent = `${Math.max(0, me.deadT).toFixed(1)} 秒後に転移門で復活`;
+    $('death-t').textContent = `${Math.max(0, me.deadT).toFixed(1)} 秒後に${world.def.gate ? '転移門' : 'エリアの入口'}で復活`;
     if (me.deadT <= 0) {
       me.dead = false; me.hp = S.mhp; me.potions = S.maxPot;
-      me.x = GATE_POS.x + rnd(-2, 2); me.z = GATE_POS.z - 6;
+      const sp = spawnPoint(world.def);
+      me.x = sp.x; me.z = sp.z;
       $('death').classList.add('hidden');
       fx.beam(me.x, me.z, 0x6ad0ff, 12, 1, 1);
     }
@@ -1231,25 +1520,38 @@ function update(dt) {
     me.moving = false;
     if (me.dodgeT > 0) {
       me.dodgeT -= dt;
-      me.x += me.dodgeDir[0] * 17 * dt; me.z += me.dodgeDir[1] * 17 * dt;
+      const sp = 17 * S.wc.roll;
+      moveMe(me.dodgeDir[0] * sp * dt, me.dodgeDir[1] * sp * dt);
       if (Math.random() < 0.5) fx.parts.emit(me.x, 0.6, me.z, { color: hasBuff('afterimage') ? 0x9affff : 0xbfe6ff, size: 0.4, life: hasBuff('afterimage') ? 0.6 : 0.3, speed: 0.5, gravity: 0 });
     } else if (me.dashT > 0) {
       me.dashT -= dt;
-      me.x += Math.sin(me.dashA) * me.dashSpeed * dt; me.z += Math.cos(me.dashA) * me.dashSpeed * dt;
+      moveMe(Math.sin(me.dashA) * me.dashSpeed * dt, Math.cos(me.dashA) * me.dashSpeed * dt);
       fx.parts.emit(me.x, 0.8, me.z, { color: RARITIES[S.wr].color, size: 0.4, life: 0.3, speed: 0.5, gravity: 0 });
     } else if (l > 0) {
       const busy = me.swingT < me.swingDur || me.skillT >= 0;
-      const slow = busy ? 0.45 : me.charging && me.chargeT > CHARGE_MIN ? 0.4 : 1;
+      const slow = me.guarding ? 0.45 : busy ? 0.45 : me.charging && me.chargeT > CHARGE_MIN ? 0.4 : 1;
       const sp = 7.2 * (1 + (S.move + buffMod('move')) / 100) * slow;
-      me.x += dx / l * sp * dt; me.z += dz / l * sp * dt;
+      moveMe(dx / l * sp * dt, dz / l * sp * dt);
       me.moving = true;
-      if (!busy && !me.charging) me.a = Math.atan2(dx, dz);
+      if (!busy && !me.charging && !me.guarding) me.a = Math.atan2(dx, dz);
       me.walkT += dt;
       me.stepT -= dt;
       if (me.stepT <= 0) { me.stepT = 0.32; audio.sfx('step'); }
     }
-    const r = Math.hypot(me.x, me.z);
-    if (r > FIELD_RADIUS) { me.x *= FIELD_RADIUS / r; me.z *= FIELD_RADIUS / r; }
+    if (me.guarding) me.a = aimAngle();
+
+    // 出口
+    if (!me.transit) {
+      for (const p of env.portals) {
+        const d = Math.hypot(p.x - me.x, p.z - me.z);
+        if (d < p.r && p.armed) {
+          if (AREAS[p.to].floor > world.unlocked) { toast('この先はまだ開放されていない', '#f99'); p.armed = false; continue; }
+          me.transit = true; net.send({ t: 'move', to: p.to }); audio.sfx('warp');
+          break;
+        }
+        if (d > p.r + 1.5) p.armed = true;
+      }
+    }
 
     // 溜め
     if (me.charging) {
@@ -1272,13 +1574,13 @@ function update(dt) {
 
     // 通常攻撃（短押しの入力を少し保持してコンボをつなぐ）
     me.swingT += dt;
-    if (me.queued > t && canAct() && me.swingT >= me.swingDur) { me.queued = 0; doSwing(); }
+    if (me.queued > t && canAct() && me.swingT >= me.swingDur && !safe) { me.queued = 0; doSwing(); }
     if (me.skillT >= 0) { me.skillT += dt; if (me.skillT > 0.55) me.skillT = -1; }
 
-    // 自然回復 / 転移門でポーション補充
+    // 自然回復 / 町や転移門の近くでポーション補充
     const regen = t - me.lastHurt > 5 ? 0.03 : 0.004;
-    me.hp = Math.min(S.mhp, me.hp + S.mhp * regen * dt);
-    if (Math.hypot(me.x - GATE_POS.x, me.z - GATE_POS.z) < 6) me.potions = S.maxPot;
+    me.hp = Math.min(S.mhp, me.hp + S.mhp * (safe ? 0.1 : regen) * dt);
+    if (safe) me.potions = S.maxPot;
   }
 
   // 毒
@@ -1290,17 +1592,26 @@ function update(dt) {
   }
 
   // 自キャラモデル
-  me.model.position.set(me.x, groundHeight(me.x, me.z), me.z);
+  me.model.position.set(me.x, heightAt(me.x, me.z), me.z);
   me.model.rotation.y = me.a;
   animatePlayer(me.model, {
-    t, moving: me.moving, walkT: me.walkT, kind: S.wk, combo: me.combo, dead: me.dead,
+    t, moving: me.moving, walkT: me.walkT, kind: S.wk, combo: me.combo, dead: me.dead, guard: me.guarding,
     swing: me.swingT < me.swingDur ? me.swingT / me.swingDur : me.charging && me.chargeT > CHARGE_MIN ? 0.02 : -1,
     spin: me.skillT >= 0 && me.spin ? me.skillT / 0.55 : -1,
     dodge: me.dodgeT > 0 ? me.dodgeT / 0.38 : 0,
   });
+  if (me.guarding && Math.random() < 0.3) fx.parts.emit(me.x + Math.sin(me.a) * 0.9 + rnd(-0.4, 0.4), rnd(0.6, 1.8), me.z + Math.cos(me.a) * 0.9 + rnd(-0.4, 0.4), { color: 0xbfe0ff, size: 0.25, life: 0.3, speed: 0.3, gravity: 0 });
   for (const b of me.buffs) if (Math.random() < 0.25) fx.parts.emit(me.x + rnd(-0.5, 0.5), rnd(0.2, 2), me.z + rnd(-0.5, 0.5), { color: b.color, size: 0.3, life: 0.6, speed: 1, gravity: 2 });
   // 伝説・神器のオーラ
   if (S.wr >= 4 && Math.random() < 0.3) fx.parts.emit(me.x + rnd(-0.6, 0.6), rnd(0.3, 2), me.z + rnd(-0.6, 0.6), { color: RARITIES[S.wr].color, size: 0.25, life: 0.8, speed: 0.4, gravity: 1.5 });
+
+  // NPC（近くに来たらこちらを向く）
+  for (const n of npcs) {
+    const d = Math.hypot(me.x - n.x, me.z - n.z);
+    const want = d < 8 ? Math.atan2(me.x - n.x, me.z - n.z) : Math.PI;
+    n.model.rotation.y += angDiff(want, n.model.rotation.y) * Math.min(1, dt * 4);
+    animatePlayer(n.model, { t: t + n.x, moving: false, walkT: 0, kind: 'sword', combo: 0, dead: false, swing: -1, spin: -1, dodge: 0 });
+  }
 
   // 他プレイヤー
   for (const o of others.values()) {
@@ -1308,28 +1619,42 @@ function update(dt) {
     const mx = o.tx - o.x, mz = o.tz - o.z;
     const moving = Math.hypot(mx, mz) > 0.03;
     o.x += mx * k; o.z += mz * k;
-    let da = o.ta - o.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
-    o.a += da * k;
+    o.a += angDiff(o.ta, o.a) * k;
     o.swingT += dt; if (o.spinT >= 0) { o.spinT += dt; if (o.spinT > 0.55) o.spinT = -1; }
     if (moving) o.walkT += dt;
-    o.model.position.set(o.x, groundHeight(o.x, o.z), o.z);
+    o.model.position.set(o.x, heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
-    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, combo: o.combo, dead: o.dead, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && o.wk === 'greatsword' ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0 });
+    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && o.wk === 'greatsword' ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0 });
   }
 
   // モンスター
   for (const mb of mobs.values()) {
     const k = 1 - Math.exp(-10 * dt);
     mb.x += (mb.tx - mb.x) * k; mb.z += (mb.tz - mb.z) * k;
-    let da = mb.ta - mb.a; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
-    mb.a += da * k;
+    mb.a += angDiff(mb.ta, mb.a) * k;
     mb.flash = Math.max(0, mb.flash - dt * 6);
-    mb.model.position.set(mb.x, groundHeight(mb.x, mb.z), mb.z);
+    mb.model.position.set(mb.x, heightAt(mb.x, mb.z), mb.z);
     mb.model.rotation.y = mb.a;
     animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged });
     if (mb.model.userData.float && Math.random() < 0.25) fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
+    if (mb.elite && Math.random() < 0.15) fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
     if (mb.kind === 2 && mb.enraged && Math.random() < 0.5) fx.parts.emit(mb.x + rnd(-2, 2), rnd(0.5, 5), mb.z + rnd(-2, 2), { color: 0xff3a20, size: 0.6, life: 0.8, speed: 1, gravity: 3 });
   }
+
+  // ギミックの見た目
+  if (env.door) {
+    const y = world.door ? -3.4 : 0;
+    env.door.position.y += (y - env.door.position.y) * Math.min(1, dt * 3);
+    env.door.visible = env.door.position.y > -3.3;
+  }
+  if (env.lever) env.lever.userData.stick.rotation.z += ((world.door ? -0.6 : 0.6) - env.lever.userData.stick.rotation.z) * Math.min(1, dt * 6);
+  if (env.chest) {
+    const open = chestOpen();
+    const lid = env.chest.userData.lid;
+    lid.rotation.x += ((open ? -1.9 : 0) - lid.rotation.x) * Math.min(1, dt * 5);
+    env.chest.userData.shine.visible = !open;
+  }
+  env.plates?.forEach((m, i) => { m.material.emissiveIntensity = world.plates[i] ? 1.6 + Math.sin(t * 8) * 0.4 : 0; });
 
   updateTeles();
   updateProjs(dt);
@@ -1339,19 +1664,21 @@ function update(dt) {
   sendT -= dt;
   if (sendT <= 0) {
     sendT = 0.066;
-    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0 });
+    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0 });
   }
   saveT -= dt;
   if (saveT <= 0) { saveT = 10; saveChar(); }
 
   // BGM 切り替え（ボス戦中で部屋の近くならボス曲）
-  const def = FLOORS[world.floor - 1];
-  const bossNear = world.bossState === 'fight' && Math.hypot(me.x - LAIR_POS.x, me.z - LAIR_POS.z) < LAIR_RADIUS + 20;
-  audio.setMusic(def.music, bossNear);
+  const fdef = FLOORS[world.floor - 1];
+  const lair = env.lair;
+  const bossNear = world.bossState === 'fight' && lair && Math.hypot(me.x - lair.x, me.z - lair.z) < lair.r + 20;
+  audio.setMusic(fdef.music, !!bossNear);
 
   // カメラ
   shake = Math.max(0, shake - dt * 2.5);
-  const off = new THREE.Vector3(0, 15 * camZoom, 12.5 * camZoom);
+  const zoom = camZoom * (world.def.shape === 'grid' ? 0.9 : 1);
+  const off = new THREE.Vector3(0, 15 * zoom, 12.5 * zoom);
   camPos.set(me.x, 0, me.z).add(off);
   camera.position.lerp(camPos, 1 - Math.exp(-8 * dt));
   if (shake > 0) camera.position.add(new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(shake * 0.35));
@@ -1360,12 +1687,10 @@ function update(dt) {
   sun.position.set(me.x + 20, 40, me.z + 10);
   sun.target.position.set(me.x, 0, me.z);
 
-  if (env) {
-    env.gate.userData.anim(t); env.lair.userData.anim(t); env.update(t, me.x, me.z);
-    const fighting = world.bossState === 'fight';
-    for (const m of env.ringMats) m.opacity = fighting ? 0.28 + Math.sin(t * 4) * 0.1 : 0.4;
-    if (Math.random() < 0.3) fx.parts.emit(GATE_POS.x + rnd(-3, 3), 0.5, GATE_POS.z + rnd(-0.5, 0.5), { color: 0x6ad0ff, size: 0.3, life: 1.5, speed: 0.5, gravity: 2 });
-  }
+  env.update(t, me.x, me.z);
+  const fighting = world.bossState === 'fight';
+  for (const m of env.ringMats) m.opacity = fighting ? 0.28 + Math.sin(t * 4) * 0.1 : 0.4;
+  if (world.def.gate && Math.random() < 0.3) fx.parts.emit(world.def.gate.x + rnd(-3, 3), 0.5, world.def.gate.z + rnd(-0.5, 0.5), { color: 0x6ad0ff, size: 0.3, life: 1.5, speed: 0.5, gravity: 2 });
   ambient.update(dt, me.x, me.z, t);
   fx.update(dt);
   updateFloat(dt);
@@ -1424,7 +1749,7 @@ $('lstart').onclick = async () => {
   const name = $('lname').value.trim() || 'プレイヤー';
   char = loadChar() || { name, color: $('lcolor').value, lv: 1, xp: 0, inv: [], eq: { weapon: starterWeapon(startKind), armor: null, acc: null } };
   char.name = name; char.color = $('lcolor').value;
-  char.tree = char.tree || {}; char.slots = char.slots || [null, null];
+  char.tree = char.tree || {}; char.slots = char.slots || [null, null]; char.quests = char.quests || {};
   saveChar();
   $('lstart').disabled = true; $('lstart').textContent = '接続中…';
   const wsUrl = params.get('server') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
@@ -1437,30 +1762,30 @@ $('lstart').onclick = async () => {
   $('login').classList.add('hidden');
   $('hud').classList.remove('hidden');
   started = true;
+  renderQuests();
   net.send({ t: 'hello', name: char.name, color: char.color, lv: char.lv });
   addChat('', ok ? 'サーバーに接続しました。友達を誘おう！' : 'ソロモードで起動しました（npm start でサーバーを立てるとマルチプレイ）', '#9fe');
+  addChat('', '町の人に話しかけると（F）サブクエストを受けられます。Mでエリアマップ。', '#9fe');
   if (spTotal(char.lv) - spSpent(char.tree) > 0) toast('未使用のスキルポイントがあります（Kでスキルツリー）', '#ffd84a');
   setTimeout(() => $('help').classList.add('hidden'), 15000);
 };
 
-// ログイン背景用に第1層を表示
-enterFloorPreview();
-function enterFloorPreview() {
-  const def = FLOORS[0];
-  env = buildFloor(def, { grass: GRASS_BY_Q[settings.quality] ?? 1 });
-  scene.add(env.group);
-  scene.fog = new THREE.Fog(def.fog, def.fogNear, def.fogFar);
-  hemi.color.set(def.hemi[0]); hemi.groundColor.set(def.hemi[1]);
-  sun.color.set(def.sun); sun.intensity = def.sunI;
+// ログイン背景用に、はじまりの街を表示
+enterPreview();
+function enterPreview() {
+  const def = AREAS.f1_town, fdef = FLOORS[0];
+  world.def = def;
+  buildEnv('f1_town');
+  hemi.color.set(fdef.hemi[0]); hemi.groundColor.set(fdef.hemi[1]);
+  sun.color.set(fdef.sun);
   sun.position.set(20, 40, 10);
-  camera.position.set(30, 12, 30); camera.lookAt(0, 2, 0);
-  ambient.setKind(def.particles);
+  ambient.setKind(fdef.particles);
   const spin = () => {
     if (started) return;
     const t = now() * 0.05;
-    camera.position.set(Math.sin(t) * 45, 14, Math.cos(t) * 45); camera.lookAt(0, 2, 0);
+    camera.position.set(Math.sin(t) * 40, 16, Math.cos(t) * 40); camera.lookAt(0, 2, 0);
     ambient.update(0.016, 0, 0, now());
-    env.gate.userData.anim(now());
+    env.update(now(), 0, 0);
     fx.update(0.016);
     requestAnimationFrame(spin);
   };
@@ -1468,4 +1793,4 @@ function enterFloorPreview() {
 }
 loop();
 
-window.__game = { me, mobs, drops, teles, char: () => char, world, fx, S: () => S, net, settings };
+window.__game = { me, mobs, drops, teles, npcs, char: () => char, world, fx, S: () => S, net, settings, env: () => env };

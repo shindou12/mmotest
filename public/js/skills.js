@@ -220,6 +220,28 @@ export const TREE_SKILLS = {
     name: '鉄壁の構え', cd: 16, desc: '4秒間、被ダメージ-60%。HPを10%回復',
     run(c) { c.buff('fortress', '鉄壁の構え', 4, { dr: 60 }, 0x9ad8ff); c.heal(0.1); },
   },
+  shieldbash: {
+    name: 'シールドバッシュ', cd: 7, desc: '盾で前方を殴りつける。ヘイトを大きく稼ぐ',
+    run(c) {
+      const a = c.aim();
+      c.dash(a, 1.5, 0.1, 0);
+      c.later(0.08, () => {
+        c.arc(3.4, 110, 2.2, { type: 'tskill', a, threat: 4 });
+        c.fx.ringWave(c.me.x + Math.sin(a) * 2, c.me.z + Math.cos(a) * 2, 0xbfd8ff, 3, 0.3);
+        c.sfx('block'); c.shake(0.3);
+      });
+    },
+  },
+  taunt: {
+    name: '挑発', cd: 14, desc: '周囲の敵の注意を自分に向ける（6秒）。その間、被ダメージ-30%',
+    run(c) {
+      c.taunt(14);
+      c.buff('taunt', '挑発', 6, { dr: 30 }, 0xff6a4a);
+      c.fx.ringWave(c.me.x, c.me.z, 0xff6a4a, 14, 0.6);
+      c.text('こっちだ！', 'info');
+      c.sfx('roar');
+    },
+  },
   javelin: {
     name: 'ジャベリン', cd: 8, desc: '槍の分身を投げ放ち、直線上の敵を貫通する',
     run(c) { c.proj({ a: c.aim(), mult: 3.5, speed: 32, life: 0.6, rad: 1.4, type: 'tskill', color: 0xbfe0ff }); c.sfx('wave'); },
@@ -275,7 +297,7 @@ const weaponTree = (k, names, a1, a2, cap) => [
 export const TREES = {
   sword: { name: '片手剣', nodes: weaponTree('sword', ['剣の心得'], 'slant', 'brave', { name: '閃光の剣', flag: 'wave', desc: '通常攻撃3段目が斬撃波となって飛ぶ' }) },
   greatsword: { name: '大剣', nodes: weaponTree('greatsword', ['大剣の心得'], 'gslam', 'fortress', { name: '大地割り', flag: 'quake', desc: '兜割りの後、さらに大きな衝撃波が広がる' }) },
-  spear: { name: '槍', nodes: weaponTree('spear', ['槍の心得'], 'javelin', 'whirl', { name: '雷槍', flag: 'thunder', desc: '会心時、対象に落雷' }) },
+  spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ジャストガードの猶予が長くなる' }) },
   dagger: { name: '短剣', nodes: weaponTree('dagger', ['短剣の心得'], 'poison', 'smoke', { name: '暗殺術', mods: { crit: 8, critd: 40 }, desc: '会心率 +8%、会心ダメージ +40%' }) },
   stat: {
     name: 'ステータス', nodes: [

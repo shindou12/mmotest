@@ -26,21 +26,23 @@ export const RARITIES = [
 ];
 
 // --- 武器種 ---------------------------------------------------------------
+// weight: 装備重量（回避のクールタイムに影響）
 export const WEAPONS = {
   sword: {
-    name: '片手剣', range: 2.8, arc: 110, speed: 0.4, mult: 1.0,
+    name: '片手剣', range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4,
     skill: { name: 'ヴォーパル・ストライク', cd: 5, desc: '前方へ突進しながら貫く', mult: 3.2 },
   },
   greatsword: {
-    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6,
+    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9,
     skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
   },
   spear: {
-    name: '槍', range: 4.3, arc: 45, speed: 0.48, mult: 1.15,
+    // 盾槍: 右クリック長押しでガードできる。ヘイトを集めやすい
+    name: '盾槍', range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true,
     skill: { name: 'ライトニング・ランス', cd: 5.5, desc: '直線上を雷光で貫く', mult: 3.0 },
   },
   dagger: {
-    name: '短剣', range: 2.3, arc: 90, speed: 0.26, mult: 0.68,
+    name: '短剣', range: 2.3, arc: 90, speed: 0.26, mult: 0.68, weight: 2,
     skill: { name: 'シャドウ・ダンス', cd: 4.5, desc: '目にも止まらぬ五連撃', mult: 1.0 },
   },
 };
@@ -56,7 +58,31 @@ export const WEAPON_SKILL_POOL = {
 export const MAX_FLOOR = 3;
 
 const TIER_PREFIX = ['木の', '青銅の', '鉄の', '鋼の', '銀の', 'ミスリルの', '魔鋼の', 'アダマンの', '星鉄の', '天鋼の', '神鉄の'];
-const ARMOR_BASE = ['布の服', '革の鎧', '鎖帷子', '鋼の胸当て', '騎士の鎧', '魔導の外套', '竜革の鎧', '星衣', '天衣'];
+
+// 防具の重さの種類。重いほどHPと被ダメ軽減が高いが、回避が遅くなる
+export const ARMOR_CLASSES = {
+  light: { name: '軽装', weight: 3, hp: 0.75, def: 0, names: ['布の服', '革の胴着', '狩人の外套', '魔導の外套', '星衣'] },
+  medium: { name: '中装', weight: 6, hp: 1.0, def: 3, names: ['革の鎧', '鎖帷子', '竜革の鎧', '銀の鎖鎧', '天衣'] },
+  heavy: { name: '重装', weight: 11, hp: 1.35, def: 7, names: ['鉄の胸当て', '鋼の鎧', '騎士の甲冑', '重装甲冑', '天鋼の大鎧'] },
+};
+
+// 合計重量 → 回避のクールタイム倍率・転がる距離の倍率
+export const WEIGHT_CLASSES = [
+  { max: 7, name: '軽量', cd: 0.7, roll: 1.1, color: '#7fe08a' },
+  { max: 13, name: '普通', cd: 1.0, roll: 1.0, color: '#cfd3da' },
+  { max: 18, name: '重い', cd: 1.35, roll: 0.9, color: '#ffc06a' },
+  { max: Infinity, name: '過重', cd: 1.75, roll: 0.8, color: '#ff7a6a' },
+];
+export function itemWeight(it) {
+  if (!it) return 0;
+  if (typeof it.weight === 'number') return it.weight;
+  if (it.slot === 'weapon') return WEAPONS[it.kind]?.weight ?? 4;
+  if (it.slot === 'armor') return ARMOR_CLASSES[it.armor || 'medium'].weight;
+  return 0.5;
+}
+export function weightClass(total) {
+  return WEIGHT_CLASSES.find((w) => total <= w.max);
+}
 const ACC_BASE = ['お守り', '銅の指輪', '銀の首飾り', '翠玉の指輪', '紅玉の護符', '星の耳飾り', '天球の指輪'];
 
 export const AFFIXES = {
@@ -88,7 +114,7 @@ export const UNIQUES = [
   { key: 'gungnir', name: 'グングニル', rarity: 5, slot: 'weapon', kind: 'spear', fx: ['thunder', 'skillcrit'], lore: '必中の神槍。放てば必ず主の手に還る。' },
   { key: 'excalibur', name: 'エクスカリバー', rarity: 5, slot: 'weapon', kind: 'greatsword', fx: ['wave', 'star'], lore: '湖の乙女より授けられし聖剣。' },
   { key: 'kusanagi_dagger', name: '月詠ノ小太刀', rarity: 5, slot: 'weapon', kind: 'dagger', fx: ['mirror', 'vamp'], lore: '月光を纏う夜の神の刃。' },
-  { key: 'aegis', name: 'アイギスの聖鎧', rarity: 5, slot: 'armor', fx: ['aegis', 'mirror'], lore: '女神の加護を宿す不壊の鎧。' },
+  { key: 'aegis', name: 'アイギスの聖鎧', rarity: 5, slot: 'armor', armor: 'heavy', fx: ['aegis', 'mirror'], lore: '女神の加護を宿す不壊の鎧。' },
   { key: 'yata', name: '八咫鏡', rarity: 5, slot: 'acc', fx: ['mirror', 'star'], lore: '真実を映す神鏡。' },
   // 伝説
   { key: 'durandal', name: 'デュランダル', rarity: 4, slot: 'weapon', kind: 'sword', fx: ['wave'], lore: '決して折れぬ聖騎士の剣。' },
@@ -96,9 +122,9 @@ export const UNIQUES = [
   { key: 'muramasa', name: '妖刀 村正', rarity: 4, slot: 'weapon', kind: 'dagger', fx: ['vamp'], lore: '血を求めて止まぬ妖刀。' },
   { key: 'dainsleif', name: 'ダーインスレイヴ', rarity: 4, slot: 'weapon', kind: 'greatsword', fx: ['vamp', 'flame'], lore: '一度抜けば血を見ずには収まらぬ。' },
   { key: 'laevateinn', name: 'レーヴァテイン', rarity: 4, slot: 'weapon', kind: 'sword', fx: ['flame'], lore: '世界を焼く炎の枝。' },
-  { key: 'dragonscale', name: '竜鱗の鎧', rarity: 4, slot: 'armor', fx: ['aegis'], lore: '古竜の鱗を編んだ鎧。' },
+  { key: 'dragonscale', name: '竜鱗の鎧', rarity: 4, slot: 'armor', armor: 'heavy', fx: ['aegis'], lore: '古竜の鱗を編んだ鎧。' },
   { key: 'starseer', name: '星詠みの指輪', rarity: 4, slot: 'acc', fx: ['star'], lore: '星の巡りを識る指輪。' },
-  { key: 'phantom', name: '幻影の外套', rarity: 4, slot: 'armor', fx: ['mirror'], lore: '纏う者の影を揺らがせる。' },
+  { key: 'phantom', name: '幻影の外套', rarity: 4, slot: 'armor', armor: 'light', fx: ['mirror'], lore: '纏う者の影を揺らがせる。' },
 ];
 
 // --- 階層データ ------------------------------------------------------------
@@ -257,9 +283,14 @@ export function makeItem(ilvl, rarity, opts = {}) {
   let slot = opts.slot || pick(['weapon', 'weapon', 'weapon', 'armor', 'acc']);
   let kind = opts.kind || null;
   let unique = null;
-  if (rarity >= 4) {
+  if (opts.uniqueDef) {
+    // ダンジョン固有のユニーク装備（レアリティは抽選したものを使う）
+    unique = { key: 'dun_' + opts.uniqueDef.name, ...opts.uniqueDef };
+  } else if (rarity >= 4) {
     const pool = UNIQUES.filter((u) => u.rarity === rarity);
     unique = pick(pool);
+  }
+  if (unique) {
     slot = unique.slot;
     kind = unique.kind || null;
   }
@@ -275,14 +306,19 @@ export function makeItem(ilvl, rarity, opts = {}) {
     it.name = unique ? unique.name : TIER_PREFIX[tier] + WEAPONS[kind].name;
     it.skill = pick(WEAPON_SKILL_POOL[kind]);
   } else if (slot === 'armor') {
-    it.hp = Math.round(45 * g);
-    it.name = unique ? unique.name : ARMOR_BASE[Math.min(ARMOR_BASE.length - 1, Math.floor((ilvl - 1) / 6))];
+    const cls = unique?.armor || opts.armor || pick(['light', 'medium', 'medium', 'heavy']);
+    const A = ARMOR_CLASSES[cls];
+    it.armor = cls;
+    it.hp = Math.round(45 * g * A.hp);
+    it.def = A.def;
+    it.name = unique ? unique.name : A.names[Math.min(A.names.length - 1, Math.floor((ilvl - 1) / 8))];
   } else {
     it.atk = Math.round(2.5 * g);
     it.hp = Math.round(15 * g);
     it.name = unique ? unique.name : ACC_BASE[Math.min(ACC_BASE.length - 1, Math.floor((ilvl - 1) / 8))];
   }
   if (unique) { it.unique = unique.key; it.fx = unique.fx.slice(); it.lore = unique.lore; }
+  it.weight = itemWeight(it);
   const keys = Object.keys(AFFIXES).sort(() => Math.random() - 0.5);
   for (let i = 0; i < r.affixes; i++) it.affixes.push([keys[i], affixValue(keys[i], r.mult)]);
   return it;

@@ -1,28 +1,31 @@
-// 階層ごとの地形・プロップ・草・空・遠景（トゥーン調）
+// エリアの地形・建物・プロップ・草・空・遠景（トゥーン調）
 import * as THREE from 'three';
-import { FIELD_RADIUS, GATE_POS, LAIR_POS, LAIR_RADIUS } from '../shared/data.js';
+import { CELL, AREAS, grid, exitsOf, lairOf } from '../shared/areas.js';
 import { toon, glow, outline, Batch } from './toon.js';
 
 function seeded(seed) {
   let s = seed >>> 0;
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 }
+const hashStr = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 
 function noise2(x, z) {
   return Math.sin(x * 0.11) * Math.cos(z * 0.13) + Math.sin(x * 0.037 + z * 0.05) * 1.6 + Math.sin(x * 0.31 - z * 0.27) * 0.3;
 }
-export function groundHeight(x, z) {
-  const r = Math.hypot(x, z);
-  let h = noise2(x, z) * 0.35;
-  const dg = Math.hypot(x - GATE_POS.x, z - GATE_POS.z), dl = Math.hypot(x - LAIR_POS.x, z - LAIR_POS.z);
-  h *= Math.min(1, dg / 12) * Math.min(1, Math.max(0, dl - LAIR_RADIUS) / 8);
-  if (r > FIELD_RADIUS) h += (r - FIELD_RADIUS) * 0.6;
-  return h;
-}
-// 転移門→ボス部屋へ続く小道
-const pathX = (z) => Math.sin(z * 0.08) * 5;
-function onPath(x, z, w = 2.2) {
-  return z > LAIR_POS.z + LAIR_RADIUS - 2 && z < GATE_POS.z && Math.abs(x - pathX(z)) < w;
+
+// エリアごとの地面の高さ関数（屋内は平ら）
+export function makeHeight(def) {
+  if (def.shape === 'grid') return () => 0;
+  const exits = exitsOf(def), R = def.R;
+  const flat = def.type === 'town' ? 0.15 : def.type === 'camp' ? 0.4 : 1;
+  return (x, z) => {
+    const r = Math.hypot(x, z);
+    let h = noise2(x, z) * 0.35 * flat;
+    if (def.gate) h *= Math.min(1, Math.hypot(x - def.gate.x, z - def.gate.z) / 12);
+    for (const e of exits) h *= Math.min(1, Math.hypot(x - e.x, z - e.z) / 6);
+    if (r > R) h += (r - R) * 0.6;
+    return h;
+  };
 }
 
 // 草の設定 [根元色, 先端色, 密度, 高さ]
@@ -32,22 +35,42 @@ const GRASS = {
   9: [0x140824, 0xa050ff, 0.5, 0.8], 10: [0xb09040, 0xfff2c8, 1.6, 0.8],
 };
 
-const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
 const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpS = new THREE.Vector3(), tmpP = new THREE.Vector3();
 function local(base, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = sx, sz = sx) {
   tmpP.set(x, y, z); tmpQ.setFromEuler(tmpE.set(rx, ry, rz)); tmpS.set(sx, sy, sz);
   return base.clone().multiply(tmpM.compose(tmpP, tmpQ, tmpS));
 }
+const I = new THREE.Matrix4();
+const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
 
-export function buildFloor(def, opts = {}) {
-  const group = new THREE.Group();
-  const R = seeded(def.n * 7919);
-  const fogC = new THREE.Color(def.fog);
+// 文字のスプライト（出口の行き先やNPC名など）
+export function textSprite(text, color = '#ffffff', width = 5, sub = '') {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = sub ? 128 : 80;
+  const g = cv.getContext('2d');
+  g.font = 'bold 44px "Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 8; g.strokeStyle = 'rgba(0,0,0,.85)';
+  g.strokeText(text, 256, 40); g.fillStyle = color; g.fillText(text, 256, 40);
+  if (sub) { g.font = 'bold 30px sans-serif'; g.strokeText(sub, 256, 98); g.fillStyle = '#ffffff'; g.fillText(sub, 256, 98); }
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xdddddd, depthTest: false, depthWrite: false, transparent: true, fog: false }));
+  sp.geometry.userData.shared = true;
+  sp.renderOrder = 998;
+  sp.scale.set(width, width * cv.height / 512, 1);
+  sp.userData.disposeMap = true;
+  return sp;
+}
 
-  // ---- 空（グラデーション＋太陽） ----
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16), new THREE.ShaderMaterial({
+// ---------------------------------------------------------------------------
+// 共通パーツ
+// ---------------------------------------------------------------------------
+function makeSky(fdef, dark) {
+  return new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { top: { value: new THREE.Color(def.skyTop) }, bot: { value: new THREE.Color(def.skyBot) }, sunC: { value: new THREE.Color(def.sun) }, sunDir: { value: new THREE.Vector3(0.45, 0.35, -0.82).normalize() } },
+    uniforms: {
+      top: { value: new THREE.Color(fdef.skyTop).multiplyScalar(dark ? 0.15 : 1) }, bot: { value: new THREE.Color(fdef.skyBot).multiplyScalar(dark ? 0.15 : 1) },
+      sunC: { value: new THREE.Color(fdef.sun).multiplyScalar(dark ? 0 : 1) }, sunDir: { value: new THREE.Vector3(0.45, 0.35, -0.82).normalize() },
+    },
     vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
     fragmentShader: `uniform vec3 top; uniform vec3 bot; uniform vec3 sunC; uniform vec3 sunDir; varying vec3 vP;
       void main(){ float k = smoothstep(-0.05, 0.55, vP.y); vec3 c = mix(bot, top, k);
@@ -55,21 +78,206 @@ export function buildFloor(def, opts = {}) {
       c += sunC * (smoothstep(0.9975, 0.999, s) * 1.2 + pow(s, 24.0) * 0.35);
       gl_FragColor = vec4(c, 1.0); }`,
   }));
-  group.add(sky);
+}
 
-  // ---- 地面 ----
-  const size = (FIELD_RADIUS + 30) * 2;
-  const ground = new THREE.PlaneGeometry(size, size, 150, 150);
+function makeGate() {
+  const gate = new THREE.Group();
+  const stone = toon(0x8a93a6), stoneD = toon(0x5a6274), gold = toon(0xe0b84a);
+  const ringMat = glow(new THREE.Color(0x7ae0ff).multiplyScalar(1.4));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(3, 0.22, 12, 64), ringMat);
+  ring.position.y = 3.8; gate.add(ring);
+  const runes = new THREE.Group(); runes.position.y = 3.8; gate.add(runes);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; runes.add(at(new THREE.Mesh(new THREE.OctahedronGeometry(0.16), ringMat), Math.cos(a) * 3.55, Math.sin(a) * 3.55, 0)); }
+  const inner = new THREE.Mesh(new THREE.CircleGeometry(2.8, 48), new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  inner.position.y = 3.8; gate.add(inner);
+  const plat = at(new THREE.Mesh(new THREE.CylinderGeometry(6, 6.6, 0.45, 40), stoneD), 0, 0.1, 0); plat.receiveShadow = true; gate.add(plat);
+  const plat2 = at(new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.25, 40), stone), 0, 0.4, 0); plat2.receiveShadow = true; gate.add(plat2);
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; const st = at(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.9), stone), Math.sin(a) * 5.2, 0.38, Math.cos(a) * 5.2); st.rotation.y = a; gate.add(st); }
+  const rune = new THREE.Mesh(new THREE.RingGeometry(3.6, 3.85, 64), new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  rune.rotation.x = -Math.PI / 2; rune.position.y = 0.54; gate.add(rune);
+  for (const s of [-1, 1]) {
+    gate.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 1.0), stoneD), s * 3.6, 0.75, 0));
+    gate.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 7, 16), stone), s * 3.6, 4.4, 0));
+    gate.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.9), gold), s * 3.6, 7.95, 0));
+    gate.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 10), ringMat), s * 3.6, 8.45, 0));
+  }
+  gate.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  outline(gate, 1);
+  gate.add(at(textSprite('転移門', '#9ae8ff', 4, '[F] 階層移動'), 0, 10, 0));
+  gate.userData.anim = (t) => { ring.rotation.z = t * 0.4; runes.rotation.z = -t * 0.25; inner.material.opacity = 0.1 + Math.sin(t * 2) * 0.05; rune.rotation.z = t * 0.2; };
+  return gate;
+}
+
+// エリア間の出口（光る門）
+function makePortal(label, color = 0x9ad8ff) {
+  const g = new THREE.Group();
+  const stone = toon(0x7a8090);
+  for (const s of [-1, 1]) {
+    g.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.2, 0.6), stone), s * 2.1, 2.1, 0));
+    g.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.9), stone), s * 2.1, 0.15, 0));
+  }
+  g.add(at(new THREE.Mesh(new THREE.BoxGeometry(5, 0.5, 0.7), stone), 0, 4.4, 0));
+  const veil = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 4), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  veil.position.y = 2.1; g.add(veil);
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(2.2, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pad.rotation.x = -Math.PI / 2; pad.position.y = 0.08; g.add(pad);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  outline(g, 1);
+  g.add(at(textSprite('▶ ' + label, '#bfe6ff', 5), 0, 5.6, 0));
+  g.userData.anim = (t) => { veil.material.opacity = 0.25 + Math.sin(t * 2.5) * 0.1; };
+  return g;
+}
+
+// ボス部屋の魔法陣
+function makeLair(lair, accent, groundCol) {
+  const g = new THREE.Group();
+  const circ = new THREE.Group();
+  const ringMats = [];
+  const R = lair.r;
+  const addRing = (r0, r1, op) => {
+    const mm = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 96), mm);
+    m.rotation.x = -Math.PI / 2; m.position.y = 0.12; circ.add(m); ringMats.push(mm);
+  };
+  addRing(R - 1, R - 0.6, 0.55); addRing(R * 0.55, R * 0.55 + 0.25, 0.55); addRing(2.6, 2.9, 0.6);
+  for (let i = 0; i < 6; i++) {
+    const mm = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const a0 = i / 6 * Math.PI * 2, a1 = (i + 2) / 6 * Math.PI * 2, rr = R * 0.55;
+    const p0 = new THREE.Vector3(Math.sin(a0) * rr, 0, Math.cos(a0) * rr), p1 = new THREE.Vector3(Math.sin(a1) * rr, 0, Math.cos(a1) * rr);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.22, p0.distanceTo(p1)), mm);
+    m.rotation.x = -Math.PI / 2; m.position.copy(p0.clone().add(p1).multiplyScalar(0.5)).setY(0.13);
+    m.rotation.z = -Math.atan2(p1.x - p0.x, p1.z - p0.z) + Math.PI;
+    circ.add(m); ringMats.push(mm);
+  }
+  g.add(circ);
+  const crystalMat = glow(new THREE.Color(accent).multiplyScalar(1.5));
+  const pilM = toon(new THREE.Color(groundCol).lerp(new THREE.Color(0x9a9aa8), 0.55));
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI / 4 + i * Math.PI / 2, x = Math.sin(a) * (R - 2.5), z = Math.cos(a) * (R - 2.5);
+    g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 4, 10), pilM), x, 2, z));
+    const cr = at(new THREE.Mesh(new THREE.OctahedronGeometry(0.5), crystalMat), x, 4.7, z); cr.scale.y = 1.6; g.add(cr);
+  }
+  g.traverse((o) => { if (o.isMesh && o.material.isMeshToonMaterial) o.castShadow = true; });
+  outline(g, 1);
+  g.position.set(lair.x, 0, lair.z);
+  g.userData.anim = (t) => { circ.rotation.y = t * 0.05; };
+  return { group: g, ringMats };
+}
+
+// 草（インスタンス描画＋風と踏み分け）
+function makeGrass(fdef, R, heightAt, R_, avoid, density) {
+  const gcfg = GRASS[fdef.n];
+  if (!gcfg || density <= 0) return null;
+  const [cb, ct, dens, hgt] = gcfg;
+  const blade = new THREE.BufferGeometry();
+  const hs = [0, 0.35, 0.7, 1], ws = [0.07, 0.055, 0.03, 0];
+  const vp = [], vc = [], idx = [];
+  const cB = new THREE.Color(cb), cT = new THREE.Color(ct);
+  hs.forEach((h, i) => { for (const s of [-1, 1]) { vp.push(s * ws[i], h, 0); const c = cB.clone().lerp(cT, h); vc.push(c.r, c.g, c.b); } });
+  for (let i = 0; i < 3; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  blade.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3));
+  blade.setAttribute('normal', new THREE.Float32BufferAttribute(vp.map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+  blade.setAttribute('color', new THREE.Float32BufferAttribute(vc, 3));
+  blade.setIndex(idx);
+  const count = Math.min(36000, Math.round(Math.PI * R * R * dens * density));
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const U = { uTime: { value: 0 }, uPlayer: { value: new THREE.Vector2() } };
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'uniform float uTime; uniform vec2 uPlayer;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+      vec4 ip = instanceMatrix * vec4(transformed, 1.0);
+      float h = position.y;
+      vec2 bp = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
+      float sway = sin(uTime * 1.7 + bp.x * 0.3 + bp.y * 0.22) * 0.16 + sin(uTime * 3.3 + bp.x * 1.3) * 0.04;
+      ip.x += sway * h * h; ip.z += sway * 0.6 * h * h;
+      vec2 d = bp - uPlayer; float dl = length(d) + 0.001;
+      float push = smoothstep(1.6, 0.2, dl) * h;
+      ip.xz += d / dl * push * 0.8; ip.y -= push * 0.35;
+      vec4 mvPosition = modelViewMatrix * ip;
+      gl_Position = projectionMatrix * mvPosition;`);
+  };
+  const inst = new THREE.InstancedMesh(blade, mat, count);
+  const col = new THREE.Color();
+  const Rn = R_;
+  let n = 0;
+  for (let tries = 0; n < count && tries < count * 3; tries++) {
+    const a = Rn() * Math.PI * 2, r = Math.sqrt(Rn()) * (R - 1);
+    const x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (avoid(x, z)) continue;
+    const clump = 0.5 + 0.5 * Math.sin(x * 0.4 + Math.sin(z * 0.3) * 2) * Math.cos(z * 0.35);
+    if (Rn() > 0.35 + clump * 0.65) continue;
+    const s = hgt * (0.55 + Rn() * 0.6) * (0.7 + clump * 0.5);
+    inst.setMatrixAt(n, local(I, x, heightAt(x, z) - 0.02, z, 0, Rn() * Math.PI, 0, 1 + Rn() * 0.6, s, 1));
+    inst.setColorAt(n, col.setHSL(0, 0, 0.82 + Rn() * 0.3));
+    n++;
+  }
+  inst.count = n;
+  inst.frustumCulled = false;
+  return { mesh: inst, U };
+}
+
+// 遠景: 浮遊する島と雲
+function makeFar(fdef, R) {
+  const far = new Batch();
+  const fogC = new THREE.Color(fdef.fog);
+  const tint = (c, k = 0.45) => new THREE.Color(c).lerp(fogC, k);
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + R() * 0.4, r = 170 + R() * 120, y = 15 + R() * 70, s = 6 + R() * 14;
+    const base = local(I, Math.sin(a) * r, y, Math.cos(a) * r, 0, R() * 6, 0, s);
+    far.add(new THREE.ConeGeometry(1, 1.8, 9), tint(fdef.ground, 0.55), local(base, 0, -0.9, 0, Math.PI, 0, 0), { flat: true });
+    far.add(new THREE.CylinderGeometry(1.02, 1, 0.18, 12), tint(fdef.ground2), local(base, 0, 0.05, 0));
+    for (let k = 0; k < 4; k++) far.add(new THREE.SphereGeometry(0.22, 8, 6), tint(fdef.props[0][2] ?? 0x3f8f3a), local(base, (R() - 0.5) * 1.2, 0.3, (R() - 0.5) * 1.2, 0, 0, 0, 1, 1.3, 1));
+  }
+  const cloudC = tint(fdef.n === 9 ? 0x3a2050 : fdef.n === 5 ? 0x5a3028 : 0xffffff, 0.25);
+  for (let i = 0; i < 26; i++) {
+    const a = R() * Math.PI * 2, r = 120 + R() * 200, y = 35 + R() * 60;
+    const base = local(I, Math.sin(a) * r, y, Math.cos(a) * r, 0, R() * 6, 0, 6 + R() * 10);
+    for (let k = 0; k < 5; k++) far.add(new THREE.SphereGeometry(0.6 + R() * 0.5, 10, 8), cloudC, local(base, (k - 2) * 0.7, R() * 0.3, (R() - 0.5) * 0.8, 0, 0, 0, 1, 0.6, 1));
+  }
+  const g = far.build();
+  g.traverse((o) => { if (o.material && !o.material.userData.shared) { o.material.fog = false; o.castShadow = false; o.receiveShadow = false; } });
+  return g;
+}
+
+// ---------------------------------------------------------------------------
+// エリアの組み立て
+// ---------------------------------------------------------------------------
+export function buildArea(def, fdef, opts = {}) {
+  const fd = { ...fdef, n: def.floor };
+  return def.shape === 'grid' ? buildGrid(def, fd) : buildOpen(def, fd, opts);
+}
+
+function buildOpen(def, fdef, opts) {
+  const group = new THREE.Group();
+  const R = seeded(hashStr(def.id));
+  const heightAt = makeHeight(def);
+  const anims = [];
+  group.add(makeSky(fdef, false));
+
+  // 地面
+  const size = (def.R + 30) * 2;
+  const ground = new THREE.PlaneGeometry(size, size, 120, 120);
   ground.rotateX(-Math.PI / 2);
   const pos = ground.attributes.position;
   const cols = new Float32Array(pos.count * 3);
-  const c1 = new THREE.Color(def.ground), c2 = new THREE.Color(def.ground2), cp = c1.clone().lerp(new THREE.Color(0x8a7458), 0.55), tmp = new THREE.Color();
+  const c1 = new THREE.Color(fdef.ground), c2 = new THREE.Color(fdef.ground2), tmp = new THREE.Color();
+  const stoneC = new THREE.Color(0xa8a49a).lerp(c1, 0.15), pathC = c1.clone().lerp(new THREE.Color(0x8a7458), 0.55);
+  const plaza = def.type === 'town' ? def.R * 0.62 : def.type === 'camp' ? 9 : 0;
+  const exits = exitsOf(def);
+  const onPath = (x, z, w) => exits.some((e) => {
+    // 中心から各出口への小道
+    const L = Math.hypot(e.x, e.z), ux = e.x / L, uz = e.z / L;
+    const along = x * ux + z * uz, side = Math.abs(x * uz - z * ux + Math.sin(along * 0.12) * 2.5);
+    return along > 0 && along < L && side < w;
+  });
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
-    pos.setY(i, groundHeight(x, z));
+    pos.setY(i, heightAt(x, z));
     const k = 0.5 + 0.5 * Math.sin(x * 0.21 + Math.cos(z * 0.17) * 2) * Math.cos(z * 0.09);
     tmp.copy(c1).lerp(c2, k * 0.85 + Math.random() * 0.15);
-    if (onPath(x, z, 2.8)) tmp.lerp(cp, onPath(x, z, 1.8) ? 0.85 : 0.45);
+    const r = Math.hypot(x, z);
+    if (r < plaza) tmp.copy(stoneC).offsetHSL(0, 0, ((Math.floor(x * 0.8) + Math.floor(z * 0.8)) % 2) * 0.03 + Math.random() * 0.02);
+    else if (onPath(x, z, 2.6)) tmp.lerp(pathC, onPath(x, z, 1.7) ? 0.85 : 0.45);
     cols[i * 3] = tmp.r; cols[i * 3 + 1] = tmp.g; cols[i * 3 + 2] = tmp.b;
   }
   ground.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -78,196 +286,251 @@ export function buildFloor(def, opts = {}) {
   gm.receiveShadow = true;
   group.add(gm);
 
-  // ---- 外周の崖とプロップ（1メッシュに結合） ----
+  // 外周の崖とプロップ
   const B = new Batch();
-  const I = new THREE.Matrix4();
-  const wallC = new THREE.Color(def.ground).multiplyScalar(0.55);
-  for (let i = 0; i < 80; i++) {
-    const a = (i / 80) * Math.PI * 2 + R() * 0.05, r = FIELD_RADIUS + 4 + R() * 7;
-    const h = 7 + R() * 15, w = 5 + R() * 5;
-    B.add(new THREE.DodecahedronGeometry(1, 1), wallC.clone().offsetHSL(0, 0, (R() - 0.5) * 0.06), local(I, Math.sin(a) * r, h * 0.3, Math.cos(a) * r, R(), R() * 6, R(), w, h, w), { flat: true });
+  const wallC = new THREE.Color(fdef.ground).multiplyScalar(0.55);
+  const nWall = Math.round(def.R * 1.3);
+  for (let i = 0; i < nWall; i++) {
+    const a = (i / nWall) * Math.PI * 2 + R() * 0.05, r = def.R + 4 + R() * 6;
+    const x = Math.sin(a) * r, z = Math.cos(a) * r;
+    if (exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7)) continue;
+    const h = 7 + R() * 14, w = 4 + R() * 5;
+    B.add(new THREE.DodecahedronGeometry(1, 1), wallC.clone().offsetHSL(0, 0, (R() - 0.5) * 0.06), local(I, x, h * 0.3, z, R(), R() * 6, R(), w, h, w), { flat: true });
   }
-  // 小道の飛び石
-  for (let z = LAIR_POS.z + LAIR_RADIUS; z < GATE_POS.z - 6; z += 1.6 + R()) {
-    const x = pathX(z) + (R() - 0.5) * 1.6;
-    B.add(new THREE.CylinderGeometry(0.5, 0.55, 0.12, 7), cp.clone().offsetHSL(0, 0, 0.05 + R() * 0.05), local(I, x, groundHeight(x, z) + 0.03, z, 0, R() * 3, 0, 0.7 + R() * 0.5, 1, 0.6 + R() * 0.4), { flat: true });
-  }
-  const avoid = (x, z) => Math.hypot(x - GATE_POS.x, z - GATE_POS.z) < 10 || Math.hypot(x - LAIR_POS.x, z - LAIR_POS.z) < LAIR_RADIUS + 3 || onPath(x, z, 3);
-  for (const [type, count, col1, col2] of def.props) {
-    for (let i = 0; i < count; i++) {
-      const a = R() * Math.PI * 2, r = 6 + Math.sqrt(R()) * (FIELD_RADIUS - 4);
+  const avoid = (x, z, pad = 3) => Math.hypot(x, z) < plaza + pad || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
+  const scale = (def.R / 68) ** 2 * (def.type === 'hunt' ? 0.6 : def.type === 'field' ? 1.1 : 0.7);
+  for (const [type, count, col1, col2] of fdef.props) {
+    for (let i = 0; i < Math.round(count * scale); i++) {
+      const a = R() * Math.PI * 2, r = 4 + Math.sqrt(R()) * (def.R - 3);
       const x = Math.sin(a) * r, z = Math.cos(a) * r;
       if (avoid(x, z)) continue;
-      const base = local(I, x, groundHeight(x, z), z, 0, R() * Math.PI * 2, 0, 0.7 + R() * 0.8);
-      makeProp(B, type, base, R, col1, col2, def);
+      makeProp(B, type, local(I, x, heightAt(x, z), z, 0, R() * Math.PI * 2, 0, 0.7 + R() * 0.8), R, col1, col2, fdef);
+    }
+  }
+  if (def.type === 'town') buildTown(B, def, R, heightAt, anims, group);
+  if (def.type === 'camp') buildCamp(B, def, R, heightAt, anims, group);
+  if (def.type === 'hunt') {
+    // 狩場: 木の柵と獣よけの杭
+    for (let i = 0; i < 40; i++) {
+      const a = R() * Math.PI * 2, r = def.R * (0.35 + R() * 0.55);
+      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      if (avoid(x, z, 0)) continue;
+      const m = local(I, x, heightAt(x, z), z, 0, a + Math.PI / 2, 0);
+      for (const s of [-1, 0, 1]) B.add(new THREE.CylinderGeometry(0.12, 0.14, 1.4, 6), 0x7a5a3a, local(m, s * 1.1, 0.7, 0));
+      B.add(new THREE.BoxGeometry(2.6, 0.14, 0.12), 0x8a6a48, local(m, 0, 1.0, 0));
+      B.add(new THREE.BoxGeometry(2.6, 0.14, 0.12), 0x8a6a48, local(m, 0, 0.55, 0));
+    }
+  }
+  group.add(B.build());
+  group.add(makeFar(fdef, R));
+
+  // 草
+  const grassAvoid = (x, z) => Math.hypot(x, z) < plaza + 1 || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 7) || onPath(x, z, 1.6) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 3);
+  const grass = makeGrass(fdef, def.R, heightAt, R, grassAvoid, (opts.grass ?? 1) * (def.type === 'town' ? 0.5 : 1));
+  if (grass) group.add(grass.mesh);
+
+  // 転移門・出口
+  let gate = null;
+  if (def.gate) { gate = makeGate(); gate.position.set(def.gate.x, 0, def.gate.z); group.add(gate); anims.push(gate.userData.anim); }
+  const portals = exits.map((e) => {
+    const p = makePortal(AREAS[e.to].name);
+    p.position.set(e.x, heightAt(e.x, e.z), e.z);
+    p.rotation.y = Math.atan2(e.x, e.z);
+    group.add(p); anims.push(p.userData.anim);
+    return { ...e, obj: p };
+  });
+
+  return {
+    group, gate, portals, heightAt, ringMats: [], lair: null,
+    light: { hemi: 1.1, sun: fdef.sunI, fogNear: fdef.fogNear, fogFar: fdef.fogFar, fog: fdef.fog },
+    update(t, px, pz) { for (const a of anims) a(t); if (grass) { grass.U.uTime.value = t; grass.U.uPlayer.value.set(px, pz); } },
+  };
+}
+
+function buildTown(B, def, R, heightAt, anims, group) {
+  // 家並み（北の出口側は空ける）
+  const roofs = [0xb0483a, 0x3a6ab0, 0x7a5a3a, 0x4a8a5a, 0x8a4a8a];
+  const n = 10;
+  for (let i = 0; i < n; i++) {
+    const a = (i + 0.5) / n * Math.PI * 2;
+    if (Math.abs(Math.atan2(Math.sin(a), -Math.cos(a))) > Math.PI - 0.5) continue; // 北
+    const r = def.R - 7, x = Math.sin(a) * r, z = Math.cos(a) * r;
+    const m = local(I, x, heightAt(x, z), z, 0, a, 0, 0.9 + R() * 0.3);
+    const w = 5 + R() * 2, d = 4.5, h = 3.2 + R() * 1.2;
+    B.add(new THREE.BoxGeometry(w, h, d), 0xeee6d4, local(m, 0, h / 2, 0));
+    B.add(new THREE.BoxGeometry(w + 0.3, 0.4, d + 0.3), 0x8a7a64, local(m, 0, 0.2, 0));
+    const roof = new THREE.CylinderGeometry(0.01, d * 0.78, 2.4, 4, 1);
+    B.add(roof, roofs[i % roofs.length], local(m, 0, h + 1.2, 0, 0, Math.PI / 4, 0, w / d * 1.0, 1, 1));
+    B.add(new THREE.BoxGeometry(1.1, 1.9, 0.1), 0x6a4428, local(m, 0, 0.95, -d / 2 - 0.02));
+    for (const s of [-1, 1]) B.add(new THREE.BoxGeometry(0.8, 0.8, 0.08), 0xffd88a, local(m, s * w * 0.3, h * 0.6, -d / 2 - 0.03), { glowing: true });
+    B.add(new THREE.BoxGeometry(0.6, 1.6, 0.6), 0x8a6a5a, local(m, w * 0.3, h + 1.4, d * 0.1));
+  }
+  // 街灯
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2 + 0.2, r = 13, x = Math.sin(a) * r, z = Math.cos(a) * r;
+    B.add(new THREE.CylinderGeometry(0.1, 0.14, 3.2, 8), 0x3a3a44, local(I, x, 1.6, z));
+    B.add(new THREE.SphereGeometry(0.28, 10, 8), 0xffe0a0, local(I, x, 3.3, z), { glowing: true });
+  }
+  // 露店（NPCの近く）
+  for (const npc of def.npcs || []) {
+    const m = local(I, npc.x + 1.5, heightAt(npc.x, npc.z), npc.z - 2, 0, 0.3, 0);
+    for (const s of [-1, 1]) B.add(new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6), 0x6a4a2a, local(m, s * 1.4, 1.2, 0));
+    B.add(new THREE.BoxGeometry(3.2, 0.9, 1.4), 0x9a7a52, local(m, 0, 0.45, 0));
+    B.add(new THREE.BoxGeometry(3.4, 0.12, 1.8), new THREE.Color(npc.color).lerp(new THREE.Color(0xffffff), 0.3), local(m, 0, 2.4, 0, 0.15, 0, 0));
+    for (let k = 0; k < 3; k++) B.add(new THREE.SphereGeometry(0.22, 8, 6), [0xd04a3a, 0xe0c040, 0x6ab04a][k], local(m, -0.9 + k * 0.9, 1.05, 0));
+  }
+  void group; void anims;
+}
+
+function buildCamp(B, def, R, heightAt, anims, group) {
+  // テントと焚き火
+  for (let i = 0; i < 4; i++) {
+    const a = Math.PI * 0.3 + i * Math.PI * 0.45, r = 12, x = Math.sin(a) * r, z = Math.cos(a) * r;
+    const m = local(I, x, heightAt(x, z), z, 0, a + Math.PI, 0);
+    B.add(new THREE.CylinderGeometry(0.01, 2.2, 2.6, 4), [0xc8b490, 0x8aa08a, 0xb08a6a, 0x9a9ab8][i], local(m, 0, 1.3, 0, 0, Math.PI / 4, 0, 1, 1, 1.4));
+    B.add(new THREE.BoxGeometry(0.8, 1.2, 0.05), 0x3a2a1a, local(m, 0, 0.6, 1.55));
+  }
+  const fx = 6, fz = 6;
+  for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; B.add(new THREE.DodecahedronGeometry(0.35, 0), 0x6a6a6a, local(I, fx + Math.sin(a) * 1, 0.15, fz + Math.cos(a) * 1), { flat: true }); }
+  for (let k = 0; k < 3; k++) B.add(new THREE.CylinderGeometry(0.12, 0.12, 1.6, 6), 0x5a3a20, local(I, fx, 0.2, fz, Math.PI / 2, k * 1.05, 0));
+  const fire = new THREE.Group();
+  const f1 = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 8), glow(new THREE.Color(0xff8a20).multiplyScalar(1.6)));
+  const f2 = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 8), glow(new THREE.Color(0xffe060).multiplyScalar(1.6)));
+  f1.position.y = 0.6; f2.position.y = 0.5; fire.add(f1, f2);
+  fire.position.set(fx, 0, fz);
+  group.add(fire);
+  anims.push((t) => { const s = 1 + Math.sin(t * 13) * 0.12; f1.scale.set(1, s, 1); f2.scale.set(1, 2 - s, 1); });
+  for (let k = 0; k < 4; k++) B.add(new THREE.BoxGeometry(1, 1, 1), 0x9a7a4a, local(I, -8 + (k % 2) * 1.1, 0.5 + Math.floor(k / 2) * 1.0, 6 + (k % 2) * 0.2, 0, k * 0.3, 0));
+}
+
+function buildGrid(def, fdef) {
+  const group = new THREE.Group();
+  const g = grid(def);
+  const R = seeded(hashStr(def.id));
+  const anims = [];
+  const isLab = def.type === 'labyrinth';
+  group.add(makeSky(fdef, true));
+  const floorC = new THREE.Color(fdef.ground).lerp(new THREE.Color(0x6a6a72), 0.7).multiplyScalar(0.8);
+  const wallC = new THREE.Color(fdef.ground2).lerp(new THREE.Color(isLab ? 0x9a96a4 : 0x8a8274), 0.8).multiplyScalar(isLab ? 0.85 : 0.7);
+  const topC = wallC.clone().multiplyScalar(0.7);
+  const B = new Batch();
+  const H = 3.2;
+  const open = (c, r) => r >= 0 && c >= 0 && r < g.H && c < g.W && g.rows[r][c] !== '#';
+  for (let r = 0; r < g.H; r++) {
+    for (let c = 0; c < g.W; c++) {
+      const ch = g.rows[r][c];
+      const x = (c - g.W / 2 + 0.5) * CELL, z = (r - g.H / 2 + 0.5) * CELL;
+      if (ch === '#') {
+        if (![[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dc, dr]) => open(c + dc, r + dr))) continue;
+        B.add(new THREE.BoxGeometry(CELL, H, CELL), wallC.clone().offsetHSL(0, 0, (R() - 0.5) * 0.05), local(I, x, H / 2, z), { flat: true });
+        B.add(new THREE.BoxGeometry(CELL + 0.1, 0.3, CELL + 0.1), topC, local(I, x, H + 0.15, z), { flat: true });
+        // 松明
+        if (R() < 0.1) {
+          const dir = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dc, dr]) => open(c + dc, r + dr));
+          if (dir) {
+            const tx = x + dir[0] * (CELL / 2 + 0.15), tz = z + dir[1] * (CELL / 2 + 0.15);
+            B.add(new THREE.CylinderGeometry(0.08, 0.06, 0.8, 6), 0x4a3020, local(I, tx, 2.0, tz, dir[1] * 0.4, 0, -dir[0] * 0.4));
+            B.add(new THREE.SphereGeometry(0.2, 8, 6), new THREE.Color(0xffa040).multiplyScalar(1.5), local(I, tx + dir[0] * 0.15, 2.5, tz + dir[1] * 0.15), { glowing: true });
+          }
+        }
+        continue;
+      }
+      const fc = floorC.clone().offsetHSL(0, 0, ((c + r) % 2) * 0.025 + (R() - 0.5) * 0.03);
+      if (ch === 'T' || ch === 't') {
+        fc.lerp(new THREE.Color(0x6a3a2a), 0.4);
+        for (let k = 0; k < 4; k++) B.add(new THREE.ConeGeometry(0.15, 0.35, 5), 0x9a9aa4, local(I, x + (k % 2 - 0.5) * 1.6, 0.17, z + (Math.floor(k / 2) - 0.5) * 1.6), { flat: true });
+      }
+      B.add(new THREE.BoxGeometry(CELL, 0.2, CELL), fc, local(I, x, -0.1, z), { flat: true });
+      if (ch === '.' && R() < 0.05) B.add(new THREE.DodecahedronGeometry(0.3, 0), wallC, local(I, x + (R() - 0.5) * 2, 0.15, z + (R() - 0.5) * 2, R(), R(), R()), { flat: true });
     }
   }
   group.add(B.build());
 
-  // ---- 遠景: 浮遊する島と雲（霧の影響を受けず空に溶ける色に） ----
-  const far = new Batch();
-  const tint = (c, k = 0.45) => new THREE.Color(c).lerp(fogC, k);
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2 + R() * 0.4, r = 170 + R() * 120, y = 15 + R() * 70, s = 6 + R() * 14;
-    const base = local(I, Math.sin(a) * r, y, Math.cos(a) * r, 0, R() * 6, 0, s);
-    far.add(new THREE.ConeGeometry(1, 1.8, 9), tint(def.ground, 0.55), local(base, 0, -0.9, 0, Math.PI, 0, 0), { flat: true });
-    far.add(new THREE.CylinderGeometry(1.02, 1, 0.18, 12), tint(def.ground2), local(base, 0, 0.05, 0));
-    for (let k = 0; k < 4; k++) far.add(new THREE.SphereGeometry(0.22, 8, 6), tint(def.props[0][2] ?? 0x3f8f3a), local(base, (R() - 0.5) * 1.2, 0.3, (R() - 0.5) * 1.2, 0, 0, 0, 1, 1.3, 1));
-    if (R() < 0.4) far.add(new THREE.CylinderGeometry(0.06, 0.08, 0.8, 8), tint(0xd8d0c0, 0.3), local(base, 0.3, 0.55, 0.1));
-  }
-  const cloudC = tint(def.n === 9 ? 0x3a2050 : def.n === 5 ? 0x5a3028 : 0xffffff, 0.25);
-  for (let i = 0; i < 26; i++) {
-    const a = R() * Math.PI * 2, r = 120 + R() * 200, y = 35 + R() * 60;
-    const base = local(I, Math.sin(a) * r, y, Math.cos(a) * r, 0, R() * 6, 0, 6 + R() * 10);
-    for (let k = 0; k < 5; k++) far.add(new THREE.SphereGeometry(0.6 + R() * 0.5, 10, 8), cloudC, local(base, (k - 2) * 0.7, R() * 0.3, (R() - 0.5) * 0.8, 0, 0, 0, 1, 0.6, 1));
-  }
-  const farG = far.build();
-  farG.traverse((o) => { if (o.material && !o.material.userData.shared) { o.material.fog = false; o.castShadow = false; o.receiveShadow = false; } });
-  group.add(farG);
+  // 出口
+  const portals = exitsOf(def).map((e) => {
+    const p = makePortal(AREAS[e.to].name);
+    p.position.set(e.x, 0, e.z);
+    group.add(p); anims.push(p.userData.anim);
+    return { ...e, obj: p };
+  });
 
-  // ---- 草（インスタンス描画＋風と踏み分け） ----
-  let grassU = null;
-  const gcfg = GRASS[def.n];
-  if (gcfg && (opts.grass ?? 1) > 0) {
-    const [cb, ct, dens, hgt] = gcfg;
-    const blade = new THREE.BufferGeometry();
-    const hs = [0, 0.35, 0.7, 1], ws = [0.07, 0.055, 0.03, 0];
-    const vp = [], vc = [], idx = [];
-    const cB = new THREE.Color(cb), cT = new THREE.Color(ct);
-    hs.forEach((h, i) => {
-      for (const s of [-1, 1]) { vp.push(s * ws[i], h, 0); const c = cB.clone().lerp(cT, h); vc.push(c.r, c.g, c.b); }
-    });
-    for (let i = 0; i < 3; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
-    blade.setAttribute('position', new THREE.Float32BufferAttribute(vp, 3));
-    blade.setAttribute('normal', new THREE.Float32BufferAttribute(vp.map(() => 0).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
-    blade.setAttribute('color', new THREE.Float32BufferAttribute(vc, 3));
-    blade.setIndex(idx);
-    const count = Math.min(42000, Math.round(Math.PI * FIELD_RADIUS * FIELD_RADIUS * dens * (opts.grass ?? 1)));
-    const mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
-    grassU = { uTime: { value: 0 }, uPlayer: { value: new THREE.Vector2() } };
-    mat.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, grassU);
-      sh.vertexShader = 'uniform float uTime; uniform vec2 uPlayer;\n' + sh.vertexShader.replace('#include <project_vertex>', `
-        vec4 ip = instanceMatrix * vec4(transformed, 1.0);
-        float h = position.y;
-        vec2 bp = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
-        float sway = sin(uTime * 1.7 + bp.x * 0.3 + bp.y * 0.22) * 0.16 + sin(uTime * 3.3 + bp.x * 1.3) * 0.04;
-        ip.x += sway * h * h; ip.z += sway * 0.6 * h * h;
-        vec2 d = bp - uPlayer; float dl = length(d) + 0.001;
-        float push = smoothstep(1.6, 0.2, dl) * h;
-        ip.xz += d / dl * push * 0.8; ip.y -= push * 0.35;
-        vec4 mvPosition = modelViewMatrix * ip;
-        gl_Position = projectionMatrix * mvPosition;`);
-    };
-    const inst = new THREE.InstancedMesh(blade, mat, count);
-    const col = new THREE.Color();
-    let n = 0;
-    for (let tries = 0; n < count && tries < count * 3; tries++) {
-      const a = R() * Math.PI * 2, r = Math.sqrt(R()) * (FIELD_RADIUS - 1);
-      const x = Math.sin(a) * r, z = Math.cos(a) * r;
-      if (Math.hypot(x - GATE_POS.x, z - GATE_POS.z) < 7 || Math.hypot(x - LAIR_POS.x, z - LAIR_POS.z) < LAIR_RADIUS + 0.5 || onPath(x, z, 1.6)) continue;
-      // まとまって生える
-      const clump = 0.5 + 0.5 * Math.sin(x * 0.4 + Math.sin(z * 0.3) * 2) * Math.cos(z * 0.35);
-      if (R() > 0.35 + clump * 0.65) continue;
-      const s = hgt * (0.55 + R() * 0.6) * (0.7 + clump * 0.5);
-      inst.setMatrixAt(n, local(I, x, groundHeight(x, z) - 0.02, z, 0, R() * Math.PI, 0, 1 + R() * 0.6, s, 1));
-      inst.setColorAt(n, col.setHSL(0, 0, 0.82 + R() * 0.3));
-      n++;
-    }
-    inst.count = n;
-    inst.frustumCulled = false;
-    group.add(inst);
+  // 扉
+  let door = null;
+  for (const d of g.pts.D || []) {
+    door = new THREE.Group();
+    const bar = toon(0x5a5a64);
+    for (let k = 0; k < 6; k++) door.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, H, 6), bar), -1.6 + k * 0.64, H / 2, 0));
+    door.add(at(new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.3), bar), 0, H - 0.3, 0));
+    door.add(at(new THREE.Mesh(new THREE.BoxGeometry(CELL, 0.3, 0.3), bar), 0, 0.5, 0));
+    const seal = at(new THREE.Mesh(new THREE.CircleGeometry(0.6, 24), glow(new THREE.Color(fdef.boss.accent).multiplyScalar(1.4), { side: THREE.DoubleSide })), 0, H / 2, 0.2);
+    door.add(seal);
+    door.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    outline(door, 1);
+    door.position.set(d.x, 0, d.z);
+    group.add(door);
   }
 
-  // ---- 転移門 ----
-  const gate = new THREE.Group();
-  const stone = toon(0x8a93a6), stoneD = toon(0x5a6274), gold = toon(0xe0b84a);
-  const ringMat = glow(new THREE.Color(0x7ae0ff).multiplyScalar(1.4));
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(3, 0.22, 12, 64), ringMat);
-  ring.position.y = 3.8; gate.add(ring);
-  const runes = new THREE.Group(); runes.position.y = 3.8; gate.add(runes);
-  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; const r = new THREE.Mesh(new THREE.OctahedronGeometry(0.16), ringMat); r.position.set(Math.cos(a) * 3.55, Math.sin(a) * 3.55, 0); runes.add(r); }
-  const inner = new THREE.Mesh(new THREE.CircleGeometry(2.8, 48), new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
-  inner.position.y = 3.8; gate.add(inner);
-  const plat = new THREE.Mesh(new THREE.CylinderGeometry(6, 6.6, 0.45, 40), stoneD); plat.position.y = 0.1; plat.receiveShadow = true; gate.add(plat);
-  const plat2 = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.25, 40), stone); plat2.position.y = 0.4; plat2.receiveShadow = true; gate.add(plat2);
-  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; const st = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.9), stone); st.position.set(Math.sin(a) * 5.2, 0.38, Math.cos(a) * 5.2); st.rotation.y = a; gate.add(st); }
-  const rune = new THREE.Mesh(new THREE.RingGeometry(3.6, 3.85, 64), new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-  rune.rotation.x = -Math.PI / 2; rune.position.y = 0.54; gate.add(rune);
-  for (const s of [-1, 1]) {
-    gate.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.5, 1.0), stoneD), s * 3.6, 0.75, 0));
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 7, 16), stone); col.position.set(s * 3.6, 4.4, 0); gate.add(col);
-    gate.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.9), gold), s * 3.6, 7.95, 0));
-    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 10), ringMat); orb.position.set(s * 3.6, 8.45, 0); gate.add(orb);
+  // レバー
+  let lever = null;
+  for (const L of g.pts.L || []) {
+    lever = new THREE.Group();
+    lever.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.8), toon(0x6a6a74)), 0, 0.3, 0));
+    const stick = new THREE.Group(); stick.position.y = 0.6; lever.add(stick);
+    stick.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.3, 8), toon(0x8a6a4a)), 0, 0.65, 0));
+    stick.add(at(new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), toon(0xd04a3a)), 0, 1.3, 0));
+    stick.rotation.z = 0.6;
+    lever.userData.stick = stick;
+    lever.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    outline(lever, 1);
+    lever.add(at(textSprite('レバー', '#ffd27a', 3, '[F] 引く'), 0, 2.8, 0));
+    lever.position.set(L.x, 0, L.z);
+    group.add(lever);
   }
-  gate.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  outline(gate, 1);
-  gate.position.set(GATE_POS.x, 0, GATE_POS.z);
-  gate.userData.anim = (t) => { ring.rotation.z = t * 0.4; runes.rotation.z = -t * 0.25; inner.material.opacity = 0.1 + Math.sin(t * 2) * 0.05; rune.rotation.z = t * 0.2; };
-  group.add(gate);
 
-  // ---- ボス部屋 ----
-  const lair = new THREE.Group();
-  const accent = def.boss.accent;
-  const floorM = new THREE.Mesh(new THREE.CircleGeometry(LAIR_RADIUS, 64), toon(new THREE.Color(def.ground).lerp(new THREE.Color(0x707080), 0.5).multiplyScalar(0.6)));
-  floorM.rotation.x = -Math.PI / 2; floorM.position.y = 0.03; floorM.receiveShadow = true; lair.add(floorM);
-  const tileM = toon(new THREE.Color(def.ground).lerp(new THREE.Color(0x707080), 0.5).multiplyScalar(0.75));
-  for (let r = 3.5; r < LAIR_RADIUS; r += 3.2) {
-    const n = Math.floor(r * 1.6);
-    for (let i = 0; i < n; i++) {
-      if (R() < 0.15) continue;
-      const a = (i + (r % 2) * 0.5) / n * Math.PI * 2;
-      const t = new THREE.Mesh(new THREE.BoxGeometry(r * 6.28 / n * 0.9, 0.06, 2.9), tileM);
-      t.position.set(Math.sin(a) * (r + 1.5), 0.06, Math.cos(a) * (r + 1.5)); t.rotation.y = a; t.receiveShadow = true;
-      lair.add(t);
-    }
+  // 宝箱
+  let chest = null;
+  for (const C of g.pts.C || []) {
+    chest = new THREE.Group();
+    const wood = toon(0x8a5a2a), gold = toon(0xe8b84a);
+    chest.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.0, 1.1), wood), 0, 0.5, 0));
+    const lid = new THREE.Group(); lid.position.set(0, 1.0, -0.55); chest.add(lid);
+    const lidMesh = at(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.8, 12, 1, false, 0, Math.PI), wood), 0, 0, 0.55);
+    lidMesh.rotation.z = Math.PI / 2;
+    lid.add(lidMesh);
+    for (const s of [-1, 1]) chest.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.05, 1.15), gold), s * 0.7, 0.52, 0));
+    chest.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.35, 0.1), gold), 0, 0.85, 0.58));
+    const shine = at(new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })), 0, 1.2, 0);
+    chest.add(shine);
+    chest.traverse((o) => { if (o.isMesh && o.material.isMeshToonMaterial) o.castShadow = true; });
+    outline(chest, 1);
+    chest.add(at(textSprite('宝箱', '#ffd27a', 3, '[F] 開ける'), 0, 2.6, 0));
+    chest.userData = { lid, shine };
+    chest.position.set(C.x, 0, C.z);
+    group.add(chest);
+    anims.push((t) => { shine.scale.setScalar(1 + Math.sin(t * 3) * 0.15); });
   }
-  const circ = new THREE.Group();
-  const ringMats = [];
-  const addRing = (r0, r1, op) => {
-    const mm = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 96), mm);
-    m.rotation.x = -Math.PI / 2; m.position.y = 0.12; circ.add(m); ringMats.push(mm);
-  };
-  addRing(LAIR_RADIUS - 1, LAIR_RADIUS - 0.6, 0.55); addRing(LAIR_RADIUS * 0.55, LAIR_RADIUS * 0.55 + 0.25, 0.55); addRing(2.6, 2.9, 0.6);
-  for (let i = 0; i < 6; i++) {
-    const mm = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const a0 = i / 6 * Math.PI * 2, a1 = (i + 2) / 6 * Math.PI * 2, rr = LAIR_RADIUS * 0.55;
-    const p0 = new THREE.Vector3(Math.sin(a0) * rr, 0, Math.cos(a0) * rr), p1 = new THREE.Vector3(Math.sin(a1) * rr, 0, Math.cos(a1) * rr);
-    const len = p0.distanceTo(p1);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.22, len), mm);
-    m.rotation.x = -Math.PI / 2; m.position.copy(p0.clone().add(p1).multiplyScalar(0.5)).setY(0.13);
-    m.rotation.z = -Math.atan2(p1.x - p0.x, p1.z - p0.z) + Math.PI;
-    circ.add(m); ringMats.push(mm);
+
+  // 感圧板
+  const plates = (g.pts.P || []).map((P) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 0.15, 24), new THREE.MeshToonMaterial({ color: 0x8a8aa0, emissive: 0x40c0ff, emissiveIntensity: 0 }));
+    m.position.set(P.x, 0.08, P.z); m.receiveShadow = true;
+    group.add(m);
+    const lab = at(textSprite('感圧板', '#9ae8ff', 3), P.x, 2.2, P.z); group.add(lab);
+    return m;
+  });
+
+  // ボス部屋
+  const lair = lairOf(def);
+  let ringMats = [];
+  if (lair) {
+    const L = makeLair(lair, fdef.boss.accent, fdef.ground);
+    group.add(L.group); ringMats = L.ringMats; anims.push(L.group.userData.anim);
   }
-  lair.add(circ);
-  const pilM = toon(new THREE.Color(def.ground2).lerp(new THREE.Color(0x9a9aa8), 0.55)), pilD = toon(new THREE.Color(def.ground2).lerp(new THREE.Color(0x6a6a78), 0.6));
-  const crystalMat = glow(new THREE.Color(accent).multiplyScalar(1.5));
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    if (Math.abs(Math.sin(a / 2)) < 0.15) continue; // 南側の入口
-    const px = Math.sin(a) * (LAIR_RADIUS + 1), pz = Math.cos(a) * (LAIR_RADIUS + 1);
-    const broken = R() < 0.25, h = broken ? 3 + R() * 3 : 9;
-    const p = new THREE.Group(); p.position.set(px, 0, pz);
-    p.add(at(new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 2), pilD), 0, 0.3, 0));
-    p.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.85, h, 12), pilM), 0, h / 2 + 0.6, 0));
-    if (!broken) {
-      p.add(at(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.5, 1.9), pilD), 0, h + 0.85, 0));
-      const cr = new THREE.Mesh(new THREE.OctahedronGeometry(0.6), crystalMat); cr.position.y = h + 1.9; cr.scale.y = 1.6; p.add(cr);
-    } else {
-      for (let k = 0; k < 3; k++) { const rb = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4 + R() * 0.3, 0), pilM); rb.position.set((R() - 0.5) * 3, 0.3, (R() - 0.5) * 3); p.add(rb); }
-    }
-    p.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    lair.add(p);
-  }
-  outline(lair, 1);
-  lair.position.set(LAIR_POS.x, 0, LAIR_POS.z);
-  lair.userData.anim = (t) => { circ.rotation.y = t * 0.05; };
-  group.add(lair);
 
   return {
-    group, gate, lair, ringMats,
-    update(t, px, pz) { if (grassU) { grassU.uTime.value = t; grassU.uPlayer.value.set(px, pz); } },
+    group, gate: null, portals, door, lever, chest, plates, lair, ringMats, heightAt: () => 0,
+    light: { hemi: 0.75, sun: fdef.sunI * 0.45, fogNear: 14, fogFar: 60, fog: new THREE.Color(fdef.fog).multiplyScalar(0.25).getHex() },
+    update(t) { for (const a of anims) a(t); },
   };
 }
 
@@ -284,10 +547,8 @@ function makeProp(B, type, M, R, c1, c2, def) {
       B.add(new THREE.CylinderGeometry(0.06, 0.1, 1.0, 6), C(c2), local(M, 0.35, 2.2, 0, 0, 0, -0.8));
       const lc = new THREE.Color(c1);
       const clumps = [[0, 3.3, 0, 1.35], [0.8, 2.9, 0.3, 0.95], [-0.75, 3.0, -0.2, 1.0], [0.2, 4.1, -0.2, 0.95], [-0.2, 2.9, 0.75, 0.85], [0.3, 2.8, -0.8, 0.85]];
-      for (const [x, y, z, r] of clumps) {
-        B.add(S(r), C(lc.clone().offsetHSL(0, 0, y > 3.5 ? 0.06 : -0.02)), local(M, x, y, z, 0, 0, 0, 1, 0.85, 1));
-      }
-      if (R() < 0.35) for (let k = 0; k < 4; k++) B.add(S(0.09, 6, 4), C(0xff5a4a), local(M, (R() - 0.5) * 2, 2.7 + R() * 1.2, 0.9 + R() * 0.3), { glowing: false });
+      for (const [x, y, z, r] of clumps) B.add(S(r), C(lc.clone().offsetHSL(0, 0, y > 3.5 ? 0.06 : -0.02)), local(M, x, y, z, 0, 0, 0, 1, 0.85, 1));
+      if (R() < 0.35) for (let k = 0; k < 4; k++) B.add(S(0.09, 6, 4), C(0xff5a4a), local(M, (R() - 0.5) * 2, 2.7 + R() * 1.2, 0.9 + R() * 0.3));
       break;
     }
     case 'pine': {

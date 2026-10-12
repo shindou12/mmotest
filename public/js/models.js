@@ -162,7 +162,7 @@ export function makePlayer(color) {
   ring.castShadow = false; root.add(ring);
 
   finish(body, 1);
-  root.userData = { body, legs, armL, armR, hand, head, cape, weapon: null, wKey: '' };
+  root.userData = { body, legs, armL, armR, hand, head, cape, ring, weapon: null, wKey: '' };
   return root;
 }
 
@@ -172,6 +172,8 @@ export function setPlayerWeapon(model, kind, rarity) {
   if (u.wKey === key) return;
   u.wKey = key;
   if (u.weapon) u.hand.remove(u.weapon);
+  if (u.shield) { u.armL.remove(u.shield); u.shield = null; }
+  if (kind === 'spear') u.shield = makeShield(rarity, u.armL);
   // 見下ろし視点で刃が「線」に見えないよう、刃の平らな面を上に向けて持つ
   const w = makeWeapon(kind, rarity);
   w.rotation.y = Math.PI / 2;
@@ -182,11 +184,35 @@ export function setPlayerWeapon(model, kind, rarity) {
   u.hand.add(u.weapon);
 }
 
+// 盾槍の盾（左腕に持つ）
+function makeShield(rarity, armL) {
+  const rc = new THREE.Color(RARITIES[rarity].color);
+  const g = new THREE.Group();
+  const face = toon(rarity >= 3 ? new THREE.Color(0x5a6a8a).lerp(rc, 0.3) : 0x5a6a8a);
+  const rim = toon(rarity >= 3 ? 0xf2c14e : 0xb8c0cc);
+  g.add(mesh(extrude([[-0.42, 0.55], [0.42, 0.55], [0.42, -0.1], [0, -0.62], [-0.42, -0.1]], 0.08), face));
+  g.add(mesh(extrude([[-0.12, 0.25], [0.12, 0.25], [0.12, -0.05], [0, -0.3], [-0.12, -0.05]], 0.03, 0), rarity >= 2 ? glow(rc.clone().multiplyScalar(1.2)) : rim, [0, 0, 0.06]));
+  g.add(mesh(new THREE.TorusGeometry(0.5, 0.035, 5, 20, Math.PI), rim, [0, 0.05, 0.02], [0, 0, 0], [0.85, 1, 1]));
+  finish(g, 0.9);
+  // 腕の外側に、面を前へ向けて持つ
+  g.position.set(-0.1, -0.45, 0.12);
+  g.rotation.set(0, -Math.PI / 2 + 0.25, 0);
+  armL.add(g);
+  return g;
+}
+
 export function animatePlayer(model, s) {
   const u = model.userData;
   const walk = s.moving ? Math.sin(s.walkT * 10) : 0;
   u.legs[0].rotation.x = walk * 0.75; u.legs[1].rotation.x = -walk * 0.75;
-  u.armL.rotation.set(-walk * 0.6, 0, -0.15);
+  if (s.guard) {
+    // ガード: 盾を前に突き出して構える
+    u.armL.rotation.set(-1.35, 0, 0.45);
+    if (u.shield) u.shield.rotation.set(Math.PI / 2, 0, 0);
+  } else {
+    u.armL.rotation.set(-walk * 0.6, 0, -0.15);
+    if (u.shield) u.shield.rotation.set(0, -Math.PI / 2 + 0.25, 0);
+  }
   u.body.position.y = s.moving ? Math.abs(Math.cos(s.walkT * 10)) * 0.07 : Math.sin(s.t * 2) * 0.015;
   u.head.rotation.x = s.moving ? 0.05 : Math.sin(s.t * 1.3) * 0.03;
   u.cape.rotation.x = s.moving ? -0.35 - Math.abs(walk) * 0.1 : -0.06 + Math.sin(s.t * 1.7) * 0.03;
