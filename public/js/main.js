@@ -244,31 +244,41 @@ function itemPower(it) {
 // ======================================================================
 // 入力
 // ======================================================================
+// 盾槍のガード（Shift 長押し。ダウン中はできない）
+function startGuard() {
+  if (me.dead || me.downT > 0 || me.guarding) return;
+  me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip');
+}
+function endGuard() {
+  // ガードしていた時間に応じて次の攻撃にボーナス（最大+50%・2秒で最大）
+  if (me.guarding) {
+    me.nextAtkBonus = 1 + Math.min(now() - me.guardStart, 2) / 2 * 0.5;
+    if (me.nextAtkBonus > 1.15) floatText(me.x, 2.6, me.z, `反撃準備 +${Math.round((me.nextAtkBonus - 1) * 100)}%`, 'info');
+  }
+  me.guarding = false;
+}
+
 // DOM のイベントは UI（ui/app.js）の Root 配下で受け、Mediator が裁定してからここを呼ぶ
 const input = {
   keyDown(k) {
     audio.init();
     if (!started) return;
     keys.add(k);
-    if (k === ' ' || k === 'shift') tryDodge();
-    if (k === 'q') usePotion();
-    if (k === 'e') tryWeaponSkill();
-    if (k === '1') tryTreeSkill(0);
-    if (k === '2') tryTreeSkill(1);
+    // 操作: 左クリック 攻撃 / 右クリック 武器スキル / Q・E スキル / Space 回避 / R 回復 / Shift長押し ガード（盾槍）
+    if (k === ' ') tryDodge();
+    if (k === 'shift' && S?.W.guard) startGuard();
+    if (k === 'r') usePotion();
+    if (k === 'q') tryTreeSkill(0);
+    if (k === 'e') tryTreeSkill(1);
   },
-  keyUp(k) { keys.delete(k); },
+  keyUp(k) { keys.delete(k); if (k === 'shift') endGuard(); },
   blur() { keys.clear(); mouse.l = mouse.r = false; me.charging = false; me.guarding = false; },
   pointerMove(x, y) { mouse.x = x; mouse.y = y; },
   pointerDown(button) {
     audio.init();
     if (!started) return;
     if (button === 0) { mouse.l = true; if (me.downT <= 0) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
-    if (button === 2) {
-      mouse.r = true;
-      // 盾槍は右クリック長押しでガード。それ以外は武器スキル（ダウン中はどちらもできない）
-      if (S?.W.guard) { if (!me.dead && me.downT <= 0) { me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip'); } }
-      else tryWeaponSkill();
-    }
+    if (button === 2) { mouse.r = true; tryWeaponSkill(); }
   },
   pointerUp(button) {
     if (button === 0) {
@@ -280,15 +290,7 @@ const input = {
         else doHeavy(me.chargeLv);
       }
     }
-    if (button === 2) {
-      mouse.r = false;
-      // 盾槍: ガードしていた時間に応じて次の攻撃にボーナス（最大+50%・2秒で最大）
-      if (me.guarding) {
-        me.nextAtkBonus = 1 + Math.min(now() - me.guardStart, 2) / 2 * 0.5;
-        if (me.nextAtkBonus > 1.15) floatText(me.x, 2.6, me.z, `反撃準備 +${Math.round((me.nextAtkBonus - 1) * 100)}%`, 'info');
-      }
-      me.guarding = false;
-    }
+    if (button === 2) mouse.r = false;
   },
   // ホイール1段で一定の比率だけ寄る/引く（どの距離でも同じ手触り）
   wheel(dy) { cam.zoomT = clamp(cam.zoomT * Math.exp(clamp(dy, -120, 120) * 0.0012), CAM_ZOOM[0], CAM_ZOOM[1]); },
@@ -307,7 +309,7 @@ const input = {
     audio.init();
     if (!started) return;
     if (act === 'atk') return down ? input.pointerDown(0) : input.pointerUp(0);
-    if (act === 'guard') return down ? input.pointerDown(2) : input.pointerUp(2);
+    if (act === 'guard') return down ? startGuard() : endGuard();
     if (!down) return;
     if (act === 'skill') tryWeaponSkill();
     if (act === 't1') tryTreeSkill(0);

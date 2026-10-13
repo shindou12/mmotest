@@ -404,7 +404,7 @@ body.touch .inv-head .dim { display: none; }
 #hotbar .slot.wsk .ic { font-size: 27px; }
 #hotbar .slot .ic { font-size: 20px; line-height: 1; z-index: 1; }
 #hotbar .slot kbd { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%); font-size: 9px; padding: 0 4px; background: rgba(0,0,0,.55); border-color: transparent; color: #e6e9f0; white-space: nowrap; }
-#hotbar .slot .nm { position: absolute; bottom: -31px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #c8cfdc; text-shadow: 0 1px 2px #000; max-width: 78px; }
+#hotbar .slot .nm { position: absolute; bottom: -31px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #c8cfdc; text-shadow: 0 1px 2px #000; max-width: 54px; }
 #hotbar .slot b { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; border-radius: 9px; background: #2e9a54; font-size: 11px; line-height: 18px; z-index: 2; }
 #hotbar .slot.ready { border-color: rgba(255, 236, 170, .75); box-shadow: 0 0 10px rgba(255, 220, 120, .35); }
 #hotbar .slot .cd, .tb .cd { inset: 0; height: 100% !important; border-radius: 50%; background: conic-gradient(rgba(0,0,0,.62) var(--p, 0%), transparent 0); }

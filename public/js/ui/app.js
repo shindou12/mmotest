@@ -295,7 +295,7 @@ export function createUI(game) {
       const sid = it.skill && WEAPON_SKILLS[it.skill]?.kind === it.kind ? it.skill : WEAPON_SKILL_POOL[it.kind][0];
       const ws = WEAPON_SKILLS[sid];
       h += `<div class="wsk">武器スキル「${ws.name}」<br><span class="dim">${ws.desc}（CT ${ws.cd}秒）</span></div>`;
-      if (WEAPONS[it.kind].guard) h += '<div class="dim">右クリック長押しでガード</div>';
+      if (WEAPONS[it.kind].guard) h += '<div class="dim">Shift長押しでガード</div>';
     }
     if (it.lore) h += `<div class="lore">${esc(it.lore)}</div>`;
     if (it.by) h += `<div class="dim">入れた人：${esc(it.by)}</div>`;
@@ -381,7 +381,7 @@ export function createUI(game) {
           nodesV.list(row.nodes, (n) => {
             const r = tree[n.id] || 0;
             const pips = Array.from({ length: n.max }, (_, i) => `<i class="${i < r ? 'on' : ''}"></i>`).join('');
-            const slotBtns = n.active && r > 0 ? `<div class="slotbtns">${[0, 1].map((i) => `<button data-slot="${i}" class="${char.slots?.[i] === n.active ? 'on' : ''}">${i + 1}</button>`).join('')}</div>` : '';
+            const slotBtns = n.active && r > 0 ? `<div class="slotbtns">${[0, 1].map((i) => `<button data-slot="${i}" class="${char.slots?.[i] === n.active ? 'on' : ''}">${'QE'[i]}</button>`).join('')}</div>` : '';
             return {
               name: n.id, data: n.id,
               html: `<div class="node ${r ? 'have' : ''} ${canLearn(char, n.id) ? 'can' : ''} ${n.active ? 'active' : ''}">
@@ -714,7 +714,7 @@ export function createUI(game) {
     }
     H.atkName.set({ text: HEAVY[S.wk].name });
     H.skillName.set({ text: S.ws.name });
-    H.wsKey.set({ text: S.W.guard ? 'E' : 'E / 右' });
+    H.wsKey.set({ text: '右クリック' });
     H.slots.guard.set({ visible: !!S.W.guard, cls: { active: me.guarding } });
     setCd(H.slots.skill, me.wsCd, S.ws.cd * (1 - S.cdr / 100));
     for (let i = 0; i < 2; i++) {

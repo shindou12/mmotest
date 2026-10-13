@@ -74,12 +74,12 @@
   </div>
   <!-- 右下: スキル（丸いアイコン） -->
   <div id="hotbar">
-    <div class="slot hidden" id="s-guard"><div class="ic">⛨</div><kbd>右長押し</kbd><div class="nm">ガード</div></div>
-    <div class="slot" id="s-pot"><div class="ic">⚗</div><b id="pot-n">3</b><kbd>Q</kbd><div class="nm">回復</div><div class="cd"></div></div>
+    <div class="slot hidden" id="s-guard"><div class="ic">⛨</div><kbd>Shift長押し</kbd><div class="nm">ガード</div></div>
+    <div class="slot" id="s-pot"><div class="ic">⚗</div><b id="pot-n">3</b><kbd>R</kbd><div class="nm">回復</div><div class="cd"></div></div>
     <div class="slot" id="s-dodge"><div class="ic">↻</div><kbd>Space</kbd><div class="nm">回避・<span id="dodge-w">普通</span></div><div class="cd"></div></div>
-    <div class="slot tsk" id="s-t1"><div class="ic">◆</div><kbd>1</kbd><div class="nm">未設定</div><div class="cd"></div></div>
-    <div class="slot tsk" id="s-t2"><div class="ic">◆</div><kbd>2</kbd><div class="nm">未設定</div><div class="cd"></div></div>
-    <div class="slot wsk" id="s-skill"><div class="ic">✦</div><kbd id="ws-key">E</kbd><div class="nm" id="skill-name">武器スキル</div><div class="cd"></div></div>
+    <div class="slot tsk" id="s-t1"><div class="ic">◆</div><kbd>Q</kbd><div class="nm">未設定</div><div class="cd"></div></div>
+    <div class="slot tsk" id="s-t2"><div class="ic">◆</div><kbd>E</kbd><div class="nm">未設定</div><div class="cd"></div></div>
+    <div class="slot wsk" id="s-skill"><div class="ic">✦</div><kbd id="ws-key">右クリック</kbd><div class="nm" id="skill-name">武器スキル</div><div class="cd"></div></div>
   </div>
   <div id="chat">
     <div id="chat-log"></div>
@@ -111,11 +111,11 @@
     WASD 移動 / マウス 向き<br>
     左クリック 通常攻撃（3段コンボ）<br>
     左クリック長押し→離す 強攻撃（溜めるほど強い）<br>
-    右クリック / E 武器スキル<br>
-    1 / 2 スキルツリーで覚えたスキル<br>
-    Space 回避（無敵時間あり）<br>
-    盾槍：右クリック長押しでガード（構えた直後はジャストガード）<br>
-    Q ポーション / I 装備 / K スキルツリー / M エリアマップ<br>
+    右クリック 武器スキル<br>
+    Q / E スキルツリーで覚えたスキル<br>
+    Space 回避（無敵時間あり。ダウン直後なら受け身）<br>
+    盾槍：Shift長押しでガード（構えた直後はジャストガード）<br>
+    R ポーション / I 装備 / K スキルツリー / M エリアマップ<br>
     F 調べる（転移門・NPC・レバー・宝箱・共有ボックス）<br>
     ホイール ズーム<br>
     Esc 設定 / Enter チャット / H ヘルプ<br>
@@ -138,7 +138,7 @@
 </div>
 
 <div id="tree" class="panel hidden">
-  <div class="inv-head"><b>スキルツリー</b><span id="sp-left"></span><span class="dim">クリックで習得 ／ ◆は使うスキル（[1][2]でスロットに入れる）</span><button id="tree-reset">振り直し</button><button id="tree-close" data-close>×</button></div>
+  <div class="inv-head"><b>スキルツリー</b><span id="sp-left"></span><span class="dim">クリックで習得 ／ ◆は使うスキル（[Q][E]でスロットに入れる）</span><button id="tree-reset">振り直し</button><button id="tree-close" data-close>×</button></div>
   <div id="tree-tabs"></div>
   <div id="tree-body"></div>
 </div>
