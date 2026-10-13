@@ -245,8 +245,7 @@ function itemPower(it) {
 // 入力
 // ======================================================================
 // 盾槍のガード（強攻撃の溜め中に自動で構える。スマホはガードボタンでも。ダウン中はできない）
-// ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃が「ガードカウンター」になる（威力2.5倍）
-const COUNTER_MULT = 2.5;
+// ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃の代わりに素早い三段突き（counterThrusts）
 function startGuard() {
   if (me.dead || me.downT > 0 || me.guarding || me.gg <= 0 || me.staggerT > 0) return;
   me.guarding = true; me.guardStart = now(); me.charging = false; me.counter = false; audio.sfx('equip');
@@ -289,7 +288,6 @@ function endGuard(fire = false) {
   const counter = me.guarding && me.counter;
   me.guarding = false; me.counter = false;
   if (!counter) return;
-  me.nextAtkBonus = COUNTER_MULT * (S.flags.has('bulwark') ? 1.3 : 1);
   me.counterFire = true;
   if (fire) doHeavy(2);
 }
@@ -1332,18 +1330,30 @@ function doHeavy(lv) {
     fx.ringWave(me.x, me.z, 0xbfe0ff, 5, 0.4);
     addShake(0.4);
     if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
-    me.swingDur = 0.6; // 突きをしっかり見せる
+    counterThrusts();
+    return;
   }
   HEAVY[S.wk].run(combat, lv);
-  if (counter) {
-    // 大きく踏み込んで突き抜ける（踏み込み 3m → 5m・短い無敵）。穂先の先へ光の筋
-    const a = me.a, sx = me.x, sz = me.z;
-    combat.dash(a, 5, 0.15, 0.25);
-    later(0.12, () => {
-      for (let d = 0; d < 10; d += 0.4) fx.parts.emit(sx + Math.sin(a) * d, 1.2, sz + Math.cos(a) * d, { color: d % 1.2 < 0.4 ? 0xffffff : 0xbfe0ff, size: 0.6, life: 0.45, speed: 1.5, gravity: 0 });
-      fx.ringWave(sx + Math.sin(a) * 6, sz + Math.cos(a) * 6, 0xbfe0ff, 3, 0.3);
+}
+// ガードカウンター: 素早い三段突き（1突きごとに少し踏み込む・最後の突きが一番強い）
+const COUNTER_HITS = [1.8, 1.8, 3.2]; // 1突きの威力（攻撃力の倍率）。合計で強攻撃（溜め切り）の約2倍
+function counterThrusts() {
+  const k = S.flags.has('bulwark') ? 1.3 : 1; // ツリー「不動の盾」で +30%
+  me.swingDur = 0.5;
+  COUNTER_HITS.forEach((mult, i) => {
+    later(i * 0.15, () => {
+      if (me.dead || me.downT > 0) return;
+      const a = me.a = aimAngle(), last = i === COUNTER_HITS.length - 1;
+      me.swingT = 0; me.swingDur = last ? 0.35 : 0.15; me.sw++; // 突きのモーションを3回（ほかのプレイヤーにも見える）
+      combat.dash(a, 0.9, 0.06, 0.1);
+      later(0.04, () => {
+        combat.line(last ? 7 : 5.5, last ? 2.2 : 1.6, mult * k, { type: 'heavy', a, stun: last ? 8 : 3 });
+        for (let d = 0.5; d < (last ? 7.5 : 6); d += 0.45) fx.parts.emit(me.x + Math.sin(a) * d, 1.2, me.z + Math.cos(a) * d, { color: last ? 0xffffff : 0xbfe0ff, size: last ? 0.6 : 0.4, life: 0.3, speed: 1, gravity: 0 });
+        audio.sfx('swing', { heavy: last });
+        if (last) { fx.ringWave(me.x + Math.sin(a) * 4, me.z + Math.cos(a) * 4, 0xbfe0ff, 3, 0.3); addShake(0.35); }
+      });
     });
-  }
+  });
 }
 
 function tryWeaponSkill() {
