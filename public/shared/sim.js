@@ -1,5 +1,6 @@
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
+import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
 import {
   FLOORS, RARITIES, MAX_FLOOR, floorLevel, bossLevel, mobHp, mobDmg, mobXp, makeItem, rollRarity,
 } from './data.js';
@@ -24,16 +25,16 @@ const ARCH = {
   scorpion: { speed: 4.2, hp: 1.25, dmg: 1.2, wind: 0.8, range: 5.0, aggro: 13 },
   mage: { speed: 2.8, hp: 0.8, dmg: 1.05, wind: 1.3, range: 11, aggro: 15, ranged: true },
 };
-const ELITE = { hp: 2.6, dmg: 1.35, xp: 2.5 };
+const ELITE = { hp: BALANCE.eliteHp, dmg: BALANCE.eliteDamage, xp: 2.5 };
 const CHEST_COOLDOWN = 300; // ダンジョン最奥の宝箱
 const SMALL_CHEST_COOLDOWN = 600; // 屋外の小さな宝箱
-const NAMED = { hp: 6, dmg: 1.5, xp: 8, respawn: 240 };
+const NAMED = { hp: BALANCE.namedHp, dmg: BALANCE.namedDamage, xp: 8, respawn: 360 };
 const BOX_MAX = 60; // 共有ボックスの容量
 const BOX_RANGE = 4.5;
 // ヘイトは一定時間ごとにリセット。狙われている人が攻撃を受けると少し延びる
 const HATE_RESET = { boss: 12, mob: 15 };
 const HATE_ABSORB = 1.2;
-const STUN_TIME = 4;
+const STUN_TIME = BALANCE.stunSeconds;
 const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; };
 
 export class World {
@@ -305,10 +306,11 @@ export class World {
   spawnMob(A, defIdx, x, z, lv, kind = 'mob', elite = false) {
     const def = A.fdef.mobs[defIdx];
     const arch = ARCH[def.t];
-    let hp = mobHp(lv) * arch.hp * (kind === 'add' ? 0.5 : 1) * (elite ? ELITE.hp : 1);
+    const scaleN = partySize(this.areaPlayers(A.id).length);
+    let hp = mobHp(lv) * floorPressure(A.n) * enemyScale(scaleN) * arch.hp * (kind === 'add' ? 0.5 : 1) * (elite ? ELITE.hp : 1);
     hp = Math.round(hp);
     const mob = {
-      id: this.seq++, kind, d: defIdx, t: def.t, name: def.name, arch, lv, hp, mhp: hp, x, z, hx: x, hz: z, elite,
+      id: this.seq++, scaleN, kind, d: defIdx, t: def.t, name: def.name, arch, lv, hp, mhp: hp, x, z, hx: x, hz: z, elite,
       a: Math.random() * Math.PI * 2, st: 0, target: null, cd: rnd(0.5, 1.5), windT: 0, wanderT: 0, wx: x, wz: z,
       provoked: 0, threat: new Map(), tauntT: 0, pathT: 0, wp: null, hateT: HATE_RESET.mob, hateMax: HATE_RESET.mob,
     };
@@ -317,17 +319,30 @@ export class World {
   }
 
   spawnBoss(A) {
-    const n = Math.max(1, this.areaPlayers(A.id).length);
+    const n = partySize(this.areaPlayers(A.id).length);
     const lv = bossLevel(A.n);
-    const hp = Math.round(mobHp(lv) * 28 * (1 + 0.65 * (n - 1)));
+    const hp = Math.round(mobHp(lv) * BALANCE.bossHp * floorPressure(A.n) * enemyScale(n, true));
     const b = {
-      id: this.seq++, kind: 'boss', d: 2, t: A.fdef.boss.t, lv, hp, mhp: hp, x: A.lair.x, z: A.lair.z - 5, a: 0,
+      id: this.seq++, scaleN: n, kind: 'boss', d: 2, t: A.fdef.boss.t, lv, hp, mhp: hp, x: A.lair.x, z: A.lair.z - 5, a: 0,
       st: 0, actT: 2.5, busyT: 0, enraged: false, phase: 1, last: null, dash: null, arch: { speed: 3.4 }, threat: new Map(),
-      hateT: HATE_RESET.boss, hateMax: HATE_RESET.boss, stun: 0, stunMax: Math.round(100 * (1 + 0.5 * (n - 1))), stunT: 0,
+      hateT: HATE_RESET.boss, hateMax: HATE_RESET.boss, stun: 0, stunMax: Math.round(BALANCE.bossStun * (1 + 0.65 * (n - 1))), stunT: 0,
     };
     A.mobs.set(b.id, b);
     A.boss = b;
     return b;
+  }
+
+  // Only scale up within an encounter. Leaving/dying never weakens an existing enemy.
+  // Preserve the HP fraction, so reinforcements cannot reset progress or instantly kill it.
+  scaleEncounter(A, m, count) {
+    const n = partySize(count), previous = m.scaleN || BALANCE.recommendedParty;
+    if (n <= previous) return;
+    const boss = m.kind === 'boss';
+    const fraction = m.hp / m.mhp;
+    m.mhp = Math.round(m.mhp * enemyScale(n, boss) / enemyScale(previous, boss));
+    m.hp = Math.max(1, Math.round(m.mhp * fraction));
+    if (boss) m.stunMax = Math.round(m.stunMax * (1 + 0.65 * (n - 1)) / (1 + 0.65 * (previous - 1)));
+    m.scaleN = n;
   }
 
   killMob(A, mob) {
@@ -339,9 +354,8 @@ export class World {
     if (isBoss) xp *= 12;
     if (mob.kind === 'add') xp *= 0.3;
     for (const p of this.areaPlayers(A.id)) {
-      if (!isBoss && dist(p, mob) > 45) continue;
-      const gap = p.lv - mob.lv;
-      const mult = gap > 6 ? 0.35 : gap < -3 ? 1.3 : 1;
+      if (p.dead || p.hp <= 0 || dist(p, mob) > (isBoss ? 55 : 45)) continue;
+      const mult = levelXpMultiplier(p.lv, mob.lv);
       this.send(p, { t: 'xp', n: Math.max(1, Math.round(xp * mult)), nm: isBoss ? A.fdef.boss.name : mob.name, ar: A.id, boss: isBoss ? A.n : 0, el: mob.named ? 3 : mob.elite ? 1 : 0 });
       // ゴールド（個人ごと）。雑魚はたまに落とさない。ボス・ネームドは金貨袋
       let gold = (3 + mob.lv * 1.5) * rnd(0.7, 1.3) * (isBoss ? 40 : mob.named ? 15 : mob.elite ? 3 : 1) * (mob.kind === 'add' ? 0.2 : 1);
@@ -458,7 +472,7 @@ export class World {
     // 湧き
     if (def.mobs && def.shape === 'open') {
       const field = [...A.mobs.values()].filter((m) => m.kind === 'mob').length;
-      const want = Math.min(28, def.mobs.count + players.length * def.mobs.perPlayer);
+      const want = Math.min(36, def.mobs.count + 3 + players.length * def.mobs.perPlayer);
       A.spawnT -= dt;
       if (field < want && A.spawnT <= 0) {
         A.spawnT = field < want / 2 ? 0.1 : (def.mobs.respawn ?? 1.2);
@@ -502,7 +516,7 @@ export class World {
         const nd = def.named;
         const mob = this.spawnMob(A, nd.d, sp.x, sp.z, nd.lv, 'mob', true);
         mob.named = true; mob.name = nd.name;
-        mob.hp = mob.mhp = Math.round(mobHp(mob.lv) * mob.arch.hp * NAMED.hp);
+        mob.hp = mob.mhp = Math.round(mobHp(mob.lv) * mob.arch.hp * NAMED.hp * floorPressure(A.n) * enemyScale(mob.scaleN));
         A.namedId = mob.id;
         this.sysArea(A.id, `どこからか強大な気配がする…「${nd.name}」が現れた`, '#ffb27a');
       }
@@ -551,6 +565,7 @@ export class World {
     }
 
     for (const m of A.mobs.values()) {
+      this.scaleEncounter(A, m, players.length);
       for (const [pid, v] of m.threat) m.threat.set(pid, v * (1 - 0.04 * dt));
       m.hateT -= dt;
       if (m.hateT <= 0) {
@@ -607,7 +622,7 @@ export class World {
     const home = { x: m.hx, z: m.hz };
     let target = this.threatTarget(m, alive, 26);
     if (!target) {
-      let best = Ar.aggro;
+      let best = Ar.aggro * 1.15;
       for (const p of alive) {
         const d = dist(p, m);
         if (d < best && !(A.def.gate && dist(p, A.def.gate) < 8)) { best = d; target = p; }
@@ -674,9 +689,9 @@ export class World {
 
   mobAttack(A, m, target, ang) {
     const Ar = m.arch;
-    const dmg = mobDmg(m.lv) * Ar.dmg * (m.named ? NAMED.dmg : m.elite ? ELITE.dmg : 1);
-    const wind = Ar.wind * (m.elite ? 0.85 : 1);
-    m.st = 2; m.windT = wind; m.cd = rnd(1.4, 2.4) + wind;
+    const dmg = mobDmg(m.lv) * floorPressure(A.n) * attackPressure(m.scaleN) * Ar.dmg * (m.named ? NAMED.dmg : m.elite ? ELITE.dmg : 1);
+    const wind = Math.max(0.42, Ar.wind * (m.elite ? 0.85 : 1) * 0.9);
+    m.st = 2; m.windT = wind; m.cd = rnd(1.0, 1.8) + wind;
     const fx = Math.sin(ang), fz = Math.cos(ang);
     const s = m.elite ? 1.3 : 1;
     let sh;
@@ -716,14 +731,14 @@ export class World {
       if (A.noTargetT > 8) { this.resetBoss(A); return; }
     } else A.noTargetT = 0;
 
-    // フェーズ: 1 → 激昂(50%) → 最終形態(25%)。移行時は大技で割り込む
-    if (!b.enraged && b.hp < b.mhp * 0.5) {
+    // フェーズ: 1 → 激昂(65%) → 最終形態(35%)。移行時は大技で割り込む
+    if (!b.enraged && b.hp < b.mhp * 0.65) {
       b.enraged = true; b.phase = 2;
       b.arch.speed = 4.6;
       this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 2 });
       b.dash = null; b.busyT = 0; b.actT = 0.4; b.forced = 'shock';
     }
-    if (b.phase === 2 && b.hp < b.mhp * 0.25) {
+    if (b.phase === 2 && b.hp < b.mhp * 0.35) {
       b.phase = 3;
       b.arch.speed = 5.2;
       this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 3 });
@@ -784,8 +799,8 @@ export class World {
       b.busyT = busy;
       // 攻撃の間隔は短め。フェーズが進むほど詰めてきて、連続攻撃も増える
       const gap = [0, rnd(0.6, 1.1), rnd(0.35, 0.7), rnd(0.15, 0.45)][b.phase || 1];
-      b.actT = busy + gap;
-      const chain = [0, 0.15, 0.4, 0.6][b.phase || 1];
+      b.actT = busy + gap * 0.8;
+      const chain = [0, 0.25, 0.5, 0.7][b.phase || 1];
       if (Math.random() < chain) b.actT = busy + 0.05;
     }
   }
@@ -819,7 +834,7 @@ export class World {
   bossPattern(A, b, pat, target, inArena) {
     const L = A.lair;
     const sp = [1, 0.9, 0.78, 0.68][b.phase || 1];
-    const base = mobDmg(b.lv) * 3.3;
+    const base = mobDmg(b.lv) * 3.3 * BALANCE.bossDamage * floorPressure(A.n) * attackPressure(b.scaleN);
     const col = b.phase === 3 ? '#ff1a8a' : b.enraged ? '#ff2a6a' : '#ff3a3a';
     // 遠距離攻撃と突進は、ときどき離れている別の人を狙う
     if (['shot', 'charge', 'chase'].includes(pat) && inArena.length > 1 && Math.random() < (pat === 'shot' ? 0.6 : 0.4)) {
@@ -1054,3 +1069,4 @@ export class World {
     this.broadcastArea(A.id, { t: 'snap', ar: A.id, p: ps, m: ms, bs: A.bossState, door: A.door ? 1 : 0, pl: plates });
   }
 }
+

@@ -1,3 +1,5 @@
+import { CharacterStore, CHARACTER_KEY } from './character-store.js';
+import { BALANCE } from '../shared/balance.js';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -43,11 +45,12 @@ const renderQuests = () => ui?.quests();
 // ======================================================================
 // セーブデータ / 設定
 // ======================================================================
-const SAVE_KEY = 'eterna_char_v1';
+const SAVE_KEY = CHARACTER_KEY;
+const characterStore = new CharacterStore();
 const SET_KEY = 'eterna_settings_v1';
 let char = null;
-function loadChar() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
-function saveChar() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(char)); } catch { /* */ } }
+function loadChar() { return characterStore.load(); }
+function saveChar() { characterStore.save(char); }
 
 const params = new URLSearchParams(location.search);
 const settings = {
@@ -369,6 +372,7 @@ function updateMouseWorld() {
 const net = new Net(onMsg);
 
 function onMsg(m) {
+  if (characterStore.lost && !['snap', 'roster', 'chat', 'leave', 'disconnected'].includes(m.t)) return;
   switch (m.t) {
     case 'welcome':
       me.id = m.id; world.unlocked = m.unlocked;
@@ -928,7 +932,9 @@ function die() {
     audio.sfx('phase');
     return;
   }
-  me.hp = 0; me.dead = true; me.deadT = 5; me.charging = false; me.guarding = false; me.buffs = []; me.downT = 0; me.kbT = 0;
+  const removed = characterStore.discard();
+  toast(removed ? '戦闘不能：このキャラクターのセーブデータを失いました' : 'キャラクターを失いました。ブラウザの保存データを削除できませんでした。', '#f99');
+  me.hp = 0; me.dead = true; me.deadT = BALANCE.deathSeconds; me.deathAt = now() + BALANCE.deathSeconds; me.charging = false; me.guarding = false; me.buffs = []; me.downT = 0; me.kbT = 0;
   audio.sfx('death');
   fx.parts.burst(me.x, 1, me.z, 80, { color: 0x9ad8ff, speed: 8, size: 0.5, life: 1.2 });
 }
@@ -972,6 +978,7 @@ function addShake(v) { if (settings.shake) shake = Math.max(shake, v); }
 
 const TYPE_MOD = { normal: 'normp', heavy: 'heavyp', wskill: 'wskillp' };
 function dealDamage(mb, mult, o = {}) {
+  if (characterStore.lost) return;
   if (!mb || mb.hp <= 0) return;
   const skill = o.type === 'wskill' || o.type === 'tskill';
   const tough = mb.kind === 2 || !!mb.elite;
@@ -1010,7 +1017,7 @@ function dealDamage(mb, mult, o = {}) {
     audio.sfx('hit', { crit });
   }
   const vamp = S.vamp + buffMod('vamp');
-  if (vamp > 0) heal(dmg * vamp / 100, false);
+  if (vamp > 0) heal(dmg * vamp / 100 * BALANCE.lifestealEfficiency, false);
   if (o.sv) onVariantHit(mb, dmg, o);
   // 称号「流星」: 武器スキルが当たると流れ星が降る（0.6秒に1回）
   if (o.type === 'wskill' && tf('t_star') && !o.noProc && now() - (me.starT || 0) > 0.6) {
@@ -1140,7 +1147,7 @@ function onVariantHit(mb, dmg, o) {
       });
     }
   }
-  if (v.key === 'sv_drain') heal(dmg * (0.08 + v.t * 0.03), true);
+  if (v.key === 'sv_drain') heal(dmg * (0.08 + v.t * 0.03) * BALANCE.lifestealEfficiency, true);
   if (v.key === 'sv_quake' && now() - c.quakeT > 0.2) {
     c.quakeT = now();
     fx.ringWave(mb.x, mb.z, 0xd8b080, 3.5, 0.35);
@@ -1513,19 +1520,21 @@ function tryDodge() {
 
 function usePotion() {
   if (!S || me.dead || me.potions <= 0 || me.potCd > 0 || me.hp >= S.mhp) return;
-  me.potions--; me.potCd = 1;
-  heal(S.mhp * 0.45 * (tf('t_spore') ? 1.4 : 1), true);
+  me.potions--; me.potCd = BALANCE.potionCooldown;
+  heal(S.mhp * BALANCE.potionHeal * (tf('t_spore') ? 1.4 : 1), true);
   audio.sfx('potion');
   fx.parts.burst(me.x, 1, me.z, 30, { color: 0x6aff8a, speed: 3, size: 0.4, life: 0.8, gravity: 3 });
 }
 
 function heal(n, show) {
+  if (characterStore.lost) return;
   const before = me.hp;
   me.hp = Math.min(S.mhp, me.hp + n);
   if (show && me.hp > before) floatText(me.x, 2.2, me.z, '+' + Math.round(me.hp - before), 'heal');
 }
 
 function gainXp(n) {
+  if (characterStore.lost) return;
   if (char.lv >= MAX_LEVEL) return;
   char.xp += n;
   floatText(me.x, 3.0, me.z, `+${n} EXP`, 'info');
@@ -2175,12 +2184,12 @@ function update(dt) {
   const safe = world.def.type === 'town' || world.def.type === 'camp';
 
   if (me.dead) {
-    me.deadT -= dt;
+    me.deadT = Math.max(0, me.deathAt - now());
     if (me.deadT <= 0) {
-      me.dead = false; me.hp = S.mhp; me.potions = S.maxPot; me.gg = GUARD.max;
-      const sp = spawnPoint(world.def);
-      me.x = sp.x; me.z = sp.z;
-      fx.beam(me.x, me.z, 0x6ad0ff, 12, 1, 1);
+      // Reload into a fresh login; the lost character cannot respawn or be autosaved.
+      started = false;
+      location.reload();
+      return;
     }
   } else {
     // 移動
@@ -2488,6 +2497,7 @@ async function startGame({ name, color, kind }) {
   net.send({ t: 'hello', name: char.name, color: char.color, lv: char.lv });
   addChat('', ok ? 'サーバーに接続しました。友達を誘おう！' : 'ソロモードで起動しました（npm start でサーバーを立てるとマルチプレイ）', '#9fe');
   addChat('', '町の人に話しかけると（F）サブクエストを受けられます。町の共有ボックスで仲間と装備を受け渡しできます。', '#9fe');
+  addChat('', '協力ハード：3〜5人推奨。敵のHPは3人基準／回復30%・再使用8秒／戦闘不能でキャラのセーブデータを失います。', '#ffb27a');
   if (spTotal(char.lv) - spSpent(char.tree) > 0) toast('未使用のスキルポイントがあります（Kでスキルツリー）', '#ffd84a');
   return ok;
 }
@@ -2497,6 +2507,7 @@ async function startGame({ name, color, kind }) {
 // ======================================================================
 const game = {
   get char() { return char; },
+  get characterLost() { return characterStore.lost; },
   get S() { return S; },
   me, world, settings, others, mobs, npcs, drops, input,
   CHARGE_MIN, CHARGE_MAX,
@@ -2516,7 +2527,7 @@ const game = {
   resetChar() {
     try {
       localStorage.removeItem(SAVE_KEY);
-      localStorage.removeItem('aincrad_solo_world'); // ソロの階層解放状況・共有ボックスもリセット
+      localStorage.removeItem('eterna_coop_hard_solo_world_v1'); // ソロの階層解放状況・共有ボックスもリセット
     } catch { /* */ }
   },
   start: startGame,
@@ -2572,3 +2583,4 @@ function enterPreview() {
 loop();
 
 window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, coins, audio, api: game };
+

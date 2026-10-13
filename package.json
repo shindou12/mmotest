@@ -1,10 +1,11 @@
 {
   "name": "aincrad-mini",
   "version": "1.0.0",
-  "description": "友達で遊ぶ10階層ミニMMO (three.js)",
+  "description": "3〜5人向け・3階層の協力ハード版",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",

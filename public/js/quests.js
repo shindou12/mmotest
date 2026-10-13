@@ -1,3 +1,4 @@
+import { BALANCE } from '../shared/balance.js';
 // サブクエスト（町や野営地のNPCから受ける）
 // type: kill（指定の敵を倒す・エリア指定可）/ chest（宝箱を開ける）/ boss（階層ボスを倒す）/ visit（エリアに着く）
 // reward: xp と装備（rarity 以上を保証）、ポーション最大数アップなど
@@ -80,6 +81,7 @@ export const QUESTS = [
     reward: { xp: 1500, rarity: 3, slot: 'weapon', title: 't_shell' },
   },
 ];
+for (const q of QUESTS) q.reward.xp = Math.round(q.reward.xp * BALANCE.questXp);
 export const QUEST_INDEX = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
 
 // クエストの状態: undefined（未受注）/ { p: 進捗, done: 達成, claimed: 報告済み }
@@ -107,3 +109,4 @@ export function questProgress(char, ev) {
   }
   return changed;
 }
+

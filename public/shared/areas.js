@@ -213,7 +213,7 @@ export const AREAS = {
     floor: 1, type: 'secret', name: '静かな湖畔', shape: 'open', R: 30, ell: [1.2, 1], wob: 0.1, mapPos: [14, 86],
     exits: [{ to: 'f1_town', ang: 80 }],
     obst: { n: 1, kinds: ['pond'], big: true }, chests: 1,
-    named: { name: 'ヌシ・ギガスライム', d: 0, lv: 8, title: 't_lake' },
+    named: { name: 'ヌシ・ギガスライム', d: 0, lv: 10, title: 't_lake' },
   },
   f1_dun: {
     floor: 1, type: 'dungeon', name: '古井戸の洞窟', shape: 'grid', map: MAPS.dun1, mapPos: [14, 46],
@@ -290,7 +290,7 @@ export const AREAS = {
     floor: 3, type: 'secret', name: '流砂の谷', shape: 'open', R: 40, ell: [0.55, 1.7], wob: 0.12, mapPos: [16, 52],
     exits: [{ to: 'f3_camp', ang: 90 }, { to: 'f3_lab', ang: 0 }],
     obst: { n: 10, kinds: ['rock'] }, hazard: { kind: 'sand', n: 8, r: [3, 5] }, chests: 1,
-    named: { name: '砂鮫ギルガ', d: 0, lv: 18, title: 't_shark' },
+    named: { name: '砂鮫ギルガ', d: 0, lv: 26, title: 't_shark' },
     mobs: { count: 6, perPlayer: 2, lv: [2, 4] },
   },
   f3_lab: {
@@ -638,3 +638,4 @@ export function lairOf(def) {
   const b = grid(def).pts.B[0];
   return { x: b.x, z: b.z, r: 20 };
 }
+

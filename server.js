@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { BALANCE } from './public/shared/balance.js';
 import { World } from './public/shared/sim.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8080;
-const SAVE = path.join(__dirname, 'world-save.json');
+const SAVE = path.join(__dirname, 'world-save-coop-hard.json');
 const ROOTS = [
   ['/vendor/three/', path.join(__dirname, 'node_modules/three/')],
   ['/', path.join(__dirname, 'public/')],
@@ -26,6 +27,7 @@ const world = new World({
 
 const server = http.createServer((req, res) => {
   let url = decodeURIComponent((req.url || '/').split('?')[0]);
+  if (url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ mode: BALANCE.id })); return; }
   if (url === '/') url = '/index.html';
   for (const [prefix, dir] of ROOTS) {
     if (!url.startsWith(prefix)) continue;
@@ -62,6 +64,7 @@ setInterval(() => {
 }, 50);
 
 server.listen(PORT, () => {
-  console.log(`浮遊城エテルナ 起動: http://localhost:${PORT}`);
+  console.log(`浮遊城エテルナ 協力ハード（3〜5人推奨） 起動: http://localhost:${PORT}`);
   console.log(`同じLANの友達は http://<このPCのIP>:${PORT} でアクセス`);
 });
+

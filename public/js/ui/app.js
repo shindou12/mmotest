@@ -66,6 +66,7 @@ export function createUI(game) {
   // ==================================================================
   const mediator = new Mediator({}, null);
   const root = new Root(document.body, mediator);
+  root.link(() => game.characterLost ? true : undefined);
 
   const canvas = root.add('canvas', '#c');
   const login = root.add('login', '#login');
@@ -774,7 +775,7 @@ export function createUI(game) {
     else H.prompt.set({ visible: false });
     // 死亡
     death.set({ visible: me.dead });
-    if (me.dead) deathT.set({ text: `${Math.max(0, me.deadT).toFixed(1)} 秒後に${world.def.gate ? '転移門' : 'エリアの入口'}で復活` });
+    if (me.dead) deathT.set({ text: `キャラクターデータ消失。${Math.max(0, me.deadT).toFixed(1)} 秒後に新規キャラ作成へ` });
   };
 
   // ---- スマホの操作ボタン ----
@@ -1187,7 +1188,7 @@ export function createUI(game) {
           if (tc.on) game.fullscreen(); // スマホ: 全画面＋横向き固定（対応ブラウザのみ）
           L.start.set({ disabled: true, text: '接続中…' });
           game.start({ name: L.name.el.value.trim() || 'プレイヤー', color: L.color.el.value, kind: this.kind }).then((ok) => {
-            H.mode.set({ text: ok ? 'ONLINE' : 'SOLO MODE（サーバー未接続）' });
+            H.mode.set({ text: ok ? '協力ハード / ONLINE' : '協力ハード / SOLO（サーバー未接続・3人基準）' });
             this.go('play');
             P.quests(); P.party();
             setTimeout(() => H.help.set({ visible: false }), 15000);
@@ -1334,3 +1335,4 @@ export function createUI(game) {
     toast: P.toast, banner: P.banner, chat: P.chat, floatText: P.floatText, hurt: P.hurt, party: P.party, quests: P.quests,
   };
 }
+

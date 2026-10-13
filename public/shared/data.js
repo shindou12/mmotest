@@ -1,4 +1,5 @@
 // ゲームデータ定義（サーバー・クライアント共通）
+import { BALANCE } from './balance.js';
 
 export const MAX_LEVEL = 50;
 export const FIELD_RADIUS = 68;
@@ -6,14 +7,14 @@ export const GATE_POS = { x: 0, z: 40 };
 export const LAIR_POS = { x: 0, z: -46 };
 export const LAIR_RADIUS = 17;
 
-// --- 成長曲線（ゆるめ） -------------------------------------------------
-export const xpToNext = (lv) => Math.round(30 * Math.pow(lv, 1.55));
-export const mobXp = (mlv) => Math.round(9 * Math.pow(mlv, 1.25));
-export const growth = (lv) => Math.pow(1.1, lv - 1);
+// --- 成長曲線（協力ハード） -------------------------------------------------
+export const xpToNext = (lv) => Math.round(BALANCE.xpRequired * Math.pow(lv, BALANCE.xpExponent));
+export const mobXp = (mlv) => Math.round(BALANCE.killXp * Math.pow(mlv, 1.25));
+export const growth = (lv) => Math.pow(BALANCE.playerGrowth, lv - 1);
 export const baseAtk = (lv) => 10 * growth(lv);
 export const baseHp = (lv) => 100 * growth(lv);
-export const mobHp = (mlv) => 45 * growth(mlv);
-export const mobDmg = (mlv) => 6 * growth(mlv);
+export const mobHp = (mlv) => BALANCE.enemyHp * Math.pow(BALANCE.enemyHpGrowth, mlv - 1);
+export const mobDmg = (mlv) => BALANCE.enemyDamage * Math.pow(BALANCE.enemyDamageGrowth, mlv - 1);
 
 // --- レアリティ -----------------------------------------------------------
 export const RARITIES = [
@@ -370,8 +371,8 @@ export const FLOORS = [
   },
 ];
 
-export const floorLevel = (n) => 1 + (n - 1) * 5; // 階層の基準モンスターLv
-export const bossLevel = (n) => floorLevel(n) + 6;
+export const floorLevel = (n) => 1 + (n - 1) * BALANCE.floorSpacing; // 基準Lv 1 / 9 / 17
+export const bossLevel = (n) => floorLevel(n) + 7;
 
 // --- 図形判定 -------------------------------------------------------------
 export function angDiff(a, b) {
@@ -551,3 +552,4 @@ export function starterWeapon(kind) {
   it.skill = WEAPON_SKILL_POOL[kind][0];
   return it;
 }
+
