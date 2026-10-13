@@ -86,6 +86,21 @@ export const HEAVY = {
 // 武器に付くスキル（右クリック）
 // ---------------------------------------------------------------------------
 export const WEAPON_SKILLS = {
+  retreat: {
+    name: 'リトリート・スラッシュ', kind: 'sword', cd: 7,
+    desc: '前方を威力200%で斬り、敵に向いたまま3.5m後退する（後退中0.22秒無敵）',
+    run(c) {
+      const a = c.aim();
+      c.later(0.06, () => {
+        c.fx.slash(c.me.x, c.me.z, a, 3.4, 180, c.col(), 1.1);
+        c.arc(3.4, 180, 2.0, { type: 'wskill', a });
+        c.sfx('swing');
+        c.dash(a + Math.PI, 3.5, 0.22, 0.22);
+        c.me.a = a;
+        c.fx.parts.burst(c.me.x, 0.3, c.me.z, 16, { color: c.col(), speed: 3, size: 0.35, life: 0.3, up: 1 });
+      });
+    },
+  },
   vorpal: {
     name: 'ヴォーパル・ストライク', kind: 'sword', cd: 5, desc: '前方へ突進しながら貫く',
     run(c) {
@@ -594,3 +609,4 @@ export function treeEffects(char, wk) {
   }
   return { mods, flags, actives };
 }
+

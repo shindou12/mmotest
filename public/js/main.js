@@ -2225,8 +2225,9 @@ function update(dt) {
       moveMe(me.dodgeDir[0] * sp * dt, me.dodgeDir[1] * sp * dt);
       if (Math.random() < 0.5) fx.parts.emit(me.x, 0.6, me.z, { color: hasBuff('afterimage') ? 0x9affff : 0xbfe6ff, size: 0.4, life: hasBuff('afterimage') ? 0.6 : 0.3, speed: 0.5, gravity: 0 });
     } else if (me.dashT > 0) {
+      const dashDt = Math.min(dt, me.dashT);
       me.dashT -= dt;
-      moveMe(Math.sin(me.dashA) * me.dashSpeed * dt, Math.cos(me.dashA) * me.dashSpeed * dt);
+      moveMe(Math.sin(me.dashA) * me.dashSpeed * dashDt, Math.cos(me.dashA) * me.dashSpeed * dashDt);
       fx.parts.emit(me.x, 0.8, me.z, { color: RARITIES[S.wr].color, size: 0.4, life: 0.3, speed: 0.5, gravity: 0 });
     } else if (me.staggerT > 0) {
       // ひるみ中は動けない

@@ -69,7 +69,7 @@ export const BOW_ZONE = { min: 2, max: 8, outside: 0.35 };
 export const INSTINCT = { dr: 8 };
 // 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
 export const WEAPON_SKILL_POOL = {
-  sword: ['vorpal', 'square', 'leap', 'horizon'],
+  sword: ['vorpal', 'square', 'leap', 'horizon', 'retreat'],
   greatsword: ['cyclone', 'breaker', 'avalanche', 'meteor'],
   spear: ['lance', 'helix', 'piercer', 'whirlspear'],
   dagger: ['shadow', 'phantom', 'fan', 'venom'],
@@ -197,6 +197,11 @@ export function weightedTier(max, high) {
 }
 // 古いセーブの特性 [種類, 値] を [種類, ティア, 値] に直す
 export function migrateItem(it) {
+  // Upgrade the starter's original skill once; retain later blacksmith choices.
+  if (it?.kind === 'sword' && it.name === '初心者の片手剣' && !it.starterSkillVersion) {
+    if (it.skill === 'vorpal') it.skill = 'retreat';
+    it.starterSkillVersion = 1;
+  }
   if (!it || it.v === 2) return it;
   it.affixes = (it.affixes || []).map((a) => {
     if (a.length === 3) return a;
@@ -549,7 +554,8 @@ export function starterWeapon(kind) {
   const it = makeItem(1, 0, { slot: 'weapon', kind });
   it.name = '初心者の' + WEAPONS[kind].name;
   it.atk = 6;
-  it.skill = WEAPON_SKILL_POOL[kind][0];
+  it.skill = kind === 'sword' ? 'retreat' : WEAPON_SKILL_POOL[kind][0];
+  if (kind === 'sword') it.starterSkillVersion = 1;
   return it;
 }
 
