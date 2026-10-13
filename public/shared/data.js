@@ -41,9 +41,9 @@ export const WEAPONS = {
     skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
   },
   spear: {
-    // 盾槍: 右クリック長押しでガードできる。ヘイトを集めやすい
+    // 盾槍: 強攻撃を溜めている間はガード。ヘイトを集めやすい
     name: '盾槍', range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true, stun: 1.3, melee: true,
-    passive: ['被ダメージ -10%', 'ガードしていた時間に応じて、次の攻撃のダメージが最大+50%'],
+    passive: ['被ダメージ -10%', '強攻撃を溜めている間はガード。ガードで攻撃を受けてから離すと「ガードカウンター」（威力2.5倍）'],
     skill: { name: 'ライトニング・ランス', cd: 5.5, desc: '直線上を雷光で貫く', mult: 3.0 },
   },
   dagger: {
@@ -493,7 +493,7 @@ export const TITLES = {
   t_wind: { name: '疾風', rarity: 2, desc: '回避した後の1.5秒間、移動速度 +40%', src: 'クエスト「猪狩り」' },
   t_blood: { name: '血の渇き', rarity: 3, req: 'melee', desc: '敵を倒すとHPを6%回復する', src: 'クエスト「霧の狼」' },
   t_hawk: { name: '鷹の眼', rarity: 3, req: 'bow', desc: '適性エリアに当たった矢は会心率 +30%', src: 'クエスト「砂の巨人」' },
-  t_guard: { name: '不落の盾', rarity: 3, req: 'spear', desc: 'ジャストガードに成功すると4秒間 被ダメージ -40%', src: 'クエスト「スライム退治」' },
+  t_guard: { name: '不落の盾', rarity: 3, req: 'spear', desc: 'ガードカウンターを出すと4秒間 被ダメージ -40%', src: 'クエスト「スライム退治」' },
   t_phoenix: { name: '不死鳥', rarity: 4, desc: '倒れたとき、その場でHP30%で一度だけ復活する（5分に1回）', src: 'クエスト「砂塵の王」' },
   // ---- クエスト報酬 ----
   t_delver: { name: '井戸の探索者', rarity: 2, desc: 'ダンジョン・迷宮区の中で移動速度 +15%', src: 'クエスト「古井戸の調査」' },

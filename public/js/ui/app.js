@@ -743,7 +743,7 @@ export function createUI(game) {
     // バフ
     const status = me.buffs.map((b) => `<span style="color:${hex(b.color)}">✦ ${esc(b.label)} ${b.t.toFixed(1)}s</span>`);
     if (me.dStack > 0) status.push(`<span style="color:#9fe">⚡ 連撃 攻速+${me.dStack * 4}%</span>`);
-    if (me.nextAtkBonus > 1.01) status.push(`<span style="color:#bfe0ff">⛨ 反撃準備 +${Math.round((me.nextAtkBonus - 1) * 100)}%</span>`);
+    if (me.guarding && me.counter) status.push('<span style="color:#bfe0ff">⛨ カウンター準備（離すとガードカウンター）</span>');
     const hz = game.hazard();
     if (hz) status.push(`<span style="color:${hz.kind === 'poison' ? '#c08aff' : '#e0c890'}">⚠ ${HAZARDS[hz.kind].name}</span>`);
     H.buffs.set({ html: status.join('　') });

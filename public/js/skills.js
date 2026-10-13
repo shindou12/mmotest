@@ -530,7 +530,7 @@ const weaponTree = (k, names, a1, a2, cap) => [
 export const TREES = {
   sword: { name: '片手剣', nodes: weaponTree('sword', ['剣の心得'], 'slant', 'brave', { name: '閃光の剣', flag: 'wave', desc: '通常攻撃3段目が斬撃波となって飛ぶ' }) },
   greatsword: { name: '大剣', nodes: weaponTree('greatsword', ['大剣の心得'], 'gslam', 'fortress', { name: '大地割り', flag: 'quake', desc: '兜割りの後、さらに大きな衝撃波が広がる' }) },
-  spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ジャストガードの猶予が長くなる' }) },
+  spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ガードカウンターの威力 +30%' }) },
   dagger: { name: '短剣', nodes: weaponTree('dagger', ['短剣の心得'], 'poison', 'smoke', { name: '暗殺術', mods: { crit: 8, critd: 40 }, desc: '会心率 +8%、会心ダメージ +40%' }) },
   axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },
   bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { zone: 3 }, desc: '引き絞ったときの適性エリアの幅 +3m' }) },

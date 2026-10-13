@@ -245,17 +245,28 @@ function itemPower(it) {
 // 入力
 // ======================================================================
 // 盾槍のガード（強攻撃の溜め中に自動で構える。スマホはガードボタンでも。ダウン中はできない）
+// ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃が「ガードカウンター」になる（威力2.5倍）
+const COUNTER_MULT = 2.5;
 function startGuard() {
   if (me.dead || me.downT > 0 || me.guarding) return;
-  me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip');
+  me.guarding = true; me.guardStart = now(); me.charging = false; me.counter = false; audio.sfx('equip');
 }
-function endGuard() {
-  // ガードしていた時間に応じて次の攻撃にボーナス（最大+50%・2秒で最大）
-  if (me.guarding) {
-    me.nextAtkBonus = 1 + Math.min(now() - me.guardStart, 2) / 2 * 0.5;
-    if (me.nextAtkBonus > 1.15) floatText(me.x, 2.6, me.z, `反撃準備 +${Math.round((me.nextAtkBonus - 1) * 100)}%`, 'info');
-  }
-  me.guarding = false;
+// ガードで攻撃を受けた → カウンター準備
+function armCounter() {
+  if (me.counter) return;
+  me.counter = true;
+  floatText(me.x, 2.8, me.z, 'カウンター準備!', 'just');
+  audio.sfx('perfect');
+  fx.ringWave(me.x, me.z, 0xbfe0ff, 2.2, 0.3);
+}
+// fire: スマホのガードボタンを離したとき（溜めていないので、ここでカウンターを出す）
+function endGuard(fire = false) {
+  const counter = me.guarding && me.counter;
+  me.guarding = false; me.counter = false;
+  if (!counter) return;
+  me.nextAtkBonus = COUNTER_MULT * (S.flags.has('bulwark') ? 1.3 : 1);
+  me.counterFire = true;
+  if (fire) doHeavy(2);
 }
 
 // DOM のイベントは UI（ui/app.js）の Root 配下で受け、Mediator が裁定してからここを呼ぶ
@@ -286,7 +297,7 @@ const input = {
       if (me.charging && started) {
         me.releaseZoneW = S ? bowZoneWidth() : BOW_ZONE.min;
         me.charging = false;
-        endGuard(); // 盾槍: 離したらガードを解いて強攻撃（ガードしていた時間のボーナスが乗る）
+        endGuard(); // 盾槍: 離したらガードを解いて強攻撃（ガードで受けていればガードカウンター）
         if (me.chargeT < CHARGE_MIN) me.queued = now() + 0.45; // 短押し → 通常攻撃（入力を少しの間覚えておく）
         else doHeavy(me.chargeLv);
       }
@@ -310,7 +321,7 @@ const input = {
     audio.init();
     if (!started) return;
     if (act === 'atk') return down ? input.pointerDown(0) : input.pointerUp(0);
-    if (act === 'guard') return down ? startGuard() : endGuard();
+    if (act === 'guard') return down ? startGuard() : endGuard(true);
     if (!down) return;
     if (act === 'skill') tryWeaponSkill();
     if (act === 't1') tryTreeSkill(0);
@@ -767,20 +778,11 @@ function resolveTele(te) {
     const dirTo = Math.atan2(src.x - me.x, src.z - me.z);
     const centered = Math.hypot(src.x - me.x, src.z - me.z) < 0.5;
     if (centered || Math.abs(angDiff(dirTo, me.a)) < THREE.MathUtils.degToRad(80)) {
-      const bulwark = S.flags.has('bulwark');
-      const justWin = 0.28 + (bulwark ? 0.15 : 0);
       if (te.src) net.send({ t: 'threat', id: te.src, n: Math.round(te.dmg * 3) });
-      if (now() - me.guardStart <= justWin) {
-        floatText(me.x, 2.8, me.z, 'JUST GUARD!', 'just');
-        if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
-        audio.sfx('perfect'); audio.sfx('block');
-        fx.ringWave(me.x, me.z, 0xbfe0ff, 4, 0.35);
-        combat.circle(me.x, me.z, 4, 1.6, { type: 'proc', noProc: true, threat: 3 });
-        return;
-      }
-      raw *= bulwark ? 0 : 0.25;
+      raw *= S.flags.has('bulwark') ? 0 : 0.25;
       audio.sfx('block');
       fx.parts.burst(me.x + Math.sin(me.a) * 0.8, 1.2, me.z + Math.cos(me.a) * 0.8, 14, { color: 0xbfe0ff, speed: 5, size: 0.4, life: 0.35 });
+      armCounter();
       if (raw <= 0) { floatText(me.x, 2.4, me.z, '防御', 'info'); return; }
     }
   }
@@ -1289,6 +1291,15 @@ function doHeavy(lv) {
   me.swingT = 0; me.swingDur = 0.5; me.combo = 2; me.sw++;
   audio.sfx('heavy');
   fx.flash(me.x, 1.5, me.z, RARITIES[S.wr].color, lv === 2 ? 30 : 15, 0.3);
+  if (me.counterFire) {
+    // ガードカウンター: 演出を大きく。称号「不落の盾」はここで被ダメ軽減
+    me.counterFire = false;
+    floatText(me.x, 3.2, me.z, 'ガードカウンター!', 'just');
+    fx.flash(me.x, 1.5, me.z, 0xbfe0ff, 60, 0.4);
+    fx.ringWave(me.x, me.z, 0xbfe0ff, 5, 0.4);
+    addShake(0.4);
+    if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
+  }
   HEAVY[S.wk].run(combat, lv);
 }
 
@@ -1387,8 +1398,8 @@ function updateBossProjs(dt) {
       if (me.guarding && S.W.guard && facing) {
         // ガードで弾を消す
         net.send({ t: 'pblock', id: p.id });
-        const just = now() - me.guardStart <= 0.28 + (S.flags.has('bulwark') ? 0.15 : 0);
-        floatText(me.x, 2.6, me.z, just ? 'JUST GUARD!' : '防御', just ? 'just' : 'info');
+        floatText(me.x, 2.6, me.z, '防御', 'info');
+        armCounter();
         audio.sfx('block');
         fx.parts.burst(p.x, 1.3, p.z, 20, { color: 0xbfe0ff, speed: 6, size: 0.4, life: 0.35 });
         gone = true;
@@ -2146,7 +2157,7 @@ function update(dt) {
       if (me.stepT <= 0) { me.stepT = 0.32; audio.sfx('step'); }
     }
     // 盾槍: 強攻撃を溜めている間はガードを構える
-    if (me.charging && S.W.guard && me.chargeT >= CHARGE_MIN && !me.guarding) { me.guarding = true; me.guardStart = now(); audio.sfx('equip'); }
+    if (me.charging && S.W.guard && me.chargeT >= CHARGE_MIN && !me.guarding) { me.guarding = true; me.guardStart = now(); me.counter = false; audio.sfx('equip'); }
     if (me.guarding) me.a = aimAngle();
 
     // 出口
