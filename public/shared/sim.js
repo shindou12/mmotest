@@ -1,3 +1,4 @@
+import { SPEAR_TIMINGS } from './skill-timings.js';
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
 import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
@@ -128,7 +129,7 @@ export class World {
         break;
       }
       case 'st': {
-        const poses = ['lance', 'helix', 'piercer', 'javelin', 'whirlspear', 'whirl', 'heavy', 'counter'];
+        const poses = Object.keys(SPEAR_TIMINGS);
         p.pm = poses.includes(m.pm) ? m.pm : '';
         p.pt = typeof m.pt === 'number' && Number.isFinite(m.pt) ? Math.max(0, Math.min(1, m.pt)) : 0;
         // wst: 武器の形 / arm: 防具の見た目 / rc: 被弾リアクション（1 のけぞり・2 ダウン）。他のプレイヤーにも同じに見せる

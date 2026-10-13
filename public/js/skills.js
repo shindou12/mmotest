@@ -1,3 +1,4 @@
+import { SPEAR_TIMINGS, repeatHitAt } from '../shared/skill-timings.js';
 // スキル定義: 強攻撃 / 武器に付くスキル / ツリーで覚えるスキル / スキルツリー
 //
 // 各スキルの run(c) は main.js が渡す戦闘コンテキスト c を使う:
@@ -42,8 +43,8 @@ export const HEAVY = {
     name: '溜め突き', desc: '踏み込みながら遠くまで貫く',
     run(c, lv) {
       const a = c.aim(), sx = c.me.x, sz = c.me.z;
-      c.dash(a, 3, 0.12, 0);
-      c.later(0.1, () => {
+      c.dash(a, 3, SPEAR_TIMINGS.heavy.dashDuration, 0);
+      c.later(SPEAR_TIMINGS.heavy.hitAt, () => {
         c.line(lv === 2 ? 8 : 6.5, 2.0, lv === 2 ? 3.8 : 2.4, { type: 'heavy', a, sx, sz });
         for (let d = 0; d < 8; d += 0.5) c.fx.parts.emit(sx + Math.sin(a) * d, 1.1, sz + Math.cos(a) * d, { color: c.col(), size: 0.5, life: 0.35, speed: 1, gravity: 0 });
       });
@@ -172,7 +173,7 @@ export const WEAPON_SKILLS = {
     name: 'ライトニング・ランス', kind: 'spear', cd: 5.5, desc: '直線上を雷光で貫く',
     run(c) {
       const a = c.aim(), sx = c.me.x, sz = c.me.z;
-      c.later(0.12, () => {
+      c.later(SPEAR_TIMINGS.lance.hitAt, () => {
         c.line(12, 2.2, 3.0, { type: 'wskill', a, sx, sz });
         c.sfx('thunder');
         for (let d = 0; d < 12; d += 0.4) c.fx.parts.emit(sx + Math.sin(a) * d, 1.1, sz + Math.cos(a) * d, { color: 0xbfe0ff, size: 0.7, life: 0.45, speed: 2, gravity: 0 });
@@ -185,10 +186,10 @@ export const WEAPON_SKILLS = {
     name: 'ヘリカル・スラスト', kind: 'spear', cd: 5, desc: '目にも留まらぬ5連突き。最後の一撃が重い',
     run(c) {
       const a = c.aim();
-      for (let i = 0; i < 5; i++) {
-        c.later(0.06 + i * 0.08, () => {
+      for (let i = 0; i < SPEAR_TIMINGS.helix.count; i++) {
+        c.later(repeatHitAt(SPEAR_TIMINGS.helix, i), () => {
           const aa = a + (Math.random() - 0.5) * 0.25;
-          c.line(5.2, 1.6, i === 4 ? 1.8 : 0.8, { type: 'wskill', a: aa });
+          c.line(5.2, 1.6, i === SPEAR_TIMINGS.helix.count - 1 ? 1.8 : 0.8, { type: 'wskill', a: aa });
           for (let d = 1; d < 5; d += 0.6) c.fx.parts.emit(c.me.x + Math.sin(aa) * d, 1.1, c.me.z + Math.cos(aa) * d, { color: c.col(), size: 0.4, life: 0.25, speed: 0.5, gravity: 0 });
           c.sfx('swing');
         });
@@ -310,8 +311,8 @@ Object.assign(WEAPON_SKILLS, {
     name: 'ソニック・ピアス', kind: 'spear', cd: 7, desc: '一直線に突進し、通り道の敵をまとめて貫く（無敵あり・ヘイト大）',
     run(c) {
       const a = c.aim(), sx = c.me.x, sz = c.me.z;
-      c.dash(a, 8, 0.22, 0.3);
-      c.later(0.2, () => {
+      c.dash(a, 8, SPEAR_TIMINGS.piercer.dashDuration, 0.3);
+      c.later(SPEAR_TIMINGS.piercer.hitAt, () => {
         c.line(8.5, 2.4, 2.6, { type: 'wskill', a, sx, sz, threat: 3 });
         for (let d = 0; d < 8; d += 0.5) c.fx.parts.emit(sx + Math.sin(a) * d, 1.1, sz + Math.cos(a) * d, { color: c.col(), size: 0.6, life: 0.4, speed: 1, gravity: 0 });
         c.sfx('wave');
@@ -324,8 +325,8 @@ Object.assign(WEAPON_SKILLS, {
     spin: true,
     run(c) {
       c.taunt(9);
-      for (let i = 0; i < 3; i++) {
-        c.later(0.08 + i * 0.16, () => {
+      for (let i = 0; i < SPEAR_TIMINGS.whirlspear.count; i++) {
+        c.later(repeatHitAt(SPEAR_TIMINGS.whirlspear, i), () => {
           c.circle(c.me.x, c.me.z, 3.4, 1.0, { type: 'wskill', threat: 2 });
           c.fx.ringWave(c.me.x, c.me.z, c.col(), 3.4, 0.25);
           c.sfx('swing');
@@ -497,14 +498,14 @@ export const TREE_SKILLS = {
   javelin: {
     motion: 'javelin',
     name: 'ジャベリン', cd: 8, desc: '槍の分身を投げ放ち、直線上の敵を貫通する',
-    run(c) { const a = c.aim();c.later(.18, () => { c.proj({ a, mult: 3.5, speed: 32, life: 0.6, rad: 1.4, type: 'tskill', color: 0xbfe0ff }); c.sfx('wave'); }); },
+    run(c) { const a = c.aim();c.later(SPEAR_TIMINGS.javelin.hitAt, () => { c.proj({ a, mult: 3.5, speed: 32, life: 0.6, rad: 1.4, type: 'tskill', color: 0xbfe0ff }); c.sfx('wave'); }); },
   },
   whirl: {
     motion: 'whirl',
     name: '旋槍', cd: 8, desc: '槍を大きく振り回して周囲を薙ぐ',
     run(c) {
-      c.later(0.05, () => { c.circle(c.me.x, c.me.z, 5, 2.4, { type: 'tskill' }); c.fx.ringWave(c.me.x, c.me.z, c.col(), 5.5, 0.35); });
-      for (let i = 0; i < 3; i++) c.later(i * 0.06, () => c.fx.slash(c.me.x, c.me.z, c.me.a + i * 2.1, 5, 200, c.col(), 1.0));
+      c.later(SPEAR_TIMINGS.whirl.hitAt, () => { c.circle(c.me.x, c.me.z, 5, 2.4, { type: 'tskill' }); c.fx.ringWave(c.me.x, c.me.z, c.col(), 5.5, 0.35); });
+      for (let i = 0; i < SPEAR_TIMINGS.whirl.effectCount; i++) c.later(i * SPEAR_TIMINGS.whirl.effectInterval, () => c.fx.slash(c.me.x, c.me.z, c.me.a + i * 2.1, 5, 200, c.col(), 1.0));
       c.sfx('swing', { heavy: true });
     },
     spin: true,

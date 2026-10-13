@@ -1,5 +1,6 @@
 // Continuous, timed poses shared by the local player and network spectators.
-export const SPEAR_MOTIONS = Object.freeze({ lance: .45, helix: .5, piercer: .5, javelin: .5, whirlspear: .55, whirl: .55, heavy: .5, counter: .95 });
+import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
+export const SPEAR_MOTIONS = Object.freeze(Object.fromEntries(Object.entries(SPEAR_TIMINGS).map(([id, timing]) => [id, timing.duration])));
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const ease = x => { x = clamp(x, 0, 1);return x * x * (3 - 2 * x); };
 function stroke(t, hit, end) {
@@ -7,8 +8,9 @@ function stroke(t, hit, end) {
   return 1 - ease((t - hit) / (end - hit));
 }
 export function counterAngle(t) {
-  if (t < .45) return 1.9 * ease(t / .45);
-  if (t < .77) { const k = (t - .45) / .32;return 1.9 + (Math.PI * 2 - 1.9) * (1 - (1 - k) ** 2); }
+  const T = SPEAR_TIMINGS.counter;
+  if (t < T.wind) return T.windAng * ease(t / T.wind);
+  if (t < T.slashEnd) { const k = (t - T.wind) / T.slash;return T.windAng + (Math.PI * 2 - T.windAng) * (1 - (1 - k) ** 2); }
   return Math.PI * 2;
 }
 export function spearPose(s) {
@@ -16,26 +18,29 @@ export function spearPose(s) {
   const p = { yaw: 0, pitch: .18, x: .32, y: 1.24, z: .24, lean: 0, step: 0 };
   if (s.sweep >= 0 || id === 'counter') {
     p.yaw = s.sweep >= 0 ? s.sweep : counterAngle(t);p.pitch = 0;p.x = .58;p.z = .03;p.y = 1.25;p.lateral = true;
-    const rest = ease((t - .77) / .18);p.x += (.32-p.x)*rest;p.z += (.24-p.z)*rest;p.side = 1-rest;p.pitch = .18*rest;return p;
+    const rest = ease((t - SPEAR_TIMINGS.counter.slashEnd) / SPEAR_TIMINGS.counter.rest);p.x += (.32-p.x)*rest;p.z += (.24-p.z)*rest;p.side = 1-rest;p.pitch = .18*rest;return p;
   }
   if (id === 'whirlspear' || id === 'whirl' || s.spin >= 0) {
-    const turns = id === 'whirlspear' ? 3 : 1;
-    const duration = id === 'whirlspear' ? .48 : .32;
+    const turns = id === 'whirlspear' ? SPEAR_TIMINGS.whirlspear.count : 1;
+    const timing = id === 'whirlspear' ? SPEAR_TIMINGS.whirlspear : SPEAR_TIMINGS.whirl;
+    const duration = timing.rotationDuration;
     const cycle = clamp(id ? t / duration * turns : s.spin * turns, 0, turns);
     p.yaw = Math.PI * 2 * (Math.floor(cycle) + ease(cycle % 1));
     p.pitch = 0;p.x = .58;p.z = .03;p.lateral = true;p.lean = .06;
-    const rest = id ? ease((t - duration) / (.55-duration)) : 0;p.x += (.32-p.x)*rest;p.z += (.24-p.z)*rest;p.lean *= 1-rest;p.pitch = .18*rest;p.side = 1-rest;return p;
+    const rest = id ? ease((t - duration) / (timing.duration-duration)) : 0;p.x += (.32-p.x)*rest;p.z += (.24-p.z)*rest;p.lean *= 1-rest;p.pitch = .18*rest;p.side = 1-rest;return p;
   }
   let out = 0;
   if (id === 'helix') {
-    const i = clamp(Math.floor(t / .08), 0, 4), start = i * .08;
-    out = stroke(t - start, .06, i === 4 ? .18 : .08) * (i === 4 ? 1 : .65);
+    const T = SPEAR_TIMINGS.helix;
+    const i = clamp(Math.floor(t / T.interval), 0, T.count - 1), start = i * T.interval;
+    out = stroke(t - start, T.hitAt, i === T.count - 1 ? T.finalRecovery : T.interval) * (i === T.count - 1 ? 1 : .65);
   } else if (id === 'piercer') {
-    out = t < .22 ? 1 : 1 - ease((t - .22) / .28);
+    const T = SPEAR_TIMINGS.piercer;
+    out = t < T.dashDuration ? 1 : 1 - ease((t - T.dashDuration) / T.recovery);
   } else if (id === 'javelin') {
-    out = stroke(t, .18, .5);p.pitch = .18 * (1 - out);
+    out = stroke(t, SPEAR_TIMINGS.javelin.hitAt, SPEAR_TIMINGS.javelin.duration);p.pitch = .18 * (1 - out);
   } else if (id === 'lance' || id === 'heavy') {
-    out = stroke(t, id === 'lance' ? .12 : .1, id === 'lance' ? .45 : .5);
+    out = stroke(t, SPEAR_TIMINGS[id].hitAt, SPEAR_TIMINGS[id].duration);
   } else if (s.charging || s.guard) {
     p.z = .14;p.pitch = 0;p.yaw = -.08;return p;
   } else if (s.swing >= 0) {

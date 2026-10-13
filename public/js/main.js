@@ -1,3 +1,4 @@
+import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
 import { SPEAR_MOTIONS, counterAngle } from './spear-motion.js';
 import { CharacterStore, CHARACTER_KEY } from './character-store.js';
 import { BALANCE } from '../shared/balance.js';
@@ -1349,7 +1350,7 @@ function doHeavy(lv) {
 }
 // ガードカウンター: その場で一回転しながら、槍で周りを大きくなぎ払う（1回で大ダメージ）
 //   溜め（wind）: ゆっくり回って振りかぶる → なぎ払い（slash）: 一気に速く回し切る → 残心（rest）
-const SWEEP = { wind: 0.45, windAng: 1.9, slash: 0.32, rest: 0.18, r: 5.2, mult: 7.5, stun: 14 };
+const SWEEP = { ...SPEAR_TIMINGS.counter, r: 5.2, mult: 7.5, stun: 14 };
 SWEEP.dur = SWEEP.wind + SWEEP.slash + SWEEP.rest;
 SWEEP.hitAt = SWEEP.wind + SWEEP.slash * 0.5;
 // 経過時間 → 体の回転角（ラジアン。この量だけ回る）

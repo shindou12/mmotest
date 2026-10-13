@@ -372,3 +372,14 @@ public/js/quests.js    サブクエストの定義と進行
 
 プレイヤーのデータ（レベルと装備）は各自のブラウザの localStorage に保存されます。友達同士で遊ぶ前提なので、チート対策はしていません。
 
+
+### モーションの管理
+
+- `public/js/models.js`: モデルの生成。既存の `animatePlayer` 呼び出しはそのまま使える。
+- `public/js/player-motion.js`: 歩行・回避・被弾と、モーションを適用する順序。
+- `public/js/weapon-motion.js` / `weapon-pose.js`: 攻撃姿勢・武器姿勢の振り分け。
+- `public/js/motions/`: 弓・槍・近接武器の腕と武器の動き。同じ曲線を使う片手剣・短剣、大剣・大斧は近接処理を共有する。
+- `public/js/pose-rig.js`: 手の到達位置、肘の曲げ方、武器の向きを求める共通計算。
+- `public/shared/skill-timings.js`: 槍の命中時刻・連撃間隔・回転・回復時間。スキル処理、モーション、通信が同じ定義を参照する。
+
+`test/motion-parity.test.js` は、分離前に取得した全6武器・4形状・117状態の姿勢と、槍のスキルイベント列との一致を検証する。見た目やタイミングを意図的に変える場合は、差分を確認してから基準データを更新する。
