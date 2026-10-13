@@ -783,7 +783,11 @@ function resolveTele(te) {
       audio.sfx('block');
       fx.parts.burst(me.x + Math.sin(me.a) * 0.8, 1.2, me.z + Math.cos(me.a) * 0.8, 14, { color: 0xbfe0ff, speed: 5, size: 0.4, life: 0.35 });
       armCounter();
+      // ガードで受けた: ひるみ・ダウンはせず、少し押し戻されるだけ（ガードとカウンター準備は続く）
+      knockFrom(src, 0.8, 0.12); hitStop = 0.05;
       if (raw <= 0) { floatText(me.x, 2.4, me.z, '防御', 'info'); return; }
+      takeDamage(raw, src, false, true);
+      return;
     }
   }
   const from = srcMob || te.sh[0];
@@ -849,7 +853,7 @@ function getUp() {
 }
 
 // 被ダメージの共通処理（予兆・ボスの弾）。src: 攻撃してきた位置 / kd: 吹き飛ばす大技
-function takeDamage(raw, src = null, kd = false) {
+function takeDamage(raw, src = null, kd = false, guarded = false) {
   const dr = clamp(buffMod('dr') + (tf('t_relic') ? 8 : 0) + (tf('t_shell') ? 12 : 0) - (tf('t_berserk') ? 15 : 0), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
@@ -859,7 +863,7 @@ function takeDamage(raw, src = null, kd = false) {
   addShake(0.3);
   ui.hurt();
   // 被弾リアクション（のけぞり / ひるみ / ダウン）
-  if (me.hp > 0) hitReaction(dmg, src, kd);
+  if (me.hp > 0 && !guarded) hitReaction(dmg, src, kd);
   if (me.hp <= 0 && S.flags.has('laststand') && now() - me.lastStandT > 90) {
     me.hp = 1; me.lastStandT = now(); me.iframe = 1.0;
     floatText(me.x, 2.8, me.z, '不屈!', 'just');
