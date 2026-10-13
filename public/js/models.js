@@ -561,7 +561,8 @@ export function animatePlayer(model, s) {
   //   待機: 穂先を少し上げる / 突き: 水平 / ガード: 盾の横から少し下げて構える
   if (u.wKind === 'spear' && u.weapon) {
     const pitch = s.guard ? -0.08 : s.swing >= 0 ? 0 : 0.3;
-    u.weapon.rotation.x = Math.PI / 2 - u.armR.rotation.x - pitch;
+    // ダウン中は腕と一緒に投げ出す（水平に保たない）
+    u.weapon.rotation.x = s.down > 0 ? Math.PI / 2 : Math.PI / 2 - u.armR.rotation.x - pitch;
   }
   model.visible = !s.dead;
 }
