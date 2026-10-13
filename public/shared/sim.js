@@ -1,4 +1,5 @@
-import { SPEAR_TIMINGS } from './skill-timings.js';
+import { MOTION_DURATIONS } from './motion-catalog.js';
+import { TECHNIQUES } from './techniques.js';
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
 import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
@@ -129,9 +130,8 @@ export class World {
         break;
       }
       case 'st': {
-        const poses = Object.keys(SPEAR_TIMINGS);
-        p.pm = poses.includes(m.pm) ? m.pm : '';
-        p.pt = typeof m.pt === 'number' && Number.isFinite(m.pt) ? Math.max(0, Math.min(1, m.pt)) : 0;
+        p.pm = typeof m.pm === 'string' && Object.hasOwn(MOTION_DURATIONS,m.pm) ? m.pm : '';
+        p.pt = typeof m.pt === 'number' && Number.isFinite(m.pt) ? Math.max(0, Math.min(2, m.pt)) : 0;
         // wst: 武器の形 / arm: 防具の見た目 / rc: 被弾リアクション（1 のけぞり・2 ダウン）。他のプレイヤーにも同じに見せる
         for (const k of ['x', 'z', 'a', 'hp', 'mhp', 'lv', 'sw', 'sk', 'wr', 'dg', 'gd', 'wst', 'arm', 'rc']) {
           if (typeof m[k] === 'number' && isFinite(m[k])) p[k] = m[k];
@@ -145,6 +145,7 @@ export class World {
         if (!mob || mob.hp <= 0) return;
         const dmg = Math.max(0, Math.min(Number(m.dmg) || 0, 1e9));
         mob.hp -= dmg;
+        this.applyTechniqueControl(A, p, mob, m.tech);
         // 盾槍はヘイトを稼ぎやすい
         this.addThreat(mob, p.id, dmg * (p.wk === 'spear' ? 2 : 1));
         if (mob.kind !== 'boss') mob.provoked = 6;
@@ -569,6 +570,7 @@ export class World {
     }
 
     for (const m of A.mobs.values()) {
+      m.slowT = Math.max(0, (m.slowT || 0) - dt);
       this.scaleEncounter(A, m, players.length);
       for (const [pid, v] of m.threat) m.threat.set(pid, v * (1 - 0.04 * dt));
       m.hateT -= dt;
@@ -677,7 +679,21 @@ export class World {
     }
   }
 
+  applyTechniqueControl(A, p, mob, id) {
+    const t = TECHNIQUES[id];
+    if (!t || t.kind !== p.wk || p.dead || mob.kind === 'boss' || dist(p,mob) > 32) return;
+    const control=t.control;
+    if (control.slow) { mob.slowT=Math.max(mob.slowT||0,control.seconds);mob.slowRate=control.slow; }
+    const displacement=control.push || (control.pull ? -control.pull : 0);
+    if (displacement) {
+      const dx=mob.x-p.x,dz=mob.z-p.z,d=Math.hypot(dx,dz);
+      if(d>.01){const move=displacement<0?-Math.min(-displacement,Math.max(0,d-1.2)):displacement;
+        const next=collide(A.def,mob.x+dx/d*move,mob.z+dz/d*move,.6,A.door);mob.x=next.x;mob.z=next.z;}
+    }
+  }
+
   moveMob(A, m, ang, speed, dt) {
+    if (m.slowT > 0) speed *= 1 - m.slowRate;
     m.x += Math.sin(ang) * speed * dt;
     m.z += Math.cos(ang) * speed * dt;
     const c = collide(A.def, m.x, m.z, 0.6, A.door);

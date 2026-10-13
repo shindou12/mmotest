@@ -6,10 +6,10 @@ export function applyBowPose(u, s) {
     const draw = s.charging ? clamp(s.charge ?? 1, 0, 1) : s.swing >= 0 ? 1 - clamp(s.swing / .25, 0, 1) : 0;
     // Turn the torso side-on while the bow and head keep facing the aim direction.
     // Moving the bow forward alone lets its deep curve/string cut through the chest.
-    const stance = 1.0;
+    const stance = s.bowStance ?? 1.0;
     u.body.rotation.y = stance;u.head.rotation.y = -stance;
     const aim = new THREE.Vector3(-Math.sin(stance), 0, Math.cos(stance));
-    const grip = aimHand(u.armL, u.elbowL, new THREE.Vector3(-.10, active ? 1.36 : 1.25, .53), new THREE.Vector3(-1, -.7, 0));
+    const grip = aimHand(u.armL, u.elbowL, new THREE.Vector3(-.10, s.bowHeight ?? (active ? 1.36 : 1.25), .53), new THREE.Vector3(-1, -.7, 0));
     const details = u.weaponModel.userData.bow;
     if (active && details) {
       const pull = .22 * draw;

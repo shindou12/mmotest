@@ -1,3 +1,5 @@
+import { ADVANCED_TREE_SKILLS } from './advanced-skills.js';
+import { TECHNIQUES } from '../shared/techniques.js';
 import { SPEAR_TIMINGS, repeatHitAt } from '../shared/skill-timings.js';
 // スキル定義: 強攻撃 / 武器に付くスキル / ツリーで覚えるスキル / スキルツリー
 //
@@ -536,6 +538,8 @@ export const TREE_SKILLS = {
   },
 };
 
+Object.assign(TREE_SKILLS, ADVANCED_TREE_SKILLS);
+
 // ---------------------------------------------------------------------------
 // スキルツリー
 // tier の段に進むには、そのツリーに tier×2 ポイント必要
@@ -586,6 +590,10 @@ export const TREES = {
   },
 };
 export const STYLE_COLS = ['回避（ダンサー）', '守護（ガーディアン）', '攻撃（バーサーカー）'];
+
+for (const t of Object.values(TECHNIQUES)) TREES[t.kind].nodes.push({
+  id: t.id + '_node', name: t.name, tier: t.tier, max: 1, active: t.id, role: t.role, desc: t.desc,
+});
 
 export const NODE_INDEX = {};
 for (const [tid, t] of Object.entries(TREES)) for (const n of t.nodes) NODE_INDEX[n.id] = { ...n, tree: tid };

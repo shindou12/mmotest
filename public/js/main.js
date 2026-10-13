@@ -1,5 +1,6 @@
+import { MOTION_DURATIONS } from '../shared/motion-catalog.js';
 import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
-import { SPEAR_MOTIONS, counterAngle } from './spear-motion.js';
+import { counterAngle } from './spear-motion.js';
 import { CharacterStore, CHARACTER_KEY } from './character-store.js';
 import { BALANCE } from '../shared/balance.js';
 import * as THREE from 'three';
@@ -18,7 +19,7 @@ import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
 import {
-  makePlayer, setPlayerWeapon, setPlayerArmor, weaponStyle, armorLook, animatePlayer, makeMob, animateMob, makeLootOrb, makeCoin, makeGoldBag,
+  makePlayer, makeWeapon, setPlayerWeapon, setPlayerArmor, weaponStyle, armorLook, animatePlayer, makeMob, animateMob, makeLootOrb, makeCoin, makeGoldBag,
 } from './models.js';
 import { Net } from './net.js';
 import { OCC } from './toon.js';
@@ -986,7 +987,7 @@ function dealDamage(mb, mult, o = {}) {
   const tough = mb.kind === 2 || !!mb.elite;
   let crit = o.crit || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + (tough && tf('t_shark') ? 15 : 0) + (tf('t_night') && indoorNow() ? 10 : 0) + (tf('t_lucky') ? 8 : 0) || (skill && S.fx.has('skillcrit'));
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; }
-  const typeMult = 1 + (S[TYPE_MOD[o.type]] || 0) / 100;
+  const typeMult = 1 + ((S[TYPE_MOD[o.type]] || 0) + buffMod(TYPE_MOD[o.type])) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
   const stunned = mb.stunT > 0 ? 1.3 : 1;
   const exec = S.flags.has('execute') && mb.hp < mb.mhp * 0.3 ? 1.5 : 1;
@@ -1000,12 +1001,13 @@ function dealDamage(mb, mult, o = {}) {
   let st = 0;
   if (mb.kind === 2 && !(mb.stunT > 0)) {
     st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
-    st *= S.W.stun * (S.W.melee ? 1 + S.stunp / 100 : 1);
+    st *= S.W.stun * (S.W.melee ? 1 + (S.stunp + buffMod('stunp')) / 100 : 1);
     if (o.sv?.key === 'sv_quake') st *= 2 + o.sv.t * 0.5;
     if (tf('t_breaker')) st *= 1.3;
     st = Math.round(st * 10) / 10;
   }
-  net.send({ t: 'hit', id: mb.id, dmg, crit, st });
+  net.send({ t: 'hit', id: mb.id, dmg, crit, st, tech: o.tech });
+  if (o.healOnHit) heal(dmg * o.healOnHit, true);
   if (o.threat > 1) net.send({ t: 'threat', id: mb.id, n: Math.round(dmg * (o.threat - 1)) });
   // 武器パッシブ（攻撃が当たったとき）
   if (['normal', 'heavy', 'wskill', 'tskill'].includes(o.type)) {
@@ -1214,12 +1216,14 @@ const combat = {
   buff: addBuff,
   taunt: (r) => net.send({ t: 'taunt', r }),
   point: aimPoint,
+  area: () => world.area,
+  targets: (x,z,r) => [...mobs.values()].filter(m=>m.hp>0&&Math.hypot(m.x-x,m.z-z)<r+m.rad),
   zone: () => bowZone(me.releaseZoneW ?? BOW_ZONE.min),
   arrow(o) {
     const color = o.color ?? RARITIES[S.wr].color;
     const mesh = arrowMesh(color, o.big);
     mesh.position.set(me.x, 1.2, me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), zone: o.noZone ? null : o.zone ?? bowZone(), color, sv: o.sv, cast: o.cast });
+    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), zone: o.noZone ? null : o.zone ?? bowZone(), color, sv: o.sv, cast: o.cast, tech: o.tech });
     // 射出の閃光
     const fx0 = me.x + Math.sin(o.a) * 0.9, fz0 = me.z + Math.cos(o.a) * 0.9;
     fx.flash(fx0, 1.3, fz0, color, o.big ? 14 : 8, 0.15, 6);
@@ -1248,9 +1252,9 @@ const combat = {
   },
   proj(o) {
     const color = o.color ?? RARITIES[S.wr].color;
-    const mesh = fx.waveMesh(color);
-    mesh.position.set(me.x, 1, me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, x: me.x, z: me.z, a: o.a, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast });
+    const mesh = o.shape === 'axe' ? phantomAxe(color) : fx.waveMesh(color);
+    mesh.position.set(o.sx ?? me.x, 1, o.sz ?? me.z); mesh.rotation.y = o.a;
+    projs.push({ mesh, x: o.sx ?? me.x, z: o.sz ?? me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast });
     audio.sfx('wave');
   },
   dash(a, dist, dur, iframe) {
@@ -1280,7 +1284,7 @@ function doSwing() {
   me.combo = now() - me.lastSwing < W.speed * 2.2 ? (me.combo + 1) % 3 : 0;
   me.lastSwing = now();
   me.swingT = 0;
-  me.swingDur = W.speed * (1 - (S.aspd + buffMod('aspd') + me.dStack * 4 + (desperate() ? 15 : 0) + titleAspd()) / 100) * (me.combo === 2 ? 1.25 : 1);
+  me.swingDur = W.speed * (1 - Math.min(75, S.aspd + buffMod('aspd') + me.dStack * 4 + (desperate() ? 15 : 0) + titleAspd()) / 100) * (me.combo === 2 ? 1.25 : 1);
   me.sw++;
   me.a = aimAngle();
   const mult = W.mult * [1, 1.1, 1.6][me.combo];
@@ -1317,6 +1321,13 @@ function arrowMesh(color, big) {
   g.userData.isArrow = true;
   return g;
 }
+function phantomAxe(color) {
+  const group=new THREE.Group(),weapon=makeWeapon('axe',S.wr,S.wst||0),oldMaterials=new Set();
+  const material=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9});
+  weapon.traverse(part=>{if(part.material){oldMaterials.add(part.material);part.material=material;}});
+  for(const mat of oldMaterials)mat.dispose();weapon.rotation.x=Math.PI/2;group.add(weapon);return group;
+}
+
 // 他プレイヤーの矢（見た目だけ）
 function fxArrow(x, z, a, color) {
   const m = arrowMesh(color, false);
@@ -1405,7 +1416,7 @@ function tryTreeSkill(i) {
 
 function startSkill(sk) {
   startAttack();
-  me.motion = S.wk === 'spear' ? sk.motion || '' : '';me.motionT = 0;
+  me.motion = sk.motion || '';me.skillDuration = sk.duration || .55;me.motionT = 0;
   me.skillT = 0; me.spin = !!sk.spin; me.sk++;
   me.a = aimAngle();
   // 回転系以外のスキルは、武器を振る（槍は突く）モーションを出す。他のプレイヤーにも見える
@@ -1434,7 +1445,7 @@ function updateProjs(dt) {
         // 投げナイフなど（zone なし）は距離に関係なく本来のダメージ
         const inZone = !w.zone || (d >= w.zone[0] - mb.rad && d <= w.zone[1] + mb.rad);
         const hawk = w.zone && inZone && tf('t_hawk') && Math.random() < 0.3;
-        dealDamage(mb, w.mult, { type: w.type, falloff: inZone ? 1 : BOW_ZONE.outside, sv: w.sv, cast: w.cast, crit: hawk || undefined });
+        dealDamage(mb, w.mult, { type: w.type, tech: w.tech, falloff: inZone ? 1 : BOW_ZONE.outside, sv: w.sv, cast: w.cast, crit: hawk || undefined });
         if (!w.zone) { /* 表示なし */ } else if (inZone) {
           floatText(mb.x, 3.4, mb.z, '適性!', 'info');
           fx.ringWave(mb.x, mb.z, 0x9affc8, 1.6, 0.25);
@@ -1447,12 +1458,12 @@ function updateProjs(dt) {
       continue;
     }
     w.mesh.position.set(w.x, 1, w.z);
-    w.mesh.material.opacity = 0.9 * (1 - w.t / w.life);
-    w.mesh.scale.setScalar(1 + w.t * 1.5);
-    fx.parts.emit(w.x, 1, w.z, { color: w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
+    if(w.shape==='axe'){w.mesh.children[0].rotation.z+=dt*18;w.mesh.traverse(part=>{if(part.material)part.material.opacity=.9*(1-w.t/w.life);});}
+    else {w.mesh.material.opacity = 0.9 * (1 - w.t / w.life);w.mesh.scale.setScalar(1 + w.t * 1.5);}
+    fx.parts.emit(w.x, 1, w.z, { color: w.color ?? w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
     for (const mb of [...mobs.values()]) {
       if (w.hit.has(mb.id)) continue;
-      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, noProc: true, sv: w.sv, cast: w.cast }); }
+      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, tech: w.tech, noProc: true, sv: w.sv, cast: w.cast }); }
     }
     const c = collide(world.def, w.x, w.z, 0.1, world.door);
     if (w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fx.dispose(w.mesh); projs.splice(i, 1); }
@@ -1980,7 +1991,7 @@ function learn(id) {
   calcStats(); saveChar();
 }
 function setSlot(i, skill) {
-  if (!skill) return;
+  if (!skill || (i !== 0 && i !== 1) || !Object.entries(char.tree).some(([id,rank])=>rank>0&&NODE_INDEX[id]?.active===skill)) return;
   char.slots = char.slots || [null, null];
   const other = char.slots.indexOf(skill);
   if (other >= 0) char.slots[other] = null;
@@ -2174,7 +2185,7 @@ function moveMe(dx, dz) {
 
 function update(dt) {
   const t = now();
-  if (me.motion) { me.motionT += dt;if (me.motionT > (SPEAR_MOTIONS[me.motion] || 0)) me.motion = ''; }
+  if (me.motion) { me.motionT += dt;if (me.motionT > (MOTION_DURATIONS[me.motion] || 0)) me.motion = ''; }
   updateMouseWorld();
   // 遅延処理（スキルの多段ヒットなど）
   for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= t) { const p = pending.splice(i, 1)[0]; if (!me.dead) p.fn(); }
@@ -2285,7 +2296,7 @@ function update(dt) {
     // 通常攻撃（短押しの入力を少し保持してコンボをつなぐ）
     me.swingT += dt;
     if (me.queued > t && (canAct() || canShootInDodge()) && me.swingT >= me.swingDur && !safe) { me.queued = 0; doSwing(); }
-    if (me.skillT >= 0) { me.skillT += dt; if (me.skillT > 0.55) me.skillT = -1; }
+    if (me.skillT >= 0) { me.skillT += dt; if (me.skillT > (me.skillDuration || .55)) me.skillT = -1; }
 
     // ハザード: 毒沼は踏んでいる間ダメージ、流砂は足が遅くなる（移動のところ）
     const hz = hazardAt(me.x, me.z);
@@ -2358,7 +2369,7 @@ function update(dt) {
     o.x += mx * k; o.z += mz * k;
     o.a += angDiff(o.ta, o.a) * k;
     o.motionT += dt;
-    if (o.motionT > (SPEAR_MOTIONS[o.motion] || 0)) o.motion = '';
+    if (o.motionT > (MOTION_DURATIONS[o.motion] || 0)) o.motion = '';
     o.swingT += dt; if (o.spinT >= 0) { o.spinT += dt; if (o.spinT > 0.55) o.spinT = -1; }
     if (moving) o.walkT += dt;
     o.model.position.set(o.x, heightAt(o.x, o.z), o.z);

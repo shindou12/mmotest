@@ -386,7 +386,7 @@ export function createUI(game) {
             return {
               name: n.id, data: n.id,
               html: `<div class="node ${r ? 'have' : ''} ${canLearn(char, n.id) ? 'can' : ''} ${n.active ? 'active' : ''}">
-                <div class="nn">${n.active ? '◆ ' : ''}${esc(n.name)}</div><div class="pips">${pips}</div>
+                <div class="nn">${n.role ? `<small class="skill-role">${esc(n.role)}</small>` : ''}${n.active ? '◆ ' : ''}${esc(n.name)}</div><div class="pips">${pips}</div>
                 <div class="nd">${esc(n.desc)}${n.active ? `<br><span class="dim">CT ${TREE_SKILLS[n.active].cd}秒</span>` : ''}</div>${slotBtns}</div>`,
               setup: (nv) => {
                 nv.link((ev) => { ev.payload.node = n.id; ev.payload.skill = n.active; });
