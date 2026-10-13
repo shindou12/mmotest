@@ -248,8 +248,33 @@ function itemPower(it) {
 // ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃が「ガードカウンター」になる（威力2.5倍）
 const COUNTER_MULT = 2.5;
 function startGuard() {
-  if (me.dead || me.downT > 0 || me.guarding) return;
+  if (me.dead || me.downT > 0 || me.guarding || me.gg <= 0 || me.staggerT > 0) return;
   me.guarding = true; me.guardStart = now(); me.charging = false; me.counter = false; audio.sfx('equip');
+}
+// ガードゲージ: ガードで受けるたびに減り（受ける前のダメージに比例）、尽きるとガードブレイクで大きな隙。
+// ガードしていない間、少したつと回復する。数値は最大HPに対する割合で決める（雑魚は何度か受けられ、ボスの大技は2〜3回で割れる）
+const GUARD = { max: 100, perHp: 120, kdExtra: 20, regenDelay: 1.0, regen: 34, breakT: 1.5, breakDmg: 1.5 };
+me.gg = GUARD.max;
+function guardDamage(rawBefore, kd) {
+  me.gg -= rawBefore / S.mhp * GUARD.perHp + (kd ? GUARD.kdExtra : 0);
+  me.ggHitT = now();
+  if (me.gg <= 0) { guardBreak(); return true; }
+  if (me.gg < GUARD.max * 0.3) { audio.sfx('impact'); floatText(me.x, 2.4, me.z, '盾がきしむ…', 'info'); }
+  return false;
+}
+function guardBreak() {
+  me.gg = 0;
+  me.guarding = false; me.charging = false; me.counter = false; me.queued = 0;
+  me.staggerT = GUARD.breakT; me.brokenT = now() + GUARD.breakT;
+  floatText(me.x, 3, me.z, 'ガードブレイク!', 'info');
+  audio.sfx('impact'); audio.sfx('block');
+  fx.parts.burst(me.x + Math.sin(me.a) * 0.6, 1.2, me.z + Math.cos(me.a) * 0.6, 40, { color: 0xbfe0ff, speed: 7, size: 0.5, life: 0.6, gravity: 8 });
+  fx.flash(me.x, 1.5, me.z, 0xff6a5a, 40, 0.3);
+  addShake(0.5); hitStop = 0.1;
+}
+function guardRegen(dt) {
+  if (me.guarding || me.gg >= GUARD.max || now() - (me.ggHitT || 0) < GUARD.regenDelay || me.staggerT > 0) return;
+  me.gg = Math.min(GUARD.max, me.gg + GUARD.regen * dt);
 }
 // ガードで攻撃を受けた → カウンター準備
 function armCounter() {
@@ -779,6 +804,8 @@ function resolveTele(te) {
     const centered = Math.hypot(src.x - me.x, src.z - me.z) < 0.5;
     if (centered || Math.abs(angDiff(dirTo, me.a)) < THREE.MathUtils.degToRad(80)) {
       if (te.src) net.send({ t: 'threat', id: te.src, n: Math.round(te.dmg * 3) });
+      // ガードゲージが尽きたらガードブレイク（そのまま全部のダメージを受ける）
+      if (guardDamage(raw, te.kd)) { takeDamage(raw, src, false, true); return; }
       raw *= S.flags.has('bulwark') ? 0 : 0.25;
       audio.sfx('block');
       fx.parts.burst(me.x + Math.sin(me.a) * 0.8, 1.2, me.z + Math.cos(me.a) * 0.8, 14, { color: 0xbfe0ff, speed: 5, size: 0.4, life: 0.35 });
@@ -854,6 +881,7 @@ function getUp() {
 
 // 被ダメージの共通処理（予兆・ボスの弾）。src: 攻撃してきた位置 / kd: 吹き飛ばす大技
 function takeDamage(raw, src = null, kd = false, guarded = false) {
+  if (now() < (me.brokenT || 0)) raw *= GUARD.breakDmg; // ガードブレイク中は被ダメージ1.5倍
   const dr = clamp(buffMod('dr') + (tf('t_relic') ? 8 : 0) + (tf('t_shell') ? 12 : 0) - (tf('t_berserk') ? 15 : 0), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
@@ -1295,7 +1323,8 @@ function doHeavy(lv) {
   me.swingT = 0; me.swingDur = 0.5; me.combo = 2; me.sw++;
   audio.sfx('heavy');
   fx.flash(me.x, 1.5, me.z, RARITIES[S.wr].color, lv === 2 ? 30 : 15, 0.3);
-  if (me.counterFire) {
+  const counter = me.counterFire;
+  if (counter) {
     // ガードカウンター: 演出を大きく。称号「不落の盾」はここで被ダメ軽減
     me.counterFire = false;
     floatText(me.x, 3.2, me.z, 'ガードカウンター!', 'just');
@@ -1303,8 +1332,18 @@ function doHeavy(lv) {
     fx.ringWave(me.x, me.z, 0xbfe0ff, 5, 0.4);
     addShake(0.4);
     if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
+    me.swingDur = 0.6; // 突きをしっかり見せる
   }
   HEAVY[S.wk].run(combat, lv);
+  if (counter) {
+    // 大きく踏み込んで突き抜ける（踏み込み 3m → 5m・短い無敵）。穂先の先へ光の筋
+    const a = me.a, sx = me.x, sz = me.z;
+    combat.dash(a, 5, 0.15, 0.25);
+    later(0.12, () => {
+      for (let d = 0; d < 10; d += 0.4) fx.parts.emit(sx + Math.sin(a) * d, 1.2, sz + Math.cos(a) * d, { color: d % 1.2 < 0.4 ? 0xffffff : 0xbfe0ff, size: 0.6, life: 0.45, speed: 1.5, gravity: 0 });
+      fx.ringWave(sx + Math.sin(a) * 6, sz + Math.cos(a) * 6, 0xbfe0ff, 3, 0.3);
+    });
+  }
 }
 
 function tryWeaponSkill() {
@@ -1329,6 +1368,8 @@ function startSkill(sk) {
   startAttack();
   me.skillT = 0; me.spin = !!sk.spin; me.sk++;
   me.a = aimAngle();
+  // 回転系以外のスキルは、武器を振る（槍は突く）モーションを出す。他のプレイヤーにも見える
+  if (!sk.spin) { me.swingT = 0; me.swingDur = 0.45; me.combo = 2; me.sw++; }
   me.charging = false;
   audio.sfx('skill');
   floatText(me.x, 3, me.z, sk.name, 'info');
@@ -1402,8 +1443,7 @@ function updateBossProjs(dt) {
       if (me.guarding && S.W.guard && facing) {
         // ガードで弾を消す
         net.send({ t: 'pblock', id: p.id });
-        floatText(me.x, 2.6, me.z, '防御', 'info');
-        armCounter();
+        if (!guardDamage(p.dmg, false)) { floatText(me.x, 2.6, me.z, '防御', 'info'); armCounter(); }
         audio.sfx('block');
         fx.parts.burst(p.x, 1.3, p.z, 20, { color: 0xbfe0ff, speed: 6, size: 0.4, life: 0.35 });
         gone = true;
@@ -2106,7 +2146,7 @@ function update(dt) {
   if (me.dead) {
     me.deadT -= dt;
     if (me.deadT <= 0) {
-      me.dead = false; me.hp = S.mhp; me.potions = S.maxPot;
+      me.dead = false; me.hp = S.mhp; me.potions = S.maxPot; me.gg = GUARD.max;
       const sp = spawnPoint(world.def);
       me.x = sp.x; me.z = sp.z;
       fx.beam(me.x, me.z, 0x6ad0ff, 12, 1, 1);
@@ -2161,7 +2201,7 @@ function update(dt) {
       if (me.stepT <= 0) { me.stepT = 0.32; audio.sfx('step'); }
     }
     // 盾槍: 強攻撃を溜めている間はガードを構える
-    if (me.charging && S.W.guard && me.chargeT >= CHARGE_MIN && !me.guarding) { me.guarding = true; me.guardStart = now(); me.counter = false; audio.sfx('equip'); }
+    if (me.charging && S.W.guard && me.chargeT >= CHARGE_MIN && !me.guarding && me.gg > 0) { me.guarding = true; me.guardStart = now(); me.counter = false; audio.sfx('equip'); }
     if (me.guarding) me.a = aimAngle();
 
     // 出口
@@ -2246,6 +2286,7 @@ function update(dt) {
     // 倒れる → 起き上がる（最後の0.25秒で起きる）/ のけぞり
     down: me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
     hurt: me.hurtT > 0 ? Math.sin(me.hurtT / 0.28 * Math.PI) : 0,
+    gg: me.gg / GUARD.max, // 盾の縁の光（ガードゲージの残り）
   });
   if (me.guarding && Math.random() < 0.3) fx.parts.emit(me.x + Math.sin(me.a) * 0.9 + rnd(-0.4, 0.4), rnd(0.6, 1.8), me.z + Math.cos(me.a) * 0.9 + rnd(-0.4, 0.4), { color: 0xbfe0ff, size: 0.25, life: 0.3, speed: 0.3, gravity: 0 });
   for (const b of me.buffs) if (Math.random() < 0.25) fx.parts.emit(me.x + rnd(-0.5, 0.5), rnd(0.2, 2), me.z + rnd(-0.5, 0.5), { color: b.color, size: 0.3, life: 0.6, speed: 1, gravity: 2 });
@@ -2366,6 +2407,7 @@ function update(dt) {
   if (weatherParts.kind) weatherParts.update(dt, me.x, me.z, t);
   exploreTick();
   waypointTick();
+  guardRegen(dt);
   pinTick();
   fx.update(dt);
   updateMobLabels();

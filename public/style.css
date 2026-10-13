@@ -546,6 +546,8 @@ body.touch #gold { top: calc(8px + env(safe-area-inset-top)); right: calc(312px 
 #stamina .bg { stroke: rgba(0,0,0,.4); }
 #stamina .fg { stroke: #ffd86a; stroke-linecap: round; filter: drop-shadow(0 0 3px rgba(255, 216, 106, .7)); }
 #stamina.full .fg { stroke: #fff4c4; }
+#stamina.guard { width: 40px; height: 40px; }
+#stamina.guard .fg { filter: drop-shadow(0 0 4px currentColor); }
 /* 溜めゲージ（自キャラの足元） */
 #charge { bottom: auto; width: 110px; height: 6px; transform: translateX(-50%); overflow: visible; }
 #charge > div { border-radius: 3px; }

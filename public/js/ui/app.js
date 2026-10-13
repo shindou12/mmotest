@@ -728,10 +728,13 @@ export function createUI(game) {
     H.dodgeW.set({ text: S.wc.name, style: { color: S.wc.color } });
     // 自キャラの横の輪: 回避の回復（原神のスタミナのように、減ったときだけ出る）
     const q = game.project(me.x, 1.4, me.z);
-    const stam = S.dodgeCd > 0 ? 1 - clamp(me.dodgeCd / S.dodgeCd, 0, 1) : 1;
-    if (stam < 1) stamSeen = t;
-    H.stamina.set({ visible: t - stamSeen < 0.6 && !me.dead, cls: { full: stam >= 1 }, style: { left: q.x + 44 + 'px', top: q.y - 52 + 'px' } });
-    H.staminaFg.set({ attr: { 'stroke-dasharray': `${(stam * 100).toFixed(1)} 100` } });
+    // 盾槍でガード中・ガードゲージが減っている間は、同じ輪でガードゲージを見せる（青 → 黄 → 赤）
+    const ggShow = S.W.guard && (me.guarding || me.gg < 100);
+    const stam = ggShow ? clamp(me.gg / 100, 0, 1) : S.dodgeCd > 0 ? 1 - clamp(me.dodgeCd / S.dodgeCd, 0, 1) : 1;
+    if (stam < 1 || ggShow) stamSeen = t;
+    const ggCol = stam > 0.6 ? '#9ad8ff' : stam > 0.3 ? '#ffd84a' : '#ff4a3a';
+    H.stamina.set({ visible: t - stamSeen < 0.6 && !me.dead, cls: { full: stam >= 1 && !ggShow, guard: ggShow }, style: { left: q.x + 44 + 'px', top: q.y - 52 + 'px' } });
+    H.staminaFg.set({ attr: { 'stroke-dasharray': `${(stam * 100).toFixed(1)} 100` }, style: { stroke: ggShow ? ggCol : '' } });
     H.charge.set({ style: { left: q.x + 'px', top: q.y + 34 + 'px' } });
     setCd(H.slots.pot, me.potions > 0 ? me.potCd : 1, 1);
     const left = spTotal(char.lv) - spSpent(char.tree);

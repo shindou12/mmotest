@@ -470,7 +470,8 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
     w.rotation.y = Math.PI / 2;
     u.weapon.rotation.x = Math.PI / 2;
   }
-  if (kind === 'spear') u.weapon.position.z = -0.7;
+  // 槍は柄の後ろ寄り（石突きから約1m）を握り、穂先側を長く前へ出す
+  if (kind === 'spear') w.position.y = -0.45;
   u.wKind = kind;
   u.hand.add(u.weapon);
 }
@@ -485,6 +486,12 @@ function makeShield(rarity, armL) {
   g.add(mesh(extrude([[-0.12, 0.25], [0.12, 0.25], [0.12, -0.05], [0, -0.3], [-0.12, -0.05]], 0.03, 0), rarity >= 2 ? glow(rc.clone().multiplyScalar(1.2)) : rim, [0, 0, 0.06]));
   g.add(mesh(new THREE.TorusGeometry(0.5, 0.035, 5, 20, Math.PI), rim, [0, 0.05, 0.02], [0, 0, 0], [0.85, 1, 1]));
   finish(g, 0.9);
+  // ガード中だけ光る縁（ガードゲージの残りで 青 → 黄 → 赤）。この盾だけの材質にする
+  const gm = new THREE.MeshBasicMaterial({ color: 0x9ad8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const gl = new THREE.Mesh(extrude([[-0.48, 0.61], [0.48, 0.61], [0.48, -0.13], [0, -0.7], [-0.48, -0.13]], 0.02, 0), gm);
+  gl.position.z = 0.1; gl.renderOrder = 2;
+  g.add(gl);
+  g.userData.gauge = gm;
   // 腕の外側に、面を前へ向けて持つ
   g.position.set(-0.1, -0.45, 0.12);
   g.rotation.set(0, -Math.PI / 2 + 0.25, 0);
@@ -511,13 +518,20 @@ export function animatePlayer(model, s) {
     const k = s.swing;
     const e = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75 * 0.3;
     const dir = s.combo % 2 === 0 ? 1 : -1;
-    if (s.kind === 'spear') { u.armR.rotation.set(-Math.PI / 2 + 0.15, 0, 0); u.armR.position.z = -0.25 + e * 0.8; }
+    if (s.kind === 'spear') {
+      // 突き: 一瞬引いて（0〜18%）→ 鋭く突き出し（〜35%）→ ゆっくり戻す。右肩を前へ入れる
+      const back = k < 0.18 ? k / 0.18 : 0;
+      const out = k < 0.18 ? 0 : k < 0.35 ? (k - 0.18) / 0.17 : 1 - (k - 0.35) / 0.65 * 0.9;
+      u.armR.rotation.set(-Math.PI / 2 + 0.12, 0, 0);
+      u.armR.position.z = -0.4 * back + 1.0 * out;
+      u.body.rotation.y = -0.35 * back + 0.3 * out;
+    }
     else if (s.kind === 'bow') {
       // 弓: 腕をまっすぐ前へ伸ばし、反対の手で弦を引く
       u.armR.rotation.set(-Math.PI / 2, 0, 0.1); u.armR.position.z = 0;
       u.armL.rotation.set(-Math.PI / 2 + 0.2, 0, -0.6 + e * 0.3);
     } else { u.armR.rotation.set(-1.4 + e * 0.2, 0, dir * (1.4 - e * 2.8)); u.armR.position.z = 0; }
-    u.body.rotation.y = s.kind === 'bow' ? 0 : dir * (0.5 - e) * 0.6;
+    if (s.kind !== 'spear') u.body.rotation.y = s.kind === 'bow' ? 0 : dir * (0.5 - e) * 0.6;
     if (u.wKind === 'bow' && u.weapon) u.weapon.rotation.x = Math.PI / 2;
   } else if (s.spin >= 0) {
     u.body.rotation.y = s.spin * Math.PI * 4; u.armR.rotation.set(-Math.PI / 2, 0, 0);
@@ -536,6 +550,19 @@ export function animatePlayer(model, s) {
     // のけぞり: 上体が後ろへ反って頭が揺れる
     u.body.rotation.x = -s.hurt * 0.35; u.head.rotation.x = -s.hurt * 0.4;
   } else u.body.rotation.x = 0;
+  // 盾の光: ガード中だけ。ガードゲージの残り（gg 0〜1）で 青 → 黄 → 赤
+  const gm = u.shield?.userData.gauge;
+  if (gm) {
+    const gg = s.gg ?? 1;
+    gm.opacity = s.guard ? 0.35 + (gg < 0.3 ? Math.abs(Math.sin(s.t * 12)) * 0.3 : 0) : 0;
+    gm.color.setHex(gg > 0.6 ? 0x9ad8ff : gg > 0.3 ? 0xffd84a : 0xff4a3a);
+  }
+  // 槍は腕の角度に関係なく水平に近く保つ（腕を前へ出しても穂先が空を向かない）
+  //   待機: 穂先を少し上げる / 突き: 水平 / ガード: 盾の横から少し下げて構える
+  if (u.wKind === 'spear' && u.weapon) {
+    const pitch = s.guard ? -0.08 : s.swing >= 0 ? 0 : 0.3;
+    u.weapon.rotation.x = Math.PI / 2 - u.armR.rotation.x - pitch;
+  }
   model.visible = !s.dead;
 }
 
