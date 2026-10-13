@@ -536,12 +536,9 @@ export function animatePlayer(model, s) {
     const e = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75 * 0.3;
     const dir = s.combo % 2 === 0 ? 1 : -1;
     if (s.kind === 'spear') {
-      // 突き: 一瞬引いて（0〜18%）→ 鋭く突き出し（〜35%）→ ゆっくり戻す。右肩を前へ入れる
-      const back = k < 0.18 ? k / 0.18 : 0;
-      const out = k < 0.18 ? 0 : k < 0.35 ? (k - 0.18) / 0.17 : 1 - (k - 0.35) / 0.65; // 最後まで引き戻す
-      u.armR.rotation.set(-Math.PI / 2 + 0.12, 0, 0);
-      u.armR.position.z = -0.4 * back + 1.0 * out;
-      u.body.rotation.y = -0.35 * back + 0.3 * out;
+      // Spear wrist/elbow/torso are solved together by updateWeaponPose.
+      u.armR.position.z = 0;
+      u.body.rotation.y = 0;
     }
     else if (s.kind === 'bow') {
       // 弓: 腕をまっすぐ前へ伸ばし、反対の手で弦を引く

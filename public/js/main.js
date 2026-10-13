@@ -1,3 +1,4 @@
+import { SPEAR_MOTIONS, counterAngle } from './spear-motion.js';
 import { CharacterStore, CHARACTER_KEY } from './character-store.js';
 import { BALANCE } from '../shared/balance.js';
 import * as THREE from 'three';
@@ -649,7 +650,7 @@ function onSnap(m) {
   world.plates = m.pl || [];
   const seenP = new Set();
   for (const p of m.p) {
-    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm, rc] = p;
+    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm, rc, pm = '', pt = 0] = p;
     if (id === me.id) continue;
     seenP.add(id);
     let o = others.get(id);
@@ -658,7 +659,7 @@ function onSnap(m) {
       scene.add(o.model);
       others.set(id, o);
     }
-    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd, rc: rc | 0 });
+    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd, rc: rc | 0, motion: pm, motionT: pt });
     setPlayerWeapon(o.model, wk, wr, wst | 0);
     setPlayerArmor(o.model, arm | 0);
     if (sw !== o.sw) {
@@ -1268,6 +1269,7 @@ const canShootInDodge = () => S.W.ranged && !me.dead && me.dodgeT > 0 && me.skil
 
 // 攻撃を始めるとき、盾槍のガードボーナスをこの攻撃に乗せる
 function startAttack() {
+  me.motion = '';me.motionT = 0;
   me.atkBonus = me.nextAtkBonus; me.atkBonusT = now() + 0.7; me.nextAtkBonus = 1;
 }
 
@@ -1338,10 +1340,11 @@ function doHeavy(lv) {
     addShake(0.4);
     if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
     me.swingT = 9; // 振りのモーションの代わりに回転なぎ払い
-    me.sweepT = 1e-4; me.sweepHit = false;
+    me.sweepT = 1e-4; me.sweepHit = false;me.motion = 'counter';me.motionT = 0;
     audio.sfx('swing', { heavy: true });
     return;
   }
+  if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; }
   HEAVY[S.wk].run(combat, lv);
 }
 // ガードカウンター: その場で一回転しながら、槍で周りを大きくなぎ払う（1回で大ダメージ）
@@ -1350,11 +1353,8 @@ const SWEEP = { wind: 0.45, windAng: 1.9, slash: 0.32, rest: 0.18, r: 5.2, mult:
 SWEEP.dur = SWEEP.wind + SWEEP.slash + SWEEP.rest;
 SWEEP.hitAt = SWEEP.wind + SWEEP.slash * 0.5;
 // 経過時間 → 体の回転角（ラジアン。この量だけ回る）
-function sweepAngle(t) {
-  if (t < SWEEP.wind) { const k = t / SWEEP.wind; return SWEEP.windAng * k * k * (3 - 2 * k); } // ゆっくり
-  if (t < SWEEP.wind + SWEEP.slash) { const k = (t - SWEEP.wind) / SWEEP.slash; return SWEEP.windAng + (Math.PI * 2 - SWEEP.windAng) * (1 - (1 - k) * (1 - k)); } // 速く
-  return Math.PI * 2;
-}
+const sweepAngle = counterAngle;
+
 function sweepTick(dt) {
   if (!(me.sweepT > 0)) return;
   const prev = me.sweepT;
@@ -1404,6 +1404,7 @@ function tryTreeSkill(i) {
 
 function startSkill(sk) {
   startAttack();
+  me.motion = S.wk === 'spear' ? sk.motion || '' : '';me.motionT = 0;
   me.skillT = 0; me.spin = !!sk.spin; me.sk++;
   me.a = aimAngle();
   // 回転系以外のスキルは、武器を振る（槍は突く）モーションを出す。他のプレイヤーにも見える
@@ -1512,7 +1513,7 @@ function tryDodge() {
   me.dodgeT = 0.38;
   me.dodgeCd = S.dodgeCd * (after ? 0.25 : 1);
   me.iframe = (after ? 0.6 : 0.32) + S.iframeBonus;
-  me.swingT = 9; me.skillT = -1; me.charging = false; me.guarding = false;
+  me.swingT = 9; me.skillT = -1; me.motion = '';me.charging = false; me.guarding = false;
   audio.sfx('dodge');
   if (tf('t_wind')) { me.buffs = me.buffs.filter((b) => b.id !== 'wind'); me.buffs.push({ id: 'wind', label: '疾風', t: 1.9, max: 1.9, mods: { move: 40 }, color: 0x9affc8 }); }
   fx.parts.burst(me.x, 0.3, me.z, 12, { color: after ? 0x9affff : 0xdddddd, speed: 3, size: 0.4, life: 0.4, gravity: 1 });
@@ -2172,6 +2173,7 @@ function moveMe(dx, dz) {
 
 function update(dt) {
   const t = now();
+  if (me.motion) { me.motionT += dt;if (me.motionT > (SPEAR_MOTIONS[me.motion] || 0)) me.motion = ''; }
   updateMouseWorld();
   // 遅延処理（スキルの多段ヒットなど）
   for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= t) { const p = pending.splice(i, 1)[0]; if (!me.dead) p.fn(); }
@@ -2329,6 +2331,7 @@ function update(dt) {
     // 倒れる → 起き上がる（最後の0.25秒で起きる）/ のけぞり
     down: me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
     hurt: me.hurtT > 0 ? Math.sin(me.hurtT / 0.28 * Math.PI) : 0,
+    motion: me.motion, motionT: me.motionT,
     charging: me.charging, charge: Math.min(1, me.chargeT / CHARGE_MAX),
     gg: me.gg / GUARD.max, // 盾の縁の光（ガードゲージの残り）
     sweep: me.sweepT > 0 ? sweepAngle(me.sweepT) : -1, // ガードカウンターの回転なぎ払い（回った角度）
@@ -2353,11 +2356,13 @@ function update(dt) {
     const moving = Math.hypot(mx, mz) > 0.03;
     o.x += mx * k; o.z += mz * k;
     o.a += angDiff(o.ta, o.a) * k;
+    o.motionT += dt;
+    if (o.motionT > (SPEAR_MOTIONS[o.motion] || 0)) o.motion = '';
     o.swingT += dt; if (o.spinT >= 0) { o.spinT += dt; if (o.spinT > 0.55) o.spinT = -1; }
     if (moving) o.walkT += dt;
     o.model.position.set(o.x, heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
-    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && o.wk === 'greatsword' ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
+    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (o.wk === 'greatsword' || o.motion === 'whirlspear' || o.motion === 'whirl') ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
   }
 
   // モンスター
@@ -2407,7 +2412,7 @@ function update(dt) {
   sendT -= dt;
   if (sendT <= 0) {
     sendT = 0.066;
-    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm, rc: me.downT > 0 ? 2 : me.hurtT > 0 ? 1 : 0 });
+    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm, pm: me.motion || '', pt: +(me.motionT || 0).toFixed(3), rc: me.downT > 0 ? 2 : me.hurtT > 0 ? 1 : 0 });
   }
   saveT -= dt;
   if (saveT <= 0) { saveT = 10; saveChar(); }

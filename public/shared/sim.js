@@ -128,6 +128,9 @@ export class World {
         break;
       }
       case 'st': {
+        const poses = ['lance', 'helix', 'piercer', 'javelin', 'whirlspear', 'whirl', 'heavy', 'counter'];
+        p.pm = poses.includes(m.pm) ? m.pm : '';
+        p.pt = typeof m.pt === 'number' && Number.isFinite(m.pt) ? Math.max(0, Math.min(1, m.pt)) : 0;
         // wst: 武器の形 / arm: 防具の見た目 / rc: 被弾リアクション（1 のけぞり・2 ダウン）。他のプレイヤーにも同じに見せる
         for (const k of ['x', 'z', 'a', 'hp', 'mhp', 'lv', 'sw', 'sk', 'wr', 'dg', 'gd', 'wst', 'arm', 'rc']) {
           if (typeof m[k] === 'number' && isFinite(m[k])) p[k] = m[k];
@@ -1059,7 +1062,7 @@ export class World {
   }
 
   snapshot(A) {
-    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0, p.rc | 0]);
+    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0, p.rc | 0, p.pm || '', p.pt || 0]);
     const ms = [...A.mobs.values()].map((m) => [
       m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st,
       m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.named ? 3 : m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,

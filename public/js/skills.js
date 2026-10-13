@@ -168,6 +168,7 @@ export const WEAPON_SKILLS = {
     },
   },
   lance: {
+    motion: 'lance',
     name: 'ライトニング・ランス', kind: 'spear', cd: 5.5, desc: '直線上を雷光で貫く',
     run(c) {
       const a = c.aim(), sx = c.me.x, sz = c.me.z;
@@ -180,11 +181,12 @@ export const WEAPON_SKILLS = {
     },
   },
   helix: {
+    motion: 'helix',
     name: 'ヘリカル・スラスト', kind: 'spear', cd: 5, desc: '目にも留まらぬ5連突き。最後の一撃が重い',
     run(c) {
       const a = c.aim();
       for (let i = 0; i < 5; i++) {
-        c.later(i * 0.08, () => {
+        c.later(0.06 + i * 0.08, () => {
           const aa = a + (Math.random() - 0.5) * 0.25;
           c.line(5.2, 1.6, i === 4 ? 1.8 : 0.8, { type: 'wskill', a: aa });
           for (let d = 1; d < 5; d += 0.6) c.fx.parts.emit(c.me.x + Math.sin(aa) * d, 1.1, c.me.z + Math.cos(aa) * d, { color: c.col(), size: 0.4, life: 0.25, speed: 0.5, gravity: 0 });
@@ -304,6 +306,7 @@ Object.assign(WEAPON_SKILLS, {
     },
   },
   piercer: {
+    motion: 'piercer',
     name: 'ソニック・ピアス', kind: 'spear', cd: 7, desc: '一直線に突進し、通り道の敵をまとめて貫く（無敵あり・ヘイト大）',
     run(c) {
       const a = c.aim(), sx = c.me.x, sz = c.me.z;
@@ -316,12 +319,13 @@ Object.assign(WEAPON_SKILLS, {
     },
   },
   whirlspear: {
+    motion: 'whirlspear',
     name: '旋風槍', kind: 'spear', cd: 6, desc: '槍を3回振り回して周りを薙ぎ、近くの敵の注意を引きつける',
     spin: true,
     run(c) {
       c.taunt(9);
       for (let i = 0; i < 3; i++) {
-        c.later(i * 0.16, () => {
+        c.later(0.08 + i * 0.16, () => {
           c.circle(c.me.x, c.me.z, 3.4, 1.0, { type: 'wskill', threat: 2 });
           c.fx.ringWave(c.me.x, c.me.z, c.col(), 3.4, 0.25);
           c.sfx('swing');
@@ -491,10 +495,12 @@ export const TREE_SKILLS = {
     },
   },
   javelin: {
+    motion: 'javelin',
     name: 'ジャベリン', cd: 8, desc: '槍の分身を投げ放ち、直線上の敵を貫通する',
-    run(c) { c.proj({ a: c.aim(), mult: 3.5, speed: 32, life: 0.6, rad: 1.4, type: 'tskill', color: 0xbfe0ff }); c.sfx('wave'); },
+    run(c) { const a = c.aim();c.later(.18, () => { c.proj({ a, mult: 3.5, speed: 32, life: 0.6, rad: 1.4, type: 'tskill', color: 0xbfe0ff }); c.sfx('wave'); }); },
   },
   whirl: {
+    motion: 'whirl',
     name: '旋槍', cd: 8, desc: '槍を大きく振り回して周囲を薙ぐ',
     run(c) {
       c.later(0.05, () => { c.circle(c.me.x, c.me.z, 5, 2.4, { type: 'tskill' }); c.fx.ringWave(c.me.x, c.me.z, c.col(), 5.5, 0.35); });

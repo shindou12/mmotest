@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { spearPose } from './spear-motion.js';
 
 export const GRIP_Y = Object.freeze({ sword: -0.15, greatsword: -0.20, dagger: -0.08, spear: 0.45, axe: 0.15, bow: 0 });
 const down = new THREE.Vector3(0, -1, 0);
@@ -63,8 +64,14 @@ export function updateWeaponPose(u, s) {
 
   if (s.down > 0) { u.weapon.rotation.set(Math.PI / 2, 0, 0); return; }
   if (u.wKind === 'spear') {
-    const sweep = s.sweep >= 0;
-    orientWeapon(u, sweep ? Math.PI / 2 : .04, sweep || s.swing >= 0 ? 0 : s.guard ? -.08 : .22);
+    const p = spearPose(s);
+    u.armR.position.z = 0;
+    u.body.rotation.y = p.yaw;
+    if (!(s.dodge > 0) && !(s.hurt > 0)) u.body.rotation.x = p.lean;
+    aimHand(u.armR, u.elbowR, new THREE.Vector3(p.x, p.y, p.z), new THREE.Vector3(1, -.6, -.3));
+    // Thrust stays on the aiming line while the torso turns; sweeps extend sideways.
+    orientWeapon(u, p.lateral ? Math.PI / 2 * (p.side ?? 1) : -p.yaw, p.pitch);
+    if (p.step) { u.legs[0].rotation.x = -p.step;u.legs[1].rotation.x = p.step; }
     return;
   }
 
