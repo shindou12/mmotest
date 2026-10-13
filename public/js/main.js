@@ -244,7 +244,7 @@ function itemPower(it) {
 // ======================================================================
 // 入力
 // ======================================================================
-// 盾槍のガード（Shift 長押し。ダウン中はできない）
+// 盾槍のガード（左クリック長押し。ダウン中はできない）
 function startGuard() {
   if (me.dead || me.downT > 0 || me.guarding) return;
   me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip');
@@ -264,25 +264,34 @@ const input = {
     audio.init();
     if (!started) return;
     keys.add(k);
-    // 操作: 左クリック 攻撃 / 右クリック 武器スキル / Q・E スキル / Space 回避 / R 回復 / Shift長押し ガード（盾槍）
+    // 操作: 左クリック 攻撃（長押しで強攻撃。盾槍はガード）/ 右クリック 武器スキル / Q・E スキル / Space 回避 / R 回復
     if (k === ' ') tryDodge();
-    if (k === 'shift' && S?.W.guard) startGuard();
     if (k === 'r') usePotion();
     if (k === 'q') tryTreeSkill(0);
     if (k === 'e') tryTreeSkill(1);
   },
-  keyUp(k) { keys.delete(k); if (k === 'shift') endGuard(); },
-  blur() { keys.clear(); mouse.l = mouse.r = false; me.charging = false; me.guarding = false; },
+  keyUp(k) { keys.delete(k); },
+  blur() { keys.clear(); mouse.l = mouse.r = false; me.charging = false; me.guarding = false; me.holdT = 0; },
   pointerMove(x, y) { mouse.x = x; mouse.y = y; },
   pointerDown(button) {
     audio.init();
     if (!started) return;
-    if (button === 0) { mouse.l = true; if (me.downT <= 0) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
+    if (button === 0) {
+      mouse.l = true;
+      // 盾槍: 長押しでガード（押し続けて少したつと構える）。それ以外の武器: 長押しで強攻撃の溜め
+      if (S?.W.guard) me.holdT = now();
+      else if (me.downT <= 0) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; }
+    }
     if (button === 2) { mouse.r = true; tryWeaponSkill(); }
   },
   pointerUp(button) {
     if (button === 0) {
       mouse.l = false;
+      if (me.holdT) {
+        // 盾槍: 構える前に離したら通常攻撃、構えていたらガードを解く
+        if (me.guarding) endGuard(); else if (started) me.queued = now() + 0.45;
+        me.holdT = 0;
+      }
       if (me.charging && started) {
         me.releaseZoneW = S ? bowZoneWidth() : BOW_ZONE.min;
         me.charging = false;
@@ -2144,6 +2153,8 @@ function update(dt) {
       me.stepT -= dt;
       if (me.stepT <= 0) { me.stepT = 0.32; audio.sfx('step'); }
     }
+    // 盾槍: 左クリックを押し続けたらガードを構える
+    if (me.holdT && mouse.l && !me.guarding && S.W.guard && now() - me.holdT >= CHARGE_MIN) startGuard();
     if (me.guarding) me.a = aimAngle();
 
     // 出口
