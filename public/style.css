@@ -460,7 +460,7 @@ body.touch .inv-head .dim { display: none; }
 #smith .inv-head b { font-size: 17px; color: #ffe7a0; letter-spacing: .08em; }
 #smith .mats { display: flex; gap: 14px; font-size: 12px; color: #ffe7a0; }
 .smith-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 120px 1fr 380px; gap: 12px; }
-#smith.codex .smith-body { grid-template-columns: 120px 0 1fr; }
+#smith.codex .smith-body { grid-template-columns: 120px minmax(0, 1fr); }
 #smith.codex #smith-list { display: none; }
 .smith-tabs { display: flex; flex-direction: column; gap: 6px; }
 .smith-tabs button { display: flex; align-items: center; gap: 8px; padding: 10px 12px; text-align: left; background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
@@ -579,3 +579,4 @@ body.touch #nav #quests .qi:nth-child(n+3) { display: none; } /* スマホは見
 body.touch #chat { top: 172px; bottom: auto; left: calc(8px + env(safe-area-inset-left)); width: 200px; }
 body.touch #chat-log { max-height: 52px; }
 body.touch #prompt { left: 56%; top: 40%; }
+

@@ -1245,7 +1245,7 @@ export function createUI(game) {
         game.sfx('ui'); P.hideTip(); P.smith();
       },
       'item:context': () => undefined,
-      'smith:slot'(ev) { sm.slot = ev.payload.idx; sm.msg = ''; P.smith(); },
+      'smith:slot'(ev) { if (sm.slot !== ev.payload.idx) sm.key = null; sm.slot = ev.payload.idx; sm.msg = ''; P.smith(); },
       'smith:key'(ev) { sm.key = ev.payload.key; sm.msg = ''; P.smith(); },
       'smith:skill'(ev) { sm.skill = ev.payload.id; sm.msg = ''; P.smith(); },
       'smith:do'() {
