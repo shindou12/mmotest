@@ -2,7 +2,7 @@ import { MOTION_DURATIONS } from '../shared/motion-catalog.js';
 import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
 import { counterAngle } from './spear-motion.js';
 import { CharacterStore, CHARACTER_KEY } from './character-store.js';
-import { BALANCE } from '../shared/balance.js';
+import { BALANCE, REVIVE } from '../shared/balance.js';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -118,6 +118,7 @@ const CHARGE_MIN = 0.22, CHARGE_MAX = 0.9;
 const DODGE_CD = 0.75;
 const me = {
   id: 0, x: 0, z: 0, a: Math.PI, hp: 100, dead: false, deadT: 0,
+  crawl: false, rv: -1, downs: 0, downsAt: 0, // 這いずり / ゲージの残り（円1周=1）/ 最近倒れた回数
   swingT: 9, swingDur: 0.4, combo: 0, lastSwing: 0, sw: 0, sk: 0, queued: 0,
   charging: false, chargeT: 0, chargeLv: 0, guarding: false, guardStart: 0,
   dodgeT: 0, dodgeCd: 0, dodgeDir: [0, 1], iframe: 0,
@@ -253,7 +254,7 @@ function itemPower(it) {
 // 盾槍のガード（強攻撃の溜め中に自動で構える。スマホはガードボタンでも。ダウン中はできない）
 // ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃の代わりに回転なぎ払い（sweepTick）
 function startGuard() {
-  if (me.dead || me.downT > 0 || me.guarding || me.gg <= 0 || me.staggerT > 0) return;
+  if (me.dead || me.crawl || me.downT > 0 || me.guarding || me.gg <= 0 || me.staggerT > 0) return;
   me.guarding = true; me.guardStart = now(); me.charging = false; me.counter = false; audio.sfx('equip');
 }
 // ガードゲージ: ガードで受けるたびに減り（受ける前のダメージに比例）、尽きるとガードブレイクで大きな隙。
@@ -317,7 +318,7 @@ const input = {
     audio.init();
     if (!started) return;
     // 長押しで強攻撃の溜め（盾槍は溜めている間ガードを構える）
-    if (button === 0) { mouse.l = true; if (me.downT <= 0) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
+    if (button === 0) { mouse.l = true; if (me.downT <= 0 && !me.crawl) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
     if (button === 2) { mouse.r = true; tryWeaponSkill(); }
   },
   pointerUp(button) {
@@ -430,6 +431,27 @@ function onMsg(m) {
     case 'door': if (m.open) { world.door = true; audio.sfx('impact'); addShake(0.4); } break;
     case 'chat': addChat(m.from, m.text, m.color); break;
     case 'leave': removeOther(m.id); break;
+    // 這いずり: 仲間が倒れた / 起き上がった / 全員倒れて力尽きた
+    case 'pdown': {
+      if (m.id === me.id) break;
+      const o = others.get(m.id);
+      banner('仲間が倒れた', `${m.name} に攻撃を当てて起こそう`, '#ff9a8a', 3);
+      toast(`⚠ ${m.name} が倒れた`, '#ff9a8a');
+      audio.sfx('roar');
+      if (o) { o.rv = Math.max(o.rv ?? -1, 0.01); fx.beam(o.x, o.z, 0xff6a5a, 10, 0.6, 1.2); }
+      break;
+    }
+    case 'revived': revived(m.by); break;
+    case 'prev': {
+      const o = others.get(m.id);
+      if (!o) break;
+      o.rv = -1;
+      toast(`${o.name} が起き上がった`, '#9affc8');
+      fx.beam(o.x, o.z, 0x9affc8, 10, 0.9, 1.0);
+      fx.ringWave(o.x, o.z, 0x9affc8, 4, 0.5);
+      break;
+    }
+    case 'bleed': if (me.crawl) die(); break;
     case 'unlock': world.unlocked = m.unlocked; break;
     case 'bossStart': {
       banner(`第${m.n}層ボス`, m.name, '#ff6a6a', 3);
@@ -600,7 +622,7 @@ function waypointTick() {
 function waypointOk(id) { const d = AREAS[id]; return !!d && (!!d.gate || !!char?.waypoints?.[id]); }
 function waypointWarp(id) {
   if (!waypointOk(id) || AREAS[id].floor > (world.unlocked || 1)) { toast('まだ解放されていないワープポイントだ', '#ff9a8a'); return false; }
-  if (me.dead) return false;
+  if (me.dead || me.crawl) return false;
   const lair = env?.lair;
   if (world.bossState === 'fight' && lair && Math.hypot(me.x - lair.x, me.z - lair.z) < lair.r + 2) { toast('ボス戦の最中はワープできない', '#ff9a8a'); return false; }
   if (id === world.area) return false;
@@ -652,8 +674,8 @@ function onSnap(m) {
   world.plates = m.pl || [];
   const seenP = new Set();
   for (const p of m.p) {
-    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm, rc, pm = '', pt = 0] = p;
-    if (id === me.id) continue;
+    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm, rc, pm = '', pt = 0, rv = -1] = p;
+    if (id === me.id) { if (me.crawl && rv >= 0) me.rv = rv; continue; }
     seenP.add(id);
     let o = others.get(id);
     if (!o) {
@@ -661,7 +683,7 @@ function onSnap(m) {
       scene.add(o.model);
       others.set(id, o);
     }
-    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd, rc: rc | 0, motion: pm, motionT: pt });
+    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd, rc: rc | 0, motion: pm, motionT: pt, rv });
     setPlayerWeapon(o.model, wk, wr, wst | 0);
     setPlayerArmor(o.model, arm | 0);
     if (sw !== o.sw) {
@@ -723,7 +745,36 @@ function removeOther(id) {
   const o = others.get(id);
   if (!o) return;
   fx.dispose(o.model);
+  reviveRing(o, 0, 0, -1);
   others.delete(id);
+}
+
+// 這いずりのゲージ: 倒れている人の足元の円。円1周が最大（最近倒れた回数が多いほど長い）
+const RING = [1.35, 1.75];
+function reviveRing(h, x, z, rv) {
+  if (!(rv >= 0)) {
+    if (h.revRing) { fx.dispose(h.revRing.g); h.revRing = null; }
+    return;
+  }
+  let R = h.revRing;
+  if (!R) {
+    const mat = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+    const g = new THREE.Group();
+    const bg = new THREE.Mesh(new THREE.RingGeometry(RING[0] - 0.08, RING[1] + 0.08, 64), mat(0x101820, 0.6));
+    const fg = new THREE.Mesh(new THREE.RingGeometry(RING[0], RING[1], 4), mat(0xffd84a, 0.95));
+    bg.renderOrder = 20; fg.renderOrder = 21;
+    g.add(bg, fg);
+    g.rotation.x = -Math.PI / 2;
+    scene.add(g);
+    R = h.revRing = { g, fg, v: -1 };
+  }
+  if (Math.abs(R.v - rv) > 0.002) {
+    R.v = rv;
+    R.fg.geometry.dispose();
+    R.fg.geometry = new THREE.RingGeometry(RING[0], RING[1], Math.max(4, Math.ceil(rv * 64)), 1, Math.PI / 2, Math.max(0.01, rv) * Math.PI * 2);
+  }
+  R.g.position.set(x, heightAt(x, z) + 0.08, z);
+  R.fg.material.opacity = 0.75 + 0.25 * Math.sin(now() * 6);
 }
 
 function onMobDie(m) {
@@ -783,7 +834,7 @@ function resolveTele(te) {
   }
   const nearSrc = te.sh.some((s) => Math.hypot(s.x - me.x, s.z - me.z) < 22);
   if (big && nearSrc) { audio.sfx('impact'); addShake(0.35); }
-  if (me.dead) return;
+  if (me.dead || me.crawl) return;
   const hit = te.sh.some((s) => inShape(s, me.x, me.z));
   if (!hit) return;
   if (me.iframe > 0) { onJustDodge(); return; }
@@ -904,7 +955,7 @@ function takeDamage(raw, src = null, kd = false, guarded = false) {
     fx.beam(me.x, me.z, 0xffd84a, 8, 0.8, 0.8);
     return;
   }
-  if (me.hp <= 0) { die(); return; }
+  if (me.hp <= 0) { fall(); return; }
 }
 
 function onJustDodge() {
@@ -924,7 +975,10 @@ function onJustDodge() {
   }
 }
 
-function die() {
+// HPが0 → 這いずり状態。仲間に攻撃（のスタン値）を当ててもらうと起き上がる。
+// エリアの全員が倒れたら力尽きる（判定はサーバー。ひとりなら即座に力尽きる）
+function fall() {
+  if (me.crawl || me.dead) return;
   // 称号「不死鳥」: その場で一度だけ復活
   if (tf('t_phoenix') && now() - (me.phoenixT ?? -1e9) > 300) {
     me.phoenixT = now();
@@ -935,6 +989,58 @@ function die() {
     audio.sfx('phase');
     return;
   }
+  // 最近倒れた回数ほど起こしにくい（円の1/4 → 1/2 → 3/4 → 1周）
+  me.downs = Math.min(REVIVE.steps, me.downs + 1); me.downsAt = now();
+  me.crawl = true; me.rv = me.downs / REVIVE.steps; me.hp = 0;
+  me.charging = false; me.guarding = false; me.counter = false; me.buffs = []; me.queued = 0;
+  me.downT = 0; me.kbT = 0; me.staggerT = 0; me.dodgeT = 0; me.dashT = 0; me.sweepT = 0; me.skillT = -1; me.swingT = 9;
+  net.send({ t: 'down', g: REVIVE.base * me.downs });
+  banner('這いずり状態', '仲間に攻撃を当ててもらうと起き上がれる', '#ff9a8a', 4);
+  audio.sfx('hurt');
+  fx.parts.burst(me.x, 0.5, me.z, 40, { color: 0xff9a8a, speed: 5, size: 0.45, life: 0.8 });
+}
+function revived(by) {
+  if (!me.crawl) return;
+  me.crawl = false; me.rv = -1;
+  me.hp = Math.round(S.mhp * REVIVE.hp); me.iframe = REVIVE.iframe; me.noDownT = now() + REVIVE.iframe;
+  banner('復活', `${by} に起こしてもらった`, '#9affc8', 3);
+  audio.sfx('levelup');
+  fx.beam(me.x, me.z, 0x9affc8, 10, 0.9, 1.0);
+  fx.ringWave(me.x, me.z, 0x9affc8, 4, 0.5);
+}
+// 倒れている仲間に攻撃が当たった → スタン値ぶんゲージを減らす（ダメージは関係なし・弓の矢では起こせない）
+function reviveHit(o, opt) {
+  if (me.crawl || me.dead || !(o.rv >= 0) || now() - (o.revHitT || 0) < 0.05) return;
+  o.revHitT = now();
+  let v = opt.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[opt.type] ?? 0;
+  v *= S.W.stun * (S.W.melee ? 1 + (S.stunp + buffMod('stunp')) / 100 : 1);
+  v = Math.min(REVIVE.perHit, Math.round(v * 10) / 10);
+  if (v <= 0) return;
+  net.send({ t: 'rev', id: o.id, v });
+  floatText(o.x, 2.2, o.z, `起こす +${v}`, 'info');
+  fx.parts.burst(o.x, 0.8, o.z, 12, { color: 0x9affc8, speed: 4, size: 0.4, life: 0.4 });
+}
+// 這いずり中: ゆっくり這って動けるだけ（攻撃・回避・ポーション・出口は使えない）
+function crawlTick(dt) {
+  let dx = 0, dz = 0;
+  if (keys.has('w') || keys.has('arrowup')) dz -= 1;
+  if (keys.has('s') || keys.has('arrowdown')) dz += 1;
+  if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
+  if (keys.has('d') || keys.has('arrowright')) dx += 1;
+  if (Math.hypot(touch.stick.x, touch.stick.y) > 0.12) { dx = touch.stick.x; dz = touch.stick.y; }
+  const l = Math.hypot(dx, dz);
+  me.moving = l > 0;
+  me.hp = 0;
+  if (!l) return;
+  moveMe(dx / l * REVIVE.crawl * dt, dz / l * REVIVE.crawl * dt);
+  me.a = Math.atan2(dx, dz);
+  me.walkT += dt * 0.5;
+  if (Math.random() < 0.15) fx.parts.emit(me.x, 0.2, me.z, { color: 0xd8c8a8, size: 0.35, life: 0.4, speed: 0.6, gravity: 1 });
+}
+const downedAllies = () => [...others.values()].filter((o) => o.rv >= 0);
+
+function die() {
+  me.crawl = false; me.rv = -1;
   const removed = characterStore.discard();
   toast(removed ? '戦闘不能：このキャラクターのセーブデータを失いました' : 'キャラクターを失いました。ブラウザの保存データを削除できませんでした。', '#f99');
   me.hp = 0; me.dead = true; me.deadT = BALANCE.deathSeconds; me.deathAt = now() + BALANCE.deathSeconds; me.charging = false; me.guarding = false; me.buffs = []; me.downT = 0; me.kbT = 0;
@@ -1237,6 +1343,10 @@ const combat = {
       if (d > range + mb.rad) continue;
       if (Math.abs(angDiff(Math.atan2(dx, dz), a)) <= arc + mb.rad / Math.max(d, 0.5) || d < mb.rad + 0.6) dealDamage(mb, mult, o);
     }
+    for (const p of downedAllies()) {
+      const dx = p.x - me.x, dz = p.z - me.z, d = Math.hypot(dx, dz);
+      if (d < range + 0.6 && (Math.abs(angDiff(Math.atan2(dx, dz), a)) <= arc + 0.6 / Math.max(d, 0.5) || d < 1.2)) reviveHit(p, o);
+    }
   },
   line(len, w, mult, o = {}) {
     const a = o.a ?? me.a, sx = o.sx ?? me.x, sz = o.sz ?? me.z;
@@ -1246,9 +1356,14 @@ const combat = {
       const along = dx * fx_ + dz * fz, side = Math.abs(dx * fz - dz * fx_);
       if (along > -mb.rad && along < len + mb.rad && side < w / 2 + mb.rad) dealDamage(mb, mult, o);
     }
+    for (const p of downedAllies()) {
+      const dx = p.x - sx, dz = p.z - sz, along = dx * fx_ + dz * fz, side = Math.abs(dx * fz - dz * fx_);
+      if (along > -0.6 && along < len + 0.6 && side < w / 2 + 0.6) reviveHit(p, o);
+    }
   },
   circle(x, z, r, mult, o = {}) {
     for (const mb of [...mobs.values()]) if (Math.hypot(mb.x - x, mb.z - z) < r + mb.rad) dealDamage(mb, mult, o);
+    for (const p of downedAllies()) if (Math.hypot(p.x - x, p.z - z) < r + 0.6) reviveHit(p, o);
   },
   proj(o) {
     const color = o.color ?? RARITIES[S.wr].color;
@@ -1268,9 +1383,9 @@ const combat = {
   },
 };
 
-function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0 && me.downT <= 0 && !(me.sweepT > 0); }
+function canAct() { return S && !me.dead && !me.crawl &&me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0 && me.downT <= 0 && !(me.sweepT > 0); }
 // 弓は回避中も通常攻撃ができる（転がり撃ち）
-const canShootInDodge = () => S.W.ranged && !me.dead && me.dodgeT > 0 && me.skillT < 0 && me.staggerT <= 0;
+const canShootInDodge = () => S.W.ranged && !me.dead && !me.crawl &&me.dodgeT > 0 && me.skillT < 0 && me.staggerT <= 0;
 
 // 攻撃を始めるとき、盾槍のガードボーナスをこの攻撃に乗せる
 function startAttack() {
@@ -1489,7 +1604,7 @@ function updateBossProjs(dt) {
     if (Math.random() < 0.6) fx.parts.emit(p.x, 1.3, p.z, { color: p.c, size: 0.4, life: 0.3, speed: 0.3, gravity: 0 });
     let gone = p.life <= 0;
     const d = Math.hypot(p.x - me.x, p.z - me.z);
-    if (!gone && !me.dead && d < p.r + 0.6) {
+    if (!gone && !me.dead && !me.crawl && d < p.r + 0.6) {
       const facing = Math.abs(angDiff(Math.atan2(p.x - me.x, p.z - me.z), me.a)) < THREE.MathUtils.degToRad(80);
       if (me.guarding && S.W.guard && facing) {
         // ガードで弾を消す
@@ -1514,7 +1629,7 @@ function updateBossProjs(dt) {
 function tryDodge() {
   audio.init();
   if (me.downT > 0) { tryTech(); return; } // ダウン中は受け身
-  if (!S || me.dead || me.dodgeCd > 0 || me.dashT > 0 || me.staggerT > 0) return;
+  if (!S || me.dead || me.crawl || me.dodgeCd > 0 || me.dashT > 0 || me.staggerT > 0) return;
   let dx = 0, dz = 0;
   if (keys.has('w')) dz -= 1; if (keys.has('s')) dz += 1; if (keys.has('a')) dx -= 1; if (keys.has('d')) dx += 1;
   if (Math.hypot(touch.stick.x, touch.stick.y) > 0.25) { dx = touch.stick.x; dz = touch.stick.y; }
@@ -1532,7 +1647,7 @@ function tryDodge() {
 }
 
 function usePotion() {
-  if (!S || me.dead || me.potions <= 0 || me.potCd > 0 || me.hp >= S.mhp) return;
+  if (!S || me.dead || me.crawl || me.potions <= 0 || me.potCd > 0 || me.hp >= S.mhp) return;
   me.potions--; me.potCd = BALANCE.potionCooldown;
   heal(S.mhp * BALANCE.potionHeal * (tf('t_spore') ? 1.4 : 1), true);
   audio.sfx('potion');
@@ -1540,7 +1655,7 @@ function usePotion() {
 }
 
 function heal(n, show) {
-  if (characterStore.lost) return;
+  if (characterStore.lost || me.crawl) return;
   const before = me.hp;
   me.hp = Math.min(S.mhp, me.hp + n);
   if (show && me.hp > before) floatText(me.x, 2.2, me.z, '+' + Math.round(me.hp - before), 'heal');
@@ -2188,14 +2303,16 @@ function update(dt) {
   if (me.motion) { me.motionT += dt;if (me.motionT > (MOTION_DURATIONS[me.motion] || 0)) me.motion = ''; }
   updateMouseWorld();
   // 遅延処理（スキルの多段ヒットなど）
-  for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= t) { const p = pending.splice(i, 1)[0]; if (!me.dead) p.fn(); }
+  for (let i = pending.length - 1; i >= 0; i--) if (pending[i].at <= t) { const p = pending.splice(i, 1)[0]; if (!me.dead && !me.crawl) p.fn(); }
 
   me.dodgeCd -= dt; me.wsCd -= dt; me.potCd -= dt; me.iframe -= dt; me.staggerT -= dt; me.hurtT -= dt;
   me.dStackT -= dt; if (me.dStackT <= 0) me.dStack = 0;
   for (const k in me.tcd) me.tcd[k] -= dt;
   for (const b of me.buffs) b.t -= dt;
   me.buffs = me.buffs.filter((b) => b.t > 0);
-  const safe = world.def.type === 'town' || world.def.type === 'camp';
+  // しばらく倒れずにいると、起こしにくさが1段階戻る
+  if (me.downs > 0 && !me.crawl && t - me.downsAt > REVIVE.decay) { me.downs--; me.downsAt = t; }
+  const safe =world.def.type === 'town' || world.def.type === 'camp';
 
   if (me.dead) {
     me.deadT = Math.max(0, me.deathAt - now());
@@ -2205,6 +2322,8 @@ function update(dt) {
       location.reload();
       return;
     }
+  } else if (me.crawl) {
+    crawlTick(dt);
   } else {
     // 移動
     let dx = 0, dz = 0;
@@ -2310,7 +2429,7 @@ function update(dt) {
         me.lastHurt = t;
         floatText(me.x, 2.2, me.z, '毒', 'poison');
         fx.parts.burst(me.x, 0.4, me.z, 8, { color: 0x9aff7a, speed: 2, size: 0.35, life: 0.5, gravity: -1 });
-        if (me.hp <= 0) die();
+        if (me.hp <= 0) fall();
       }
     }
 
@@ -2341,13 +2460,15 @@ function update(dt) {
     spin: me.skillT >= 0 && me.spin ? me.skillT / 0.55 : -1,
     dodge: me.dodgeT > 0 ? me.dodgeT / 0.38 : 0,
     // 倒れる → 起き上がる（最後の0.25秒で起きる）/ のけぞり
-    down: me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
+    down: me.crawl ? 1 : me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
     hurt: me.hurtT > 0 ? Math.sin(me.hurtT / 0.28 * Math.PI) : 0,
     motion: me.motion, motionT: me.motionT,
     charging: me.charging, charge: Math.min(1, me.chargeT / CHARGE_MAX),
     gg: me.gg / GUARD.max, // 盾の縁の光（ガードゲージの残り）
     sweep: me.sweepT > 0 ? sweepAngle(me.sweepT) : -1, // ガードカウンターの回転なぎ払い（回った角度）
   });
+  reviveRing(me, me.x, me.z, me.crawl ? me.rv : -1);
+  for (const o of others.values()) reviveRing(o, o.x, o.z, o.rv);
   if (me.guarding && Math.random() < 0.3) fx.parts.emit(me.x + Math.sin(me.a) * 0.9 + rnd(-0.4, 0.4), rnd(0.6, 1.8), me.z + Math.cos(me.a) * 0.9 + rnd(-0.4, 0.4), { color: 0xbfe0ff, size: 0.25, life: 0.3, speed: 0.3, gravity: 0 });
   for (const b of me.buffs) if (Math.random() < 0.25) fx.parts.emit(me.x + rnd(-0.5, 0.5), rnd(0.2, 2), me.z + rnd(-0.5, 0.5), { color: b.color, size: 0.3, life: 0.6, speed: 1, gravity: 2 });
   // 伝説・神器のオーラ
@@ -2374,7 +2495,7 @@ function update(dt) {
     if (moving) o.walkT += dt;
     o.model.position.set(o.x, heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
-    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (o.wk === 'greatsword' || o.motion === 'whirlspear' || o.motion === 'whirl') ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
+    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (o.wk === 'greatsword' || o.motion === 'whirlspear' || o.motion === 'whirl') ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
   }
 
   // モンスター
@@ -2601,5 +2722,5 @@ function enterPreview() {
 }
 loop();
 
-window.__game = { me, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, coins, audio, api: game };
+window.__game = { me, others, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, camera, coins, audio, api: game };
 

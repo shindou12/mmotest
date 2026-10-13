@@ -12,6 +12,12 @@ export const BALANCE = Object.freeze({
   questXp: 0.60,
 });
 
+// 這いずり（HP0で倒れる → 仲間の攻撃のスタン値で起き上がる）。単位はスタン値
+//   base: 最初に倒れたときのゲージ（円の1/4）。大剣の溜め強攻撃1発＋通常1回で起きる量
+//   倒れるたびに base×2, ×3, ×4（円1周）まで増え、decay 秒倒れずにいると1段階戻る
+export const REVIVE = Object.freeze({ base: 10.5, steps: 4, perHit: 9, decay: 300, hp: 0.3, iframe: 2, crawl: 1.4, range: 8 });
+export const REVIVE_FULL = REVIVE.base * REVIVE.steps;
+
 export function partySize(count) {
   return Math.max(BALANCE.recommendedParty, Math.min(BALANCE.maxScaledParty, Math.floor(count) || 0));
 }

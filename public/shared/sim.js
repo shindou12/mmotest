@@ -2,7 +2,7 @@ import { MOTION_DURATIONS } from './motion-catalog.js';
 import { TECHNIQUES } from './techniques.js';
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
-import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
+import { BALANCE, REVIVE, REVIVE_FULL, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
 import {
   FLOORS, RARITIES, MAX_FLOOR, floorLevel, bossLevel, mobHp, mobDmg, mobXp, makeItem, rollRarity,
 } from './data.js';
@@ -155,6 +155,27 @@ export class World {
           if (mob.stun >= mob.stunMax) this.stunBoss(A, mob);
         }
         if (mob.hp <= 0) this.killMob(A, mob);
+        break;
+      }
+      case 'down': {
+        // HPが0になって這いずり状態へ。g: 起き上がるのに要るゲージ（最近倒れた回数で増える。クライアントが計算）
+        if (p.dead || p.down) return;
+        p.down = true; p.hp = 0;
+        p.rev = Math.max(REVIVE.base, Math.min(REVIVE_FULL, Number(m.g) || REVIVE.base));
+        for (const mob of A.mobs.values()) mob.threat?.delete(p.id);
+        this.broadcastArea(A.id, { t: 'pdown', id: p.id, name: p.name });
+        this.checkWipe(A, this.areaPlayers(A.id));
+        break;
+      }
+      case 'rev': {
+        // 倒れている仲間に攻撃を当てた（v: その攻撃のスタン値）
+        const q = this.players.get(m.id);
+        if (!q || q === p || !q.down || q.area !== p.area || p.dead || p.down || dist(p, q) > REVIVE.range) return;
+        q.rev -= Math.max(0, Math.min(Number(m.v) || 0, REVIVE.perHit));
+        if (q.rev > 0) return;
+        q.down = false; q.rev = 0;
+        this.send(q, { t: 'revived', by: p.name });
+        this.broadcastArea(A.id, { t: 'prev', id: q.id, by: p.id });
         break;
       }
       case 'absorb': {
@@ -465,7 +486,8 @@ export class World {
   tickArea(A, dt) {
     const def = A.def;
     const players = this.areaPlayers(A.id);
-    const alive = players.filter((p) => !p.dead);
+    const alive = players.filter((p) => !p.dead && !p.down);
+    this.checkWipe(A, players);
 
     // タイマー
     if (A.timers.length) {
@@ -848,7 +870,12 @@ export class World {
   }
 
   livePlayer(A, id) {
-    return this.areaPlayers(A.id).find((p) => p.id === id && !p.dead);
+    return this.areaPlayers(A.id).find((p) => p.id === id && !p.dead && !p.down);
+  }
+
+  // 這いずり: 同じエリアの全員が倒れたら（ひとりでも）、這いずっている人は全員力尽きる
+  checkWipe(A, players) {
+    if (!players.some((p) => p.down) || !players.every((p) => p.dead || p.down)) return;    for (const p of players) if (p.down) { p.down = false; p.rev = 0; this.send(p, { t: 'bleed' }); }
   }
 
   bossPattern(A, b, pat, target, inArena) {
@@ -940,7 +967,7 @@ export class World {
         this.later(A, 2.0, () => this.tele(A, b, mk(Math.PI / 4), 0.9, base * 1.2, '#ff1a8a'));
         this.later(A, 2.6, () => this.tele(A, b, mk(0), 0.9, base * 1.2, '#ff1a8a'));
         this.later(A, 3.2, () => {
-          for (const p of this.areaPlayers(A.id)) if (!p.dead) for (let k = 0; k < 3; k++) this.later(A, k * 0.3, () => this.tele(A, b, [{ k: 'circle', x: r2(p.x), z: r2(p.z), r: 2.8 }], 0.7, base * 0.8, '#ff1a8a'));
+          for (const p of this.areaPlayers(A.id)) if (!p.dead && !p.down) for (let k = 0; k < 3; k++) this.later(A, k * 0.3, () => this.tele(A, b, [{ k: 'circle', x: r2(p.x), z: r2(p.z), r: 2.8 }], 0.7, base * 0.8, '#ff1a8a'));
         });
         return 4.6;
       }
@@ -1079,7 +1106,7 @@ export class World {
   }
 
   snapshot(A) {
-    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0, p.rc | 0, p.pm || '', p.pt || 0]);
+    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0, p.rc | 0, p.pm || '', p.pt || 0, p.down ? Math.round(p.rev / REVIVE_FULL * 1000) / 1000 : -1]);
     const ms = [...A.mobs.values()].map((m) => [
       m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st,
       m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.named ? 3 : m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,
