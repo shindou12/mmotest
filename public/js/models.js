@@ -513,7 +513,7 @@ function makeShield(rarity, armL) {
 
 export function animatePlayer(model, s) {
   const u = model.userData;
-  u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);
+  u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);u.head.rotation.y = 0;
   const walk = s.moving ? Math.sin(s.walkT * 10) : 0;
   u.legs[0].rotation.x = walk * 0.75; u.legs[1].rotation.x = -walk * 0.75;
   if (s.guard) {

@@ -72,3 +72,25 @@ test('each of the six starting weapons has the selected type and skill', () => {
     const item = starterWeapon(kind);assert.equal(item.kind, kind);assert.equal(item.slot, 'weapon');assert.ok(item.skill);
   }
 });
+
+test('bow limbs and string stay outside the chest during idle, drawing and release', () => {
+  for (let style = 0; style < 4; style++) {
+    const model = makePlayer('#448a9b');setPlayerWeapon(model, 'bow', 3, style);
+    const u = model.userData;
+    for (const pose of [{}, { moving: true, walkT: .3 }, { charging: true, charge: .5 }, { charging: true, charge: 1 }, { swing: 0 }, { swing: .2 }]) {
+      animatePlayer(model, { ...base, ...pose, kind: 'bow' });model.updateMatrixWorld(true);
+      const inverse = u.body.matrixWorld.clone().invert();
+      u.weaponModel.traverse(part => {
+        if (!part.geometry?.attributes.position || !part.visible) return;
+        const positions = part.geometry.attributes.position;
+        for (let i = 0; i < positions.count; i++) {
+          const p = new THREE.Vector3().fromBufferAttribute(positions, i).applyMatrix4(part.matrixWorld).applyMatrix4(inverse);
+          if (p.y < .92 || p.y > 1.55) continue;
+          assert.ok(Math.hypot(p.x, p.z) > .33, `bow/${style}: vertex intersects chest at ${p.toArray()}`);
+        }
+      });
+      const facing = new THREE.Vector3(0, 0, 1).applyQuaternion(u.head.getWorldQuaternion(new THREE.Quaternion()));
+      assert.ok(facing.z > .995 && Math.abs(facing.x) < .03, 'head does not face the aiming direction');
+    }
+  }
+});

@@ -38,12 +38,16 @@ export function updateWeaponPose(u, s) {
   if (bow && !(s.down > 0)) {
     const active = s.charging || s.swing >= 0;
     const draw = s.charging ? clamp(s.charge ?? 1, 0, 1) : s.swing >= 0 ? 1 - clamp(s.swing / .25, 0, 1) : 0;
-    const grip = new THREE.Vector3(-.10, active ? 1.36 : 1.03, active ? .52 : .36);
-    aimHand(u.armL, u.elbowL, grip, new THREE.Vector3(-1, -.7, 0));
+    // Turn the torso side-on while the bow and head keep facing the aim direction.
+    // Moving the bow forward alone lets its deep curve/string cut through the chest.
+    const stance = 1.0;
+    u.body.rotation.y = stance;u.head.rotation.y = -stance;
+    const aim = new THREE.Vector3(-Math.sin(stance), 0, Math.cos(stance));
+    const grip = aimHand(u.armL, u.elbowL, new THREE.Vector3(-.10, active ? 1.36 : 1.25, .53), new THREE.Vector3(-1, -.7, 0));
     const details = u.weaponModel.userData.bow;
     if (active && details) {
       const pull = .22 * draw;
-      aimHand(u.armR, u.elbowR, new THREE.Vector3(grip.x, grip.y, grip.z + details.sx - pull), new THREE.Vector3(1, 0, -.7));
+      aimHand(u.armR, u.elbowR, grip.clone().addScaledVector(aim, details.sx - pull), new THREE.Vector3(1, 0, -.7));
       const pos = details.string.geometry.attributes.position;pos.setX(1, details.sx - pull);pos.needsUpdate = true;
       details.arrow.visible = s.charging || s.swing < .15;
       details.arrow.position.x = details.sx - pull;
@@ -53,7 +57,7 @@ export function updateWeaponPose(u, s) {
     }
     // Bow limbs remain vertical; its model's -90 degree yaw puts the string toward the torso.
     const handOrientation = u.armL.quaternion.clone().multiply(u.elbowL.quaternion);
-    u.weapon.quaternion.copy(handOrientation).invert();
+    u.weapon.quaternion.copy(handOrientation).invert().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -stance));
     return;
   }
 
