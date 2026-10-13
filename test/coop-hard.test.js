@@ -47,7 +47,7 @@ test('late joins preserve damage progress and earned stun resistance; leaving ne
   assert.ok(b.mhp > oldMax);assert.ok(b.stunMax > oldStunMax);
   const max = b.mhp, stun = b.stunMax;
   w.scaleEncounter(A, b, 1);assert.equal(b.mhp, max);assert.equal(b.stunMax, stun);
-  assert.equal(b.stunT, 2.5);
+  assert.equal(b.stunT, 3);
 });
 
 test('rewards are shared nearby, exclude dead/remote players, and penalize outleveled farming', () => {
@@ -89,4 +89,13 @@ test('elite and named mobs are tougher without reducing per-player loot guarante
   assert.ok(elite.mhp > regular.mhp * 3);
   assert.ok(enemyScale(5, true) > enemyScale(3, true));
   assert.equal(BALANCE.potionHeal, .3);assert.equal(BALANCE.potionCooldown, 8);
+});
+
+
+test('boss stun thresholds use the original party formula and stun lasts three seconds', () => {
+  for (const [count, expected] of [[1,200],[2,200],[3,200],[4,250],[5,300]]) {
+    const {w,A}=party(count,'f1_lab');const boss=w.spawnBoss(A);
+    assert.equal(boss.stunMax,expected);w.stunBoss(A,boss);
+    assert.equal(boss.stunT,3);assert.equal(boss.stunMax,Math.round(expected*1.3));
+  }
 });

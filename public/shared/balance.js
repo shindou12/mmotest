@@ -5,7 +5,7 @@ export const BALANCE = Object.freeze({
   xpRequired: 65, xpExponent: 1.6, killXp: 7,
   playerGrowth: 1.065, enemyHpGrowth: 1.105, enemyDamageGrowth: 1.095,
   enemyHp: 65, enemyDamage: 12, floorSpacing: 8,
-  bossHp: 48, bossDamage: 1.1, bossStun: 160, stunSeconds: 2.5,
+  bossHp: 48, bossDamage: 1.1, bossStun: 100, bossStunPerPlayer: 0.5, stunSeconds: 3,
   eliteHp: 3.2, eliteDamage: 1.5, namedHp: 8, namedDamage: 1.75,
   potionHeal: 0.30, potionCooldown: 8, lifestealEfficiency: 0.55,
   deathSeconds: 5,

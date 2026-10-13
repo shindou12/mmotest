@@ -330,7 +330,7 @@ export class World {
     const b = {
       id: this.seq++, scaleN: n, kind: 'boss', d: 2, t: A.fdef.boss.t, lv, hp, mhp: hp, x: A.lair.x, z: A.lair.z - 5, a: 0,
       st: 0, actT: 2.5, busyT: 0, enraged: false, phase: 1, last: null, dash: null, arch: { speed: 3.4 }, threat: new Map(),
-      hateT: HATE_RESET.boss, hateMax: HATE_RESET.boss, stun: 0, stunMax: Math.round(BALANCE.bossStun * (1 + 0.65 * (n - 1))), stunT: 0,
+      hateT: HATE_RESET.boss, hateMax: HATE_RESET.boss, stun: 0, stunMax: Math.round(BALANCE.bossStun * (1 + BALANCE.bossStunPerPlayer * (n - 1))), stunT: 0,
     };
     A.mobs.set(b.id, b);
     A.boss = b;
@@ -346,7 +346,7 @@ export class World {
     const fraction = m.hp / m.mhp;
     m.mhp = Math.round(m.mhp * enemyScale(n, boss) / enemyScale(previous, boss));
     m.hp = Math.max(1, Math.round(m.mhp * fraction));
-    if (boss) m.stunMax = Math.round(m.stunMax * (1 + 0.65 * (n - 1)) / (1 + 0.65 * (previous - 1)));
+    if (boss) m.stunMax = Math.round(m.stunMax * (1 + BALANCE.bossStunPerPlayer * (n - 1)) / (1 + BALANCE.bossStunPerPlayer * (previous - 1)));
     m.scaleN = n;
   }
 
