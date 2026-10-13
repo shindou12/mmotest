@@ -1335,18 +1335,19 @@ function doHeavy(lv) {
   }
   HEAVY[S.wk].run(combat, lv);
 }
-// ガードカウンター: 素早い三段突き（1突きごとに少し踏み込む・最後の突きが一番強い）
+// ガードカウンター: その場で「突く・引く」を3回くり返す三段突き（前へは動かない・最後の突きが一番強い）
 const COUNTER_HITS = [1.8, 1.8, 3.2]; // 1突きの威力（攻撃力の倍率）。合計で強攻撃（溜め切り）の約2倍
+const COUNTER_GAP = 0.22; // 1突き（突いて引くまで）の長さ
 function counterThrusts() {
   const k = S.flags.has('bulwark') ? 1.3 : 1; // ツリー「不動の盾」で +30%
-  me.swingDur = 0.5;
+  me.swingDur = COUNTER_GAP;
   COUNTER_HITS.forEach((mult, i) => {
-    later(i * 0.15, () => {
+    later(i * COUNTER_GAP, () => {
       if (me.dead || me.downT > 0) return;
       const a = me.a = aimAngle(), last = i === COUNTER_HITS.length - 1;
-      me.swingT = 0; me.swingDur = last ? 0.35 : 0.15; me.sw++; // 突きのモーションを3回（ほかのプレイヤーにも見える）
-      combat.dash(a, 0.9, 0.06, 0.1);
-      later(0.04, () => {
+      // 突いて引くモーションを1回ずつ（ほかのプレイヤーにも見える）
+      me.swingT = 0; me.swingDur = COUNTER_GAP; me.sw++;
+      later(0.05, () => {
         combat.line(last ? 7 : 5.5, last ? 2.2 : 1.6, mult * k, { type: 'heavy', a, stun: last ? 8 : 3 });
         for (let d = 0.5; d < (last ? 7.5 : 6); d += 0.45) fx.parts.emit(me.x + Math.sin(a) * d, 1.2, me.z + Math.cos(a) * d, { color: last ? 0xffffff : 0xbfe0ff, size: last ? 0.6 : 0.4, life: 0.3, speed: 1, gravity: 0 });
         audio.sfx('swing', { heavy: last });

@@ -521,7 +521,7 @@ export function animatePlayer(model, s) {
     if (s.kind === 'spear') {
       // 突き: 一瞬引いて（0〜18%）→ 鋭く突き出し（〜35%）→ ゆっくり戻す。右肩を前へ入れる
       const back = k < 0.18 ? k / 0.18 : 0;
-      const out = k < 0.18 ? 0 : k < 0.35 ? (k - 0.18) / 0.17 : 1 - (k - 0.35) / 0.65 * 0.9;
+      const out = k < 0.18 ? 0 : k < 0.35 ? (k - 0.18) / 0.17 : 1 - (k - 0.35) / 0.65; // 最後まで引き戻す
       u.armR.rotation.set(-Math.PI / 2 + 0.12, 0, 0);
       u.armR.position.z = -0.4 * back + 1.0 * out;
       u.body.rotation.y = -0.35 * back + 0.3 * out;
