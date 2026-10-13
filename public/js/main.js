@@ -1012,10 +1012,7 @@ function revived(by) {
 function reviveHit(o, opt) {
   if (me.crawl || me.dead || !(o.rv >= 0) || now() - (o.revHitT || 0) < 0.05) return;
   o.revHitT = now();
-  let v = opt.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[opt.type] ?? 0;
-  // 弓はスタン値が低すぎるので、起こすときだけ片手剣並みに扱う
-  v *= S.W.ranged ? 1 : S.W.stun * (1 + (S.stunp + buffMod('stunp')) / 100);
-  v = Math.min(REVIVE.perHit, Math.round(v * 10) / 10);
+  const v = Math.min(REVIVE.perHit, stunValue(opt));
   if (v <= 0) return;
   net.send({ t: 'rev', id: o.id, v });
   floatText(o.x, 2.2, o.z, `起こす +${v}`, 'info');
@@ -1087,6 +1084,14 @@ function aimPoint() {
 function addShake(v) { if (settings.shake) shake = Math.max(shake, v); }
 
 const TYPE_MOD = { normal: 'normp', heavy: 'heavyp', wskill: 'wskillp' };
+// 攻撃のスタン値（ボスのスタンと、倒れた仲間を起こす量の両方に使う）。強攻撃ほど・近接武器ほど大きい
+function stunValue(o) {
+  let st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
+  st *= S.W.stun * (S.W.melee ? 1 + (S.stunp + buffMod('stunp')) / 100 : 1);
+  if (o.sv?.key === 'sv_quake') st *= 2 + o.sv.t * 0.5;
+  if (tf('t_breaker')) st *= 1.3;
+  return Math.round(st * 10) / 10;
+}
 function dealDamage(mb, mult, o = {}) {
   if (characterStore.lost) return;
   if (!mb || mb.hp <= 0) return;
@@ -1105,14 +1110,7 @@ function dealDamage(mb, mult, o = {}) {
   dmg = Math.max(1, Math.round(dmg));
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
   // スタン値: 強攻撃で大きく溜まる。近接武器ほど溜めやすい
-  let st = 0;
-  if (mb.kind === 2 && !(mb.stunT > 0)) {
-    st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
-    st *= S.W.stun * (S.W.melee ? 1 + (S.stunp + buffMod('stunp')) / 100 : 1);
-    if (o.sv?.key === 'sv_quake') st *= 2 + o.sv.t * 0.5;
-    if (tf('t_breaker')) st *= 1.3;
-    st = Math.round(st * 10) / 10;
-  }
+  const st = mb.kind === 2 && !(mb.stunT > 0) ? stunValue(o) : 0;
   net.send({ t: 'hit', id: mb.id, dmg, crit, st, tech: o.tech });
   if (o.healOnHit) heal(dmg * o.healOnHit, true);
   if (o.threat > 1) net.send({ t: 'threat', id: mb.id, n: Math.round(dmg * (o.threat - 1)) });
@@ -1550,7 +1548,7 @@ function projRevive(w, arrow) {
     const key = 'p' + p.id;
     if (w.hit.has(key) || Math.hypot(p.x - w.x, p.z - w.z) > w.rad + 0.6) continue;
     w.hit.add(key);
-    reviveHit(p, { type: w.type });
+    reviveHit(p, { type: w.type, sv: w.sv });
     if (arrow && !w.pierce) return true;
   }
   return false;
