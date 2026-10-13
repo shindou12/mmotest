@@ -2,7 +2,7 @@ import { MOTION_DURATIONS } from '../shared/motion-catalog.js';
 import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
 import { counterAngle } from './spear-motion.js';
 import { CharacterStore, CHARACTER_KEY } from './character-store.js';
-import { BALANCE, REVIVE } from '../shared/balance.js';
+import { BALANCE, REVIVE, reviveStep } from '../shared/balance.js';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -989,12 +989,12 @@ function fall() {
     audio.sfx('phase');
     return;
   }
-  // 最近倒れた回数ほど起こしにくい（円の1/4 → 1/2 → 3/4 → 1周）
-  me.downs = Math.min(REVIVE.steps, me.downs + 1); me.downsAt = now();
-  me.crawl = true; me.rv = me.downs / REVIVE.steps; me.hp = 0;
+  // 最近倒れた回数ほど起こしにくい（ゲージ ×1 → ×2.5 → ×4。円は 1/3 → 2/3 → 1周に見せる）
+  me.downs = Math.min(REVIVE.mult.length, me.downs + 1); me.downsAt = now();
+  me.crawl = true; me.rv = REVIVE.disp[reviveStep(me.downs)]; me.hp = 0;
   me.charging = false; me.guarding = false; me.counter = false; me.buffs = []; me.queued = 0;
   me.downT = 0; me.kbT = 0; me.staggerT = 0; me.dodgeT = 0; me.dashT = 0; me.sweepT = 0; me.skillT = -1; me.swingT = 9;
-  net.send({ t: 'down', g: REVIVE.base * me.downs });
+  net.send({ t: 'down', n: me.downs });
   banner('這いずり状態', '仲間に攻撃を当ててもらうと起き上がれる', '#ff9a8a', 4);
   audio.sfx('hurt');
   fx.parts.burst(me.x, 0.5, me.z, 40, { color: 0xff9a8a, speed: 5, size: 0.45, life: 0.8 });
