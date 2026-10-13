@@ -1352,12 +1352,12 @@ function sweepTick(dt) {
   if (!(me.sweepT > 0)) return;
   const prev = me.sweepT;
   me.sweepT += dt;
-  const t = me.sweepT, a = me.a - sweepAngle(t);
+  const t = me.sweepT, a = me.a + sweepAngle(t); // 上から見て反時計回り（体の回転と同じ向き）
   // 振りかぶり中は穂先に光が集まり、なぎ払い中は弧の軌跡を残す
   if (t < SWEEP.wind) {
     if (Math.random() < 0.6) fx.parts.emit(me.x + Math.sin(a) * 3.2, 1.15, me.z + Math.cos(a) * 3.2, { color: 0xbfe0ff, size: 0.4, life: 0.25, speed: 0.6, gravity: 0 });
   } else if (t < SWEEP.wind + SWEEP.slash + 0.05) {
-    const a0 = me.a - sweepAngle(prev);
+    const a0 = me.a + sweepAngle(prev);
     // このフレームで通った範囲に斬撃の弧を描く（回転の軌跡が残る）
     const deg = Math.abs(a - a0) * 180 / Math.PI;
     if (deg > 1) fx.slash(me.x, me.z, (a + a0) / 2, SWEEP.r, Math.max(24, deg + 12), 0xbfe0ff, 1.1);

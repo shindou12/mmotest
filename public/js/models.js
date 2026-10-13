@@ -516,7 +516,7 @@ export function animatePlayer(model, s) {
   u.cape.rotation.x = s.moving ? -0.35 - Math.abs(walk) * 0.1 : -0.06 + Math.sin(s.t * 1.7) * 0.03;
   if (s.sweep >= 0) {
     // 盾槍のガードカウンター: 一回転しながら、右腕を横へ伸ばして槍で周りをなぎ払う（s.sweep = 回った角度）
-    u.body.rotation.y = -s.sweep;
+    u.body.rotation.y = s.sweep; // 上から見て反時計回り
     u.armR.rotation.set(-0.15, 0, 1.25); u.armR.position.z = 0;
   } else if (s.swing >= 0) {
     const k = s.swing;
