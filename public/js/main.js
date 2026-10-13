@@ -1008,12 +1008,13 @@ function revived(by) {
   fx.beam(me.x, me.z, 0x9affc8, 10, 0.9, 1.0);
   fx.ringWave(me.x, me.z, 0x9affc8, 4, 0.5);
 }
-// 倒れている仲間に攻撃が当たった → スタン値ぶんゲージを減らす（ダメージは関係なし・弓の矢では起こせない）
+// 倒れている仲間に攻撃が当たった → スタン値ぶんゲージを減らす（ダメージは関係なし）
 function reviveHit(o, opt) {
   if (me.crawl || me.dead || !(o.rv >= 0) || now() - (o.revHitT || 0) < 0.05) return;
   o.revHitT = now();
   let v = opt.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[opt.type] ?? 0;
-  v *= S.W.stun * (S.W.melee ? 1 + (S.stunp + buffMod('stunp')) / 100 : 1);
+  // 弓はスタン値が低すぎるので、起こすときだけ片手剣並みに扱う
+  v *= S.W.ranged ? 1 : S.W.stun * (1 + (S.stunp + buffMod('stunp')) / 100);
   v = Math.min(REVIVE.perHit, Math.round(v * 10) / 10);
   if (v <= 0) return;
   net.send({ t: 'rev', id: o.id, v });
@@ -1543,6 +1544,17 @@ function startSkill(sk) {
   if (sk === S.ws) castWeaponSkill(sk); else sk.run(combat);
 }
 
+// 矢・斬撃波が倒れている仲間に当たったら起こす（貫通しない矢はそこで止まる）
+function projRevive(w, arrow) {
+  for (const p of downedAllies()) {
+    const key = 'p' + p.id;
+    if (w.hit.has(key) || Math.hypot(p.x - w.x, p.z - w.z) > w.rad + 0.6) continue;
+    w.hit.add(key);
+    reviveHit(p, { type: w.type });
+    if (arrow && !w.pierce) return true;
+  }
+  return false;
+}
 function updateProjs(dt) {
   for (let i = projs.length - 1; i >= 0; i--) {
     const w = projs[i];
@@ -1568,6 +1580,7 @@ function updateProjs(dt) {
         fx.parts.burst(w.x, 1.2, w.z, inZone ? 16 : 6, { color: inZone ? 0x9affc8 : 0xffffff, speed: 5, size: 0.4, life: 0.3 });
         if (!w.pierce) { done = true; break; }
       }
+      if (!done) done = projRevive(w, true);
       const c = collide(world.def, w.x, w.z, 0.1, world.door);
       if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fx.dispose(w.mesh); projs.splice(i, 1); }
       continue;
@@ -1580,6 +1593,7 @@ function updateProjs(dt) {
       if (w.hit.has(mb.id)) continue;
       if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, tech: w.tech, noProc: true, sv: w.sv, cast: w.cast }); }
     }
+    projRevive(w, false);
     const c = collide(world.def, w.x, w.z, 0.1, world.door);
     if (w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fx.dispose(w.mesh); projs.splice(i, 1); }
   }
