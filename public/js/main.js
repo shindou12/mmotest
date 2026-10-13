@@ -1339,7 +1339,7 @@ function doHeavy(lv) {
 }
 // ガードカウンター: その場で一回転しながら、槍で周りを大きくなぎ払う（1回で大ダメージ）
 //   溜め（wind）: ゆっくり回って振りかぶる → なぎ払い（slash）: 一気に速く回し切る → 残心（rest）
-const SWEEP = { wind: 0.5, windAng: 1.3, slash: 0.18, rest: 0.2, r: 5.2, mult: 7.5, stun: 14 };
+const SWEEP = { wind: 0.45, windAng: 1.9, slash: 0.32, rest: 0.18, r: 5.2, mult: 7.5, stun: 14 };
 SWEEP.dur = SWEEP.wind + SWEEP.slash + SWEEP.rest;
 SWEEP.hitAt = SWEEP.wind + SWEEP.slash * 0.5;
 // 経過時間 → 体の回転角（ラジアン。この量だけ回る）
@@ -1358,6 +1358,9 @@ function sweepTick(dt) {
     if (Math.random() < 0.6) fx.parts.emit(me.x + Math.sin(a) * 3.2, 1.15, me.z + Math.cos(a) * 3.2, { color: 0xbfe0ff, size: 0.4, life: 0.25, speed: 0.6, gravity: 0 });
   } else if (t < SWEEP.wind + SWEEP.slash + 0.05) {
     const a0 = me.a - sweepAngle(prev);
+    // このフレームで通った範囲に斬撃の弧を描く（回転の軌跡が残る）
+    const deg = Math.abs(a - a0) * 180 / Math.PI;
+    if (deg > 1) fx.slash(me.x, me.z, (a + a0) / 2, SWEEP.r, Math.max(24, deg + 12), 0xbfe0ff, 1.1);
     for (let i = 0; i <= 8; i++) {
       const aa = a0 + (a - a0) * i / 8;
       for (const r of [SWEEP.r - 0.4, SWEEP.r - 1.4, SWEEP.r - 2.4]) fx.parts.emit(me.x + Math.sin(aa) * r, 1.15, me.z + Math.cos(aa) * r, { color: r > SWEEP.r - 1 ? 0xffffff : 0xbfe0ff, size: 0.6, life: 0.3, speed: 0.4, gravity: 0 });
