@@ -245,7 +245,7 @@ function itemPower(it) {
 // 入力
 // ======================================================================
 // 盾槍のガード（強攻撃の溜め中に自動で構える。スマホはガードボタンでも。ダウン中はできない）
-// ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃の代わりに素早い三段突き（counterThrusts）
+// ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃の代わりに回転なぎ払い（sweepTick）
 function startGuard() {
   if (me.dead || me.downT > 0 || me.guarding || me.gg <= 0 || me.staggerT > 0) return;
   me.guarding = true; me.guardStart = now(); me.charging = false; me.counter = false; audio.sfx('equip');
@@ -1255,7 +1255,7 @@ const combat = {
   },
 };
 
-function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0 && me.downT <= 0; }
+function canAct() { return S && !me.dead && me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0 && me.downT <= 0 && !(me.sweepT > 0); }
 // 弓は回避中も通常攻撃ができる（転がり撃ち）
 const canShootInDodge = () => S.W.ranged && !me.dead && me.dodgeT > 0 && me.skillT < 0 && me.staggerT <= 0;
 
@@ -1330,31 +1330,48 @@ function doHeavy(lv) {
     fx.ringWave(me.x, me.z, 0xbfe0ff, 5, 0.4);
     addShake(0.4);
     if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
-    counterThrusts();
+    me.swingT = 9; // 振りのモーションの代わりに回転なぎ払い
+    me.sweepT = 1e-4; me.sweepHit = false;
+    audio.sfx('swing', { heavy: true });
     return;
   }
   HEAVY[S.wk].run(combat, lv);
 }
-// ガードカウンター: その場で「突く・引く」を3回くり返す三段突き（前へは動かない・最後の突きが一番強い）
-const COUNTER_HITS = [1.8, 1.8, 3.2]; // 1突きの威力（攻撃力の倍率）。合計で強攻撃（溜め切り）の約2倍
-const COUNTER_GAP = 0.22; // 1突き（突いて引くまで）の長さ
-function counterThrusts() {
-  const k = S.flags.has('bulwark') ? 1.3 : 1; // ツリー「不動の盾」で +30%
-  me.swingDur = COUNTER_GAP;
-  COUNTER_HITS.forEach((mult, i) => {
-    later(i * COUNTER_GAP, () => {
-      if (me.dead || me.downT > 0) return;
-      const a = me.a = aimAngle(), last = i === COUNTER_HITS.length - 1;
-      // 突いて引くモーションを1回ずつ（ほかのプレイヤーにも見える）
-      me.swingT = 0; me.swingDur = COUNTER_GAP; me.sw++;
-      later(0.05, () => {
-        combat.line(last ? 7 : 5.5, last ? 2.2 : 1.6, mult * k, { type: 'heavy', a, stun: last ? 8 : 3 });
-        for (let d = 0.5; d < (last ? 7.5 : 6); d += 0.45) fx.parts.emit(me.x + Math.sin(a) * d, 1.2, me.z + Math.cos(a) * d, { color: last ? 0xffffff : 0xbfe0ff, size: last ? 0.6 : 0.4, life: 0.3, speed: 1, gravity: 0 });
-        audio.sfx('swing', { heavy: last });
-        if (last) { fx.ringWave(me.x + Math.sin(a) * 4, me.z + Math.cos(a) * 4, 0xbfe0ff, 3, 0.3); addShake(0.35); }
-      });
-    });
-  });
+// ガードカウンター: その場で一回転しながら、槍で周りを大きくなぎ払う（1回で大ダメージ）
+//   溜め（wind）: ゆっくり回って振りかぶる → なぎ払い（slash）: 一気に速く回し切る → 残心（rest）
+const SWEEP = { wind: 0.5, windAng: 1.3, slash: 0.18, rest: 0.2, r: 5.2, mult: 7.5, stun: 14 };
+SWEEP.dur = SWEEP.wind + SWEEP.slash + SWEEP.rest;
+SWEEP.hitAt = SWEEP.wind + SWEEP.slash * 0.5;
+// 経過時間 → 体の回転角（ラジアン。この量だけ回る）
+function sweepAngle(t) {
+  if (t < SWEEP.wind) { const k = t / SWEEP.wind; return SWEEP.windAng * k * k * (3 - 2 * k); } // ゆっくり
+  if (t < SWEEP.wind + SWEEP.slash) { const k = (t - SWEEP.wind) / SWEEP.slash; return SWEEP.windAng + (Math.PI * 2 - SWEEP.windAng) * (1 - (1 - k) * (1 - k)); } // 速く
+  return Math.PI * 2;
+}
+function sweepTick(dt) {
+  if (!(me.sweepT > 0)) return;
+  const prev = me.sweepT;
+  me.sweepT += dt;
+  const t = me.sweepT, a = me.a - sweepAngle(t);
+  // 振りかぶり中は穂先に光が集まり、なぎ払い中は弧の軌跡を残す
+  if (t < SWEEP.wind) {
+    if (Math.random() < 0.6) fx.parts.emit(me.x + Math.sin(a) * 3.2, 1.15, me.z + Math.cos(a) * 3.2, { color: 0xbfe0ff, size: 0.4, life: 0.25, speed: 0.6, gravity: 0 });
+  } else if (t < SWEEP.wind + SWEEP.slash + 0.05) {
+    const a0 = me.a - sweepAngle(prev);
+    for (let i = 0; i <= 8; i++) {
+      const aa = a0 + (a - a0) * i / 8;
+      for (const r of [SWEEP.r - 0.4, SWEEP.r - 1.4, SWEEP.r - 2.4]) fx.parts.emit(me.x + Math.sin(aa) * r, 1.15, me.z + Math.cos(aa) * r, { color: r > SWEEP.r - 1 ? 0xffffff : 0xbfe0ff, size: 0.6, life: 0.3, speed: 0.4, gravity: 0 });
+    }
+  }
+  if (!me.sweepHit && prev < SWEEP.hitAt && me.sweepT >= SWEEP.hitAt) {
+    me.sweepHit = true;
+    const kk = S.flags.has('bulwark') ? 1.3 : 1; // ツリー「不動の盾」で +30%
+    combat.circle(me.x, me.z, SWEEP.r, SWEEP.mult * kk, { type: 'heavy', stun: SWEEP.stun });
+    fx.ringWave(me.x, me.z, 0xbfe0ff, SWEEP.r + 0.5, 0.4, 1.0, 1.0);
+    fx.flash(me.x, 1.2, me.z, 0xbfe0ff, 50, 0.3);
+    audio.sfx('heavy'); addShake(0.45);
+  }
+  if (me.sweepT >= SWEEP.dur) me.sweepT = 0;
 }
 
 function tryWeaponSkill() {
@@ -2188,6 +2205,8 @@ function update(dt) {
       // ダウン中は動けない（回避で受け身）
       me.downT -= dt;
       if (me.downT <= 0) getUp();
+    } else if (me.sweepT > 0) {
+      // ガードカウンターの回転なぎ払い中は、その場から動かない
     } else if (me.dodgeT > 0) {
       me.dodgeT -= dt;
       const sp = 17 * S.wc.roll;
@@ -2298,6 +2317,7 @@ function update(dt) {
     down: me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
     hurt: me.hurtT > 0 ? Math.sin(me.hurtT / 0.28 * Math.PI) : 0,
     gg: me.gg / GUARD.max, // 盾の縁の光（ガードゲージの残り）
+    sweep: me.sweepT > 0 ? sweepAngle(me.sweepT) : -1, // ガードカウンターの回転なぎ払い（回った角度）
   });
   if (me.guarding && Math.random() < 0.3) fx.parts.emit(me.x + Math.sin(me.a) * 0.9 + rnd(-0.4, 0.4), rnd(0.6, 1.8), me.z + Math.cos(me.a) * 0.9 + rnd(-0.4, 0.4), { color: 0xbfe0ff, size: 0.25, life: 0.3, speed: 0.3, gravity: 0 });
   for (const b of me.buffs) if (Math.random() < 0.25) fx.parts.emit(me.x + rnd(-0.5, 0.5), rnd(0.2, 2), me.z + rnd(-0.5, 0.5), { color: b.color, size: 0.3, life: 0.6, speed: 1, gravity: 2 });
@@ -2419,6 +2439,7 @@ function update(dt) {
   exploreTick();
   waypointTick();
   guardRegen(dt);
+  sweepTick(dt);
   pinTick();
   fx.update(dt);
   updateMobLabels();

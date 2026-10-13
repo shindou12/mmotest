@@ -514,7 +514,11 @@ export function animatePlayer(model, s) {
   u.body.position.y = s.moving ? Math.abs(Math.cos(s.walkT * 10)) * 0.07 : Math.sin(s.t * 2) * 0.015;
   u.head.rotation.x = s.moving ? 0.05 : Math.sin(s.t * 1.3) * 0.03;
   u.cape.rotation.x = s.moving ? -0.35 - Math.abs(walk) * 0.1 : -0.06 + Math.sin(s.t * 1.7) * 0.03;
-  if (s.swing >= 0) {
+  if (s.sweep >= 0) {
+    // 盾槍のガードカウンター: 一回転しながら、右腕を横へ伸ばして槍で周りをなぎ払う（s.sweep = 回った角度）
+    u.body.rotation.y = -s.sweep;
+    u.armR.rotation.set(-0.15, 0, 1.25); u.armR.position.z = 0;
+  } else if (s.swing >= 0) {
     const k = s.swing;
     const e = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75 * 0.3;
     const dir = s.combo % 2 === 0 ? 1 : -1;
@@ -560,7 +564,7 @@ export function animatePlayer(model, s) {
   // 槍は腕の角度に関係なく水平に近く保つ（腕を前へ出しても穂先が空を向かない）
   //   待機: 穂先を少し上げる / 突き: 水平 / ガード: 盾の横から少し下げて構える
   if (u.wKind === 'spear' && u.weapon) {
-    const pitch = s.guard ? -0.08 : s.swing >= 0 ? 0 : 0.3;
+    const pitch = s.guard ? -0.08 : s.swing >= 0 || s.sweep >= 0 ? 0 : 0.3;
     // ダウン中は腕と一緒に投げ出す（水平に保たない）
     u.weapon.rotation.x = s.down > 0 ? Math.PI / 2 : Math.PI / 2 - u.armR.rotation.x - pitch;
   }
