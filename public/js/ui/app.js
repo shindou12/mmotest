@@ -295,7 +295,7 @@ export function createUI(game) {
       const sid = it.skill && WEAPON_SKILLS[it.skill]?.kind === it.kind ? it.skill : WEAPON_SKILL_POOL[it.kind][0];
       const ws = WEAPON_SKILLS[sid];
       h += `<div class="wsk">武器スキル「${ws.name}」<br><span class="dim">${ws.desc}（CT ${ws.cd}秒）</span></div>`;
-      if (WEAPONS[it.kind].guard) h += '<div class="dim">左クリック長押しでガード（強攻撃の代わり）</div>';
+      if (WEAPONS[it.kind].guard) h += '<div class="dim">強攻撃を溜めている間はガード（離すと強攻撃）</div>';
     }
     if (it.lore) h += `<div class="lore">${esc(it.lore)}</div>`;
     if (it.by) h += `<div class="dim">入れた人：${esc(it.by)}</div>`;
@@ -712,7 +712,7 @@ export function createUI(game) {
       lastGold = gold;
       H.goldN.set({ text: gold.toLocaleString() });
     }
-    H.atkName.set({ text: S.W.guard ? 'ガード' : HEAVY[S.wk].name });
+    H.atkName.set({ text: HEAVY[S.wk].name });
     H.skillName.set({ text: S.ws.name });
     H.wsKey.set({ text: '右クリック' });
     H.slots.guard.set({ visible: !!S.W.guard, cls: { active: me.guarding } });
@@ -790,7 +790,7 @@ export function createUI(game) {
     T.layer.set({ visible: mediator.is('play') });
     if (!mediator.is('play')) return;
     const S = game.S, me = game.me, char = game.char, B = T.btn;
-    B.atk.nm.set({ text: `${S.W.name}・長押し${S.W.guard ? 'ガード' : HEAVY[S.wk].name}` });
+    B.atk.nm.set({ text: `${S.W.name}・長押し${HEAVY[S.wk].name}` });
     B.atk.set({ cls: { charging: me.charging && me.chargeT >= game.CHARGE_MIN } });
     B.skill.nm.set({ text: S.ws.name });
     setCd(B.skill, me.wsCd, S.ws.cd * (1 - S.cdr / 100));

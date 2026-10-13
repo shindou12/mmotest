@@ -244,7 +244,7 @@ function itemPower(it) {
 // ======================================================================
 // 入力
 // ======================================================================
-// 盾槍のガード（左クリック長押し。ダウン中はできない）
+// 盾槍のガード（強攻撃の溜め中に自動で構える。スマホはガードボタンでも。ダウン中はできない）
 function startGuard() {
   if (me.dead || me.downT > 0 || me.guarding) return;
   me.guarding = true; me.guardStart = now(); me.charging = false; audio.sfx('equip');
@@ -271,30 +271,22 @@ const input = {
     if (k === 'e') tryTreeSkill(1);
   },
   keyUp(k) { keys.delete(k); },
-  blur() { keys.clear(); mouse.l = mouse.r = false; me.charging = false; me.guarding = false; me.holdT = 0; },
+  blur() { keys.clear(); mouse.l = mouse.r = false; me.charging = false; me.guarding = false; },
   pointerMove(x, y) { mouse.x = x; mouse.y = y; },
   pointerDown(button) {
     audio.init();
     if (!started) return;
-    if (button === 0) {
-      mouse.l = true;
-      // 盾槍: 長押しでガード（押し続けて少したつと構える）。それ以外の武器: 長押しで強攻撃の溜め
-      if (S?.W.guard) me.holdT = now();
-      else if (me.downT <= 0) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; }
-    }
+    // 長押しで強攻撃の溜め（盾槍は溜めている間ガードを構える）
+    if (button === 0) { mouse.l = true; if (me.downT <= 0) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
     if (button === 2) { mouse.r = true; tryWeaponSkill(); }
   },
   pointerUp(button) {
     if (button === 0) {
       mouse.l = false;
-      if (me.holdT) {
-        // 盾槍: 構える前に離したら通常攻撃、構えていたらガードを解く
-        if (me.guarding) endGuard(); else if (started) me.queued = now() + 0.45;
-        me.holdT = 0;
-      }
       if (me.charging && started) {
         me.releaseZoneW = S ? bowZoneWidth() : BOW_ZONE.min;
         me.charging = false;
+        endGuard(); // 盾槍: 離したらガードを解いて強攻撃（ガードしていた時間のボーナスが乗る）
         if (me.chargeT < CHARGE_MIN) me.queued = now() + 0.45; // 短押し → 通常攻撃（入力を少しの間覚えておく）
         else doHeavy(me.chargeLv);
       }
@@ -2153,8 +2145,8 @@ function update(dt) {
       me.stepT -= dt;
       if (me.stepT <= 0) { me.stepT = 0.32; audio.sfx('step'); }
     }
-    // 盾槍: 左クリックを押し続けたらガードを構える
-    if (me.holdT && mouse.l && !me.guarding && S.W.guard && now() - me.holdT >= CHARGE_MIN) startGuard();
+    // 盾槍: 強攻撃を溜めている間はガードを構える
+    if (me.charging && S.W.guard && me.chargeT >= CHARGE_MIN && !me.guarding) { me.guarding = true; me.guardStart = now(); audio.sfx('equip'); }
     if (me.guarding) me.a = aimAngle();
 
     // 出口
