@@ -1156,13 +1156,17 @@ export function createUI(game) {
           L.weaponWrap.set({ style: { display: 'none' } });
           L.fresh.set({ visible: true });
         }
-        this.kind = 'sword';
+        this.kind = info?.kind || [...L.weapons.children].find(([, v]) => v.el.classList.contains('on'))?.[0] || 'sword';
+        for (const [k, v] of L.weapons.children) v.set({ cls: { on: k === this.kind } });
+        L.start.set({ text: info ? `つづきから（${WEAPONS[info.kind].name}）` : `${WEAPONS[this.kind].name}で新規開始` });
       },
       exit() { login.set({ visible: false }); hud.set({ visible: true }); },
       on: {
         'login:weapon'(ev) {
+          if (!WEAPONS[ev.payload.kind]) return undefined;
           this.kind = ev.payload.kind;
           for (const [k, v] of L.weapons.children) v.set({ cls: { on: k === this.kind } });
+          L.start.set({ text: `${WEAPONS[this.kind].name}で新規開始` });
           game.sfx('ui');
         },
         // 最初からはじめる（誤操作防止のため2回押しで実行）
@@ -1178,6 +1182,7 @@ export function createUI(game) {
           L.existing.set({ text: '新しいキャラクターではじめます' });
           L.weaponWrap.set({ style: { display: '' } });
           L.fresh.set({ visible: false });
+          L.start.set({ text: `${WEAPONS[this.kind].name}で新規開始` });
           L.name.set({ focus: true });
           return undefined;
         },

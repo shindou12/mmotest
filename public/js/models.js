@@ -1,5 +1,6 @@
 // トゥーン調のキャラクター / 武器 / モンスター（プリミティブ＋押し出し形状で造形）
 import * as THREE from 'three';
+import { GRIP_Y, updateWeaponPose } from './weapon-pose.js';
 import { RARITIES } from '../shared/data.js';
 import { toon, glow, outline, compact, gradientMap } from './toon.js';
 
@@ -23,6 +24,19 @@ function extrude(pts, depth, bevel = 0.012) {
   return g;
 }
 const finish = (root, w = 1) => { compact(root); outline(root, w); return root; };
+
+
+function bowString(g, tip, sx, color) {
+  const string = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(sx, -tip, 0), new THREE.Vector3(sx, 0, 0), new THREE.Vector3(sx, tip, 0),
+  ]), new THREE.LineBasicMaterial({ color }));
+  g.add(string);
+  const arrow = new THREE.Group();
+  arrow.add(mesh(cyl(.008, .008, .72, 5), toon(0xd9c7a0), [.36, 0, 0], [0, 0, -Math.PI / 2]));
+  arrow.add(mesh(cone(.025, .10, 5), toon(0xdfe7f0), [.76, 0, 0], [0, 0, -Math.PI / 2]));
+  arrow.visible = false;g.add(arrow);
+  g.userData.bow = { string, arrow, sx, tip };
+}
 
 // ---------------------------------------------------------------------------
 // 武器
@@ -139,7 +153,7 @@ function weaponVariant(kind, style, C) {
   }
   if (kind === 'bow') {
     const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
-    const string = (tip, sx) => { const s = mesh(cyl(0.008, 0.008, tip * 2, 4), glow(rarity >= 2 ? rc : new THREE.Color(0xeeeeee)), [sx, 0, 0]); s.userData.noOutline = true; g.add(s); };
+    const string = (tip, sx) => bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
     if (style === 1 || style === 2) { // 1: リカーブ（先端が反る） 2: ロングボウ（長い）
       const R = style === 2 ? 1.25 : 0.75, arc = style === 2 ? Math.PI * 0.62 : Math.PI * 0.66;
       const limb = new THREE.TorusGeometry(R, style === 2 ? 0.04 : 0.05, 6, 28, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
@@ -262,8 +276,7 @@ export function makeWeapon(kind, rarity = 0, style = 0) {
       limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
       g.add(mesh(limb, wood));
       const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
-      const str = mesh(cyl(0.008, 0.008, tip * 2, 4), glow(rarity >= 2 ? rc : new THREE.Color(0xeeeeee)), [sx, 0, 0]);
-      str.userData.noOutline = true; g.add(str);
+      bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
       g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip, [0, 0, 0]));
       for (const s of [-1, 1]) g.add(mesh(sphere(0.06, 8, 6), gold, [sx, s * tip, 0]));
       g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
@@ -342,17 +355,20 @@ export function makePlayer(color) {
     body.add(leg); legs.push(leg);
   }
   // 腕
-  const mkArm = (s) => {
-    const arm = new THREE.Group(); arm.position.set(s * 0.36, 1.4, 0);
+  const mkArm = (side) => {
+    const arm = new THREE.Group();arm.position.set(side * 0.36, 1.4, 0);
     arm.add(mesh(capsule(0.072, 0.2, 8), cloth, [0, -0.15, 0]));
-    arm.add(mesh(capsule(0.068, 0.18, 8), clothD, [0, -0.4, 0]));
-    arm.add(mesh(cyl(0.085, 0.08, 0.1, 10), leather, [0, -0.5, 0]));
-    arm.add(mesh(sphere(0.07, 10, 8), leather, [0, -0.6, 0]));
-    body.add(arm);
-    return arm;
+    const elbow = new THREE.Group();elbow.position.y = -.30;arm.add(elbow);
+    elbow.add(mesh(sphere(.073, 8, 6), clothD));
+    elbow.add(mesh(capsule(.068, .18, 8), clothD, [0, -.11, 0]));
+    elbow.add(mesh(cyl(.085, .08, .1, 10), leather, [0, -.20, 0]));
+    const hand = new THREE.Group();hand.position.y = -.30;elbow.add(hand);
+    hand.add(mesh(sphere(.07, 10, 8), leather));
+    arm.userData = { elbow, hand };body.add(arm);return arm;
   };
   const armL = mkArm(-1), armR = mkArm(1);
-  const hand = new THREE.Group(); hand.position.y = -0.62; armR.add(hand);
+  const elbowL = armL.userData.elbow, elbowR = armR.userData.elbow;
+  const hand = armR.userData.hand, handL = armL.userData.hand;
   // 背中のマント
   const cape = mesh(new THREE.CylinderGeometry(0.3, 0.5, 1.0, 14, 4, true, Math.PI * 0.7, Math.PI * 0.6), coat, [0, 0.98, -0.02]);
   cape.userData.noOutline = true; cape.userData.keep = true; body.add(cape);
@@ -361,7 +377,7 @@ export function makePlayer(color) {
   ring.castShadow = false; root.add(ring);
 
   finish(body, 1);
-  root.userData = { body, legs, armL, armR, hand, head, cape, ring, weapon: null, wKey: '', color: c, armor: null, armorLook: 0 };
+  root.userData = { body, legs, armL, armR, elbowL, elbowR, hand, handL, head, cape, ring, weapon: null, wKey: '', color: c, armor: null, armorLook: 0 };
   return root;
 }
 
@@ -455,25 +471,21 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
   const key = kind + rarity + ':' + style;
   if (u.wKey === key) return;
   u.wKey = key;
-  if (u.weapon) u.hand.remove(u.weapon);
-  if (u.shield) { u.armL.remove(u.shield); u.shield = null; }
+  if (u.weapon) u.weapon.removeFromParent();
+  if (u.shield) { u.shield.removeFromParent(); u.shield = null; }
   if (kind === 'spear') u.shield = makeShield(rarity, u.armL);
-  // 見下ろし視点で刃が「線」に見えないよう、刃の平らな面を上に向けて持つ
   const w = makeWeapon(kind, rarity, style);
+  u.weaponModel = w;
   u.weapon = new THREE.Group();
+  u.weapon.name = kind + '-grip';
   u.weapon.add(w);
-  if (kind === 'bow') {
-    // 弓は縦に持ち、弦を体側へ向ける
-    w.rotation.set(0, Math.PI / 2, 0);
-    u.weapon.rotation.set(0, 0, 0);
-  } else {
-    w.rotation.y = Math.PI / 2;
-    u.weapon.rotation.x = Math.PI / 2;
-  }
-  // 槍は柄の後ろ寄り（石突きから約1m）を握り、穂先側を長く前へ出す
-  if (kind === 'spear') w.position.y = -0.45;
+  w.position.y = -GRIP_Y[kind];
+  w.rotation.y = kind === 'bow' ? -Math.PI / 2 : 0;
   u.wKind = kind;
-  u.hand.add(u.weapon);
+  (kind === 'bow' ? u.handL : u.hand).add(u.weapon);
+  u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);
+  animatePlayer(model, { t: 0, moving: false, walkT: 0, kind, combo: 0, swing: -1, spin: -1, sweep: -1, dodge: 0, down: 0, hurt: 0 });
+
 }
 
 // 盾槍の盾（左腕に持つ）
@@ -493,14 +505,15 @@ function makeShield(rarity, armL) {
   g.add(gl);
   g.userData.gauge = gm;
   // 腕の外側に、面を前へ向けて持つ
-  g.position.set(-0.1, -0.45, 0.12);
+  g.position.set(-0.08, -0.14, 0.12);
   g.rotation.set(0, -Math.PI / 2 + 0.25, 0);
-  armL.add(g);
+  armL.userData.elbow.add(g);
   return g;
 }
 
 export function animatePlayer(model, s) {
   const u = model.userData;
+  u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);
   const walk = s.moving ? Math.sin(s.walkT * 10) : 0;
   u.legs[0].rotation.x = walk * 0.75; u.legs[1].rotation.x = -walk * 0.75;
   if (s.guard) {
@@ -561,12 +574,10 @@ export function animatePlayer(model, s) {
     gm.opacity = s.guard ? 0.35 + (gg < 0.3 ? Math.abs(Math.sin(s.t * 12)) * 0.3 : 0) : 0;
     gm.color.setHex(gg > 0.6 ? 0x9ad8ff : gg > 0.3 ? 0xffd84a : 0xff4a3a);
   }
-  // 槍は腕の角度に関係なく水平に近く保つ（腕を前へ出しても穂先が空を向かない）
-  //   待機: 穂先を少し上げる / 突き: 水平 / ガード: 盾の横から少し下げて構える
-  if (u.wKind === 'spear' && u.weapon) {
-    const pitch = s.guard ? -0.08 : s.swing >= 0 || s.sweep >= 0 ? 0 : 0.3;
-    // ダウン中は腕と一緒に投げ出す（水平に保たない）
-    u.weapon.rotation.x = s.down > 0 ? Math.PI / 2 : Math.PI / 2 - u.armR.rotation.x - pitch;
+  updateWeaponPose(u, s);
+  if (u.shield && !(s.down > 0)) {
+    // Shield faces forward in body space, regardless of forearm bending.
+    u.shield.quaternion.copy(u.armL.quaternion).multiply(u.elbowL.quaternion).invert();
   }
   model.visible = !s.dead;
 }
@@ -920,3 +931,4 @@ export function makeLootOrb(rarity) {
   g.userData.orb = orb;
   return g;
 }
+

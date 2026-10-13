@@ -2328,6 +2328,7 @@ function update(dt) {
     // 倒れる → 起き上がる（最後の0.25秒で起きる）/ のけぞり
     down: me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
     hurt: me.hurtT > 0 ? Math.sin(me.hurtT / 0.28 * Math.PI) : 0,
+    charging: me.charging, charge: Math.min(1, me.chargeT / CHARGE_MAX),
     gg: me.gg / GUARD.max, // 盾の縁の光（ガードゲージの残り）
     sweep: me.sweepT > 0 ? sweepAngle(me.sweepT) : -1, // ガードカウンターの回転なぎ払い（回った角度）
   });
