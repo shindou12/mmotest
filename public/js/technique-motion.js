@@ -41,6 +41,10 @@ function profile(style,i){
   if(style==='slantspin'&&i===3)return [{yaw:-1.2,pitch:.1,bodyYaw:-.6,guard:.3,lean:.05},{yaw:1.1,pitch:.1,bodyYaw:Math.PI*2-.4,z:.5,lean:.15,leg:.3}];
   return [{yaw:-sign*1.1,pitch:.2,bodyYaw:-sign*.35,lean:.1},{yaw:sign*1.0,pitch:.05,bodyYaw:sign*.4,z:.5,lean:.18,leg:.3}];
  case 'risingtwin':return i===0?[{pitch:-.6,y:1.0,z:.4,lean:.16},{pitch:1.2,y:1.64,z:.28,lean:-.06,leg:.25}]:[{pitch:1.5,y:1.74,z:.16,lean:-.14,leg:.2},{pitch:-.45,y:1.12,z:.5,lean:.24,leg:.35}];
+ case 'coat':return [{pitch:.95,y:1.32,z:.32,guard:1,bodyYaw:-.1},{yaw:.7,pitch:.15,bodyYaw:.3,z:.48,guard:.2,lean:.08}];
+ case 'flanktwin':return [{yaw:sign*1.4,pitch:.2,bodyYaw:sign*.35,y:1.15},{yaw:-sign*.85,pitch:0,z:.47,bodyYaw:-sign*.35,lean:.13}];
+ case 'bleedspin':return i===0?[{yaw:-1.0,pitch:.3,bodyYaw:-.4,y:1.16},{yaw:.9,pitch:-.2,bodyYaw:Math.PI,z:.46,lean:.1}]:[{yaw:-.9,pitch:.25,bodyYaw:Math.PI+.4,y:1.16},{yaw:.9,pitch:-.2,bodyYaw:Math.PI*2-.3,z:.46,lean:.1,leg:.3}];
+ case 'blink':return [{yaw:-1.25,pitch:.2,bodyYaw:-.3,lean:.35,y:1.05,leg:.4},{yaw:1.3,pitch:.05,bodyYaw:.5,lean:.3,z:.5,leg:.4}];
  case 'brave':return [{pitch:.4,y:1.3,z:.3,guard:.3},{pitch:1.55,y:1.78,z:.12,lean:-.12,guard:1}];
  case 'fan3':return [{yaw:-1.45,pitch:.15,bodyYaw:-.6,z:.25},{yaw:1.45,pitch:.15,bodyYaw:.65,z:.52,lean:.12,leg:.25}];
  case 'sidelong':return [{yaw:1.3,pitch:.15,lean:-.12,bodyYaw:.3,leg:.35},{yaw:-.95,pitch:.1,bodyYaw:-.55,z:.5,lean:.2,leg:.3}];
@@ -53,6 +57,7 @@ function profile(style,i){
 }
 // 跳んで叩きつける（グランド・スラム）: しゃがむ → 跳び上がって振りかぶる → 着地と同時に叩きつけ → 残心
 const CUSTOM={
+ smoke:[{at:0},{at:.08,pitch:-.35,y:1.0,z:.32,lean:.22,lift:-.1,leg:.3},{at:.22,pitch:.6,y:1.45,z:.2,lean:-.35,lift:.55,leg:-.3,guard:.6},{at:.4,pitch:.3,y:1.25,lean:-.1,lift:.08,leg:.2},{at:.55}],
  slam:[{at:0},{at:.09,pitch:.9,y:1.32,z:.2,lift:-.16,lean:.18,leg:.35},{at:.22,pitch:1.55,y:1.74,z:.16,lift:1.15,lean:-.18,leg:-.25},{at:.36,pitch:-.5,y:1.1,z:.52,lift:0,lean:.26,leg:.4},{at:.52,pitch:-.45,y:1.1,z:.5,lift:-.06,lean:.22,leg:.35},{at:.8}],
 };
 export const ALL_MOTIONS=Object.freeze({...TECHNIQUES,...TREE_MOTIONS});
@@ -62,7 +67,7 @@ export const TECHNIQUE_FRAMES=Object.freeze(Object.fromEntries(Object.values(ALL
  t.hits.forEach((hit,i)=>{const [wind,impact]=profile(t.style,i),previous=t.hits[i-1]||0,next=t.hits[i+1]||t.duration;
  frames.push({at:Math.max(previous+.02,hit-.12),...base,...wind},{at:hit,...base,...impact},{at:Math.min(hit+.10,next-.02),...base,...impact});});
  // 一回転で終わる動き（旋）は、最後の向きを一周ぶんにして巻き戻らないようにする
- frames.push({at:t.duration,...base,bodyYaw:t.style==='slantspin'?Math.PI*2:0});return [t.id,frames.sort((a,b)=>a.at-b.at)];
+ frames.push({at:t.duration,...base,bodyYaw:t.style==='slantspin'||t.style==='bleedspin'?Math.PI*2:0});return [t.id,frames.sort((a,b)=>a.at-b.at)];
 })));
 export function sampleTechnique(id,time){
  const frames=TECHNIQUE_FRAMES[id];if(!frames)return null;

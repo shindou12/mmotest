@@ -19,6 +19,16 @@ export const TREE_MOTIONS = Object.freeze({
   sw_side_long: m('sw_side_long', 'sword', 0.8, [0.36], 'sidelong'),
   // 大剣・払い上げA「返し斬り」: 斬り上げたあと、そのまま振り下ろす
   gt_rising_twin: m('gt_rising_twin', 'greatsword', 0.9, [0.25, 0.55], 'risingtwin'),
+  // 短剣・ポイズン・エッジ: 左手で刃に毒を塗って振り払う
+  dk_poison: m('dk_poison', 'dagger', 0.6, [0.25], 'coat'),
+  // 短剣・スモーク・ステップ: 煙玉を足元に叩きつけて後ろへ跳ぶ
+  dk_smoke: m('dk_smoke', 'dagger', 0.55, [0.1], 'smoke'),
+  // 短剣・抜け駆けA「返し抜け」: すり抜けて斬り、逆へもう一度抜けて斬る
+  dk_flank_twin: m('dk_flank_twin', 'dagger', 0.85, [0.23, 0.63], 'flanktwin'),
+  // 短剣・裂傷連舞B「血風」: 回りながら二度斬る
+  dk_bleed_spin: m('dk_bleed_spin', 'dagger', 0.6, [0.15, 0.33], 'bleedspin'),
+  // 短剣・瞬影（強攻撃）: 低く構えて駆け抜けながら斬る
+  dk_blink: m('dk_blink', 'dagger', 0.45, [0.16], 'blink'),
   // 大剣・光波: 振りかぶって前へ振り抜き、光波を飛ばす
   gt_wave: m('gt_wave', 'greatsword', 0.55, [0.12], 'lightwave'),
 });

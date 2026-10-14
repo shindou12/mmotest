@@ -1880,6 +1880,7 @@ function doHeavy(lv) {
     return;
   }
   if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; }
+  if (S.wk === 'dagger') { me.motion = 'dk_blink'; me.motionT = 0; } // 瞬影: 低く駆け抜けながら斬る
   HEAVY[S.wk].run(combat, lv);
   if (S.wk === 'dagger' && S.wt?.ks2 === 'dk_step') later(0.24, () => { me.a += Math.PI; me.afterJust = true; floatText(me.x, 3, me.z, '影渡り', 'just'); fx.ringWave(me.x, me.z, 0xcab4ff, 2.2, 0.3); }); // 影渡り: すり抜けたら敵のほうへ向き直る
 }

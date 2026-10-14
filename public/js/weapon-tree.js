@@ -406,11 +406,12 @@ export const KNIFE_COLOR = 0xcab4ff;
 Object.assign(WT_SKILLS, {
   dk_flank: {
     name: '抜け駆け', kind: 'dagger', cd: 9.6, motion: 'dagger_flank', duration: T.dagger_flank.duration,
+    motionOf: (W) => (W.br('dk_flank') === 'A' ? 'dk_flank_twin' : 'dagger_flank'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('dk_flank') >= 2 ? 4.9 : 3.9, b = W.br('dk_flank');
       c.dash(a + Math.PI / 2, 4, 0.18, 0.25); c.me.a = a;
       at(c, T.dagger_flank.hits[0], () => { c.arc(3.1, 100, m, { type: 'tskill', a, crit: b === 'B' || undefined }); c.fx.slash(c.me.x, c.me.z, a, 3.1, 100, c.col(), 1.15); c.sfx('swing'); });
-      if (b === 'A') at(c, T.dagger_flank.hits[0] + 0.24, () => { c.dash(a - Math.PI / 2, 4, 0.18, 0.25); c.me.a = a; at(c, 0.16, () => { c.arc(3.1, 100, 1.5, { type: 'tskill', a }); c.fx.slash(c.me.x, c.me.z, a, 3.1, 100, c.col(), 1.15, true); c.sfx('swing'); }); });
+      if (b === 'A') at(c, TREE_MOTIONS.dk_flank_twin.hits[1] - 0.16, () => { c.dash(a - Math.PI / 2, 4, 0.18, 0.25); c.me.a = a; at(c, 0.16, () => { c.arc(3.1, 100, 1.5, { type: 'tskill', a }); c.fx.slash(c.me.x, c.me.z, a, 3.1, 100, c.col(), 1.15, true); c.sfx('swing'); }); });
     },
   },
   dk_vital: {
@@ -429,6 +430,7 @@ Object.assign(WT_SKILLS, {
   },
   dk_bleed: {
     name: '裂傷連舞', kind: 'dagger', cd: 13.2, motion: 'dagger_bleed', duration: T.dagger_bleed.duration,
+    motionOf: (W) => (W.br('dk_bleed') === 'B' ? 'dk_bleed_spin' : 'dagger_bleed'),
     run(c) {
       const W = c.wt(), lv2 = W.lv('dk_bleed') >= 2, b = W.br('dk_bleed'), a = c.aim();
       T.dagger_bleed.hits.forEach((h, i) => at(c, h, () => {
@@ -443,7 +445,7 @@ Object.assign(WT_SKILLS, {
     },
   },
   dk_poison: {
-    name: 'ポイズン・エッジ', kind: 'dagger', cd: 18,
+    name: 'ポイズン・エッジ', kind: 'dagger', cd: 18, motion: 'dk_poison', duration: TREE_MOTIONS.dk_poison.duration,
     run(c) {
       const W = c.wt(), lv2 = W.lv('dk_poison') >= 2;
       c.buff('dk_poison', 'ポイズン・エッジ', lv2 ? 10 : 8, {}, 0x8aff5a);
@@ -451,7 +453,7 @@ Object.assign(WT_SKILLS, {
     },
   },
   dk_smoke: {
-    name: 'スモーク・ステップ', kind: 'dagger', cd: 12,
+    name: 'スモーク・ステップ', kind: 'dagger', cd: 12, motion: 'dk_smoke', duration: TREE_MOTIONS.dk_smoke.duration,
     run(c) {
       const W = c.wt(), lv2 = W.lv('dk_smoke') >= 2;
       c.fx.parts.burst(c.me.x, 0.8, c.me.z, 50, { color: 0x8a8a9a, speed: 4, size: 0.9, life: 1.0, gravity: 0.5 });
