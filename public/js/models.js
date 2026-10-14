@@ -833,6 +833,25 @@ export function makeCoin() {
   g.userData.body = body;
   return g;
 }
+// 強化の欠片: 水色に光る結晶のかけら（大きい1本と小さい2本）。body を回す
+export function makeShard() {
+  const g = new THREE.Group(), body = new THREE.Group();
+  g.add(body);
+  const core = glow(new THREE.Color(0x8ae8ff).multiplyScalar(1.4));
+  const pale = toon(0xd8f6ff, { emissive: 0x4ab8ff, emissiveIntensity: 0.5 });
+  const shard = (h, r, x, z, tilt, m) => {
+    const s = new THREE.Mesh(new THREE.OctahedronGeometry(r, 0), m);
+    s.scale.set(1, h / r, 1); s.position.set(x, h * 0.5, z); s.rotation.z = tilt; s.castShadow = true;
+    body.add(s);
+  };
+  shard(0.26, 0.09, 0, 0, 0.1, core);
+  shard(0.16, 0.06, 0.09, 0.04, -0.5, pale);
+  shard(0.13, 0.05, -0.08, -0.03, 0.6, pale);
+  g.userData.body = body;
+  g.scale.setScalar(1.9);
+  return g;
+}
+
 export function makeGoldBag() {
   const g = new THREE.Group();
   const body = new THREE.Group(); g.add(body);

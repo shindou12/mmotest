@@ -499,6 +499,12 @@ export class AudioEngine {
         }
         break;
       }
+      // 強化の欠片: 結晶のチリリン（飛び出すときは控えめ、拾うときははっきり）
+      case 'shard': {
+        const v = opt.drop ? 0.5 : 1;
+        [[2637, 0], [3951, 0.05], [3136, 0.1]].forEach(([f, at]) => { tone('sine', f, 0, 0.35, 0.04 * v, at).connect(this.revSend); tone('sine', f * 2.76, 0, 0.12, 0.012 * v, at); });
+        break;
+      }
       // 落とし物が飛び出す（ポコッ）
       case 'lootpop': tone('sine', 260 + Math.random() * 60, 620, 0.09, 0.12); this.noiseHit(t, 0.05, 'bandpass', 900, 0.05, B, 2); break;
       case 'pickup': tone('sine', 1320, 1760, 0.08, 0.08); tone('sine', 1760, 2200, 0.1, 0.06, 0.06); break;

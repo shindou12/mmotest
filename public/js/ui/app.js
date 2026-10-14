@@ -133,9 +133,11 @@ export function createUI(game) {
   }
   const INV = {
     grid: panels.inv.add('grid', '#inv-grid'), stats: panels.inv.add('stats', '#stats'), salvage: panels.inv.add('salvage', '#inv-salvage'),
+    auto: panels.inv.add('auto', '#inv-auto'), autoLbl: panels.inv.add('autoLbl', '#inv-auto-lbl'),
     eq: {},
   };
   INV.salvage.on('click', 'inv:salvageCommon');
+  INV.auto.on('input', 'inv:autoSalvage', (e) => ({ v: +e.target.value }));
   for (const el of panels.inv.el.querySelectorAll('.eq')) INV.eq[el.dataset.slot] = panels.inv.add('eq_' + el.dataset.slot, el.querySelector('.cell'));
   INV.grid.link((ev) => { ev.ctx.source = 'inv'; });
   for (const [slot, v] of Object.entries(INV.eq)) {
@@ -324,6 +326,11 @@ export function createUI(game) {
       v.data = it?.id;
       v.set({ html: it ? P.itemCell(it, { eq: true }).replace(/^<div[^>]*>|<\/div>$/g, '') : 'なし', style: { 'border-color': it ? RARITIES[it.rarity].color : '', color: it ? RARITIES[it.rarity].color : '#666' } });
     }
+    // 分解の対象（このレア度以下）: 自動分解と一括分解で共通
+    const lim = char.autoSalvage ?? -1, limName = lim < 0 ? '' : RARITIES[lim].name;
+    INV.auto.set({ value: lim });
+    INV.autoLbl.set({ text: lim < 0 ? 'なし' : lim === 0 ? 'コモンだけ' : `${limName}以下`, style: { color: lim < 0 ? '' : RARITIES[lim].color } });
+    INV.salvage.set({ text: lim < 0 ? '一括分解' : `${limName}以下を一括分解`, disabled: lim < 0 });
     if (char.inv.length) INV.grid.list(char.inv, (it) => ({ html: P.itemCell(it, { showUp: true }), data: it.id, setup: cellSetup }));
     else INV.grid.list([], () => ({})).set({ html: '<div class="dim">アイテムなし。モンスターを倒そう！</div>' });
     const st = [
@@ -1275,6 +1282,7 @@ export function createUI(game) {
       },
       'item:context'(ev) { if (ev.ctx.source === 'inv') { game.salvage(ev.payload.id); P.hideTip(); } },
       'inv:salvageCommon'() { game.salvageCommon(); },
+      'inv:autoSalvage'(ev) { game.setAutoSalvage(ev.payload.v); },
       invAction(ev) {
         if (!this.sel) return;
         if (ev.payload.what === 'use') game.equip(this.sel); else game.salvage(this.sel);

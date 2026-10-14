@@ -19,7 +19,7 @@ import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
 import {
-  makePlayer, makeWeapon, setPlayerWeapon, setPlayerArmor, weaponStyle, armorLook, animatePlayer, makeMob, animateMob, makeLootItem, makeCoin, makeGoldBag,
+  makePlayer, makeWeapon, setPlayerWeapon, setPlayerArmor, weaponStyle, armorLook, animatePlayer, makeMob, animateMob, makeLootItem, makeShard, makeCoin, makeGoldBag,
 } from './models.js';
 import { Net } from './net.js';
 import { OCC } from './toon.js';
@@ -399,7 +399,12 @@ function onMsg(m) {
       break;
     case 'loot':
       // 倒した敵・開けた宝箱から、1つずつポコポコ飛び出す
-      m.items.forEach((d, i) => spawnDrop(d.it, d.x, d.z, m.sx != null ? { x: m.sx, z: m.sz, y: m.src === 'chest' ? 0.8 : 1.2 } : null, i * LOOT.stagger));
+      m.items.forEach((d, i) => {
+        const src = m.sx != null ? { x: m.sx, z: m.sz, y: m.src === 'chest' ? 0.8 : 1.2 } : null;
+        // 自動分解の対象なら、その場で硬貨と強化の欠片になって出てくる
+        if (salvageTarget(d.it)) spawnSalvaged(d.it, d.x, d.z, src, i * LOOT.stagger);
+        else spawnDrop(d.it, d.x, d.z, src, i * LOOT.stagger);
+      });
       if (m.src === 'chest') {
         char.chests = char.chests || {};
         char.chests[m.cid || m.ar] = Date.now();
@@ -2009,6 +2014,16 @@ function addGold(n, bonus = true) {
   goldGainBuf += n; goldGainT = 0.35;
 }
 function collectCoin(c) {
+  if (c.mat) {
+    // 強化の欠片（自動分解で出たもの）: 分解と同じ素材が手に入る
+    harvest(c.mat);
+    audio.sfx('shard');
+    floatText(me.x, 2.6, me.z, `強化の欠片 +${salvageMats(c.mat).shard}`, 'info');
+    fx.parts.burst(me.x, 1.2, me.z, 8, { color: SHARD_COLOR, speed: 3, size: 0.3, life: 0.35, gravity: 0 });
+    fx.dispose(c.model);
+    saveChar(); ui.refresh();
+    return;
+  }
   addGold(c.value);
   if (c.bag) {
     audio.sfx('bag');
@@ -2072,7 +2087,7 @@ function updateCoins(dt) {
 }
 // エリア移動などで残った硬貨は、そのまま所持金に入れる
 function flushCoins() {
-  for (const c of coins.splice(0)) { addGold(c.value); fx.dispose(c.model); }
+  for (const c of coins.splice(0)) { if (c.mat) harvest(c.mat); else addGold(c.value); fx.dispose(c.model); }
 }
 
 // ======================================================================
@@ -2162,8 +2177,31 @@ function salvage(id) {
   harvest(it);
   saveChar(); ui.refresh();
 }
+// 分解の対象: バーで選んだレア度以下。称号・★付き（超越の特性つき）・伝説以上は対象外
+function salvageTarget(it) {
+  const lim = char.autoSalvage ?? -1;
+  return lim >= 0 && it.slot !== 'title' && it.rarity <= lim && it.rarity < 4 && transcendCount(it) === 0;
+}
+function setAutoSalvage(v) {
+  char.autoSalvage = clamp(Math.round(v), -1, 3);
+  saveChar(); ui.refresh();
+}
+// 自動分解: 落とし物の代わりに、硬貨と強化の欠片が飛び出す
+const SHARD_COLOR = 0x8ae8ff;
+function spawnSalvaged(it, x, z, src, delay) {
+  setTimeout(() => {
+    const ox = src?.x ?? x, oz = src?.z ?? z;
+    spawnGold(salvageValue(it), ox, oz);
+    const model = makeShard();
+    model.position.set(ox, 1, oz);
+    scene.add(model);
+    const a = Math.atan2(x - ox, z - oz) + rnd(-0.3, 0.3), sp = Math.max(1.5, Math.hypot(x - ox, z - oz) * 1.6);
+    coins.push({ mat: it, model, value: 0, x: ox, z: oz, y: 1.0, vx: Math.sin(a) * sp, vz: Math.cos(a) * sp, vy: rnd(6, 8), t: 0, spin: rnd(4, 8), bounces: 0 });
+    if (Math.hypot(ox - me.x, oz - me.z) < 30) audio.sfx('shard', { drop: true });
+  }, delay * 1000);
+}
 function salvageCommon() {
-  const junk = char.inv.filter((i) => i.rarity < 2 && i.slot !== 'title');
+  const junk = char.inv.filter(salvageTarget);
   if (!junk.length) return;
   char.inv = char.inv.filter((i) => !junk.includes(i));
   salvageGold(junk.reduce((a, i) => a + salvageValue(i), 0));
@@ -2783,7 +2821,7 @@ const game = {
     if (it.kind === 'lever') { net.send({ t: 'interact', what: 'lever' }); audio.sfx('equip'); }
     if (it.kind === 'chest' && !chestOpen(it.chest)) net.send({ t: 'interact', what: 'chest', id: it.chest.id });
   },
-  equip, unequip, salvage, salvageCommon, learn, setSlot, resetTree, setSetting, acceptQuest,
+  equip, unequip, salvage, salvageCommon, setAutoSalvage, learn, setSlot, resetTree, setSetting, acceptQuest,
   smithEnhance, smithAffix, smithSkill, smithLore,
   claimQuest: (id) => claimQuest(QUEST_INDEX[id]),
   warp: (n) => net.send({ t: 'warp', floor: n }),

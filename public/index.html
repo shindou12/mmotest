@@ -124,7 +124,7 @@
 </div>
 
 <div id="inv" class="panel hidden">
-  <div class="inv-head"><b>装備 / インベントリ</b><span class="dim">クリック:装備　右クリック:分解</span><button id="inv-salvage">コモン・アンコモン一括分解</button><button id="inv-close" data-close>×</button></div>
+  <div class="inv-head"><b>装備 / インベントリ</b><span class="dim">クリック:装備　右クリック:分解</span><label class="inv-auto" title="このレア度以下の落とし物は、拾う前に自動でゴールドと強化の欠片になります（称号・★付き・伝説以上は対象外）"><span>自動分解</span><input id="inv-auto" type="range" min="-1" max="3" step="1" value="-1"><b id="inv-auto-lbl">なし</b></label><button id="inv-salvage">一括分解</button><button id="inv-close" data-close>×</button></div>
   <div class="inv-body">
     <div class="inv-left">
       <div class="eq" data-slot="weapon"><div class="eq-l">武器</div><div class="cell"></div></div>

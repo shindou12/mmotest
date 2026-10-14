@@ -97,6 +97,12 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .inv-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .inv-head b { font-size: 16px; }
 .inv-head button:last-child { margin-left: auto; }
+#inv .inv-head { flex-wrap: wrap; row-gap: 6px; }
+#inv .inv-head > b, #inv .inv-head > .dim, #inv .inv-head > button { white-space: nowrap; }
+.inv-auto { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.inv-auto input { width: 110px; accent-color: #ffd84a; }
+.inv-auto b { min-width: 7.5em; font-size: 12px; }
+#inv-salvage:disabled { opacity: .45; cursor: default; }
 .inv-body { display: flex; gap: 14px; overflow: hidden; }
 .inv-left { width: 260px; flex-shrink: 0; overflow-y: auto; }
 .inv-right { flex: 1; overflow-y: auto; }
