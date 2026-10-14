@@ -8,6 +8,7 @@
 // - クラス（3つから1つ）・マスター（クラスごとに2つから1つ）は1ポイント。強化・分岐なし（コード上は ks1 / ks2）
 // 今は片手剣・大剣。ほかの武器は旧ツリー（skills.js の TREES）のまま
 import { TECHNIQUES } from '../shared/techniques.js';
+import { TREE_MOTIONS } from '../shared/tree-motions.js';
 import { xpToNext } from '../shared/data.js';
 
 export const PROF_MAX = 20;
@@ -323,11 +324,11 @@ Object.assign(WT_SKILLS, {
     },
   },
   gt_slam: {
-    name: 'グランド・スラム', kind: 'greatsword', cd: 12,
+    name: 'グランド・スラム', kind: 'greatsword', cd: 12, motion: 'gt_slam', duration: TREE_MOTIONS.gt_slam.duration,
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('gt_slam') >= 2 ? 6.5 : 5.2, b = W.br('gt_slam'), r = b === 'A' ? 7.2 : 4.8;
       c.dash(a, 6, 0.35, 0.45);
-      at(c, 0.36, () => {
+      at(c, TREE_MOTIONS.gt_slam.hits[0], () => {
         c.circle(c.me.x, c.me.z, r, m, { type: 'tskill', stun: 8 });
         c.fx.ringWave(c.me.x, c.me.z, c.col(), r + 1.2, 0.45);
         c.fx.parts.burst(c.me.x, 0.3, c.me.z, 60, { color: 0xc8b090, speed: 9, size: 0.6, life: 0.7, up: 2 });

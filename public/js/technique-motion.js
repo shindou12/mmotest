@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TECHNIQUES } from '../shared/techniques.js';
+import { TREE_MOTIONS } from '../shared/tree-motions.js';
 import { aimHand, orientWeapon } from './pose-rig.js';
 import { applyBowPose } from './motions/bow.js';
 const base={yaw:0,pitch:.25,bodyYaw:0,lean:0,x:.3,y:1.24,z:.28,guard:0,lift:0,leg:0,draw:0};
@@ -36,11 +37,19 @@ function profile(style,i){
  case 'tether':return [{draw:1,lean:.03},{draw:0,lean:-.05}];
  case 'sideshot':return [{draw:1,lift:.1,leg:.3},{draw:0,lift:.12,bodyYaw:i?.18:-.1}];
  case 'trap':return [{draw:.8,lean:.18,lift:-.1},{draw:0,lean:.25,lift:-.16,guard:.2}];
+ case 'riposte':return [{yaw:-1.35,pitch:.05,bodyYaw:-.55,y:1.12,z:.2,guard:.6,lean:-.04},{yaw:1.45,pitch:.12,bodyYaw:.75,z:.52,lean:.18,leg:.38}];
+ case 'gtriposte':return [{yaw:-.95,pitch:-.55,y:1.0,z:.34,bodyYaw:-.45,lean:.12},{yaw:.75,pitch:1.15,y:1.62,z:.3,bodyYaw:.5,lean:-.1,leg:.35}];
  case 'chime':return [{draw:.3,guard:1},{draw:0,bodyYaw:-.2,lean:-.1,guard:1}];
  default:return [{},{z:.5}];
  }
 }
-export const TECHNIQUE_FRAMES=Object.freeze(Object.fromEntries(Object.values(TECHNIQUES).map(t=>{
+// 跳んで叩きつける（グランド・スラム）: しゃがむ → 跳び上がって振りかぶる → 着地と同時に叩きつけ → 残心
+const CUSTOM={
+ slam:[{at:0},{at:.09,pitch:.9,y:1.32,z:.2,lift:-.16,lean:.18,leg:.35},{at:.22,pitch:1.55,y:1.74,z:.16,lift:1.15,lean:-.18,leg:-.25},{at:.36,pitch:-.5,y:1.1,z:.52,lift:0,lean:.26,leg:.4},{at:.52,pitch:-.45,y:1.1,z:.5,lift:-.06,lean:.22,leg:.35},{at:.8}],
+};
+export const ALL_MOTIONS=Object.freeze({...TECHNIQUES,...TREE_MOTIONS});
+export const TECHNIQUE_FRAMES=Object.freeze(Object.fromEntries(Object.values(ALL_MOTIONS).map(t=>{
+ if(CUSTOM[t.style])return [t.id,CUSTOM[t.style].map(f=>({...base,...f}))];
  const frames=[{at:0,...base}];
  t.hits.forEach((hit,i)=>{const [wind,impact]=profile(t.style,i),previous=t.hits[i-1]||0,next=t.hits[i+1]||t.duration;
  frames.push({at:Math.max(previous+.02,hit-.12),...base,...wind},{at:hit,...base,...impact},{at:Math.min(hit+.10,next-.02),...base,...impact});});
@@ -53,7 +62,7 @@ export function sampleTechnique(id,time){
  const k=ease(Math.max(0,Math.min(1,(time-a.at)/Math.max(.00001,b.at-a.at))));const p={};for(const key of Object.keys(base))p[key]=a[key]+(b[key]-a[key])*k;return p;
 }
 export function applyTechniquePose(u,s){
- const t=TECHNIQUES[s.motion];if(!t||t.kind!==u.wKind||s.down>0||s.dodge>0||s.hurt>0)return false;
+ const t=ALL_MOTIONS[s.motion];if(!t||t.kind!==u.wKind||s.down>0||s.dodge>0||s.hurt>0)return false;
  const p=sampleTechnique(t.id,s.motionT||0);
  if(t.kind==='bow'){
   const time=s.motionT||0,blend=ease(Math.min(1,time/.08))*ease(Math.max(0,Math.min(1,(t.duration-time)/.12)));

@@ -138,3 +138,29 @@ test('greatsword: same tree shape, light-wave / one-blow / counter classes, and 
   wtLearn(c, 'gt_guillo');
   assert.equal(run('gt_guillo').find((e) => e.m === 'line').a[2], 6.5);
 });
+
+test('tree motions (sword counter, greatsword riposte, ground slam) are continuous, distinct and accepted by the server', async () => {
+  const THREE = await import('three');
+  const { TREE_MOTIONS } = await import('../public/shared/tree-motions.js');
+  const { MOTION_DURATIONS } = await import('../public/shared/motion-catalog.js');
+  const { sampleTechnique } = await import('../public/js/technique-motion.js');
+  const { makePlayer, setPlayerWeapon, animatePlayer } = await import('../public/js/models.js');
+  const base = { t: 1, moving: false, walkT: 0, combo: 0, swing: -1, spin: -1, sweep: -1, dodge: 0, down: 0, hurt: 0 };
+  const sigs = new Set();
+  for (const M of Object.values(TREE_MOTIONS)) {
+    assert.equal(MOTION_DURATIONS[M.id], M.duration, 'server must accept the motion name');
+    sigs.add(JSON.stringify(M.hits.map((h) => sampleTechnique(M.id, h))));
+    const m = makePlayer('#448a9b'); setPlayerWeapon(m, M.kind, 3, 0); const u = m.userData;
+    let prev;
+    for (let time = 0; time <= M.duration; time += 0.005) {
+      animatePlayer(m, { ...base, kind: M.kind, motion: M.id, motionT: time }); m.updateMatrixWorld(true);
+      const hand = u.hand.getWorldPosition(new THREE.Vector3());
+      assert.ok(hand.toArray().every(Number.isFinite), M.id);
+      if (prev) assert.ok(hand.distanceTo(prev) < 0.25, `${M.id}: jump at ${time.toFixed(3)}`);
+      prev = hand;
+    }
+  }
+  assert.equal(sigs.size, Object.keys(TREE_MOTIONS).length, 'each motion has its own pose');
+  assert.ok(sampleTechnique('gt_slam', 0.22).lift > 1, 'ground slam leaves the ground');
+  assert.ok(sampleTechnique('gt_slam', TREE_MOTIONS.gt_slam.hits[0]).lift < 0.05, 'and lands on the hit');
+});

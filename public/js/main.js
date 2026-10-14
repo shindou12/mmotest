@@ -1,4 +1,5 @@
 import { MOTION_DURATIONS } from '../shared/motion-catalog.js';
+import { TREE_MOTIONS } from '../shared/tree-motions.js';
 import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
 import { counterAngle } from './spear-motion.js';
 import { CharacterStore, CHARACTER_KEY } from './character-store.js';
@@ -1359,11 +1360,12 @@ function wtCounter(src) {
   me.charging = false; me.chargeT = 0; me.chargeLv = 0;
   me.iframe = Math.max(me.iframe, 0.4);
   const a = src ? Math.atan2(src.x - me.x, src.z - me.z) : me.a;
-  me.a = a; me.swingT = 0; me.swingDur = 0.5; me.combo = 2; me.sw++; me.act++;
+  const M = TREE_MOTIONS.gt_riposte;
+  me.a = a; me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration; me.act++;
   floatText(me.x, 3.1, me.z, '見切り!', 'just');
   audio.sfx('perfect'); audio.sfx('block');
   fx.ringWave(me.x, me.z, 0xffffff, 3, 0.3); fx.flash(me.x, 1.5, me.z, 0xffffff, 40, 0.25);
-  later(0.08, () => { combat.arc(4, 200, 3.5, { type: 'heavy', a, stun: 8 }); fx.slash(me.x, me.z, a, 4, 200, 0xffffff, 1.6); audio.sfx('swing', { heavy: true }); addShake(0.25); });
+  later(M.hits[0], () => { combat.arc(4, 200, 3.5, { type: 'heavy', a, stun: 8 }); fx.slash(me.x, me.z, a, 4, 200, 0xffffff, 1.6, true); audio.sfx('swing', { heavy: true }); addShake(0.25); });
   if (S.wt.ks2 === 'gt_iai') me.iaiReady = true;
   if (S.wt.ks2 === 'gt_mirror') addBuff('gt_mirror', '明鏡', 5, { dmgp: 30 }, 0xe0f0ff);
   wtEye();
@@ -1778,6 +1780,7 @@ function doHeavy(lv) {
     fx.ringWave(me.x, me.z, 0xbfe0ff, 5, 0.4);
     addShake(0.4);
     if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
+    if (S.wk !== 'spear') { swordCounter(); return; } // 片手剣（守護騎士）は踏み込みの横斬り
     me.swingT = 9; // 振りのモーションの代わりに回転なぎ払い
     me.sweepT = 1e-4; me.sweepHit = false;me.motion = 'counter';me.motionT = 0;
     audio.sfx('swing', { heavy: true });
@@ -1785,6 +1788,19 @@ function doHeavy(lv) {
   }
   if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; }
   HEAVY[S.wk].run(combat, lv);
+}
+// 片手剣のガードカウンター（守護騎士）: 踏み込みながら大きく横に斬り払う。威力は盾槍の回転なぎ払いの半分
+function swordCounter() {
+  const M = TREE_MOTIONS.sw_counter, a = me.a;
+  me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration;
+  combat.dash(a, 1.4, 0.16, 0.3);
+  audio.sfx('swing', { heavy: true });
+  later(M.hits[0], () => {
+    combat.arc(4.2, 300, SWEEP.mult * 0.5, { type: 'heavy', stun: SWEEP.stun, a });
+    fx.slash(me.x, me.z, a, 4.2, 300, 0xbfe0ff, 1.4);
+    fx.ringWave(me.x, me.z, 0xbfe0ff, 4.6, 0.35);
+    audio.sfx('heavy'); addShake(0.35);
+  });
 }
 // ガードカウンター: その場で一回転しながら、槍で周りを大きくなぎ払う（1回で大ダメージ）
 //   溜め（wind）: ゆっくり回って振りかぶる → なぎ払い（slash）: 一気に速く回し切る → 残心（rest）
