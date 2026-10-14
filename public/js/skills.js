@@ -540,6 +540,10 @@ export const TREE_SKILLS = {
 
 Object.assign(TREE_SKILLS, ADVANCED_TREE_SKILLS);
 
+// スキル全体のクールタイム倍率（武器スキル・ツリーのスキル・Q/Eの技すべて。表示も同じ値になる）
+export const SKILL_CD_MULT = 1.2;
+for (const s of [...Object.values(WEAPON_SKILLS), ...Object.values(TREE_SKILLS)]) s.cd = Math.round(s.cd * SKILL_CD_MULT * 10) / 10;
+
 // ---------------------------------------------------------------------------
 // スキルツリー
 // tier の段に進むには、そのツリーに tier×2 ポイント必要
