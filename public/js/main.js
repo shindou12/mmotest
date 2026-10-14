@@ -1197,7 +1197,9 @@ function cutCds(sec) { me.wsCd -= sec; for (const k in me.tcd) me.tcd[k] -= sec;
 function setMom(n) {
   n = clamp(n, 0, 10);
   if (n === me.mom) return;
+  const up = n > me.mom;
   me.mom = n;
+  if (up && n === 10 && me.model) { fx.ringWave(me.x, me.z, 0xffb040, 3, 0.35); fx.flash(me.x, 1.4, me.z, 0xffb040, 25, 0.25); } // 勢いが最大になった合図
   me.buffs = me.buffs.filter((b) => b.id !== 'sw_mom');
   if (n > 0) me.buffs.push({ id: 'sw_mom', label: `勢い ${n}`, t: 1e9, max: 1e9, mods: {}, color: 0xff9a2e });
 }
@@ -1252,7 +1254,13 @@ function wtOnHit(mb, dmg, crit, o) {
     later(0.05, () => { combat.circle(x, z, 3, 1.5, { type: 'proc', wtNo: true }); fx.ringWave(x, z, LIGHT_COLOR, 3.4, 0.35); fx.flash(x, 1.2, z, LIGHT_COLOR, 30, 0.25); audio.sfx('wave'); });
   }
   // 天剣: 斬撃波1発につき1回
-  if (o.wave && W.ks2 === 'sw_heaven' && o.proj && !o.proj.heaven) { o.proj.heaven = true; cutCds(0.15); }
+  if (o.wave && W.ks2 === 'sw_heaven' && o.proj && !o.proj.heaven) {
+    o.proj.heaven = true; cutCds(0.15);
+    // 天剣: 当たった所から光の粒が持ち主へ戻ってくる（クールタイムが縮んだ合図）
+    const dx = me.x - mb.x, dz = me.z - mb.z, d = Math.hypot(dx, dz) || 1;
+    for (let i = 0; i < 6; i++) fx.parts.emit(mb.x, 1.3, mb.z, { color: 0xfff0a0, size: 0.32, life: Math.min(0.6, d / 14), dir: [dx / d, 0.05, dz / d], speed: 14, spread: 0.15, gravity: 0, drag: 0 });
+    fx.parts.burst(me.x, 1.3, me.z, 6, { color: 0xfff0a0, speed: 2.5, size: 0.3, life: 0.35 });
+  }
 }
 // スキルを使った後（free: 幻剣のもう1回）
 function wtAfterCast(id, free = false) {
@@ -1302,7 +1310,7 @@ function wtOnGuard(raw) {
     net.send({ t: 'taunt', r: 8 });
     fx.ringWave(me.x, me.z, 0xfff0a0, 4, 0.4);
   }
-  if (W.ks2 === 'sw_avenger') me.revenge = Math.min(S.mhp, me.revenge + raw);
+  if (W.ks2 === 'sw_avenger') { me.revenge = Math.min(S.mhp, me.revenge + raw); fx.ringWave(me.x, me.z, 0xff4a3a, 1.6 + Math.min(1, me.revenge / (S.mhp * 0.5)) * 1.6, 0.3); }
 }
 // 報復者: 溜めたダメージを次の強攻撃（ガードカウンター）に上乗せ
 function wtRevenge() {
@@ -1380,6 +1388,32 @@ function wtEye() {
   quietBuff('gt_eye', '見切り眼', 3, { dmgp: W.lv('gt_eye') >= 2 ? 25 : 15 }, 0x9affff);
   if (W.br('gt_eye') === 'A') me.eyeCharge = true;
   if (W.br('gt_eye') === 'B') cutCds(2);
+}
+// 武器ツリーの状態を、体と剣のまわりの光で見せる（勢い・剣聖の全会心・報復者の蓄え）
+const wtHandPos = new THREE.Vector3();
+const wtAuraAcc = { mom: 0, saint: 0, rev: 0 };
+// 1秒あたり rate 個の割合で粒を出す（フレームの速さに左右されない）
+function wtEmit(key, rate, dt, fn) { wtAuraAcc[key] += rate * dt; while (wtAuraAcc[key] >= 1) { wtAuraAcc[key]--; fn(); } }
+function wtAura(dt) {
+  const W = S?.wt;
+  if (!W || me.dead || me.crawl || !me.model) return;
+  // 剣闘士: 勢いが溜まるほど、橙の火の粉が体から立ちのぼる（最大で足元に炎の輪）
+  if (W.ks1 === 'sw_glad' && me.mom > 0) {
+    wtEmit('mom', me.mom * 7, dt, () => fx.parts.emit(me.x + rnd(-0.55, 0.55), rnd(0.1, 1.5), me.z + rnd(-0.55, 0.55), { color: me.mom >= 10 ? 0xffc040 : 0xff7a2a, size: 0.3 + me.mom * 0.03, life: 0.7, speed: 1.4, gravity: -4 }));
+    if (me.mom >= 10 && now() - (me.momFxT || 0) > 0.7) { me.momFxT = now(); fx.ringWave(me.x, me.z, 0xff9a2e, 1.8, 0.45); }
+  }
+  // 剣聖: 全会心の間は、剣から金の光がこぼれ、足元に金の輪
+  if (hasBuff('sw_saint')) {
+    me.model.userData.hand?.getWorldPosition(wtHandPos);
+    wtEmit('saint', 45, dt, () => fx.parts.emit(wtHandPos.x + rnd(-0.35, 0.35), wtHandPos.y + rnd(-0.2, 0.7), wtHandPos.z + rnd(-0.35, 0.35), { color: 0xffe070, size: 0.34, life: 0.45, speed: 0.6, gravity: -2 }));
+    if (now() - (me.saintFxT || 0) > 0.5) { me.saintFxT = now(); fx.ringWave(me.x, me.z, 0xffd84a, 2.2, 0.4); }
+  }
+  // 報復者: 溜めたダメージが多いほど、赤い揺らめきが濃くなり、足元の赤い輪が脈打つ
+  if (W.ks2 === 'sw_avenger' && me.revenge > 0) {
+    const k = Math.min(1, me.revenge / (S.mhp * 0.5));
+    wtEmit('rev', 12 + 45 * k, dt, () => fx.parts.emit(me.x + rnd(-0.5, 0.5), rnd(0.1, 1.3), me.z + rnd(-0.5, 0.5), { color: k > 0.7 ? 0xff2a2a : 0xff6a5a, size: 0.28 + 0.28 * k, life: 0.6, speed: 0.9, gravity: -2.5 }));
+    if (now() - (me.revFxT || 0) > 1.1 - 0.6 * k) { me.revFxT = now(); fx.ringWave(me.x, me.z, 0xff4a3a, 1.4 + k, 0.4); }
+  }
 }
 // 熟練度: 今の武器で経験値を得ると上がる
 function gainWeaponProf(n) {
@@ -2782,6 +2816,7 @@ function update(dt) {
   for (const k in me.tcd) me.tcd[k] -= cdt;
   for (const b of me.buffs) b.t -= dt;
   if (me.saintOn && !hasBuff('sw_saint')) { me.saintOn = false; setMom(0); } // 剣聖の全会心が終わったら勢いは0
+  wtAura(dt);
   me.buffs = me.buffs.filter((b) => b.t > 0);
   // しばらく倒れずにいると、起こしにくさが1段階戻る
   if (me.downs > 0 && !me.crawl && t - me.downsAt > REVIVE.decay) { me.downs--; me.downsAt = t; }
