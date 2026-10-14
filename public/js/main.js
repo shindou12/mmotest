@@ -766,15 +766,19 @@ function reviveRing(h, x, z, rv) {
     g.add(bg, fg);
     g.rotation.x = -Math.PI / 2;
     scene.add(g);
-    R = h.revRing = { g, fg, v: -1 };
+    R = h.revRing = { g, fg, v: -1, shown: rv, t: now() };
   }
-  if (Math.abs(R.v - rv) > 0.002) {
-    R.v = rv;
+  // サーバーの値に向かってなめらかに追いかける（減るときも戻るときも）
+  const t = now();
+  R.shown += (rv - R.shown) * Math.min(1, (t - R.t) * 12);
+  R.t = t;
+  if (Math.abs(R.v - R.shown) > 0.002) {
+    R.v = R.shown;
     R.fg.geometry.dispose();
-    R.fg.geometry = new THREE.RingGeometry(RING[0], RING[1], Math.max(4, Math.ceil(rv * 64)), 1, Math.PI / 2, Math.max(0.01, rv) * Math.PI * 2);
+    R.fg.geometry = new THREE.RingGeometry(RING[0], RING[1], Math.max(4, Math.ceil(R.v * 64)), 1, Math.PI / 2, Math.max(0.01, R.v) * Math.PI * 2);
   }
   R.g.position.set(x, heightAt(x, z) + 0.08, z);
-  R.fg.material.opacity = 0.75 + 0.25 * Math.sin(now() * 6);
+  R.fg.material.opacity = 0.75 + 0.25 * Math.sin(t * 6);
 }
 
 function onMobDie(m) {

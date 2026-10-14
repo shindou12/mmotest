@@ -47,22 +47,23 @@ test('recent downs scale the gauge x1 / x2.5 / x4, drawn as 1/3, 2/3 and a full 
   assert.equal(ring(w, A, messages, 2), -1);
 });
 
-test('after 2.5 seconds without a hit, the gauge comes back 10% of its total every second', () => {
+test('after 2.5 seconds without a hit, the gauge smoothly comes back at 10% of its total per second', () => {
   const { w, A } = party(2);
   w.handle(1, { t: 'down', n: 2 });
-  const p = w.players.get(1), max = REVIVE.base * 2.5;
-  const wait = (s) => { for (let i = 0; i < Math.round(s * 10); i++) { w.time += 0.1; w.tickArea(A, 0.1); } };
+  const p = w.players.get(1), max = REVIVE.base * 2.5, near = (a, b) => Math.abs(a - b) < 1e-6;
+  const wait = (s) => { for (let i = 0; i < Math.round(s * 20); i++) { w.time += 0.05; w.tickArea(A, 0.05); } };
   w.handle(2, { t: 'rev', id: 1, v: max * 0.6 });
-  wait(2.4);
-  assert.ok(Math.abs(p.rev - max * 0.4) < 1e-9, 'still waiting');
-  wait(0.2);
-  assert.ok(Math.abs(p.rev - max * 0.5) < 1e-9, '+10% at 2.5s');
+  wait(2.45);
+  assert.ok(near(p.rev, max * 0.4), 'still waiting');
+  wait(0.5);
+  assert.ok(p.rev > max * 0.4 && p.rev < max * 0.5, 'part of the way after half a second');
   wait(1);
-  assert.ok(Math.abs(p.rev - max * 0.6) < 1e-9, '+10% a second later');
+  assert.ok(Math.abs(p.rev - max * 0.55) < max * 0.01, 'about +10% per second');
+  const before = p.rev;
   w.handle(2, { t: 'rev', id: 1, v: 1 }); // 当てると待ち直し
   wait(2.4);
-  assert.ok(Math.abs(p.rev - (max * 0.6 - 1)) < 1e-9);
-  wait(10);
+  assert.ok(near(p.rev, before - 1));
+  wait(30);
   assert.equal(p.rev, max, 'never above full');
 });
 
