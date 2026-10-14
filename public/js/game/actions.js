@@ -1,5 +1,4 @@
 import { MOTION_DURATIONS } from '../../shared/motion-catalog.js';
-import { TREE_MOTIONS } from '../../shared/tree-motions.js';
 import { SPEAR_TIMINGS } from '../../shared/skill-timings.js';
 import { counterAngle } from '../spear-motion.js';
 import { BALANCE } from '../../shared/balance.js';
@@ -8,7 +7,6 @@ import { MAX_LEVEL, RARITIES, xpToNext } from '../../shared/data.js';
 import { collide } from '../../shared/areas.js';
 import { makeWeapon } from '../models.js';
 import { HEAVY, TREE_SKILLS } from '../skills.js';
-import { KNIFE_COLOR } from '../weapon-tree.js';
 import { angDiff, now } from './util.js';
 import { banner, floatText, toast, ui } from './ui-bridge.js';
 import { char, characterStore, saveChar } from './save.js';
@@ -19,9 +17,9 @@ import { armCounter, guardDamage } from './input.js';
 import { net } from './net-client.js';
 import { downedAllies, onJustDodge, reviveHit, takeDamage, tryTech } from './hurt.js';
 import { addShake, aimAngle, aimPoint, dealDamage, later, touch } from './combat.js';
-import { addBleed, addPoison, axBers, axThrow, bwBlast, bwRain, bwSnipe, bwTrap, gainWeaponProf, phantomReady, skillCd, spBanner, spJump, spReach, spThunder, wtAfterCast, wtCounter, wtHeavy, wtOnDodge, wtOnGuard, wtRevenge } from './tree-effects.js';
+import { gainWeaponProf, phantomReady, skillCd, wtAfterCast, wtHeavy, wtOnGuard } from './tree-effects.js';
 import { castWeaponSkill, desperate, tf, titleAspd, variantParams } from './variants.js';
-import { pay } from './items.js';
+import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 
 // スキルから使う戦闘コンテキスト（skills.js の c）
 export const combat = {
@@ -29,13 +27,8 @@ export const combat = {
   fx,
   S: () => S,
   wt: () => S.wt,
-  primeCharge(frac) { me.primeCharge = frac; },
-  poison: (mb, n) => addPoison(mb, n),
-  bleed: (mb, perSec, stack) => addBleed(mb, perSec, stack),
   resetCd(id) { me.tcd[id] = 0; },
-  pay(frac) { const d = Math.min(me.hp - 1, Math.round(S.mhp * frac)); if (d > 0) { me.hp -= d; floatText(me.x, 2.2, me.z, d, 'me'); } }, // HPを払う（0にはならない）
-  ambush(n) { me.ambush = Math.max(me.ambush, n); },
-  parry(sec, dr) { addBuff('sw_parry', '受け流し', sec, { dr }, 0xbfe0ff); me.parryUntil = now() + sec; me.parryDone = false; },
+  // 武器だけの道具（c.parry / c.primeCharge / c.poison / c.bleed / c.ambush / c.pay / c.trap）は、各武器のファイル（game/weapons/*.js）が足す
   aim: aimAngle,
   col: () => RARITIES[S.wr].color,
   later,
@@ -68,7 +61,7 @@ export const combat = {
     for (const mb of [...mobs.values()]) {
       const dx = mb.x - me.x, dz = mb.z - me.z, d = Math.hypot(dx, dz);
       if (d > range + mb.rad) continue;
-      if (Math.abs(angDiff(Math.atan2(dx, dz), a)) <= arc + mb.rad / Math.max(d, 0.5) || d < mb.rad + 0.6) dealDamage(mb, mult, S.wt?.ks1 === 'sp_reach' ? { ...o, tip: d / (range + mb.rad) } : o);
+      if (Math.abs(angDiff(Math.atan2(dx, dz), a)) <= arc + mb.rad / Math.max(d, 0.5) || d < mb.rad + 0.6) dealDamage(mb, mult, fxReduce('hitOpts', o, d / (range + mb.rad)));
     }
     for (const p of downedAllies()) {
       const dx = p.x - me.x, dz = p.z - me.z, d = Math.hypot(dx, dz);
@@ -81,7 +74,7 @@ export const combat = {
     for (const mb of [...mobs.values()]) {
       const dx = mb.x - sx, dz = mb.z - sz;
       const along = dx * fx_ + dz * fz, side = Math.abs(dx * fz - dz * fx_);
-      if (along > -mb.rad && along < len + mb.rad && side < w / 2 + mb.rad) dealDamage(mb, mult, S.wt?.ks1 === 'sp_reach' ? { ...o, tip: along / (len + mb.rad) } : o);
+      if (along > -mb.rad && along < len + mb.rad && side < w / 2 + mb.rad) dealDamage(mb, mult, fxReduce('hitOpts', o, along / (len + mb.rad)));
     }
     for (const p of downedAllies()) {
       const dx = p.x - sx, dz = p.z - sz, along = dx * fx_ + dz * fz, side = Math.abs(dx * fz - dz * fx_);
@@ -103,8 +96,7 @@ export const combat = {
     me.dashA = a; me.dashT = dur; me.dashSpeed = dist / dur; me.a = a;
     if (iframe) me.iframe = Math.max(me.iframe, iframe);
   },
-  reach: (normal) => spReach(normal),
-  trap: (x, z, o) => bwTrap(x, z, o),
+  reach: (normal) => fxReduce('reach', 1, normal),
   nearest(range) {
     let best = null, bd = range;
     for (const mb of mobs.values()) { const d = Math.hypot(mb.x - me.x, mb.z - me.z); if (d < bd) { bd = d; best = mb; } }
@@ -127,32 +119,25 @@ export function doSwing() {
   me.lastSwing = now();
   me.swingT = 0;
   me.act++;
-  me.swingDur = W.speed * (1 - Math.min(75, S.aspd + buffMod('aspd') + me.dStack * S.dStackPer + (S.wt?.ks1 === 'sw_glad' ? me.mom * 2 : 0) + axBers() + (desperate() ? 15 : 0) + titleAspd()) / 100) * (me.combo === 2 ? 1.25 : 1);
+  me.swingDur = W.speed * (1 - Math.min(75, S.aspd + buffMod('aspd') + me.dStack * S.dStackPer + fxReduce('swingAspd', 0) + (desperate() ? 15 : 0) + titleAspd()) / 100) * (me.combo === 2 ? 1.25 : 1);
   me.sw++;
   me.a = aimAngle();
   const mult = W.mult * [1, 1.1, 1.6][me.combo];
   const col = RARITIES[S.wr].color;
   const a = me.a;
   if (W.ranged) {
-    if (S.wt?.ks1 === 'bw_rapid') { // 連射: 2本ずつ
-      for (const d of [-0.04, 0.04]) combat.arrow({ a: a + d, mult: mult * 0.75, type: 'normal' });
-      if (S.wt.ks2 === 'bw_storm' && ++me.stormN % 5 === 0) bwRain(aimPoint());
-    } else combat.arrow({ a, mult, type: 'normal' });
+    if (!fxSome('shoot', a, mult)) combat.arrow({ a, mult, type: 'normal' }); // 連射 など
     return;
   }
-  const range = W.range * spReach(true);
-  fx.slash(me.x, me.z, me.a, range, W.arc, hasBuff('sp_thunder') ? 0x9ad8ff : col, 1.0, me.combo % 2 === 1);
+  const range = W.range * fxReduce('reach', 1, true);
+  fx.slash(me.x, me.z, me.a, range, W.arc, fxReduce('swingColor', col), 1.0, me.combo % 2 === 1);
   audio.sfx('swing', { heavy: S.wk === 'greatsword' || S.wk === 'axe' || me.combo === 2 });
   later(0.06, () => combat.arc(range, W.arc, mult, { a, type: 'normal' }));
-  if (S.wt?.br('sp_spear') === 'B' && me.combo === 2) later(0.2, () => { combat.arc(range, W.arc, 0.6, { a, type: 'normal' }); fx.slash(me.x, me.z, a, range, W.arc, col, 0.8); }); // 連突き
-  spPierce(a);
-  if (me.combo === 2 && S.fx.has('wave')) combat.proj({ a, mult: 1.4, type: 'normal' });
-  else if (me.combo === 2 && S.wt?.br('sw_norm') === 'A') combat.proj({ a, mult: 1.2, type: 'normal' }); // 剣の心得A「閃光」
-  if (S.wt?.ks2 === 'dk_thousand' && me.combo === 2 && me.dStack >= S.dStackMax) { // 千本: 3段目は手首でナイフを3本投げる
-    me.motion = 'dk_thousand'; me.motionT = 0;
-    later(TREE_MOTIONS.dk_thousand.hits[0], () => { for (const d of [-0.22, 0, 0.22]) combat.arrow({ a: a + d, mult: 0.35, type: 'proc', noZone: true, speed: 40, color: KNIFE_COLOR }); });
-  }
-  if (S.wt?.ks1 === 'sw_mage' && now() < me.mageT) combat.proj({ a, mult: 0.8, type: 'normal', speed: 26, life: 0.5, rad: 1.1 }); // 魔剣士
+  fxCall('swingExtra', a, range, col); // 連突き・一点突破 など
+  const waved = me.combo === 2 && S.fx.has('wave');
+  if (waved) combat.proj({ a, mult: 1.4, type: 'normal' });
+  fxCall('swingLate', a, waved); // 剣の心得A「閃光」・千本 など
+  fxCall('swingLast', a); // 魔剣士 など
 }
 
 // 矢の見た目
@@ -189,17 +174,10 @@ export function fxArrow(x, z, a, color) {
   fx.add(m, 0.6, (o, k) => { o.position.x = x + Math.sin(a) * 40 * k * 0.6; o.position.z = z + Math.cos(a) * 40 * k * 0.6; });
 }
 
-// 一点突破: 溜めた次の突きが前方を貫く衝撃になる
-export function spPierce(a) {
-  if (!me.pierceReady) return;
-  me.pierceReady = false;
-  combat.proj({ a, mult: 1.6, type: 'normal', speed: 30, life: 0.45, rad: 1.3, color: 0xfff0a0, wtNo: true });
-  fx.flash(me.x, 1.3, me.z, 0xfff0a0, 30, 0.2);
-}
 export function doHeavy(lv) {
   if (!canAct() || lv < 1) return;
   startAttack(); me.act++;
-  wtRevenge();
+  fxCall('beforeHeavy'); // 報復者 など
   wtHeavy(lv);
   me.a = aimAngle();
   me.swingT = 0; me.swingDur = 0.5; me.combo = 2; me.sw++;
@@ -214,37 +192,13 @@ export function doHeavy(lv) {
     fx.ringWave(me.x, me.z, 0xbfe0ff, 5, 0.4);
     addShake(0.4);
     if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
-    if (S.wk !== 'spear') { swordCounter(); return; } // 片手剣（守護騎士）は踏み込みの横斬り
-    const W = S.wt;
-    if (W?.ks1 === 'sp_knight') spThunder();
-    if (W?.ks2 === 'sp_banner') spBanner(me.x, me.z);
-    if (W?.br('sp_ctr') === 'A') me.iframe = Math.max(me.iframe, SWEEP.dur);
-    if (W?.br('sp_ctr') === 'B') later(SWEEP.dur, () => { if (!me.dead) { const a = aimAngle(); me.a = a; me.swingT = 0; me.swingDur = 0.4; me.combo = 2; me.sw++; combat.line(6 * spReach(false), 2, 1.5, { type: 'heavy', a }); fx.slash(me.x, me.z, a, 6, 30, 0xbfe0ff, 1.2); audio.sfx('swing', { heavy: true }); } }); // 二段反撃
-    me.swingT = 9; // 振りのモーションの代わりに回転なぎ払い
-    me.sweepT = 1e-4; me.sweepHit = false;me.motion = 'counter';me.motionT = 0;
-    audio.sfx('swing', { heavy: true });
+    fxSome('guardCounter'); // 盾槍は回転なぎ払い、片手剣（守護騎士）は踏み込みの横斬り
     return;
   }
-  if (S.wt?.ks1 === 'sp_dragoon') { spJump(lv); return; }
-  if (S.wt?.ks1 === 'ax_throw') { axThrow(lv); return; }
-  if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; spPierce(me.a); }
-  if (S.wk === 'dagger') { me.motion = 'dk_blink'; me.motionT = 0; } // 瞬影: 低く駆け抜けながら斬る
-  if (S.wk === 'bow' && lv === 2) { me.motion = 'bw_full'; me.motionT = 0; fx.ringWave(me.x, me.z, 0xffd84a, S.bowMax, 0.35); } // 最大まで引いた矢: 反動と、射程いっぱいの輪
+  if (fxSome('heavyOverride', lv)) return; // 竜騎士の跳躍・投斧 など
+  fxCall('heavyStart', lv); // 武器ごとの強攻撃のモーション など
   HEAVY[S.wk].run(combat, lv);
-  if (S.wk === 'dagger' && S.wt?.ks2 === 'dk_step') later(0.24, () => { me.a += Math.PI; me.afterJust = true; me.motion = 'dk_step_turn'; me.motionT = 0; floatText(me.x, 3, me.z, '影渡り', 'just'); fx.ringWave(me.x, me.z, 0xcab4ff, 2.2, 0.3); }); // 影渡り: すり抜けたら敵のほうへ向き直る
-}
-// 片手剣のガードカウンター（守護騎士）: 踏み込みながら大きく横に斬り払う。威力は盾槍の回転なぎ払いの半分
-export function swordCounter() {
-  const M = TREE_MOTIONS.sw_counter, a = me.a;
-  me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration;
-  combat.dash(a, 1.4, 0.16, 0.3);
-  audio.sfx('swing', { heavy: true });
-  later(M.hits[0], () => {
-    combat.arc(4.2, 300, SWEEP.mult * 0.5, { type: 'heavy', stun: SWEEP.stun, a });
-    fx.slash(me.x, me.z, a, 4.2, 300, 0xbfe0ff, 1.4);
-    fx.ringWave(me.x, me.z, 0xbfe0ff, 4.6, 0.35);
-    audio.sfx('heavy'); addShake(0.35);
-  });
+  fxCall('heavyAfter', lv); // 影渡り など
 }
 // ガードカウンター: その場で一回転しながら、槍で周りを大きくなぎ払う（1回で大ダメージ）
 //   溜め（wind）: ゆっくり回って振りかぶる → なぎ払い（slash）: 一気に速く回し切る → 残心（rest）
@@ -274,8 +228,8 @@ export function sweepTick(dt) {
   }
   if (!me.sweepHit && prev < SWEEP.hitAt && me.sweepT >= SWEEP.hitAt) {
     me.sweepHit = true;
-    const kk = (S.flags.has('bulwark') ? 1.3 : 1) * (S.wk === 'spear' ? 1 + (S.wt?.v('sp_ctr', 'ctr') || 0) / 100 : 0.5); // 反撃の心得で強くなる。盾槍以外（守護騎士）は半分
-    combat.circle(me.x, me.z, SWEEP.r, SWEEP.mult * kk, { type: 'heavy', stun: SWEEP.stun * (S.wt?.br('sp_brk') === 'B' ? 2 : 1) });
+    const kk = (S.flags.has('bulwark') ? 1.3 : 1) * fxReduce('sweepPower', 0.5); // 反撃の心得で強くなる。盾槍以外（守護騎士）は半分
+    combat.circle(me.x, me.z, SWEEP.r, SWEEP.mult * kk, { type: 'heavy', stun: SWEEP.stun * fxReduce('sweepStun', 1) });
     fx.ringWave(me.x, me.z, 0xbfe0ff, SWEEP.r + 0.5, 0.4, 1.0, 1.0);
     fx.flash(me.x, 1.2, me.z, 0xbfe0ff, 50, 0.3);
     audio.sfx('heavy'); addShake(0.45);
@@ -341,26 +295,23 @@ export function updateProjs(dt) {
       w.mesh.position.set(w.x, 1.2, w.z);
       if (Math.random() < 0.7) fx.parts.emit(w.x, 1.2, w.z, { color: w.color, size: 0.35, life: 0.25, speed: 0.4, gravity: 0 });
       let done = false;
-      if (S.wt?.ks2 === 'bw_shot' && !w.trapShot) { // 射抜き: 自分の罠を矢で射抜くと大爆発
-        const tr = me.traps.find((q) => q.dodge && Math.hypot(q.x - w.x, q.z - w.z) < 1.3);
-        if (tr) { w.trapShot = true; bwBlast(tr); }
-      }
+      fxCall('arrowTick', w); // 射抜き など
       for (const mb of [...mobs.values()]) {
         if (w.hit.has(mb.id) || Math.hypot(mb.x - w.x, mb.z - w.z) > w.rad + mb.rad) continue;
         w.hit.add(mb.id);
-        // 射程の中はどこでも本来のダメージ。遠矢: 射程の端（8割より先）で当たると +20%
-        const d = Math.hypot(mb.x - w.sx, mb.z - w.sz), edge = S.wt?.br('bw_zone') === 'B' && d >= w.range * 0.8;
+        // 射程の中はどこでも本来のダメージ。遠矢（射程の端で +20%）は弓のファイル
+        const d = Math.hypot(mb.x - w.sx, mb.z - w.sz), edge = fxSome('arrowEdge', w, d);
         const hawk = w.full && tf('t_hawk') && Math.random() < 0.3;
         dealDamage(mb, w.mult * (edge ? 1.2 : 1), { type: w.type, tech: w.tech, sv: w.sv, cast: w.cast, crit: hawk || w.crit || undefined, poison: w.poison, full: w.full, snipe: w.snipe });
         if (w.onHit) w.onHit(mb);
-        if (w.snipe && !w.snipeDone) { w.snipeDone = true; bwSnipe(true); }
+        fxCall('arrowHit', w, mb); // 鷹の目・狙い澄まし など
         if (edge) floatText(mb.x, 3.4, mb.z, '遠矢', 'info');
         fx.parts.burst(w.x, 1.2, w.z, w.full ? 18 : 8, { color: w.full ? 0xffd84a : 0xffffff, speed: 5, size: 0.4, life: 0.3 });
         if (!w.pierce) { done = true; break; }
       }
       if (!done) done = projRevive(w, true);
       const c = collide(world.def, w.x, w.z, 0.1, world.door);
-      if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { if (w.snipe && !w.snipeDone) bwSnipe(false); fx.dispose(w.mesh); projs.splice(i, 1); }
+      if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fxCall('arrowGone', w); fx.dispose(w.mesh); projs.splice(i, 1); }
       continue;
     }
     w.mesh.position.set(w.x, 1, w.z);
@@ -405,7 +356,7 @@ export function updateBossProjs(dt) {
         audio.sfx('block');
         fx.parts.burst(p.x, 1.3, p.z, 20, { color: 0xbfe0ff, speed: 6, size: 0.4, life: 0.35 });
         gone = true;
-      } else if (wtCounter(p)) {
+      } else if (fxSome('counter', p)) {
         net.send({ t: 'pblock', id: p.id });
         gone = true; // 大剣カウンターで弾を受け流す
       } else if (me.iframe > 0) {
@@ -437,7 +388,7 @@ export function tryDodge() {
   me.iframe = (after ? 0.6 : 0.32) + S.iframeBonus;
   me.swingT = 9; me.skillT = -1; me.motion = '';me.charging = false; me.guarding = false;
   audio.sfx('dodge');
-  wtOnDodge();
+  fxCall('onDodge'); // 速射・罠師 など
   if (tf('t_wind')) { me.buffs = me.buffs.filter((b) => b.id !== 'wind'); me.buffs.push({ id: 'wind', label: '疾風', t: 1.9, max: 1.9, mods: { move: 40 }, color: 0x9affc8 }); }
   fx.parts.burst(me.x, 0.3, me.z, 12, { color: after ? 0x9affff : 0xdddddd, speed: 3, size: 0.4, life: 0.4, gravity: 1 });
 }

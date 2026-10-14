@@ -17,12 +17,13 @@ import { env, heightAt, pinTick, waypointTick } from './area.js';
 import { reviveRing } from './snapshot.js';
 import { REACT, crawlTick, fall, getUp, hitStop, setHitStop, updateTeles } from './hurt.js';
 import { aimAngle, aimPoint, autoTarget, dealDamage, setShake, shake, touch } from './combat.js';
-import { setMom, wtAura, wtPoisonTick, wtToxMul } from './tree-effects.js';
+import { wtAura } from './tree-effects.js';
 import { desperate, tf, titleMove } from './variants.js';
 import { canAct, doSwing, sweepAngle, sweepTick, updateBossProjs, updateProjs } from './actions.js';
 import { chestOpen, exploreTick } from './progress.js';
 import { lootWalk, updateCoins, updateDrops } from './loot.js';
 import { updateMobLabels } from './labels.js';
+import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 
 // ======================================================================
 // メインループ
@@ -123,11 +124,11 @@ export function update(dt) {
 
   me.dodgeCd -= dt; me.wsCd -= dt; me.potCd -= dt; me.iframe -= dt; me.staggerT -= dt; me.hurtT -= dt;
   me.dStackT -= dt; if (me.dStackT <= 0) me.dStack = 0;
-  const cdt = S?.wt?.br('sw_brave') === 'B' && hasBuff('sw_brave') ? dt / 0.7 : dt; // ブレイブハートB「速攻」
+  const cdt = fxReduce('cooldownDt', dt); // ブレイブハートB「速攻」 など
   me.wsCd -= cdt - dt;
   for (const k in me.tcd) me.tcd[k] -= cdt;
   for (const b of me.buffs) b.t -= dt;
-  if (me.saintOn && !hasBuff('sw_saint')) { me.saintOn = false; setMom(0); } // 剣聖の全会心が終わったら勢いは0
+  fxCall('tick'); // 剣聖の全会心が終わったら勢いは0 など
   wtAura(dt);
   me.buffs = me.buffs.filter((b) => b.t > 0);
   // しばらく倒れずにいると、起こしにくさが1段階戻る
@@ -264,12 +265,12 @@ export function update(dt) {
   for (const mb of [...mobs.values()]) {
     if (mb.poisonUntil > t) {
       mb.poisonT -= dt;
-      if (mb.poisonT <= 0) { mb.poisonT = 0.5; dealDamage(mb, mb.vStack ? wtPoisonTick(mb) : Math.max(0.12, mb.poisonPow || 0), { type: 'dot', noProc: true }); fx.parts.emit(mb.x, 1.2, mb.z, { color: 0x8aff5a, size: 0.4 + (mb.vStack || 0) * 0.06, life: 0.5, speed: 1, gravity: 1 }); }
+      if (mb.poisonT <= 0) { mb.poisonT = 0.5; dealDamage(mb, mb.vStack ? fxReduce('poisonTick', 0, mb) : Math.max(0.12, mb.poisonPow || 0), { type: 'dot', noProc: true }); fx.parts.emit(mb.x, 1.2, mb.z, { color: 0x8aff5a, size: 0.4 + (mb.vStack || 0) * 0.06, life: 0.5, speed: 1, gravity: 1 }); }
     } else if (mb.vStack) mb.vStack = 0;
     // 出血（短剣）
     if (mb.bleedUntil > t) {
       mb.bleedT = (mb.bleedT || 0) - dt;
-      if (mb.bleedT <= 0) { mb.bleedT = 0.5; dealDamage(mb, mb.bleedPow * 0.5 * wtToxMul(), { type: 'dot', noProc: true }); fx.parts.emit(mb.x, 1.0, mb.z, { color: 0xff4a5a, size: 0.35, life: 0.45, speed: 1.4, gravity: 4 }); }
+      if (mb.bleedT <= 0) { mb.bleedT = 0.5; dealDamage(mb, mb.bleedPow * 0.5 * fxReduce('bleedMul', 1), { type: 'dot', noProc: true }); fx.parts.emit(mb.x, 1.0, mb.z, { color: 0xff4a5a, size: 0.35, life: 0.45, speed: 1.4, gravity: 4 }); }
     } else if (mb.bleedN) { mb.bleedN = 0; mb.bleedPow = 0; }
     // 燃焼（スキル変化「爆炎」）
     if (mb.burnUntil > t) {
@@ -283,7 +284,7 @@ export function update(dt) {
   me.model.position.set(me.x, heightAt(me.x, me.z), me.z);
   me.model.rotation.y = me.a;
   animatePlayer(me.model, {
-    t, moving: me.moving, walkT: me.walkT, kind: S.wk, combo: me.combo, dead: me.dead, guard: me.guarding, shieldBack: S.wt?.ks1 === 'sp_dragoon',
+    t, moving: me.moving, walkT: me.walkT, kind: S.wk, combo: me.combo, dead: me.dead, guard: me.guarding, shieldBack: fxSome('shieldBack'),
     swing: me.swingT < me.swingDur ? me.swingT / me.swingDur : me.charging && me.chargeT > CHARGE_MIN ? 0.02 : -1,
     spin: me.skillT >= 0 && me.spin ? me.skillT / 0.55 : -1,
     dodge: me.dodgeT > 0 ? me.dodgeT / 0.38 : 0,
@@ -373,7 +374,7 @@ export function update(dt) {
   sendT -= dt;
   if (sendT <= 0) {
     sendT = 0.066;
-    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm, pm: me.motion || '', pt: +(me.motionT || 0).toFixed(3), rc: me.downT > 0 ? 2 : me.hurtT > 0 ? 1 : 0, cl: S.wt?.ks1 === 'sp_dragoon' ? 1 : 0 }); // cl: クラスの見た目（1 = 竜騎士の背負った盾）
+    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm, pm: me.motion || '', pt: +(me.motionT || 0).toFixed(3), rc: me.downT > 0 ? 2 : me.hurtT > 0 ? 1 : 0, cl: fxSome('shieldBack') ? 1 : 0 }); // cl: クラスの見た目（1 = 竜騎士の背負った盾）
   }
   saveT -= dt;
   if (saveT <= 0) { saveT = 10; saveChar(); }

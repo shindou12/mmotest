@@ -132,7 +132,7 @@ export function resetTree() {
 // 鍛冶屋: 強化 / 特性変更 / スキル変更 / 伝承化。結果は { ok, msg, ... } で返し、画面側が表示する
 // ======================================================================
 export const fail = (msg) => { audio.sfx('ui'); return { ok: false, msg }; };
-export function pay(cost) {
+export function payGold(cost) {
   if ((char.gold || 0) < (cost.gold || 0)) return 'ゴールドが足りません';
   if ((char.mats.shard || 0) < (cost.shard || 0)) return '強化の欠片が足りません';
   if (cost.gemKey && (char.mats.gems[cost.gemKey] || 0) < (cost.gem || 0)) return '宝石が足りません';
@@ -145,7 +145,7 @@ export function smithEnhance(id) {
   const it = findItem(id);
   if (!it || it.slot === 'title') return fail('強化できない装備です');
   if ((it.enh || 0) >= ENH_MAX) return fail('これ以上は強化できません');
-  const err = pay(enhCost(it));
+  const err = payGold(enhCost(it));
   if (err) return fail(err);
   const rate = ENH_RATE[it.enh || 0];
   const ok = Math.random() < rate;
@@ -174,7 +174,7 @@ export function smithAffix(id, idx, key) {
   if (!char.codex[key]) return fail('まだ特性リストにない特性です（その特性の付いた装備を分解すると追加されます）');
   if (it.affixes.some((a, i) => i !== idx && a[0] === key)) return fail('同じ特性はひとつの装備に1つまでです');
   if (isVariant(key) && (it.slot !== 'weapon' || it.affixes.some((a, i) => i !== idx && isVariant(a[0])))) return fail('スキル変化は武器に1つまでです');
-  const err = pay({ ...affixCost(it), gemKey: key });
+  const err = payGold({ ...affixCost(it), gemKey: key });
   if (err) return fail(err);
   const tier = weightedTier(Math.min(char.codex[key], CRAFT_MAX_TIER), false);
   it.affixes[idx] = [key, tier, affixVal(key, tier)];
@@ -187,7 +187,7 @@ export function smithSkill(id, skillId) {
   const it = findItem(id);
   if (!it || it.slot !== 'weapon' || WEAPON_SKILLS[skillId]?.kind !== it.kind) return fail('変更できないスキルです');
   if (it.skill === skillId) return fail('すでにそのスキルです');
-  const err = pay(skillCost(it));
+  const err = payGold(skillCost(it));
   if (err) return fail(err);
   it.skill = skillId;
   audio.sfx('skill');
@@ -197,7 +197,7 @@ export function smithSkill(id, skillId) {
 export function smithLore(id) {
   const it = findItem(id);
   if (!it || !isLegend(it.rarity) || !it.fx?.length || it.slot === 'title') return fail('伝説・神器の装備だけが伝承化できます');
-  const err = pay(loreCost(it));
+  const err = payGold(loreCost(it));
   if (err) return fail(err);
   const t = loreTitle(it);
   const i = char.inv.indexOf(it);

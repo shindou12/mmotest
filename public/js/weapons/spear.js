@@ -134,4 +134,7 @@ function mods(st, br, mods) {
   if (br('sp_iron') === 'B') mods.hpp = (mods.hpp || 0) + 10;
 }
 
-export default { wk: 'spear', tree: SPEAR, skills, mods };
+// 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
+const legacy = { prefixes: ['spear_'], slots: ['shieldbash', 'taunt', 'spear_fan', 'spear_sweep', 'spear_press', 'spear_stake', 'spear_intercept'] };
+
+export default { wk: 'spear', tree: SPEAR, skills, mods, legacy };

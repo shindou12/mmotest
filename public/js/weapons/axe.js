@@ -128,4 +128,7 @@ const skills = {
 function mods(st, br, mods) {
 }
 
-export default { wk: 'axe', tree: AXE, skills, mods };
+// 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
+const legacy = { prefixes: ['axe_'], slots: ['warstomp', 'bloodlust', 'axe_hook', 'axe_execute', 'axe_return', 'axe_blood', 'axe_rush'] };
+
+export default { wk: 'axe', tree: AXE, skills, mods, legacy };

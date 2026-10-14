@@ -22,6 +22,9 @@ import { acceptQuest, chestOpen, claimQuest, exploredOf, nearestInteract } from 
 import { coins, lootClick } from './game/loot.js';
 import { equip, findItem, learn, resetTree, salvage, salvageCommon, setAutoSalvage, setSetting, setSlot, smithAffix, smithEnhance, smithLore, smithSkill, unequip } from './game/items.js';
 import { bowGuide, hazardAt, loop, makeBowGuide, setBowGuide } from './game/loop.js';
+import './game/weapons/index.js';
+
+ // 武器ごとの効果（武器ツリー）を登録する
 
 // ======================================================================
 // ログイン

@@ -6,7 +6,7 @@ import { ui } from './ui-bridge.js';
 import { char } from './save.js';
 import { audio, fx } from './render.js';
 import { CHARGE_MAX, DODGE_CD, me } from './state.js';
-import { setMom } from './tree-effects.js';
+import { fxCall } from './weapon-fx.js';
 
 // ======================================================================
 // バフ
@@ -73,11 +73,12 @@ export function calcStats() {
   };
   S = {
     wk, W, atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: WT ? new Set([...T.actives, ...WT.actives]) : T.actives,
-    wt: WT, guard: (!!W.guard && WT?.ks1 !== 'sp_dragoon') || WT?.ks1 === 'sw_guard',
-    chargeMax: CHARGE_MAX * (WT?.ks1 === 'gt_blow' ? 1.25 : 1) * (WT?.br('gt_charge') === 'A' || WT?.br('bw_draw') === 'A' ? 0.8 : 1), dodgeDist: WT?.br('sw_light') === 'B' || WT?.br('dk_agile') === 'B' ? 1.3 : 1,
-    // 短剣の連撃: 当てるたびに攻撃の速さ（連撃の心得・連刃）
-    dStackPer: wk !== 'dagger' ? 0 : !WT ? 4 : WT.lv('dk_combo') ? WT.v('dk_combo', 'per') : WT.ks1 === 'dk_blades' ? 4 : 0,
-    dStackMax: WT?.ks1 === 'dk_blades' ? 15 : 10, dStackT: (WT?.br('dk_combo') === 'A' ? 5 : 3) * (WT?.ks2 === 'dk_gale' ? 2 : 1),
+    // 武器ツリーで変わるもの（ガード・溜め・回避の距離・連撃）は、下の fxCall('stats') で各武器が決める
+    wt: WT, guard: !!W.guard,
+    chargeMax: CHARGE_MAX, dodgeDist: 1,
+    // 短剣の連撃: 当てるたびに攻撃の速さ
+    dStackPer: 0,
+    dStackMax: 10, dStackT: 3,
     crit: 5 + m('crit'), critd: 150 + m('critd'), aspd: m('aspd'), move: m('move'),
     vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0) + P.vamp, cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
     // 生存本能: 近接武器は常に被ダメ軽減
@@ -87,13 +88,13 @@ export function calcStats() {
     justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion') + (char.potBonus || 0),
     ws: WEAPON_SKILLS[weaponSkillId()], weight, wc,
     dodgeCd: DODGE_CD * wc.cd * (1 - Math.min(60, m('dodgecd')) / 100) * P.dodge,
-    iframeBonus: P.iframe + (WT ? WT.v('sw_light', 'iframe') : 0) + (WT?.br('bw_roll') === 'B' ? 0.1 : 0), stunp: m('stunp'),
-    // 弓: 引かずに撃つ射程（張り弦 +4m）・最大射程（遠見の心得）・弓を引く速さ（速引き +30%）
-    bowBase: (W.baseRange || 0) + (WT?.br('bw_zone') === 'A' ? 4 : 0), bowMax: (W.range || 0) + (WT ? WT.v('bw_zone', 'rng') : 0), bowDraw: (W.draw || 1) * (WT?.br('bw_draw') === 'A' ? 1.3 : 1),
+    iframeBonus: P.iframe, stunp: m('stunp'),
+    // 弓: 引かずに撃つ射程・最大射程・弓を引く速さ（武器の特性。ツリーでの変化は弓のファイル）
+    bowBase: (W.baseRange || 0), bowMax: (W.range || 0), bowDraw: (W.draw || 1),
   };
-  if (W.ranged) S.chargeMax = Math.max(0.3, (S.bowMax - S.bowBase) / S.bowDraw); // 弓: 最大射程まで引いたら最大の溜め
+  fxCall('stats', S, WT, W);
   me.hp = Math.min(me.hp, S.mhp);
-  if (S.wt?.ks1 !== 'sw_glad' && me.mom) setMom(0);
+  fxCall('afterStats');
   S.wst = weaponStyle(eq.weapon);
   S.arm = armorLook(eq.armor);
   if (me.model) { setPlayerWeapon(me.model, S.wk, S.wr, S.wst); setPlayerArmor(me.model, S.arm); }

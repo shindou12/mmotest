@@ -134,4 +134,7 @@ function mods(st, br, mods) {
   if (br('sw_light') === 'B') mods.dodgecd = (mods.dodgecd || 0) + 20;
 }
 
-export default { wk: 'sword', tree: SWORD, skills, mods };
+// 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
+const legacy = { prefixes: ['sword_'], slots: ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance'] };
+
+export default { wk: 'sword', tree: SWORD, skills, mods, legacy };

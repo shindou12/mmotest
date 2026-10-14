@@ -103,6 +103,8 @@ export function wtEffects(char, wk) {
 
 // スキル（Q/E）: 全武器のスキルをまとめる（skills.js の TREE_SKILLS に入る）
 export const WT_SKILLS = Object.assign({}, ...WEAPON_DEFS.map((d) => d.skills));
+// 旧ツリーからの移行（武器ごとの legacy をまとめる）
+export const WT_LEGACY = { prefixes: WEAPON_DEFS.flatMap((d) => d.legacy?.prefixes || []), slots: WEAPON_DEFS.flatMap((d) => d.legacy?.slots || []) };
 export { LIGHT_COLOR } from './weapons/greatsword.js';
 export { KNIFE_COLOR } from './weapons/dagger.js';
 for (const [id, s] of Object.entries(WT_SKILLS)) s.desc = WT_NODE[id].base;

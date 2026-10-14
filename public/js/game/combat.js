@@ -7,9 +7,10 @@ import { audio, fx } from './render.js';
 import { me, mobs, mouse, pending } from './state.js';
 import { S, buffMod, hasBuff } from './stats.js';
 import { net } from './net-client.js';
-import { spTip, wtBehind, wtCritAdd, wtDmgMult, wtOnHit } from './tree-effects.js';
+import { wtCritAdd, wtDmgMult, wtOnHit } from './tree-effects.js';
 import { indoorNow, onVariantHit, tf, titleDmg } from './variants.js';
 import { combat, heal } from './actions.js';
+import { fxReduce, fxSome } from './weapon-fx.js';
 
 // ======================================================================
 // 戦闘（プレイヤー側）
@@ -54,10 +55,7 @@ export const TYPE_MOD = { normal: 'normp', heavy: 'heavyp', wskill: 'wskillp' };
 export function stunValue(o) {
   let st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
   st *= S.W.stun * (S.W.melee ? 1 + (S.stunp + buffMod('stunp')) / 100 : 1);
-  const W = S.wt;
-  if (W && o.type === 'heavy') st *= (W.ks1 === 'ax_crush' ? 2 : 1) * (W.br('ax_heavy') === 'B' ? 1.5 : 1); // 破砕・重圧
-  if (W?.br('ax_brk') === 'B' && o.type === 'normal' && me.combo === 2) st *= 3; // 揺さぶり
-  if (W?.br('bw_draw') === 'B' && o.type === 'heavy') st *= 1.5; // 重矢
+  st = fxReduce('stun', st, o); // 武器ツリー（破砕・重圧・揺さぶり・重矢 など）
   if (o.sv?.key === 'sv_quake') st *= SV.quake(o.sv.t);
   if (tf('t_breaker')) st *= 1.3;
   return Math.round(st * 10) / 10;
@@ -67,12 +65,10 @@ export function dealDamage(mb, mult, o = {}) {
   if (!mb || mb.hp <= 0) return;
   const skill = o.type === 'wskill' || o.type === 'tskill';
   const tough = mb.kind === 2 || !!mb.elite;
-  let crit = o.crit || (S.wt && hasBuff('sw_saint') && o.type !== 'dot') || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + wtCritAdd(o) + (tough && tf('t_shark') ? 15 : 0) + (tf('t_night') && indoorNow() ? 10 : 0) + (tf('t_lucky') ? 8 : 0) || (skill && S.fx.has('skillcrit'));
+  let crit = o.crit || (S.wt && fxSome('critAlways', o)) || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + wtCritAdd(o) + (tough && tf('t_shark') ? 15 : 0) + (tf('t_night') && indoorNow() ? 10 : 0) + (tf('t_lucky') ? 8 : 0) || (skill && S.fx.has('skillcrit'));
   let ambushed = false;
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; ambushed = true; }
-  if (!crit && spTip(o) === 1) crit = true;
-  if (!crit && S.wt?.ks2 === 'ax_shatter' && o.type === 'heavy' && mb.kind === 2 && mb.stunT > 0) crit = true; // 砕骨 // 間合い: 槍の先端は必ず会心
-  if (S.wt && !crit && wtBehind(mb) && S.wt.ks1 === 'dk_assassin' && o.type !== 'dot' && o.type !== 'proc') crit = true; // 暗殺: 背後は必ず会心
+  if (!crit && fxSome('critAfter', mb, o)) crit = true; // 武器ツリー: 間合いの先端・砕骨・暗殺の背後 など
   const typeMult = 1 + ((S[TYPE_MOD[o.type]] || 0) + buffMod(TYPE_MOD[o.type])) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
   const stunned = mb.stunT > 0 ? 1.3 : 1;
@@ -80,17 +76,13 @@ export function dealDamage(mb, mult, o = {}) {
   const guardBonus = now() < me.atkBonusT ? me.atkBonus : 1;
   const bossT = mb.kind === 2 && tf('t_boss1') ? 1.15 : 1;
   let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus * bossT * titleDmg(mb)
-    * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1) * wtDmgMult(o, mb, crit) * (ambushed && S.wt?.br('dk_smoke') === 'B' ? 1.5 : 1);
+    * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1) * wtDmgMult(o, mb, crit) * fxReduce('ambushMult', 1, ambushed);
   dmg = Math.max(1, Math.round(dmg));
-  if (S.wt?.ks2 === 'dk_exec' && crit && mb.kind !== 2 && mb.hp <= mb.mhp * 0.25 && wtBehind(mb) && o.type !== 'dot' && dmg < mb.hp) { // 必殺: 背後の会心で弱った雑魚はとどめ
-    dmg = mb.hp;
-    floatText(mb.x, 3, mb.z, '必殺', 'just'); fx.flash(mb.x, 1.4, mb.z, 0xcab4ff, 40, 0.3);
-    fx.slash(mb.x, mb.z, me.a, 2.2, 40, 0xffffff, 1.2); fx.parts.burst(mb.x, 1.2, mb.z, 30, { color: 0xcab4ff, speed: 7, size: 0.45, life: 0.5 });
-  }
+  dmg = fxReduce('finisher', dmg, mb, crit, o); // 必殺 など
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
   // スタン値: 強攻撃で大きく溜まる。近接武器ほど溜めやすい
   const st = mb.kind === 2 && !(mb.stunT > 0) ? stunValue(o) : 0;
-  net.send({ t: 'hit', id: mb.id, dmg, crit, st, tech: o.tech || (S.wt?.ks2 === 'sp_hold' && spTip(o) === 1 && mb.kind !== 2 ? 'spear_press' : undefined) }); // 間合い支配: 先端で当てた雑魚を押し戻す
+  net.send({ t: 'hit', id: mb.id, dmg, crit, st, tech: o.tech || fxReduce('hitTech', undefined, o, mb) }); // 間合い支配: 先端で当てた雑魚を押し戻す など
   if (o.healOnHit) heal(dmg * o.healOnHit, true);
   if (o.threat > 1) net.send({ t: 'threat', id: mb.id, n: Math.round(dmg * (o.threat - 1)) });
   // 武器パッシブ（攻撃が当たったとき）

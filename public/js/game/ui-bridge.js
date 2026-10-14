@@ -1,5 +1,3 @@
-
-
 // 画面（ui/app.js）への窓口。DOM には直接さわらない
 export let ui = null;
 export const toast = (...a) => ui?.toast(...a);

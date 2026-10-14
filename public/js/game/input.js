@@ -3,11 +3,12 @@ import { clamp, now } from './util.js';
 import { floatText } from './ui-bridge.js';
 import { audio, camera, fx } from './render.js';
 import { CAM_ZOOM, CHARGE_MIN, cam, keys, me, mouse, started } from './state.js';
-import { S, bowRange, hasBuff } from './stats.js';
+import { S, bowRange } from './stats.js';
 import { setHitStop } from './hurt.js';
 import { addShake, touch } from './combat.js';
 import { wtChargeStart } from './tree-effects.js';
 import { doHeavy, tryDodge, tryTreeSkill, tryWeaponSkill, usePotion } from './actions.js';
+import { fxReduce, fxSome } from './weapon-fx.js';
 
 // ======================================================================
 // 入力
@@ -23,8 +24,8 @@ export function startGuard() {
 export const GUARD = { max: 100, perHp: 120, kdExtra: 20, regenDelay: 1.0, regen: 34, breakT: 1.5, breakDmg: 1.5 };
 me.gg = GUARD.max;
 export function guardDamage(rawBefore, kd) {
-  // 盾の心得: 減りが少ない / 挑発A「威圧」: 効果中は減らない
-  const keep = S.wt?.br('sp_taunt') === 'A' && hasBuff('sp_taunt') ? 0 : 1 - (S.wt?.v('sp_shield', 'gauge') || 0) / 100;
+  // 盾の心得: 減りが少ない / 挑発A「威圧」: 効果中は減らない（盾槍のファイル）
+  const keep = fxReduce('guardKeep', 1);
   me.gg -= (rawBefore / S.mhp * GUARD.perHp + (kd ? GUARD.kdExtra : 0)) * keep;
   me.ggHitT = now();
   if (me.gg <= 0) { guardBreak(); return true; }
@@ -43,7 +44,7 @@ export function guardBreak() {
 }
 export function guardRegen(dt) {
   if (me.guarding || me.gg >= GUARD.max || now() - (me.ggHitT || 0) < GUARD.regenDelay || me.staggerT > 0) return;
-  me.gg = Math.min(GUARD.max, me.gg + GUARD.regen * dt * (S.wt?.br('sp_shield') === 'A' ? 2 : 1));
+  me.gg = Math.min(GUARD.max, me.gg + GUARD.regen * dt * fxReduce('guardRegen', 1));
 }
 // ガードで攻撃を受けた → カウンター準備
 export function armCounter() {
@@ -92,7 +93,7 @@ export const input = {
         me.charging = false;
         endGuard(); // 盾槍: 離したらガードを解いて強攻撃（ガードで受けていればガードカウンター）
         if (me.chargeT < CHARGE_MIN) me.queued = now() + 0.45; // 短押し → 通常攻撃（入力を少しの間覚えておく）
-        else if (S?.wk === 'dagger' && me.chargeLv < 2) me.queued = now() + 0.45; // 短剣の瞬影は溜めきったときだけ（途中で離したら通常攻撃）
+        else if (fxSome('heavyNeedsFull') && me.chargeLv < 2) me.queued = now() + 0.45; // 短剣の瞬影は溜めきったときだけ（途中で離したら通常攻撃）
         else doHeavy(me.chargeLv);
       }
     }

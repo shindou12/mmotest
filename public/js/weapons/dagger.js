@@ -132,4 +132,7 @@ function mods(st, br, mods) {
   if (br('dk_vitalp') === 'A') mods.crit = (mods.crit || 0) + 8;
 }
 
-export default { wk: 'dagger', tree: DAGGER, skills, mods };
+// 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
+const legacy = { prefixes: ['dagger_'], slots: ['poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken'] };
+
+export default { wk: 'dagger', tree: DAGGER, skills, mods, legacy };

@@ -10,6 +10,7 @@ import { addShake } from './combat.js';
 import { tf } from './variants.js';
 import { fxArrow, heal } from './actions.js';
 import { makeMobLabel } from './labels.js';
+import { fxCall } from './weapon-fx.js';
 
 // ======================================================================
 // スナップショット適用
@@ -131,7 +132,7 @@ export function reviveRing(h, x, z, rv) {
 export function onMobDie(m) {
   const mb = mobs.get(m.id);
   // 称号「血の渇き」: 自分がとどめを刺した（直前に当てた）敵ならHP回復
-  if (mb && S?.wt?.br('sw_brave') === 'A' && now() - mb.localT < 1.2) { const b = me.buffs.find((q) => q.id === 'sw_brave'); if (b) { b.t += 2; b.max = Math.max(b.max, b.t); } }
+  fxCall('onKill', mb); // ブレイブハートA「猛り」 など
   if (mb && tf('t_blood') && now() - mb.localT < 1.2 && S) { heal(S.mhp * 0.06, true); fx.parts.burst(me.x, 1, me.z, 14, { color: 0xff4a5a, speed: 3, size: 0.4, life: 0.5 }); }
   const fdef = FLOORS[world.floor - 1];
   const col = mb ? (m.boss ? fdef.boss.accent : fdef.mobs[0].color) : 0xffffff;

@@ -7,15 +7,16 @@ import { banner, floatText, toast, ui } from './ui-bridge.js';
 import { char, characterStore } from './save.js';
 import { audio, fx, scene } from './render.js';
 import { keys, me, mobs, others, teles } from './state.js';
-import { S, addBuff, buffMod, hasBuff } from './stats.js';
+import { S, addBuff, buffMod } from './stats.js';
 import { GUARD, armCounter, guardDamage } from './input.js';
 import { net } from './net-client.js';
 import { heightAt } from './area.js';
 import { addShake, stunValue, touch } from './combat.js';
-import { wtCounter, wtDr, wtEye, wtOnGuard, wtOnHurt } from './tree-effects.js';
+import { wtDr, wtOnGuard, wtOnHurt } from './tree-effects.js';
 import { tf } from './variants.js';
 import { combat, tryDodge } from './actions.js';
 import { moveMe } from './loop.js';
+import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 
 // ======================================================================
 // テレグラフ（予兆）と被弾判定
@@ -63,7 +64,7 @@ export function resolveTele(te) {
   const hit = te.sh.some((s) => inShape(s, me.x, me.z));
   if (!hit) return;
   if (me.iframe > 0) { onJustDodge(); return; }
-  if (wtCounter(mobs.get(te.src) || te.sh[0])) return; // 大剣カウンター: 強攻撃を押した直後に受けると受け流す
+  if (fxSome('counter', mobs.get(te.src) || te.sh[0])) return; // 大剣カウンター: 強攻撃を押した直後に受けると受け流す
   if (te.src) net.send({ t: 'absorb', id: te.src }); // 狙われ役が攻撃を受けるとヘイトのリセットが少し延びる
   if (S.fx.has('aegis') && Math.random() < 0.25) {
     floatText(me.x, 2.4, me.z, '無効化!', 'info');
@@ -93,7 +94,7 @@ export function resolveTele(te) {
       fx.parts.burst(me.x + Math.sin(me.a) * 0.8, 1.2, me.z + Math.cos(me.a) * 0.8, 14, { color: 0xbfe0ff, speed: 5, size: 0.4, life: 0.35 });
       armCounter(); wtOnGuard(te.dmg, srcMob);
       // ガードで受けた: ひるみ・ダウンはせず、少し押し戻されるだけ（ガードとカウンター準備は続く）。鉄壁A「不動」は押し戻されない
-      if (S.wt?.br('sp_iron') !== 'A') knockFrom(src, 0.8, 0.12);
+      if (!fxSome('steadyGuard')) knockFrom(src, 0.8, 0.12);
       hitStop = 0.05;
       if (raw <= 0) { floatText(me.x, 2.4, me.z, '防御', 'info'); return; }
       takeDamage(raw, src, false, true);
@@ -122,8 +123,8 @@ export function knockFrom(src, dist, dur) {
 export function hitReaction(dmg, src, kd) {
   me.hurtT = 0.28;
   // 大剣の「剛体」: 溜め中はスーパーアーマー（破城の構えAの効果中も）。剛体Bは溜め中に吹き飛ばされない
-  const armor = (me.charging && (S.wt?.lv('gt_armor') ?? 0) >= 1) || (S.wt?.br('gt_siege') === 'A' && hasBuff('gt_siege'));
-  const canDown = now() >= (me.noDownT || 0) && !armor && !(me.charging && S.wt?.br('gt_armor') === 'B');
+  const armor = fxSome('superArmor');
+  const canDown = now() >= (me.noDownT || 0) && !armor && !fxSome('noKnockdown');
   if ((dmg >= S.mhp * REACT.down || kd) && canDown) {
     // ダウン（吹き飛び）
     hitStop = 0.09;
@@ -166,9 +167,8 @@ export function getUp() {
 // 被ダメージの共通処理（予兆・ボスの弾）。src: 攻撃してきた位置 / kd: 吹き飛ばす大技
 export function takeDamage(raw, src = null, kd = false, guarded = false) {
   if (now() < (me.brokenT || 0)) raw *= GUARD.breakDmg; // ガードブレイク中は被ダメージ1.5倍
-  if (S.wt?.ks2 === 'sw_berserk') raw *= 1 + 0.02 * me.mom; // 狂剣士: 勢いの分だけ被ダメージが増える
-  if (S.wt?.ks2 === 'ax_reckless') raw *= 1.25; // 捨て身
-  const backB = S.wt?.br('sw_tough') === 'B' && me.hp < S.mhp * 0.5 ? 15 : 0; // 不撓B「背水」
+  raw = fxReduce('incoming', raw); // 狂剣士・捨て身 など
+  const backB = fxReduce('drLowHp', 0); // 不撓B「背水」
   const dr = clamp(buffMod('dr') + backB + wtDr() + (tf('t_relic') ? 8 : 0) + (tf('t_shell') ? 12 : 0) - (tf('t_berserk') ? 15 : 0), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
@@ -187,12 +187,7 @@ export function takeDamage(raw, src = null, kd = false, guarded = false) {
     fx.beam(me.x, me.z, 0xffd84a, 8, 0.8, 0.8);
     return;
   }
-  if (me.hp <= 0 && S.wt?.ks2 === 'ax_undying' && now() - (me.undyingT ?? -999) > 60) { // 不死身
-    me.hp = 1; me.undyingT = now(); me.iframe = Math.max(me.iframe, 2);
-    floatText(me.x, 2.8, me.z, '不死身!', 'just'); audio.sfx('perfect');
-    fx.ringWave(me.x, me.z, 0xff3a3a, 3, 0.5); fx.flash(me.x, 1.5, me.z, 0xff3a3a, 50, 0.4);
-    return;
-  }
+  if (me.hp <= 0 && fxSome('cheatDeath')) return; // 不死身 など
   if (me.hp <= 0) { fall(); return; }
 }
 
@@ -201,9 +196,7 @@ export function onJustDodge() {
   audio.sfx('perfect');
   fx.ringWave(me.x, me.z, 0x9affff, 3, 0.3);
   if (S.justbuff > 0) addBuff('just', '見切り', 3, { dmgp: S.justbuff }, 0x9affff);
-  if (S.wt?.br('sw_light') === 'A') { me.afterJust = true; floatText(me.x, 3.0, me.z, '後の先', 'just'); }
-  if (S.wt?.br('dk_agile') === 'A') me.ambush = Math.max(me.ambush, 1); // 残影: 次の1撃は会心
-  wtEye();
+  fxCall('justDodge'); // 後の先・残影・見切り眼 など
   if (S.counter > 0) {
     combat.circle(me.x, me.z, 5, S.counter / 100, { type: 'proc', noProc: true });
     fx.ringWave(me.x, me.z, 0xbff8ff, 5.5, 0.35);
