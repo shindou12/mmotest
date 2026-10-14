@@ -9,6 +9,7 @@ import { mesh, sphere, capsule, cyl, lathe, extrude, finish } from './models/kit
 import { WEAPON_MODELS } from './models/weapon-models.js';
 import { MOB_MODELS } from './models/mob-models.js';
 import { ARMOR_LOOKS } from './models/armor-looks.js';
+import { SHIELD_MODELS } from './models/shield-models.js';
 
 // 共通の道具（mesh・sphere・extrude・finish・bowString など）は models/kit.js
 
@@ -224,7 +225,7 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
   u.wKey = key;
   if (u.weapon) u.weapon.removeFromParent();
   if (u.shield) { u.shield.removeFromParent(); u.shield = null; }
-  if (WEAPONS[kind]?.shield) u.shield = makeShield(rarity, u.armL);
+  if (WEAPONS[kind]?.shield) u.shield = makeShield(rarity, u.armL, WEAPONS[kind].shield);
   const w = makeWeapon(kind, rarity, style);
   u.weaponModel = w;
   u.weapon = new THREE.Group();
@@ -240,23 +241,9 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
 
 }
 
-// 盾槍の盾（左腕に持つ）
-function makeShield(rarityIn, armL) {
-  const rc = new THREE.Color(RARITIES[rarityIn].color);
-  const rarity = visTier(rarityIn);
-  const g = new THREE.Group();
-  const face = toon(rarity >= 3 ? new THREE.Color(0x5a6a8a).lerp(rc, 0.3) : 0x5a6a8a);
-  const rim = toon(rarity >= 3 ? 0xf2c14e : 0xb8c0cc);
-  g.add(mesh(extrude([[-0.42, 0.55], [0.42, 0.55], [0.42, -0.1], [0, -0.62], [-0.42, -0.1]], 0.08), face));
-  g.add(mesh(extrude([[-0.12, 0.25], [0.12, 0.25], [0.12, -0.05], [0, -0.3], [-0.12, -0.05]], 0.03, 0), rarity >= 2 ? glow(rc.clone().multiplyScalar(1.2)) : rim, [0, 0, 0.06]));
-  g.add(mesh(new THREE.TorusGeometry(0.5, 0.035, 5, 20, Math.PI), rim, [0, 0.05, 0.02], [0, 0, 0], [0.85, 1, 1]));
-  finish(g, 0.9);
-  // ガード中だけ光る縁（ガードゲージの残りで 青 → 黄 → 赤）。この盾だけの材質にする
-  const gm = new THREE.MeshBasicMaterial({ color: 0x9ad8ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
-  const gl = new THREE.Mesh(extrude([[-0.48, 0.61], [0.48, 0.61], [0.48, -0.13], [0, -0.7], [-0.48, -0.13]], 0.02, 0), gm);
-  gl.position.z = 0.1; gl.renderOrder = 2;
-  g.add(gl);
-  g.userData.gauge = gm;
+// 盾（左腕に持つ）。形は models/shield-models.js の登録表（武器の表の shield が形の名前）
+function makeShield(rarityIn, armL, shape) {
+  const g = SHIELD_MODELS[shape]({ rarityIn, rc: new THREE.Color(RARITIES[rarityIn].color), rarity: visTier(rarityIn) });
   // 腕の外側に、面を前へ向けて持つ
   g.position.set(-0.08, -0.14, 0.12);
   g.rotation.set(0, -Math.PI / 2 + 0.25, 0);

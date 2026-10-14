@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { WEAPONS } from '../shared/data.js';
+import { WEAPONS, WEAPON_KINDS } from '../shared/data.js';
 
-export const GRIP_Y = Object.freeze({ sword: -0.15, greatsword: -0.20, dagger: -0.08, spear: 0.45, axe: 0.15, bow: 0 });
+// 武器を握る位置は武器の表（shared/data.js の WEAPONS[kind].grip）
+export const GRIP_Y = Object.freeze(Object.fromEntries(WEAPON_KINDS.map((k) => [k, WEAPONS[k].grip])));
 const down = new THREE.Vector3(0, -1, 0);
 const width = new THREE.Vector3(), shaft = new THREE.Vector3(), normal = new THREE.Vector3();
 const basis = new THREE.Matrix4(), desired = new THREE.Quaternion();

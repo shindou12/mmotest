@@ -1,7 +1,6 @@
 import { FLOORS } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, WEATHERS } from '../../shared/areas.js';
 import { buildArea, textSprite } from '../env.js';
-import { makePlayer } from '../models.js';
 import { QUESTS, questAvailable, questState } from '../quests.js';
 import { now } from './util.js';
 import { banner, toast, ui } from './ui-bridge.js';
@@ -15,6 +14,7 @@ import { tf } from './variants.js';
 import { clearBossProjs } from './actions.js';
 import { questEvent } from './progress.js';
 import { disposeDrop, flushCoins } from './loot.js';
+import { makeNpc } from '../models/npc-models.js';
 
 // ======================================================================
 // エリア
@@ -125,8 +125,7 @@ export function waypointWarp(id) {
 export function buildNpcs(def) {
   for (const n of npcs.splice(0)) fx.dispose(n.model);
   for (const d of def.npcs || []) {
-    const model = makePlayer(d.color);
-    model.userData.ring.visible = false;
+    const model = makeNpc(d);
     model.position.set(d.x, heightAt(d.x, d.z), d.z);
     scene.add(model);
     const n = { ...d, model, label: null, mark: '' };

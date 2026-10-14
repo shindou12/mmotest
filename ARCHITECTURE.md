@@ -51,7 +51,9 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ kit.js          ★ 形の道具（mesh・sphere・extrude・finish・bowString など）
    │   ├─ weapon-models.js ★ 武器の形の登録表（kind → base と styles）
    │   ├─ armor-looks.js  ★ 防具の見た目の登録表（look → 関数）
-   │   └─ mob-models.js   ★ 敵の形の登録表（t → 関数。知らない t は knight）
+   │   ├─ mob-models.js   ★ 敵の形の登録表（t → 関数。知らない t は knight）
+   │   ├─ shield-models.js ★ 盾の形の登録表（WEAPONS[kind].shield の名前 → 関数）
+   │   └─ npc-models.js   ★ NPC の見た目の登録表（エリアの npcs[].model → 関数。なければ villager）
    │
    ├─ player-motion.js 体の動き（歩き・のけぞり・ダウン）の取りまとめ
    ├─ weapon-motion.js 攻撃の振り（どの動きを優先するか）
@@ -96,6 +98,15 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 - sim.js は、分ける前と同じモジュール（motion-catalog・techniques・balance・data・areas）を直接読む。
 - `sim/common.js` は何も import しない。
 - `sim/*.js` から新しいモジュールを読むときは、sim.js からも直接読むか、戦闘の golden（`npm run test:golden`）で差が出ないことを確かめる。
+
+### 中心の処理と状態（設計の判断）
+
+戦闘・被弾・能力値・毎フレーム（`game/combat.js`・`hurt.js`・`stats.js`・`loop.js` など）は、ゲームの状態（`game/state.js` の me・mobs・world、
+`stats.js` の S）を直接読む「具体的な実装の層」として残している。
+
+- 外から足す・差し替える部分（武器の効果・スキル・登録表）は、この層に依存せず、小さな形（`weapon-api.js`・スキルの `c`）を受け取る。
+- 中心の処理どうしを全部引数で受け渡す形にすると、毎フレームの処理に受け渡しが増え、式の順番も変わる。
+  「今とまったく同じ挙動・重くしない」を優先して、ここは分けたモジュール（役目ごとに1ファイル）にとどめた。
 
 ## 武器ごとの効果（フック）の仕組み
 
@@ -147,10 +158,26 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
    - 能力値 S は計算し直されるので、分割代入せず `player.S` で読む。
    - `public/js/game/weapons/index.js` に import と1行（install の並び）を足す。
 4. 形: `public/js/models/weapon-models.js` の `WEAPON_MODELS` に `<wk>: { base(k) {...}, styles: {...} }` を足す。
-   - 持つ位置は `pose-rig.js` の `GRIP_Y` に足す。
+   - 握る位置は手順1の `WEAPONS` の `grip`、盾を持つなら `shield` に盾の形の名前（`models/shield-models.js`）。
 5. 動き: 近接武器なら何もしなくてよい（`motions/melee.js` の動きになる）。
    - 独自の構えにするときは `motions/<wk>.js` に `pose` / `swing` / `technique` を書いて、`motions/index.js` の `WEAPON_MOTIONS` に登録する。
 6. 初期スキル（Q/E）は `public/js/skills.js` と `shared/data.js` の `WEAPON_SKILL_POOL` に足す。
+
+### まとめ: 新しい武器で触る場所
+
+どれも「表に1項目足す」か「ファイルを1つ足して登録の1行を足す」で、既存の処理は直さない。
+
+| 何を | どこに | 種類 |
+|---|---|---|
+| 武器の種類（能力・射程・握る位置・盾・両手持ちなど） | `shared/data.js` の `WEAPONS` | 表に1項目（サーバーと共通） |
+| 武器ツリー（段・ノード・スキル・能力値） | `js/weapons/<wk>.js` ＋ `js/weapons/index.js` に1行 | ファイル＋登録 |
+| 武器ツリーの効果（クラス・マスター・パッシブ） | `js/game/weapons/<wk>.js` ＋ `js/game/weapons/index.js` に1行 | ファイル＋登録 |
+| 形 | `js/models/weapon-models.js` の `WEAPON_MODELS` | 表に1項目 |
+| 構え・振り（近接と違うときだけ） | `js/motions/<wk>.js` ＋ `js/motions/index.js` に1行 | ファイル＋登録 |
+| 最初のスキル | `shared/data.js` の `WEAPON_SKILL_POOL` と `js/skills.js` | 表に1項目 |
+
+ツリーのデータ（`js/weapons/`）と効果（`js/game/weapons/`）を分けているのは、データ側を node のテストや画面からも読めるようにするため
+（効果側はブラウザのゲーム本体にしか要らない）。
 
 ### クラス・マスター・パッシブ（武器ツリーのノード）を足す
 
@@ -177,6 +204,8 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - 名前は `models.js` の `ARMOR_LOOK_NAMES` に足す。
 - 敵の形: `models/mob-models.js` の `MOB_MODELS[t](k)`。
   - 動かす部位は `k.parts` に入れる（動きは `animateMob`）。
+- 盾の形: `models/shield-models.js` の `SHIELD_MODELS[形]`。武器の表の `shield` にその名前を書く。
+- NPC の見た目: `models/npc-models.js` の `NPC_MODELS[名前](d)`。エリアの `npcs` に `model: '名前'` を書く（なければ villager）。
 - 形の道具（`mesh`・`sphere`・`capsule`・`cone`・`cyl`・`lathe`・`extrude`・`finish`・`bowString`）は `models/kit.js`。
 
 ### モーションを足す・編集する
