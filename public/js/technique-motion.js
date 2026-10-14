@@ -66,6 +66,7 @@ function profile(style,i){
  case 'hookspin':return i===0?[{yaw:.9,pitch:-.05,z:.45,bodyYaw:-.5},{yaw:-.6,pitch:-.05,z:.4,bodyYaw:Math.PI*2-.4,lean:.1,leg:.25}]:[{pitch:1.2,y:1.65,z:.16,bodyYaw:Math.PI*2},{pitch:-.3,z:.51,lean:.2,leg:.2,bodyYaw:Math.PI*2}];
  case 'returntri':return i===0?[{yaw:-1.3,pitch:.5,y:1.45,bodyYaw:-.6},{yaw:1.2,pitch:.1,z:.55,bodyYaw:.55,lean:.1}]:[{pitch:.05,z:.53},{pitch:.8,z:.23,bodyYaw:-.15}];
  case 'execsweep':return [{yaw:-1.5,pitch:.15,y:1.25,bodyYaw:-.8,lean:-.05},{yaw:1.4,pitch:0,y:1.15,z:.5,bodyYaw:.85,lean:.2,leg:.4}];
+ case 'backshot':return [{draw:1,lean:-.18,lift:.18,bodyYaw:-.1},{draw:0,lean:-.24,lift:.26,bodyYaw:.08}];
  case 'chime':return [{draw:.3,guard:1},{draw:0,bodyYaw:-.2,lean:-.1,guard:1}];
  default:return [{},{z:.5}];
  }

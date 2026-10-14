@@ -8,16 +8,13 @@ import { makePlayer,setPlayerWeapon,animatePlayer } from '../public/js/models.js
 import { sampleTechnique } from '../public/js/technique-motion.js';
 import { World } from '../public/shared/sim.js';
 const base={t:1,moving:false,walkT:0,combo:0,swing:-1,spin:-1,sweep:-1,dodge:0,down:0,hurt:0};
-test('29 techniques are actual one-rank tree nodes and only activate with their weapon',()=>{
+test('29 techniques keep their motions, and every weapon now uses the new weapon tree instead of the old one',()=>{
  assert.equal(TECHNIQUE_IDS.length,29);
- // 片手剣・大剣・短剣・盾槍・大斧は新しい武器ツリー（weapon-tree.test.js）に移った
- for(const kind of ['bow']){
-  const additions=Object.values(TECHNIQUES).filter(t=>t.kind===kind);assert.equal(additions.length,5);
-  const char={lv:30,tree:{[kind+'_norm']:3,[kind+'_heavy']:3}};
-  for(const t of additions){const n=TREES[kind].nodes.find(n=>n.active===t.id);assert.ok(n);assert.equal(n.max,1);assert.equal(canLearn({lv:1,tree:{}},n.id),false);assert.equal(canLearn(char,n.id),true);char.tree[n.id]=1;assert.equal(canLearn(char,n.id),false);assert.equal(TREE_SKILLS[t.id].motion,t.id);assert.equal(MOTION_DURATIONS[t.id],t.duration);}
-  const active=treeEffects(char,kind).actives;for(const t of additions)assert.ok(active.has(t.id));
-  assert.equal(treeEffects(char,'sword').actives.size,0);
- }
+ // 武器ごとの旧ツリーはなくなり、技は新しい武器ツリー（weapon-tree.test.js）のスキルの動きとして使う
+ for(const kind of ['sword','greatsword','spear','dagger','axe','bow'])assert.equal(TREES[kind],undefined,kind);
+ for(const t of Object.values(TECHNIQUES))assert.equal(MOTION_DURATIONS[t.id],t.duration,t.id);
+ assert.equal(canLearn({lv:30,tree:{}},'bow_double_node'),false);
+ assert.equal(treeEffects({lv:30,tree:{st_str:2}},'bow').mods.atkp,6,'the stat tree still works');
 });
 test('all new motion tracks are finite, continuous and distinct through every weapon style',()=>{
  const signatures=new Set();

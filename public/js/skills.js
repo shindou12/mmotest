@@ -70,7 +70,9 @@ export const HEAVY = {
     name: '溜め撃ち', desc: '弓を引き絞り、貫通する矢を放つ',
     run(c, lv) {
       // 適性エリアは引き絞った長さで広がる（main の c.zone()）
-      c.arrow({ a: c.aim(), mult: lv === 2 ? 2.6 : 1.6, type: 'heavy', pierce: true, speed: 55, rad: lv === 2 ? 1.2 : 0.8, big: true, zone: c.zone() });
+      // 武器ツリー: 狙撃手は最大溜めが必ず会心 / 重矢は矢が太い
+      const W = c.S?.().wt, snipe = lv === 2 && W?.ks1 === 'bw_sniper', fat = W?.br('bw_draw') === 'B' ? 1.5 : 1;
+      c.arrow({ a: c.aim(), mult: lv === 2 ? 2.6 : 1.6, type: 'heavy', pierce: true, speed: 55, rad: (lv === 2 ? 1.2 : 0.8) * fat, big: true, zone: c.zone(), crit: snipe || undefined, snipe });
     },
   },
   dagger: {
@@ -553,18 +555,9 @@ Object.assign(TREE_SKILLS, WT_SKILLS);
 // スキルツリー
 // tier の段に進むには、そのツリーに tier×2 ポイント必要
 // ---------------------------------------------------------------------------
-const weaponTree = (k, names, a1, a2, cap) => [
-  { id: `${k}_norm`, name: names[0], tier: 0, max: 3, mods: { normp: 6 }, desc: '通常攻撃のダメージ +6%' },
-  { id: `${k}_heavy`, name: '溜めの極意', tier: 0, max: 3, mods: { heavyp: 10 }, desc: '強攻撃のダメージ +10%' },
-  { id: `${k}_a1`, name: TREE_SKILLS[a1].name, tier: 1, max: 1, active: a1, desc: TREE_SKILLS[a1].desc },
-  { id: `${k}_skill`, name: '技の冴え', tier: 1, max: 3, mods: { wskillp: 12 }, desc: '武器スキルのダメージ +12%' },
-  { id: `${k}_a2`, name: TREE_SKILLS[a2].name, tier: 2, max: 1, active: a2, desc: TREE_SKILLS[a2].desc },
-  { id: `${k}_cap`, name: cap.name, tier: 3, max: 1, ...cap },
-];
 
 export const TREES = {
-  // 片手剣・大剣・短剣・盾槍・大斧は新しい武器ツリー（weapon-tree.js）に移った
-  bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { zone: 3 }, desc: '引き絞ったときの適性エリアの幅 +3m' }) },
+  // 武器ごとのツリーはすべて新しい武器ツリー（weapon-tree.js）に移った
   stat: {
     name: 'ステータス', nodes: [
       { id: 'st_str', name: '筋力', tier: 0, max: 5, mods: { atkp: 3 }, desc: '攻撃力 +3%' },

@@ -57,6 +57,11 @@ export const TREE_MOTIONS = Object.freeze({
   ax_rush_twin: m('ax_rush_twin', 'axe', 1.0, [0.32, 0.62], 'rushtwin'),
   // 大斧・投斧（強攻撃）: 振りかぶって斧を投げる
   ax_throw: m('ax_throw', 'axe', 0.5, [0.18], 'axethrow'),
+  // 弓・バックショット: 後ろへ跳びながら、のけぞって放つ
+  bw_back: m('bw_back', 'bow', 0.45, [0.1], 'backshot'),
+  // 弓・二段射ちA「三段」/ 跳弦射撃A「三連」: もう1本続けて放つ
+  bw_double_tri: m('bw_double_tri', 'bow', 0.8, [0.12, 0.36, 0.56], 'double'),
+  bw_side_tri: m('bw_side_tri', 'bow', 0.9, [0.25, 0.4, 0.55], 'sideshot'),
   // 分岐で形が変わる技の動き
   // 大剣・横一文字A「大薙ぎ」: 体ごと大きくひねって、ほぼ一周を薙ぐ
   gt_broad_wide: m('gt_broad_wide', 'greatsword', 0.85, [0.32], 'broadwide'),

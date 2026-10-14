@@ -53,7 +53,7 @@ test('skills and passives go to lv3, then choose A or B once; points are limited
   const E = wtEffects(c, 'sword');
   assert.equal(E.mods.normp, 20, 'lv3 keeps lv2 numbers');
   assert.equal(E.br('sw_norm'), 'A');
-  assert.equal(wtEffects(c, 'bow'), null, 'other weapons keep the old tree');
+  assert.ok(wtEffects(c, 'bow'), 'every weapon has a weapon tree now');
 });
 
 test('lv1 is most of the value, lv2 grows, and the old sword tree is gone', () => {
@@ -255,4 +255,28 @@ test('axe: berserker / crush / throw classes, the old heavy +25% and lifesteal m
   wtLearn(c, 'ax_hook'); wtLearn(c, 'ax_hook'); wtLearn(c, 'ax_hook'); wtChoose(c, 'ax_hook', 'A');
   const hk = run('ax_hook').filter((e) => e.m === 'arc');
   assert.equal(hk[0].a[1], 360, 'pulls from all around'); assert.equal(hk[0].a[3].tech, 'axe_hook');
+});
+
+test('bow: sniper / rapid / trapper classes, zone passives, skills scale and branch', () => {
+  const c = fresh();
+  profOf(c, 'bow').lv = 20;
+  assert.equal(TREES.bow, undefined, 'old bow tree is gone');
+  wtLearn(c, 'bw_zone'); wtLearn(c, 'bw_zone'); wtLearn(c, 'bw_draw'); wtLearn(c, 'bw_draw');
+  const E = wtEffects(c, 'bow');
+  assert.equal(E.v('bw_zone', 'zw'), 3); assert.equal(E.mods.heavyp, 25);
+  assert.ok(wtLearn(c, 'bw_trapper')); assert.ok(!wtCanLearn(c, 'bw_sniper')); assert.ok(!wtCanLearn(c, 'bw_hawk')); assert.ok(wtLearn(c, 'bw_shot'));
+  const run = (id) => {
+    const k = ctx(wtEffects(c, 'bow'));
+    Object.assign(k.c, { arrow: (...a) => k.events.push({ m: 'arrow', a }), trap: (...a) => k.events.push({ m: 'trap', a }), point: () => ({ x: 0, z: 6 }) });
+    TREE_SKILLS[id].run(k.c); k.run(); return k.events;
+  };
+  wtLearn(c, 'bw_double');
+  assert.deepEqual(run('bw_double').filter((e) => e.m === 'arrow').map((e) => e.a[0].mult), [0.9, 1.8]);
+  wtLearn(c, 'bw_double'); wtLearn(c, 'bw_double'); wtChoose(c, 'bw_double', 'A');
+  assert.deepEqual(run('bw_double').filter((e) => e.m === 'arrow').map((e) => e.a[0].mult), [1.15, 2.3, 1.2], 'third arrow');
+  wtLearn(c, 'bw_trap'); wtLearn(c, 'bw_trap'); wtLearn(c, 'bw_trap'); wtChoose(c, 'bw_trap', 'A');
+  const tr = run('bw_trap').filter((e) => e.m === 'trap');
+  assert.equal(tr.length, 3); assert.ok(Math.abs(tr[0].a[2].mult - 3.3 * 0.6) < 1e-9);
+  wtLearn(c, 'bw_back'); wtLearn(c, 'bw_back'); wtLearn(c, 'bw_back'); wtChoose(c, 'bw_back', 'A');
+  assert.equal(run('bw_back').filter((e) => e.m === 'arrow').length, 5, 'fan of five');
 });

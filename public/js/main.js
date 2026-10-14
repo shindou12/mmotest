@@ -132,7 +132,7 @@ const me = {
   staggerT: 0, hurtT: 0, downT: 0, downStart: -99, noDownT: 0, kbT: 0, kbX: 0, kbZ: 0, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
   // 武器ツリー（片手剣）の状態: 攻撃の通し番号 / 勢い / 魔剣士の時間 / 幻剣 / 受け流し / 報復 など
   act: 0, mom: 0, mageT: 0, cycleAct: -1, danceAct: -1, danceExt: 0, normHealAct: -1, normHeals: 0, edgeT: 0, edgeHealT: 0,
-  afterJust: false, revenge: 0, chargeStart: 0, eyeCharge: false, eyeT: -99, iaiReady: false, primeCharge: 0, lastHeavyLv: 0, lastHeavyT: -99, phantom: null, phantomUntil: 0, soarReady: 0, tipRun: 0, tipAct: -1, pierceReady: false, banner: null, boltT: 0, parryUntil: 0, parryDone: true, saintOn: false, paladinT: 0,
+  afterJust: false, revenge: 0, chargeStart: 0, eyeCharge: false, eyeT: -99, iaiReady: false, primeCharge: 0, lastHeavyLv: 0, lastHeavyT: -99, phantom: null, phantomUntil: 0, soarReady: 0, aimN: 0, hawkT: -99, stormN: 0, traps: [], trapT: -99, tipRun: 0, tipAct: -1, pierceReady: false, banner: null, boltT: 0, parryUntil: 0, parryDone: true, saintOn: false, paladinT: 0,
   model: null,
 };
 const world = { area: 'f1_town', def: AREAS.f1_town, floor: 1, unlocked: 1, bossState: 'idle', door: false, plates: [] };
@@ -221,7 +221,7 @@ function calcStats() {
   S = {
     wk, W, atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: WT ? new Set([...T.actives, ...WT.actives]) : T.actives,
     wt: WT, guard: (!!W.guard && WT?.ks1 !== 'sp_dragoon') || WT?.ks1 === 'sw_guard',
-    chargeMax: CHARGE_MAX * (WT?.ks1 === 'gt_blow' ? 1.25 : 1) * (WT?.br('gt_charge') === 'A' ? 0.8 : 1), dodgeDist: WT?.br('sw_light') === 'B' || WT?.br('dk_agile') === 'B' ? 1.3 : 1,
+    chargeMax: CHARGE_MAX * (WT?.ks1 === 'gt_blow' ? 1.25 : 1) * (WT?.br('gt_charge') === 'A' || WT?.br('bw_draw') === 'A' ? 0.8 : 1), dodgeDist: WT?.br('sw_light') === 'B' || WT?.br('dk_agile') === 'B' ? 1.3 : 1,
     // 短剣の連撃: 当てるたびに攻撃の速さ（連撃の心得・連刃）
     dStackPer: wk !== 'dagger' ? 0 : !WT ? 4 : WT.lv('dk_combo') ? WT.v('dk_combo', 'per') : WT.ks1 === 'dk_blades' ? 4 : 0,
     dStackMax: WT?.ks1 === 'dk_blades' ? 15 : 10, dStackT: (WT?.br('dk_combo') === 'A' ? 5 : 3) * (WT?.ks2 === 'dk_gale' ? 2 : 1),
@@ -234,7 +234,9 @@ function calcStats() {
     justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion') + (char.potBonus || 0),
     ws: WEAPON_SKILLS[weaponSkillId()], weight, wc,
     dodgeCd: DODGE_CD * wc.cd * (1 - Math.min(60, m('dodgecd')) / 100) * P.dodge,
-    iframeBonus: P.iframe + (WT ? WT.v('sw_light', 'iframe') : 0), stunp: m('stunp'), optimal: W.optimal || 0, zoneMax: BOW_ZONE.max + m('zone'),
+    iframeBonus: P.iframe + (WT ? WT.v('sw_light', 'iframe') : 0) + (WT?.br('bw_roll') === 'B' ? 0.1 : 0), stunp: m('stunp'),
+    // 弓: 適性距離（遠矢で +3m）と適性エリアの幅（鷹の目の心得で広がる）
+    optimal: (W.optimal || 0) + (WT?.br('bw_zone') === 'B' ? 3 : 0), zoneMin: BOW_ZONE.min + (WT ? WT.v('bw_zone', 'zw') : 0), zoneMax: BOW_ZONE.max + m('zone') + (WT ? WT.v('bw_zone', 'zw') : 0),
   };
   me.hp = Math.min(me.hp, S.mhp);
   if (S.wt?.ks1 !== 'sw_glad' && me.mom) setMom(0);
@@ -246,11 +248,11 @@ function calcStats() {
 
 // 弓の適性エリア: 外側の円（適性距離）から内側へ、引き絞るほど広がる
 function bowZoneWidth() {
-  if (!me.charging) return BOW_ZONE.min;
+  if (!me.charging) return S.zoneMin;
   const k = clamp(me.chargeT / S.chargeMax, 0, 1);
-  return BOW_ZONE.min + (S.zoneMax - BOW_ZONE.min) * k;
+  return S.zoneMin + (S.zoneMax - S.zoneMin) * k;
 }
-function bowZone(w = BOW_ZONE.min) { const outer = S.optimal; return [Math.max(0, outer - w), outer]; }
+function bowZone(w = S.zoneMin) { const outer = S.optimal; return [Math.max(0, outer - w), outer]; }
 
 function itemPower(it) {
   if (!it) return 0;
@@ -1135,6 +1137,7 @@ function stunValue(o) {
   const W = S.wt;
   if (W && o.type === 'heavy') st *= (W.ks1 === 'ax_crush' ? 2 : 1) * (W.br('ax_heavy') === 'B' ? 1.5 : 1); // 破砕・重圧
   if (W?.br('ax_brk') === 'B' && o.type === 'normal' && me.combo === 2) st *= 3; // 揺さぶり
+  if (W?.br('bw_draw') === 'B' && o.type === 'heavy') st *= 1.5; // 重矢
   if (o.sv?.key === 'sv_quake') st *= SV.quake(o.sv.t);
   if (tf('t_breaker')) st *= 1.3;
   return Math.round(st * 10) / 10;
@@ -1238,6 +1241,8 @@ function wtDmgMult(o, mb, crit) {
   if (W.ks2 === 'dk_spread' && mb?.vStack) k *= 1 + 0.04 * mb.vStack;
   if (W.br('dk_combo') === 'B' && me.dStack >= S.dStackMax) k *= 1.06;
   if (W.ks1 === 'dk_assassin' && o.type !== 'proc' && wtBehind(mb)) k *= 1.2 * (W.ks2 === 'dk_exec' && crit && mb.kind === 2 ? 1.4 : 1);
+  // 弓: 狙い澄まし
+  if (W.ks2 === 'bw_aim' && o.snipe) k *= 1 + 0.1 * me.aimN;
   // 大斧
   if (o.type !== 'proc') k *= 1 + axBers() / 100;
   if (W.br('ax_swing') === 'B' && o.type === 'normal' && me.combo === 2) k *= 1.3;
@@ -1328,6 +1333,7 @@ function wtAfterCast(id, free = false) {
   if (!W) return;
   if (W.ks1 === 'sw_mage') me.mageT = now() + 3;
   if (W.br('sw_cycle') === 'B') quietBuff('sw_cycleB', '余勢', 2, { aspd: 12 }, 0x9affc8);
+  if (W.br('bw_quiver') === 'B') quietBuff('bw_quiverB', '余勢', 2, { aspd: 25 }, 0x9affc8);
   if (id === 'sw_dance') me.danceExt = 0;
   if (free) {
     me.phantom = null; me.phantomUntil = now() + 1.2;
@@ -1401,7 +1407,7 @@ function wtDr() {
   return dr;
 }
 // 断罪: 最大溜めの強攻撃の会心率 +35%
-const wtCritAdd = (o) => (S.wt?.ks2 === 'gt_judge' && o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8 ? 35 : 0);
+const wtCritAdd = (o) => (S.wt?.ks2 === 'gt_judge' && o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8 ? 35 : 0) + (S.wt?.br('bw_crit') === 'A' && o.zoneHit ? 10 : 0); // 急所射ち: 適性エリアで +10%
 // 強攻撃の押し始め: 居合・踏み込み溜めで、溜めた状態から始める
 function wtChargeStart() {
   if (!S?.wt) return;
@@ -1411,7 +1417,7 @@ function wtChargeStart() {
     spJump(2, true);
     return;
   }
-  if (me.iaiReady) { me.iaiReady = false; me.chargeT = S.chargeMax; floatText(me.x, 3, me.z, '居合', 'just'); }
+  if (me.iaiReady) { me.iaiReady = false; me.chargeT = S.chargeMax; floatText(me.x, 3, me.z, S.wk === 'bow' ? '鷹の目' : '居合', 'just'); }
   else if (me.primeCharge > 0) { me.chargeT = S.chargeMax * me.primeCharge; me.primeCharge = 0; }
 }
 // 強攻撃を振ったとき: 光波・月の残滓・破城の構えB
@@ -1471,6 +1477,7 @@ function wtEmit(key, rate, dt, fn) { wtAuraAcc[key] += rate * dt; while (wtAuraA
 function wtAura(dt) {
   const W = S?.wt;
   if (!W || me.dead || me.crawl || !me.model) return;
+  bwTrapTick();
   // 大斧: 血の心得（渇き・血気）と、破砕の衝撃（ボスがスタンしたとき）
   if (W.br('ax_blood') === 'A' && me.hp < S.mhp * 0.5) quietBuff('ax_thirst', '渇き', 0.3, { vamp: W.lv('ax_blood') >= 2 ? 3 : 2 }, 0xff3a3a);
   if (W.br('ax_blood') === 'B' && me.hp >= S.mhp) quietBuff('ax_full', '血気', 0.3, { atkp: 10 }, 0xff9a9a);
@@ -1602,6 +1609,80 @@ function spBanner(x, z) {
   me.banner = { x, z, until: now() + 8, mesh: g };
   fx.beam(x, z, 0x6ab0ff, 4, 0.5, 0.5);
 }
+// ---- 弓 ----
+// 最大溜めの矢（狙撃手）が当たった / 外れた: 鷹の目・狙い澄まし
+function bwSnipe(inZone) {
+  const W = S.wt;
+  if (W?.ks2 === 'bw_hawk' && inZone && now() - me.hawkT > 8) { me.hawkT = now(); me.iaiReady = true; fx.ringWave(me.x, me.z, 0xffd84a, 2, 0.3); }
+  if (W?.ks2 === 'bw_aim') {
+    me.aimN = inZone ? Math.min(3, me.aimN + 1) : 0;
+    me.buffs = me.buffs.filter((b) => b.id !== 'bw_aim');
+    if (me.aimN > 0) me.buffs.push({ id: 'bw_aim', label: `狙い澄まし +${me.aimN * 10}%`, t: 1e9, max: 1e9, mods: {}, color: 0xffd84a });
+  }
+}
+// 矢嵐: 狙った場所に矢の雨
+function bwRain(p) {
+  for (let i = 0; i < 5; i++) later(0.12 + i * 0.07, () => {
+    const x = p.x + rnd(-1.6, 1.6), z = p.z + rnd(-1.6, 1.6);
+    fx.parts.burst(x, 6, z, 6, { color: 0xbfe8ff, speed: 2, size: 0.35, life: 0.3, gravity: 40 });
+    later(0.15, () => { combat.circle(x, z, 1.5, 0.5, { type: 'proc', noProc: true }); fx.ringWave(x, z, 0xbfe8ff, 1.6, 0.2); });
+  });
+}
+// 罠（罠師の回避・置き矢）: 踏まれると発動。dodge: 罠師の罠（数に上限がある）
+function bwTrap(x, z, o) {
+  const g = new THREE.Group(), col = o.color ?? 0xffc860;
+  const ring = new THREE.Mesh(new THREE.RingGeometry(o.r - 0.12, o.r, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
+  for (let i = 0; i < 6; i++) {
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.35, 5), new THREE.MeshLambertMaterial({ color: 0xd8c8a8 }));
+    const a = i / 6 * Math.PI * 2; sp.position.set(Math.sin(a) * o.r * 0.45, 0.15, Math.cos(a) * o.r * 0.45); g.add(sp);
+  }
+  g.position.set(x, heightAt(x, z), z);
+  const t = { x, z, ...o, armAt: now() + (o.arm ?? 0.5), until: now() + o.life, area: world.area, mesh: g };
+  fx.add(g, o.life + 0.2, (obj) => { ring.material.opacity = now() < t.armAt ? 0.2 : 0.4 + Math.sin(now() * 8) * 0.15; });
+  if (o.dodge) {
+    const mine = me.traps.filter((q) => q.dodge);
+    if (mine.length >= (S.wt?.ks2 === 'bw_lure' ? 4 : 2)) bwTrapGone(mine[0]);
+  }
+  me.traps.push(t);
+  fx.parts.burst(x, 0.3, z, 10, { color: col, speed: 2, size: 0.3, life: 0.3 });
+  return t;
+}
+function bwTrapGone(t) {
+  me.traps = me.traps.filter((q) => q !== t);
+  const it = fx.items.find((q) => q.obj === t.mesh);
+  if (it) it.life = 0;
+}
+function bwTrapTick() {
+  for (const t of [...me.traps]) {
+    if (t.area !== world.area || now() > t.until) { bwTrapGone(t); continue; }
+    if (now() < t.armAt) continue;
+    if (![...mobs.values()].some((mb) => mb.hp > 0 && Math.hypot(mb.x - t.x, mb.z - t.z) < t.r + mb.rad * 0.5)) continue;
+    bwTrapGone(t);
+    combat.circle(t.x, t.z, t.r, t.mult, { type: t.dodge ? 'proc' : 'tskill', tech: 'bow_trap', stun: t.stun, noProc: t.dodge });
+    fx.parts.burst(t.x, 0.4, t.z, 30, { color: t.color ?? 0xffc860, speed: 6, size: 0.4, life: 0.4, up: 3 }); fx.ringWave(t.x, t.z, t.color ?? 0xffc860, t.r + 0.4, 0.3);
+    audio.sfx('hit');
+  }
+}
+// 射抜き: 罠を矢で撃ち抜いて大爆発
+function bwBlast(t) {
+  bwTrapGone(t);
+  combat.circle(t.x, t.z, 3.5, 3.5, { type: 'proc', noProc: true, stun: 6 });
+  fx.ringWave(t.x, t.z, 0xff9a4a, 4, 0.4); fx.flash(t.x, 1.2, t.z, 0xff9a4a, 50, 0.3);
+  fx.parts.burst(t.x, 0.6, t.z, 50, { color: 0xffb060, speed: 9, size: 0.55, life: 0.5, up: 3 });
+  floatText(t.x, 2.6, t.z, '射抜き!', 'just'); audio.sfx('impact'); addShake(0.35);
+}
+// 回避した（速射・罠師）
+function wtOnDodge() {
+  const W = S.wt;
+  if (!W) return;
+  if (W.ks2 === 'bw_quick') quietBuff('bw_quick', '速射', 1.5 + 0.38, { aspd: 40 }, 0x9affc8);
+  if (W.ks1 === 'bw_trapper' && now() - me.trapT >= 2) {
+    me.trapT = now();
+    const lure = W.ks2 === 'bw_lure';
+    bwTrap(me.x, me.z, { mult: 2.0 * (lure ? 1.3 : 1), r: 1.8, stun: lure ? 15 : 3, life: 15, arm: 0.5, dodge: true });
+  }
+}
 // ---- 大斧 ----
 // 狂戦士: 減ったHP10%ごとに +3%（捨て身は1.5倍）
 function axBers() {
@@ -1674,7 +1755,7 @@ function wtResetTree(wk) {
   const own = new Set(Object.keys(wtOf(char, wk).lv));
   wtReset(char, wk);
   char.slots = char.slots.map((s) => (own.has(s) ? null : s));
-  setMom(0); me.revenge = 0;
+  setMom(0); me.revenge = 0; me.aimN = 0;
   audio.sfx('ui');
   toast(`${WEAPONS[wk].name}のツリーを振り直しました（-${cost}G）`, '#9fe');
   calcStats(); saveChar();
@@ -1683,10 +1764,10 @@ function wtResetTree(wk) {
 function migrateWeaponTrees() {
   char.prof = char.prof || {}; char.wt = char.wt || {};
   let back = 0;
-  for (const id of Object.keys(char.tree)) if (id.startsWith('sword_') || id.startsWith('greatsword_') || id.startsWith('gs_') || id.startsWith('dagger_') || id.startsWith('spear_') || id.startsWith('axe_')) { back += char.tree[id]; delete char.tree[id]; }
-  const gone = ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance', 'gslam', 'fortress', 'gs_guillotine', 'gs_rising', 'gs_broad', 'gs_recoil', 'gs_siege', 'poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken', 'shieldbash', 'taunt', 'spear_fan', 'spear_sweep', 'spear_press', 'spear_stake', 'spear_intercept', 'warstomp', 'bloodlust', 'axe_hook', 'axe_execute', 'axe_return', 'axe_blood', 'axe_rush'];
+  for (const id of Object.keys(char.tree)) if (id.startsWith('sword_') || id.startsWith('greatsword_') || id.startsWith('gs_') || id.startsWith('dagger_') || id.startsWith('spear_') || id.startsWith('axe_') || id.startsWith('bow_')) { back += char.tree[id]; delete char.tree[id]; }
+  const gone = ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance', 'gslam', 'fortress', 'gs_guillotine', 'gs_rising', 'gs_broad', 'gs_recoil', 'gs_siege', 'poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken', 'shieldbash', 'taunt', 'spear_fan', 'spear_sweep', 'spear_press', 'spear_stake', 'spear_intercept', 'warstomp', 'bloodlust', 'axe_hook', 'axe_execute', 'axe_return', 'axe_blood', 'axe_rush', 'backshot', 'focus', 'bow_double', 'bow_tether', 'bow_side', 'bow_trap', 'bow_chime'];
   char.slots = char.slots.map((id) => (id && (gone.includes(id) || !TREE_SKILLS[id]) ? null : id));
-  if (back) later(1, () => toast(`片手剣・大剣・短剣・盾槍・大斧は新しい武器ツリーになりました。旧ツリーの ${back} ポイントを返しました`, '#ffd84a'));
+  if (back) later(1, () => toast(`すべての武器が新しい武器ツリーになりました。旧ツリーの ${back} ポイントを返しました`, '#ffd84a'));
   if (params.has('prof')) {
     const wk = char.eq.weapon?.kind || 'sword', p = profOf(char, wk);
     p.lv = clamp(Math.round(+params.get('prof')) || 1, 1, 20); p.xp = 0;
@@ -1897,7 +1978,7 @@ const combat = {
     const color = o.color ?? RARITIES[S.wr].color;
     const mesh = arrowMesh(color, o.big);
     mesh.position.set(me.x, 1.2, me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), zone: o.noZone ? null : o.zone ?? bowZone(), color, sv: o.sv, cast: o.cast, tech: o.tech, poison: o.poison || 0 });
+    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), zone: o.noZone || (o.type === 'tskill' && S.wt?.br('bw_quiver') === 'A') ? null : o.zone ?? bowZone(), color, sv: o.sv, cast: o.cast, tech: o.tech, poison: o.poison || 0, crit: o.crit, snipe: o.snipe, onHit: o.onHit });
     // 射出の閃光
     const fx0 = me.x + Math.sin(o.a) * 0.9, fz0 = me.z + Math.cos(o.a) * 0.9;
     fx.flash(fx0, 1.3, fz0, color, o.big ? 14 : 8, 0.15, 6);
@@ -1930,7 +2011,7 @@ const combat = {
     }
   },
   circle(x, z, r, mult, o = {}) {
-    for (const mb of [...mobs.values()]) if (Math.hypot(mb.x - x, mb.z - z) < r + mb.rad) dealDamage(mb, mult, o);
+    for (const mb of [...mobs.values()]) if (mb !== o.skip && Math.hypot(mb.x - x, mb.z - z) < r + mb.rad) dealDamage(mb, mult, o);
     for (const p of downedAllies()) if (Math.hypot(p.x - x, p.z - z) < r + 0.6) reviveHit(p, o);
   },
   proj(o) {
@@ -1945,6 +2026,7 @@ const combat = {
     if (iframe) me.iframe = Math.max(me.iframe, iframe);
   },
   reach: (normal) => spReach(normal),
+  trap: (x, z, o) => bwTrap(x, z, o),
   nearest(range) {
     let best = null, bd = range;
     for (const mb of mobs.values()) { const d = Math.hypot(mb.x - me.x, mb.z - me.z); if (d < bd) { bd = d; best = mb; } }
@@ -1976,7 +2058,11 @@ function doSwing() {
   const col = RARITIES[S.wr].color;
   const a = me.a;
   if (W.ranged) {
-    combat.arrow({ a, mult, type: 'normal' });
+    const k = me.dodgeT > 0 && S.wt?.br('bw_roll') === 'A' ? 1.3 : 1; // 転がり撃ち
+    if (S.wt?.ks1 === 'bw_rapid') { // 連射: 2本ずつ
+      for (const d of [-0.04, 0.04]) combat.arrow({ a: a + d, mult: mult * 0.75 * k, type: 'normal' });
+      if (S.wt.ks2 === 'bw_storm' && ++me.stormN % 5 === 0) bwRain(aimPoint());
+    } else combat.arrow({ a, mult: mult * k, type: 'normal' });
     if (me.dodgeT > 0) floatText(me.x, 2.4, me.z, '転がり撃ち', 'info');
     return;
   }
@@ -2180,6 +2266,10 @@ function updateProjs(dt) {
       w.mesh.position.set(w.x, 1.2, w.z);
       if (Math.random() < 0.7) fx.parts.emit(w.x, 1.2, w.z, { color: w.color, size: 0.35, life: 0.25, speed: 0.4, gravity: 0 });
       let done = false;
+      if (S.wt?.ks2 === 'bw_shot' && !w.trapShot) { // 射抜き: 自分の罠を矢で射抜くと大爆発
+        const tr = me.traps.find((q) => q.dodge && Math.hypot(q.x - w.x, q.z - w.z) < 1.3);
+        if (tr) { w.trapShot = true; bwBlast(tr); }
+      }
       for (const mb of [...mobs.values()]) {
         if (w.hit.has(mb.id) || Math.hypot(mb.x - w.x, mb.z - w.z) > w.rad + mb.rad) continue;
         w.hit.add(mb.id);
@@ -2187,7 +2277,9 @@ function updateProjs(dt) {
         // 投げナイフなど（zone なし）は距離に関係なく本来のダメージ
         const inZone = !w.zone || (d >= w.zone[0] - mb.rad && d <= w.zone[1] + mb.rad);
         const hawk = w.zone && inZone && tf('t_hawk') && Math.random() < 0.3;
-        dealDamage(mb, w.mult, { type: w.type, tech: w.tech, falloff: inZone ? 1 : BOW_ZONE.outside, sv: w.sv, cast: w.cast, crit: hawk || undefined, poison: w.poison });
+        dealDamage(mb, w.mult, { type: w.type, tech: w.tech, falloff: inZone ? 1 : S.wt?.br('bw_zone') === 'A' ? 0.6 : BOW_ZONE.outside, sv: w.sv, cast: w.cast, crit: hawk || w.crit || undefined, poison: w.poison, zoneHit: !!w.zone && inZone, snipe: w.snipe });
+        if (w.onHit) w.onHit(mb);
+        if (w.snipe && !w.snipeDone) { w.snipeDone = true; bwSnipe(inZone); }
         if (!w.zone) { /* 表示なし */ } else if (inZone) {
           floatText(mb.x, 3.4, mb.z, '適性!', 'info');
           fx.ringWave(mb.x, mb.z, 0x9affc8, 1.6, 0.25);
@@ -2197,7 +2289,7 @@ function updateProjs(dt) {
       }
       if (!done) done = projRevive(w, true);
       const c = collide(world.def, w.x, w.z, 0.1, world.door);
-      if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fx.dispose(w.mesh); projs.splice(i, 1); }
+      if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { if (w.snipe && !w.snipeDone) bwSnipe(false); fx.dispose(w.mesh); projs.splice(i, 1); }
       continue;
     }
     w.mesh.position.set(w.x, 1, w.z);
@@ -2274,6 +2366,7 @@ function tryDodge() {
   me.iframe = (after ? 0.6 : 0.32) + S.iframeBonus;
   me.swingT = 9; me.skillT = -1; me.motion = '';me.charging = false; me.guarding = false;
   audio.sfx('dodge');
+  wtOnDodge();
   if (tf('t_wind')) { me.buffs = me.buffs.filter((b) => b.id !== 'wind'); me.buffs.push({ id: 'wind', label: '疾風', t: 1.9, max: 1.9, mods: { move: 40 }, color: 0x9affc8 }); }
   fx.parts.burst(me.x, 0.3, me.z, 12, { color: after ? 0x9affff : 0xdddddd, speed: 3, size: 0.4, life: 0.4, gravity: 1 });
 }
@@ -3492,6 +3585,6 @@ loop();
 
 window.__game = { me, others, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, camera, coins, audio, api: game,
   // 自動テスト用の操作（通常攻撃・強攻撃・スキル）
-  dbg: { canAct, hit: (mb, mult, o) => dealDamage(mb, mult, o), press: (on) => (on ? input.pointerDown(0) : input.pointerUp(0)), swing: () => { if (canAct() && me.swingT >= me.swingDur) doSwing(); }, heavy: doHeavy, tree: tryTreeSkill, ws: tryWeaponSkill },
+  dbg: { canAct, hit: (mb, mult, o) => dealDamage(mb, mult, o), press: (on) => (on ? input.pointerDown(0) : input.pointerUp(0)), swing: () => { if (canAct() && me.swingT >= me.swingDur) doSwing(); }, heavy: doHeavy, tree: tryTreeSkill, ws: tryWeaponSkill, dodge: tryDodge },
 };
 
