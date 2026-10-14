@@ -123,3 +123,20 @@ export function handTracker() {
   const v = new THREE.Vector3();
   return (model) => { model.userData.hand?.getWorldPosition(v); return v; };
 }
+
+// 飛び道具（strikes.proj の shape）の形の登録表。形を足すときはここに足す（shape がない・知らないときは斬撃波）
+//   make(color, fx, wr, wst): メッシュ / wave: 斬撃波として扱う（斬撃波を強める効果が乗る） / tick(w, dt): 毎フレームの見た目
+export const PROJ_SHAPES = {
+  wave: {
+    wave: true,
+    make: (color, fx) => fx.waveMesh(color),
+    tick(w) { w.mesh.material.opacity = 0.9 * (1 - w.t / w.life); w.mesh.scale.setScalar(1 + w.t * 1.5); },
+  },
+  // 投げた斧: 今の武器の斧の幻影が回りながら飛ぶ
+  axe: {
+    wave: false,
+    make: (color, fx, wr, wst) => phantomAxe(color, wr, wst),
+    tick(w, dt) { w.mesh.children[0].rotation.z += dt * 18; w.mesh.traverse((part) => { if (part.material) part.material.opacity = .9 * (1 - w.t / w.life); }); },
+  },
+};
+export const projShape = (shape) => (Object.hasOwn(PROJ_SHAPES, shape ?? '') ? PROJ_SHAPES[shape] : PROJ_SHAPES.wave);

@@ -39,7 +39,8 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ progress.js / loot.js / items.js / labels.js
    │   ├─ loop.js         毎フレームの更新
    │   ├─ weapon-fx.js    ★ 武器ごとの効果の差し込み口（フック）
-   │   └─ weapons/<武器>.js ★ 武器ツリーの効果（フックの登録）。index.js で読み込む
+   │   ├─ weapon-api.js   ★ 武器の効果に渡す道具（player・field・attack・tree・show・party・register の小さな形）
+   │   └─ weapons/<武器>.js ★ 武器ツリーの効果。install(api) で道具を受け取り、フックを登録する。index.js が呼ぶ
    │
    ├─ weapon-tree.js   武器ツリーの仕組み（熟練度・振り分け・効果のまとめ）
    ├─ weapons/<武器>.js ★ 武器ツリーのデータ（段・ノード）・スキル・能力値。index.js が登録表
@@ -84,7 +85,8 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
 
 依存の向き: `game` → `ui` へは `ui-bridge.js` だけを通す。`game/*` の中心の処理（combat・hurt・stats・
 actions・loop など）は、武器の名前やノードの id を知らず、`weapon-fx.js` のフックを呼ぶだけ。
-武器ごとの中身は `game/weapons/<武器>.js` に閉じている。
+武器ごとの中身は `game/weapons/<武器>.js` に閉じている。武器の効果のファイルは具体的なモジュール（state・stats・combat…）を import せず、
+`game/weapon-api.js` が作る小さな形（ポート）を引数で受け取る（依存性の逆転）。
 
 ### sim の import の深さ
 
@@ -99,13 +101,14 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 
 `game/weapon-fx.js`:
 
-- `registerWeaponFx(wk, { フック名: 関数 })` で登録する。
+- `register(wk, { フック名: 関数 }, { フック名: 順 })` で登録する（`register` は install(api) が受け取る `api.register`）。
 - 呼ぶ側の使い分けは次のとおり。
   - `fxCall(名前, ...)` は全部を呼ぶ。
   - `fxSome(名前, ...)` はどれかが true を返したら止める（横取り）。
   - `fxReduce(名前, 値, ...)` は値を順に変える（倍率・加算）。
 - 全武器のフックを呼び、各フックは自分のクラス・ノードが有効なときだけ働く。持ち替えた直後に残るバフや設置物も、これでそのまま働く。
-- 呼ぶ順は登録した順が基本。もとの計算順（掛け算の順で小数の端数が変わるもの）を保つために、`ORDER` で武器の順を決めている場面がある。
+- 呼ぶ順は登録した順が基本。もとの計算順（掛け算の順で小数の端数が変わるもの）を保つために、各武器が第3引数で場面ごとの順を書いている。
+  新しい武器は順を書かなければ、順の付いた武器のあとに呼ばれる（ほかのファイルは直さなくてよい）。
 
 主なフック（場面）:
 
@@ -138,9 +141,11 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
    - `skills`: ツリーの Q/E スキル。
    - `mods(st, br, mods)`: ツリーが足す能力値。
    - `public/js/weapons/index.js` の `WEAPON_DEFS` に1行足す。並び順がツリー画面の順になる。
-3. `public/js/game/weapons/<wk>.js` を作る。`registerWeaponFx('<wk>', { ... })` で効果を登録する。
-   - スキルに渡す道具（`combat` 文脈）を足すときは `Object.assign(combat, { ... })`。
-   - `public/js/game/weapons/index.js` に `import './<wk>.js';` を1行足す。
+3. `public/js/game/weapons/<wk>.js` を作る。`export default function install({ player, field, attack, tree, show, party, register })` の中で、
+   `register('<wk>', { ... })` で効果を登録する（使える道具は `game/weapon-api.js` の一覧）。
+   - スキルに渡す道具（`combat` 文脈）を足すときは `attack.extendCombat({ ... })`。
+   - 能力値 S は計算し直されるので、分割代入せず `player.S` で読む。
+   - `public/js/game/weapons/index.js` に import と1行（install の並び）を足す。
 4. 形: `public/js/models/weapon-models.js` の `WEAPON_MODELS` に `<wk>: { base(k) {...}, styles: {...} }` を足す。
    - 持つ位置は `pose-rig.js` の `GRIP_Y` に足す。
 5. 動き: 近接武器なら何もしなくてよい（`motions/melee.js` の動きになる）。
@@ -185,7 +190,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - 一回転で終わる動きは `FULL_TURN` に足す。
   - つまみ（yaw・pitch・bodyYaw・lean・x・y・z・guard・lift・leg・draw）は `BASE` に並んでいる。
 - 武器ごとの構え・通常攻撃の振り: `motions/<武器>.js` と、その登録表 `motions/index.js`。
-- 盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`。`spin: true` の動きは回転として扱われ、ほかのプレイヤーからも回って見える）。
+- 盾槍の突きの技は `spear-motion.js` の `THRUSTS`（技ごとの登録表）に足す。盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`。`spin: true` の動きは回転として扱われ、ほかのプレイヤーからも回って見える）。
 
 ### 敵・ボスの技・メッセージを足す（サーバー）
 
@@ -198,6 +203,10 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - `public/shared/data.js` のボスの `patterns` / `p3` に名前を書くと使われる。
 - プレイヤーからのメッセージ: `public/shared/sim/messages.js` の `MESSAGES[t]` に関数を足す。
   - 送る側は `net.send({ t, ... })`。
+
+### 飛び道具の形を足す
+
+- `public/js/game/meshes.js` の `PROJ_SHAPES[形]` に { make, wave, tick } を足し、スキルや効果で `strikes.proj({ shape: '形', ... })` と書く。
 
 ### エリアの飾り・障害物を足す
 

@@ -18,7 +18,7 @@ import { addShake, aimAngle, aimPoint, dealDamage, later, touch } from './combat
 import { gainWeaponProf, phantomReady, skillCd, wtAfterCast, wtHeavy, wtOnGuard } from './tree-effects.js';
 import { castWeaponSkill, desperate, tf, titleAspd, variantParams } from './variants.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
-import { arrowMesh, bossProjMesh, phantomAxe } from './meshes.js';
+import { arrowMesh, bossProjMesh, projShape } from './meshes.js';
 
 // スキル（skills.js の c）と武器の効果に渡す戦闘コンテキスト。役目ごとの小さな形に分けてある
 // 使う側は必要な形だけを読む（例: 武器の効果は strikes で当て、feedback で見せる）
@@ -74,9 +74,9 @@ export const strikes = {
   },
   proj(o) {
     const color = o.color ?? RARITIES[S.wr].color;
-    const mesh = o.shape === 'axe' ? phantomAxe(color, S.wr, S.wst||0) : fx.waveMesh(color);
+    const shape = projShape(o.shape), mesh = shape.make(color, fx, S.wr, S.wst||0);
     mesh.position.set(o.sx ?? me.x, 1, o.sz ?? me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, x: o.sx ?? me.x, z: o.sz ?? me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast, wave: o.shape !== 'axe', wtNo: !!o.wtNo, stun: o.stun, eclipse: !!o.eclipse });
+    projs.push({ mesh, x: o.sx ?? me.x, z: o.sz ?? me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast, wave: shape.wave, wtNo: !!o.wtNo, stun: o.stun, eclipse: !!o.eclipse });
     audio.sfx('wave');
   },
   arrow(o) {
@@ -305,8 +305,7 @@ export function updateProjs(dt) {
       continue;
     }
     w.mesh.position.set(w.x, 1, w.z);
-    if(w.shape==='axe'){w.mesh.children[0].rotation.z+=dt*18;w.mesh.traverse(part=>{if(part.material)part.material.opacity=.9*(1-w.t/w.life);});}
-    else {w.mesh.material.opacity = 0.9 * (1 - w.t / w.life);w.mesh.scale.setScalar(1 + w.t * 1.5);}
+    projShape(w.shape).tick(w, dt);
     fx.parts.emit(w.x, 1, w.z, { color: w.color ?? w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
     for (const mb of [...mobs.values()]) {
       if (w.hit.has(mb.id)) continue;
