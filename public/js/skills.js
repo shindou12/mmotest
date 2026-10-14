@@ -563,8 +563,7 @@ const weaponTree = (k, names, a1, a2, cap) => [
 ];
 
 export const TREES = {
-  // 片手剣・大剣・短剣・盾槍は新しい武器ツリー（weapon-tree.js）に移った
-  axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },
+  // 片手剣・大剣・短剣・盾槍・大斧は新しい武器ツリー（weapon-tree.js）に移った
   bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { zone: 3 }, desc: '引き絞ったときの適性エリアの幅 +3m' }) },
   stat: {
     name: 'ステータス', nodes: [

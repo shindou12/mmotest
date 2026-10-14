@@ -69,7 +69,7 @@ export const WEAPONS = {
   },
   axe: {
     name: '大斧', range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true,
-    passive: ['強攻撃ダメージ +25%', '与えたダメージの3%を回復'],
+    passive: [], // 大斧は武器ツリー（熟練度）で決める
   },
   // 弓: 矢を飛ばす。適性エリア（外円=optimal と、引き絞るほど内側へ広がる内円の間）でだけ本来のダメージ
   bow: {

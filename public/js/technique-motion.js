@@ -56,6 +56,10 @@ function profile(style,i){
  case 'bashrush':return [{pitch:.15,z:.15,guard:1,lean:.3,leg:.45,y:1.1},{pitch:.1,z:.32,guard:1,lean:.38,bodyYaw:.15,leg:.5}];
  case 'clang':return [{pitch:1.2,y:1.6,z:.2,guard:1,lean:-.12},{pitch:.3,y:1.35,z:.35,guard:1,lean:.05,leg:.2}];
  case 'lowspin':return [{yaw:-1.2,pitch:-.35,y:1.08,bodyYaw:-.4},{yaw:1.1,pitch:-.35,y:.98,x:.5,z:.18,bodyYaw:Math.PI*2-.3,lean:.2,leg:.3}];
+ case 'hooktwin':return i===0?[{yaw:.75,pitch:-.1,z:.48},{yaw:-.85,pitch:-.1,z:.15,bodyYaw:-.3}]:i===1?[{pitch:1.2,y:1.65,z:.16},{pitch:-.3,z:.51,lean:.2,leg:.2}]:[{pitch:1.6,y:1.78,z:.12,lean:-.15,bodyYaw:.2},{pitch:-.55,y:1.08,z:.52,lean:.3,leg:.4}];
+ case 'roar':return [{pitch:.6,y:1.4,z:.25,lean:.1},{pitch:1.5,y:1.8,z:.1,lean:-.25,guard:1,leg:.25}];
+ case 'rushtwin':return i===0?[{pitch:.1,z:.3,lean:.2},{pitch:-.35,z:.55,lean:.28,leg:.4}]:[{pitch:1.4,y:1.7,z:.14,lean:-.1,bodyYaw:-.25},{pitch:-.6,y:1.05,z:.48,lean:.32,leg:.45,bodyYaw:.15}];
+ case 'axethrow':return [{yaw:.4,pitch:1.5,y:1.75,z:.05,lean:-.2,bodyYaw:-.35},{yaw:-.1,pitch:.1,y:1.35,z:.6,lean:.25,bodyYaw:.3,leg:.35}];
  case 'chime':return [{draw:.3,guard:1},{draw:0,bodyYaw:-.2,lean:-.1,guard:1}];
  default:return [{},{z:.5}];
  }
@@ -66,6 +70,7 @@ const CUSTOM={
  smoke:[{at:0},{at:.08,pitch:-.35,y:1.0,z:.32,lean:.22,lift:-.1,leg:.3},{at:.22,pitch:.6,y:1.45,z:.2,lean:-.35,lift:.55,leg:-.3,guard:.6},{at:.4,pitch:.3,y:1.25,lean:-.1,lift:.08,leg:.2},{at:.55}],
  dive:[{at:0},{at:.1,pitch:.4,y:1.3,z:.22,lift:-.18,lean:.2,leg:.4},{at:.28,pitch:1.3,y:1.72,z:.16,lift:1.35,lean:-.22,leg:-.3},{at:.44,pitch:-1.2,y:1.5,z:.42,lift:1.0,lean:.35,leg:-.1},{at:.55,pitch:-1.3,y:1.1,z:.5,lift:0,lean:.32,leg:.45},{at:.7,pitch:-1.2,y:1.12,z:.48,lift:-.08,lean:.25,leg:.35},{at:.85}],
  fanleap:[{at:0},{at:.08,pitch:.3,z:.2,lift:-.12,leg:.35},{at:.2,pitch:.6,y:1.5,z:.2,lift:.9,lean:-.1,leg:-.2},{at:.24,yaw:-.5,pitch:-.6,z:.55,lift:.5,lean:.3},{at:.32,yaw:0,pitch:-.6,z:.58,lift:.2,lean:.3},{at:.4,yaw:.5,pitch:-.6,z:.55,lift:0,lean:.3,leg:.35},{at:.75}],
+ stomp:[{at:0},{at:.12,pitch:.5,y:1.4,z:.25,lean:-.12,lift:.12,leg:-.6},{at:.24,pitch:.7,y:1.45,z:.22,lean:-.18,lift:.2,leg:-.75},{at:.3,pitch:.2,y:1.2,z:.35,lean:.2,lift:-.12,leg:.5},{at:.45,pitch:.2,y:1.22,z:.33,lean:.15,lift:-.08,leg:.4},{at:.6}],
  slam:[{at:0},{at:.09,pitch:.9,y:1.32,z:.2,lift:-.16,lean:.18,leg:.35},{at:.22,pitch:1.55,y:1.74,z:.16,lift:1.15,lean:-.18,leg:-.25},{at:.36,pitch:-.5,y:1.1,z:.52,lift:0,lean:.26,leg:.4},{at:.52,pitch:-.45,y:1.1,z:.5,lift:-.06,lean:.22,leg:.35},{at:.8}],
 };
 export const ALL_MOTIONS=Object.freeze({...TECHNIQUES,...TREE_MOTIONS});

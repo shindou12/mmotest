@@ -226,3 +226,33 @@ test('spear: dragoon / reach / knight classes, the old -10% moved into 鉄壁の
   assert.equal(run('sp_taunt').find((e) => e.m === 'buff').a[3].dr, 30);
   for (const id of ['sp_fan', 'sp_sweep', 'sp_bash', 'sp_stake', 'sp_intercept', 'sp_taunt']) assert.ok(TREE_SKILLS[id], id);
 });
+
+test('axe: berserker / crush / throw classes, the old heavy +25% and lifesteal moved into the tree, skills scale and branch', () => {
+  const c = fresh();
+  profOf(c, 'axe').lv = 20;
+  assert.equal(TREES.axe, undefined, 'old axe tree is gone');
+  wtLearn(c, 'ax_heavy'); wtLearn(c, 'ax_heavy'); wtLearn(c, 'ax_blood'); wtLearn(c, 'ax_blood');
+  const E = wtEffects(c, 'axe');
+  assert.equal(E.mods.heavyp, 25, 'the old +25% heavy now lives in 剛力の心得');
+  assert.equal(E.mods.vamp, 3, 'the old 3% lifesteal now lives in 血の心得');
+  assert.ok(wtLearn(c, 'ax_throw')); assert.ok(!wtCanLearn(c, 'ax_crush')); assert.ok(!wtCanLearn(c, 'ax_undying')); assert.ok(wtLearn(c, 'ax_storm'));
+  const T0 = { id: 1, x: 0, z: 2, hp: 20, mhp: 100 };
+  const run = (id) => {
+    const k = ctx(wtEffects(c, 'axe'));
+    Object.assign(k.c, { nearest: () => T0, targets: () => [T0], hit: (...a) => k.events.push({ m: 'hit', a }), resetCd: (...a) => k.events.push({ m: 'reset', a }), pay: (...a) => k.events.push({ m: 'pay', a }), shake: () => {} });
+    k.c.fx.parts.burst = () => {};
+    TREE_SKILLS[id].run(k.c); k.run(); return k.events;
+  };
+  wtLearn(c, 'ax_exec');
+  assert.equal(run('ax_exec').find((e) => e.m === 'hit').a[1], 6.8, 'low-HP targets take double');
+  wtLearn(c, 'ax_return'); wtLearn(c, 'ax_return'); wtLearn(c, 'ax_return'); wtChoose(c, 'ax_return', 'A');
+  const p = run('ax_return').filter((e) => e.m === 'proj');
+  assert.equal(p.length, 4, 'twin blades: out, two side axes, back'); assert.equal(p[0].a[0].mult, 1.9); assert.equal(p[1].a[0].mult, 0.95);
+  wtLearn(c, 'ax_lust'); wtLearn(c, 'ax_lust'); wtLearn(c, 'ax_lust'); wtChoose(c, 'ax_lust', 'A');
+  const ev = run('ax_lust');
+  assert.deepEqual(ev.find((e) => e.m === 'pay').a, [0.15]);
+  assert.deepEqual(ev.find((e) => e.m === 'buff').a[3], { atkp: 20, vamp: 8, aspd: 20 });
+  wtLearn(c, 'ax_hook'); wtLearn(c, 'ax_hook'); wtLearn(c, 'ax_hook'); wtChoose(c, 'ax_hook', 'A');
+  const hk = run('ax_hook').filter((e) => e.m === 'arc');
+  assert.equal(hk[0].a[1], 360, 'pulls from all around'); assert.equal(hk[0].a[3].tech, 'axe_hook');
+});

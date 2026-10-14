@@ -47,4 +47,14 @@ export const TREE_MOTIONS = Object.freeze({
   sp_sweep_spin: m('sp_sweep_spin', 'spear', 0.75, [0.3], 'lowspin'),
   // 盾槍・扇突きA「竜爪」: 跳び上がってから三方へ突き降ろす
   sp_fan_leap: m('sp_fan_leap', 'spear', 0.75, [0.22, 0.31, 0.4], 'fanleap'),
+  // 大斧・引き裂きB「叩き伏せ」: 引き寄せて叩いたあと、もう一度振り下ろす
+  ax_hook_twin: m('ax_hook_twin', 'axe', 1.05, [0.22, 0.55, 0.85], 'hooktwin'),
+  // 大斧・ウォーストンプ: 片足を高く上げて踏み下ろす
+  ax_stomp: m('ax_stomp', 'axe', 0.6, [0.3], 'stomp'),
+  // 大斧・ブラッドラスト: 斧を掲げて吼える
+  ax_lust: m('ax_lust', 'axe', 0.6, [0.25], 'roar'),
+  // 大斧・猛進断B「二段」: 叩き斬ってから、足元へもう一度叩きつける
+  ax_rush_twin: m('ax_rush_twin', 'axe', 1.0, [0.32, 0.62], 'rushtwin'),
+  // 大斧・投斧（強攻撃）: 振りかぶって斧を投げる
+  ax_throw: m('ax_throw', 'axe', 0.5, [0.18], 'axethrow'),
 });
