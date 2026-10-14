@@ -458,7 +458,28 @@ export class AudioEngine {
         break;
       }
       case 'drop': {
+        // 地面に落ちた音（物の種類で変わる）＋ レア度の合図（上がるほど目立つ）
         const r = opt.rarity || 0;
+        if (opt.slot) {
+          if (opt.slot === 'weapon') { // 金属: 非整数倍の倍音でガシャン
+            this.noiseHit(t, 0.22, 'bandpass', 2600, 0.06, B, 1.2);
+            for (const [k, v] of [[1, 0.06], [2.76, 0.035], [5.4, 0.02], [8.9, 0.01]]) tone('sine', 520 * k, 0, 0.18 + 0.1 / k, v);
+            tone('sine', 140, 70, 0.1, 0.12);
+          } else if (opt.slot === 'armor') { // 革・布: 低いドサッ
+            this.noiseHit(t, 0.3, 'lowpass', 700, 0.14, B, 0.8);
+            tone('sine', 110, 55, 0.14, 0.18);
+          } else if (opt.slot === 'title') { // 紙: パサッ
+            this.noiseHit(t, 0.12, 'highpass', 3000, 0.09, B);
+            this.noiseHit(t + 0.05, 0.08, 'bandpass', 1800, 0.06, B);
+          } else { // 装飾品: 小さくチリン
+            for (const [k, v] of [[1, 0.05], [2.76, 0.025]]) tone('sine', 1900 * k, 0, 0.22, v);
+            this.noiseHit(t, 0.06, 'highpass', 5000, 0.04, B);
+          }
+          if (r === 1) tone('sine', mtof(84), 0, 0.25, 0.035, 0.04);
+          else if (r === 2) [0, 7].forEach((s, i) => tone('sine', mtof(81 + s), 0, 0.45, 0.06, 0.04 + i * 0.07).connect(this.revSend));
+          else if (r === 3) [0, 4, 7, 12].forEach((s, i) => tone('triangle', mtof(79 + s), 0, 0.6, 0.06, 0.04 + i * 0.06).connect(this.revSend));
+          if (r <= 3) break;
+        }
         if (r <= 1) tone('sine', 880, 1320, 0.12, 0.08);
         else if (r <= 3) { [0, 7, 12].forEach((s, i) => tone('sine', mtof(76 + s + r), 0, 0.4, 0.08, i * 0.05).connect(this.revSend)); }
         else {

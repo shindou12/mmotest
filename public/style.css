@@ -258,6 +258,16 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .dmg.heal { color: #6f6; }
 .dmg.info { color: #8fd8ff; font-size: 20px; }
 .dmg.just { color: #9ff; font-size: 28px; letter-spacing: .1em; }
+/* 落とし物の名札（PoE風）: 暗い札にレア度の色の文字。上のレア度ほど枠が太く、文字が大きい */
+.loot { position: absolute; pointer-events: auto; cursor: pointer; white-space: nowrap; user-select: none;
+  font: 600 12px/1 "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif; letter-spacing: .02em;
+  padding: 3px 7px 4px; background: rgba(0, 0, 0, .72); border: 1px solid transparent; color: #cfd3da; }
+.loot:hover { background: rgba(30, 34, 48, .92); outline: 1px solid rgba(255, 255, 255, .7); }
+.loot.r1 { color: #7cf084; border-color: rgba(98, 220, 106, .35); }
+.loot.r2 { color: #6cb8ff; border-color: rgba(74, 168, 255, .7); font-size: 13px; }
+.loot.r3 { color: #c99aff; border-color: #b86cff; font-size: 14px; }
+.loot.r4 { color: #ffb252; border: 2px solid #ffa236; font-size: 15px; background: rgba(20, 10, 0, .85); box-shadow: 0 0 10px rgba(255, 162, 54, .45); }
+.loot.r5 { color: #fff; border: 2px solid #fff; font-size: 16px; background: #c8203f; box-shadow: 0 0 14px rgba(255, 61, 99, .8); }
 .plate { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 11px; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 .plate .pb { width: 60px; height: 5px; background: rgba(0,0,0,.6); border-radius: 3px; margin: 2px auto 0; overflow: hidden; }
 .plate .pb > div { height: 100%; background: #e44; }

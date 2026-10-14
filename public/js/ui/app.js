@@ -968,6 +968,47 @@ export function createUI(game) {
       v.get('name').set({ text: `Lv${o.lv} ${o.name}` });
       v.get('hp').set({ style: { width: clamp(o.hp / o.mhp * 100, 0, 100) + '%' } });
     }
+    lootLabels();
+  };
+
+  // ---- 落とし物の名札（レア度で色分け。重なったら上へ積む。クリックで拾う） ----
+  const loot = new Map();
+  const lootLabels = () => {
+    const live = new Set();
+    const list = [];
+    for (const d of game.drops) {
+      if (!d.landed) continue;
+      live.add(d.id);
+      let v = loot.get(d.id);
+      if (!v) {
+        const el = document.createElement('div');
+        floatLayer.el.appendChild(el);
+        v = new View(el, 'loot' + d.id, floatLayer);
+        v.set({ cls: { loot: true, ['r' + d.it.rarity]: true }, text: d.it.name, attr: { title: `${RARITIES[d.it.rarity].name}（クリックで拾う）` } });
+        v.on('click', 'loot:pick', () => ({ id: d.id }));
+        v.size = { w: el.offsetWidth, h: el.offsetHeight };
+        loot.set(d.id, v);
+      }
+      const q = game.project(d.x, 0.3, d.z);
+      if (q.vis) list.push({ v, q });
+      else v.set({ style: { display: 'none' } });
+    }
+    for (const [id, v] of loot) if (!live.has(id)) { v.remove(); loot.delete(id); }
+    // 手前（画面の下）の札から置き、重なる札はその上へずらす
+    list.sort((a, b) => b.q.y - a.q.y);
+    const placed = [];
+    for (const { v, q } of list) {
+      const { w, h } = v.size;
+      const x = q.x - w / 2;
+      let y = q.y - h - 4;
+      for (let n = 0; n < 30; n++) {
+        const hit = placed.find((p) => x < p.x + p.w && x + w > p.x && y < p.y + p.h + 2 && y + h + 2 > p.y);
+        if (!hit) break;
+        y = hit.y - h - 2;
+      }
+      placed.push({ x, y, w, h });
+      v.set({ style: { display: '', left: x + 'px', top: y + 'px' } });
+    }
   };
 
   // ---- 通知 ----
@@ -1075,6 +1116,7 @@ export function createUI(game) {
         // スマホ操作中は、タッチから作られるマウスの代替イベントを無視する
         'pointer:down'(ev) { if (!this.is('login') && !tc.on) game.input.pointerDown(ev.payload.button); },
         'pointer:up'(ev) { if (!this.is('login') && !tc.on) game.input.pointerUp(ev.payload.button); },
+        'loot:pick'(ev) { if (this.is('play')) game.lootClick(ev.payload.id); },
         // ---- スマホ ----
         'device:touch'() { enableTouch(); },
         'stick:start'(ev) {

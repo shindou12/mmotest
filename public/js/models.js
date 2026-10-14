@@ -852,6 +852,37 @@ export function makeGoldBag() {
   return g;
 }
 
+// 地面に落ちている装備（寝かせた実物）。item: 落ちた物を回して飛ばす中身 / glow: 足元の淡い光（アンコモン以上）
+export function makeLootItem(it) {
+  const r = it.rarity, c = new THREE.Color(RARITIES[r].color);
+  const g = new THREE.Group(), item = new THREE.Group();
+  g.add(item);
+  if (it.slot === 'weapon') {
+    const w = makeWeapon(it.kind || 'sword', r, weaponStyle(it));
+    w.rotation.x = Math.PI / 2; w.scale.setScalar(0.8);
+    item.add(w);
+  } else if (it.slot === 'armor') {
+    const m = toon(it.armor === 'heavy' ? 0x9aa6b4 : it.armor === 'light' ? 0x6b4a32 : 0x4a5a7a);
+    item.add(mesh(new THREE.BoxGeometry(0.62, 0.16, 0.5), m, [0, 0.08, 0]));
+    item.add(mesh(new THREE.BoxGeometry(0.2, 0.12, 0.26), m, [0.38, 0.06, -0.1]));
+    item.add(mesh(new THREE.BoxGeometry(0.2, 0.12, 0.26), m, [-0.38, 0.06, -0.1]));
+  } else if (it.slot === 'title') {
+    item.add(mesh(cyl(0.07, 0.07, 0.6, 10), toon(0xf2e6c4), [0, 0.07, 0], [0, 0, Math.PI / 2]));
+    item.add(mesh(cyl(0.025, 0.025, 0.7, 6), toon(0x7a4a2a), [0, 0.07, 0], [0, 0, Math.PI / 2]));
+  } else {
+    item.add(mesh(new THREE.TorusGeometry(0.16, 0.04, 8, 18), toon(0xf2c14e), [0, 0.05, 0], [Math.PI / 2, 0, 0]));
+    item.add(mesh(new THREE.OctahedronGeometry(0.08), glow(c.clone().multiplyScalar(1.5)), [0, 0.1, 0.16]));
+  }
+  let halo = null;
+  if (r >= 1) {
+    halo = new THREE.Mesh(new THREE.CircleGeometry(0.6 + r * 0.08, 24), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.18 + r * 0.04, depthWrite: false }));
+    halo.rotation.x = -Math.PI / 2; halo.position.y = 0.03;
+    g.add(halo);
+  }
+  g.userData.item = item; g.userData.halo = halo;
+  return g;
+}
+
 export function makeLootOrb(rarity) {
   const c = new THREE.Color(RARITIES[rarity].color);
   const g = new THREE.Group();

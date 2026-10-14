@@ -19,7 +19,7 @@ import { AudioEngine } from './audio.js';
 import { FX, makeTelegraph } from './fx.js';
 import { buildArea, textSprite, AmbientParticles } from './env.js';
 import {
-  makePlayer, makeWeapon, setPlayerWeapon, setPlayerArmor, weaponStyle, armorLook, animatePlayer, makeMob, animateMob, makeLootOrb, makeCoin, makeGoldBag,
+  makePlayer, makeWeapon, setPlayerWeapon, setPlayerArmor, weaponStyle, armorLook, animatePlayer, makeMob, animateMob, makeLootItem, makeCoin, makeGoldBag,
 } from './models.js';
 import { Net } from './net.js';
 import { OCC } from './toon.js';
@@ -318,7 +318,7 @@ const input = {
     audio.init();
     if (!started) return;
     // 長押しで強攻撃の溜め（盾槍は溜めている間ガードを構える）
-    if (button === 0) { mouse.l = true; if (me.downT <= 0 && !me.crawl) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
+    if (button === 0) { mouse.l = true; me.lootGo = 0; if (me.downT <= 0 && !me.crawl) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
     if (button === 2) { mouse.r = true; tryWeaponSkill(); }
   },
   pointerUp(button) {
@@ -1845,20 +1845,34 @@ function chestOpen(C) { return Date.now() - (char.chests?.[C.id] || 0) < chestCd
 // ======================================================================
 // ドロップ
 // ======================================================================
+// 落ちた物は宙を舞って地面に落ち（flip）、着地すると名前の札が出る。札をクリックで拾う（遠ければ歩いて行く）
+const LOOT = { flip: 0.55, height: 2.4, toss: 1.6, pickR: 2.4, life: 150 };
+let dropSeq = 0;
 function spawnDrop(it, x, z) {
-  const model = makeLootOrb(it.rarity);
-  model.position.set(x, heightAt(x, z), z);
+  const model = makeLootItem(it);
+  const a = Math.random() * Math.PI * 2;
+  const ox = x - Math.sin(a) * LOOT.toss, oz = z - Math.cos(a) * LOOT.toss;
+  model.position.set(ox, heightAt(ox, oz) + 1, oz);
   scene.add(model);
+  drops.push({ id: ++dropSeq, it, x, z, ox, oz, model, beam: null, t: 0, landed: false, spin: rnd(-1, 1) });
   const r = it.rarity, col = RARITIES[r].color;
-  const beam = r >= 2 ? fx.beam(x, z, col, 6 + r * 4, 0.25 + r * 0.08) : null;
-  drops.push({ it, x, z, model, beam, t: 0 });
-  fx.parts.burst(x, 1, z, 10 + r * 15, { color: col, speed: 4 + r, size: 0.4, life: 0.8 });
-  audio.sfx('drop', { rarity: r });
   if (r >= 4) {
     const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : it.slot === 'title' ? '称号' : '装飾品';
     banner(r === 5 ? '★★★ 神器ドロップ ★★★' : '★ 伝説の' + what + ' ★', it.name, col, r);
-    fx.flash(x, 3, z, col, 120, 1.2, 40);
-    fx.ringWave(x, z, col, 10, 1.0);
+  }
+}
+// 着地: 物の音＋レア度の合図。エピック以上は光の柱
+function landDrop(d) {
+  d.landed = true;
+  const r = d.it.rarity, col = RARITIES[r].color;
+  d.model.position.set(d.x, heightAt(d.x, d.z), d.z);
+  d.model.userData.item.rotation.set(0, d.spin * Math.PI, 0);
+  if (Math.hypot(d.x - me.x, d.z - me.z) < 40) audio.sfx('drop', { rarity: r, slot: d.it.slot });
+  fx.parts.burst(d.x, 0.2, d.z, 6 + r * 4, { color: r >= 2 ? col : 0xd8c8a8, speed: 2 + r * 0.6, size: 0.35, life: 0.45, gravity: 2 });
+  if (r >= 3) d.beam = fx.beam(d.x, d.z, col, 6 + r * 4, 0.25 + r * 0.08);
+  if (r >= 4) {
+    fx.flash(d.x, 3, d.z, col, 120, 1.2, 40);
+    fx.ringWave(d.x, d.z, col, 10, 1.0);
     addShake(r === 5 ? 1 : 0.5);
   }
 }
@@ -1868,25 +1882,53 @@ function disposeDrop(d) {
   if (d.beam) fx.dispose(d.beam);
 }
 
+function pickupDrop(d) {
+  if (char.inv.length >= 60) { toast('インベントリがいっぱい！（Iで分解）', '#f88'); return false; }
+  char.inv.unshift(d.it);
+  saveChar();
+  audio.sfx('pickup');
+  const cmp = itemPower(d.it) > itemPower(char.eq[d.it.slot]) ? '  ▲' : '';
+  toast(`${RARITIES[d.it.rarity].name}「${d.it.name}」を入手${cmp}`, RARITIES[d.it.rarity].color, d.it.rarity >= 4);
+  disposeDrop(d);
+  drops.splice(drops.indexOf(d), 1);
+  if (me.lootGo === d.id) me.lootGo = 0;
+  ui.refresh();
+  return true;
+}
+// 札をクリック: 近ければ拾い、遠ければそこまで歩いてから拾う（移動キーで取りやめ）
+function lootClick(id) {
+  const d = drops.find((q) => q.id === id);
+  if (!d || !d.landed || me.dead || me.crawl) return;
+  if (Math.hypot(d.x - me.x, d.z - me.z) <= LOOT.pickR) pickupDrop(d);
+  else me.lootGo = d.id;
+}
+function lootWalk(dt) {
+  const d = drops.find((q) => q.id === me.lootGo);
+  if (!d) { me.lootGo = 0; return; }
+  const dx = d.x - me.x, dz = d.z - me.z, l = Math.hypot(dx, dz);
+  if (l <= LOOT.pickR * 0.8) { pickupDrop(d); return; }
+  const sp = 7.2 * (1 + (S.move + buffMod('move') + titleMove()) / 100);
+  moveMe(dx / l * sp * dt, dz / l * sp * dt);
+  me.a = Math.atan2(dx, dz); me.moving = true; me.walkT += dt;
+}
+
 function updateDrops(dt) {
   for (let i = drops.length - 1; i >= 0; i--) {
     const d = drops[i];
     d.t += dt;
-    d.model.userData.orb.rotation.y += dt * 2;
-    d.model.userData.orb.position.y = 0.8 + Math.sin(d.t * 3) * 0.15;
+    const item = d.model.userData.item;
+    if (!d.landed) {
+      // 宙を舞う: 放物線で飛びながら回る
+      const k = Math.min(1, d.t / LOOT.flip);
+      const x = d.ox + (d.x - d.ox) * k, z = d.oz + (d.z - d.oz) * k;
+      d.model.position.set(x, heightAt(x, z) + LOOT.height * 4 * k * (1 - k) + 0.6 * (1 - k), z);
+      item.rotation.set(d.t * 14, d.t * 9 * d.spin, d.t * 6);
+      if (k >= 1) landDrop(d);
+      continue;
+    }
     if (d.beam) d.beam.material.uniforms.uTime.value = d.t;
-    const dist = Math.hypot(d.x - me.x, d.z - me.z);
-    if (!me.dead && d.t > 0.5 && dist < 1.8) {
-      if (char.inv.length >= 60) { if (d.t % 3 < dt) toast('インベントリがいっぱい！（Iで分解）', '#f88'); continue; }
-      char.inv.unshift(d.it);
-      saveChar();
-      audio.sfx('pickup');
-      const cmp = itemPower(d.it) > itemPower(char.eq[d.it.slot]) ? '  ▲' : '';
-      toast(`${RARITIES[d.it.rarity].name}「${d.it.name}」を入手${cmp}`, RARITIES[d.it.rarity].color, d.it.rarity >= 4);
-      disposeDrop(d);
-      drops.splice(i, 1);
-      ui.refresh();
-    } else if (d.t > 150) { disposeDrop(d); drops.splice(i, 1); }
+    if (d.model.userData.halo) d.model.userData.halo.material.opacity = (0.16 + d.it.rarity * 0.04) * (0.75 + 0.25 * Math.sin(d.t * 3));
+    if (d.t > LOOT.life) { disposeDrop(d); drops.splice(i, 1); }
   }
 }
 
@@ -2381,7 +2423,10 @@ function update(dt) {
     } else if (me.staggerT > 0) {
       // ひるみ中は動けない
       if (Math.random() < 0.3) fx.parts.emit(me.x + rnd(-0.3, 0.3), 2.2, me.z + rnd(-0.3, 0.3), { color: 0xffffff, size: 0.25, life: 0.3, speed: 1, gravity: 0 });
+    } else if (me.lootGo && !l && canAct()) {
+      lootWalk(dt); // 札をクリックした落とし物へ歩いていく
     } else if (l > 0) {
+      me.lootGo = 0;
       const busy = me.swingT < me.swingDur || me.skillT >= 0;
       const slow = me.guarding ? 0.45 : busy ? 0.45 : me.charging && me.chargeT > CHARGE_MIN ? 0.4 : 1;
       const sp = 7.2 * (1 + (S.move + buffMod('move') + (desperate() ? 25 : 0) + titleMove()) / 100) * slow * analog * (hazardAt(me.x, me.z)?.kind === 'sand' ? 0.5 : 1);
@@ -2677,7 +2722,7 @@ const game = {
   },
   nearestInteract, chestOpen, itemPower, findItem,
   explored: exploredOf,
-  waypointOk, waypointWarp, setPin,
+  waypointOk, waypointWarp, setPin, lootClick,
   sfx: (n) => audio.sfx(n),
   loginInfo() { const c = loadChar(); return c && { name: c.name, color: c.color, lv: c.lv, kind: c.eq?.weapon?.kind || 'sword' }; },
   resetChar() {
