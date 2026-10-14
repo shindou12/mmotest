@@ -17,6 +17,8 @@ export const TREE_MOTIONS = Object.freeze({
   sw_aircut_fan: m('sw_aircut_fan', 'sword', 0.62, [0.18], 'fan3'),
   // 片手剣・霞返しA「霞斬り」: 長く跳んで、低い姿勢から斬り返す
   sw_side_long: m('sw_side_long', 'sword', 0.8, [0.36], 'sidelong'),
+  // 大剣・払い上げA「返し斬り」: 斬り上げたあと、そのまま振り下ろす
+  gt_rising_twin: m('gt_rising_twin', 'greatsword', 0.9, [0.25, 0.55], 'risingtwin'),
   // 大剣・光波: 振りかぶって前へ振り抜き、光波を飛ばす
   gt_wave: m('gt_wave', 'greatsword', 0.55, [0.12], 'lightwave'),
 });

@@ -40,6 +40,7 @@ function profile(style,i){
  case 'slant':case 'slantspin':
   if(style==='slantspin'&&i===3)return [{yaw:-1.2,pitch:.1,bodyYaw:-.6,guard:.3,lean:.05},{yaw:1.1,pitch:.1,bodyYaw:Math.PI*2-.4,z:.5,lean:.15,leg:.3}];
   return [{yaw:-sign*1.1,pitch:.2,bodyYaw:-sign*.35,lean:.1},{yaw:sign*1.0,pitch:.05,bodyYaw:sign*.4,z:.5,lean:.18,leg:.3}];
+ case 'risingtwin':return i===0?[{pitch:-.6,y:1.0,z:.4,lean:.16},{pitch:1.2,y:1.64,z:.28,lean:-.06,leg:.25}]:[{pitch:1.5,y:1.74,z:.16,lean:-.14,leg:.2},{pitch:-.45,y:1.12,z:.5,lean:.24,leg:.35}];
  case 'brave':return [{pitch:.4,y:1.3,z:.3,guard:.3},{pitch:1.55,y:1.78,z:.12,lean:-.12,guard:1}];
  case 'fan3':return [{yaw:-1.45,pitch:.15,bodyYaw:-.6,z:.25},{yaw:1.45,pitch:.15,bodyYaw:.65,z:.52,lean:.12,leg:.25}];
  case 'sidelong':return [{yaw:1.3,pitch:.15,lean:-.12,bodyYaw:.3,leg:.35},{yaw:-.95,pitch:.1,bodyYaw:-.55,z:.5,lean:.2,leg:.3}];

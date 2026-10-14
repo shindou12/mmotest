@@ -280,10 +280,11 @@ export const LIGHT_COLOR = 0xa8e4ff;
 Object.assign(WT_SKILLS, {
   gt_rising: {
     name: '払い上げ', kind: 'greatsword', cd: 10.8, motion: 'gs_rising', duration: T.gs_rising.duration,
+    motionOf: (W) => (W.br('gt_rising') === 'A' ? 'gt_rising_twin' : 'gs_rising'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('gt_rising') >= 2 ? 5.2 : 4.2, b = W.br('gt_rising');
       at(c, T.gs_rising.hits[0], () => slashAt(c, a, 3.7, 100, m, { stun: b === 'B' ? 36 : 18 }));
-      if (b === 'A') at(c, T.gs_rising.hits[0] + 0.3, () => { slashAt(c, a, 3.4, 80, 2.0, { stun: 5 }); c.shake(0.3); });
+      if (b === 'A') at(c, TREE_MOTIONS.gt_rising_twin.hits[1], () => { slashAt(c, a, 3.4, 80, 2.0, { stun: 5 }); c.shake(0.3); });
     },
   },
   gt_broad: {
