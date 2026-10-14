@@ -1,0 +1,7756 @@
+{
+ "sword:base": {
+  "hash": "dcb67bee97ef644643f5de9f",
+  "log": "753900f3ccbe5ec309cf5da3",
+  "state": "1f3c3770377546fce194951e",
+  "mobs": "04d60cbd6990f138bc5174b3",
+  "hits": [
+   [
+    16,
+    0,
+    0,
+    ""
+   ],
+   [
+    18,
+    0,
+    0,
+    ""
+   ],
+   [
+    16,
+    0,
+    0,
+    ""
+   ],
+   [
+    26,
+    0,
+    0,
+    ""
+   ],
+   [
+    26,
+    0,
+    0,
+    ""
+   ],
+   [
+    54,
+    0,
+    0,
+    ""
+   ],
+   [
+    54,
+    0,
+    0,
+    ""
+   ],
+   [
+    32,
+    0,
+    0,
+    ""
+   ],
+   [
+    16,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 109,
+   "hit": 9,
+   "absorb": 3
+  }
+ },
+ "sword:sw_mage": {
+  "hash": "717c0de59a8cd30952fafc27",
+  "log": "ec5d64ef55e4c733d1630851",
+  "state": "31a184d378d09a488b000934",
+  "mobs": "a69bd9e61a46889c828decf5",
+  "hits": [
+   [
+    61,
+    0,
+    0,
+    ""
+   ],
+   [
+    67,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ],
+   [
+    49,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 4
+  }
+ },
+ "sword:sw_glad": {
+  "hash": "a369bc2c219962e5fd6766f4",
+  "log": "ec805b1baaf24833025b385a",
+  "state": "b8df2957d3b6622584abddd2",
+  "mobs": "5a63a26e58fa979c05962e1d",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    77,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    112,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "sword:sw_guard": {
+  "hash": "3b7cf9d5e6e4c1de607cd7e9",
+  "log": "d76b42fa01df161e82a5bf78",
+  "state": "699c105a0b60837232ac4f01",
+  "mobs": "74db4e5d553453da4fcdd9bf",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "sword:sw_mage+sw_heaven": {
+  "hash": "971e15146fd99750d5a88933",
+  "log": "7fe7d3fb5208dd52dc426731",
+  "state": "3d8fa2f700c1f2006d84b674",
+  "mobs": "7c4260b830792c33d3603c72",
+  "hits": [
+   [
+    61,
+    0,
+    0,
+    ""
+   ],
+   [
+    67,
+    0,
+    0,
+    ""
+   ],
+   [
+    98,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 6,
+   "absorb": 3
+  }
+ },
+ "sword:sw_mage+sw_phantom": {
+  "hash": "1845f1b5635dca1897d2534b",
+  "log": "e474319dbafc0fb0c417fb09",
+  "state": "6b2420559ce5124579bdf995",
+  "mobs": "f3c371e34e970cb42a234ae1",
+  "hits": [
+   [
+    61,
+    0,
+    0,
+    ""
+   ],
+   [
+    67,
+    0,
+    0,
+    ""
+   ],
+   [
+    98,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    49,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 5,
+   "absorb": 1
+  }
+ },
+ "sword:sw_glad+sw_saint": {
+  "hash": "8cb54e01ad46c2090a78a7f5",
+  "log": "1690a41a219ecefd02affa75",
+  "state": "c26a0879ff71e96648806594",
+  "mobs": "fe39c20547e804fb46eb44c1",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    77,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    112,
+    0,
+    0,
+    ""
+   ],
+   [
+    245,
+    0,
+    0,
+    ""
+   ],
+   [
+    136,
+    0,
+    0,
+    ""
+   ],
+   [
+    70,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 7,
+   "absorb": 3
+  }
+ },
+ "sword:sw_glad+sw_berserk": {
+  "hash": "0655cef20b729c62e7b26841",
+  "log": "0e898817501d701d0a19260e",
+  "state": "46e12252544a1febc4079718",
+  "mobs": "97dcabaf9b4e9680fa034f49",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    77,
+    0,
+    0,
+    ""
+   ],
+   [
+    116,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "sword:sw_guard+sw_paladin": {
+  "hash": "44f94f3f65cca0daf97fc921",
+  "log": "9d13935e5b09b016e1a0020b",
+  "state": "959102deca96bb1eb546d364",
+  "mobs": "0fa5d91b45210e34929516cb",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    255,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 4,
+   "absorb": 2,
+   "threat": 1,
+   "taunt": 1
+  }
+ },
+ "sword:sw_guard+sw_avenger": {
+  "hash": "8ba69588c668b33dd8661fb7",
+  "log": "eedfce8604b99949a1f7282e",
+  "state": "0771dd6d35f2b0092b9cae3a",
+  "mobs": "72e10e8d5e5c5b73ee28ef8f",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ],
+   [
+    136,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 7,
+   "absorb": 3
+  }
+ },
+ "sword:sw_aircut:1": {
+  "hash": "e36b33405b57b55ad77c1f1a",
+  "log": "6364445810db05d5056769ae",
+  "state": "48f56e6e62dcfc72128ac270",
+  "mobs": "58dab392a1c594567800aaf0",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "sword:sw_aircut:A": {
+  "hash": "aeb2535125c13dd0defc2da9",
+  "log": "00ffac591b7fab8d30eb4bdf",
+  "state": "88eb91a0fc2f2535e35a64d7",
+  "mobs": "7db66a9177e2195dd6f96401",
+  "hits": [
+   [
+    172,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "sword:sw_aircut:B": {
+  "hash": "abd355f8c4e7f2a9de5b13bb",
+  "log": "76b2bef87b669c72da5ef36c",
+  "state": "c8ec17813021efe63fb66314",
+  "mobs": "b6914f6d3336b2d8035c41c2",
+  "hits": [
+   [
+    245,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 40,
+   "hit": 1,
+   "absorb": 3
+  }
+ },
+ "sword:sw_parry:1": {
+  "hash": "72a53cc3db5400dc2d5e511a",
+  "log": "f0f84dfab6ab493d43089e88",
+  "state": "30f378e8b39890e2068a02c1",
+  "mobs": "4c378876fbf2d4d4fe7f2497",
+  "hits": [
+   [
+    150,
+    0,
+    0,
+    ""
+   ],
+   [
+    150,
+    0,
+    0,
+    ""
+   ],
+   [
+    150,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "sword:sw_parry:A": {
+  "hash": "3b04bd47b60c463c0db8d678",
+  "log": "88d131a8aed3b3a8c8a08a56",
+  "state": "ebbd3a5b947f64350668830e",
+  "mobs": "4236cc70ab07e0218fa6495b",
+  "hits": [
+   [
+    204,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "absorb": 1,
+   "hit": 1
+  }
+ },
+ "sword:sw_parry:B": {
+  "hash": "011966fcbaa8d39d88738eb5",
+  "log": "6e191536928e4c2236b7425e",
+  "state": "962c5346e8f4d8797e6a07a9",
+  "mobs": "dab0a8b10977a8e3752748c3",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "sword:sw_slant:1": {
+  "hash": "329cbed336eaef8f395f644f",
+  "log": "47b0c224b9517654cf54f7f1",
+  "state": "df6aa6f1fbaadf9aee87914a",
+  "mobs": "3bb27d0db9e6eee215f20aed",
+  "hits": [
+   [
+    136,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 2
+  }
+ },
+ "sword:sw_slant:A": {
+  "hash": "87f7020fbfcc4d4c51bb59cd",
+  "log": "ad1363850db0b2e97b8f3e6a",
+  "state": "4d3f02e5779fedc87fb11ef8",
+  "mobs": "6b6a16d4c9c8d56f0c3275b5",
+  "hits": [
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "sword:sw_slant:B": {
+  "hash": "1c8bf76cd76996cd03d9b042",
+  "log": "ce7ca95e940c4b19e93e89d8",
+  "state": "4dc880e921c0c4660ba15b19",
+  "mobs": "2013da3f8c18803fe71ea684",
+  "hits": [
+   [
+    177,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "sword:sw_side:1": {
+  "hash": "5c7d05c88a1ba5113fd38b3c",
+  "log": "fb875be94bf65eb23908dbb9",
+  "state": "a11bb97f721e0b3e7b1e3fa7",
+  "mobs": "4de1d15100c9dcc4d7e34045",
+  "hits": [
+   [
+    232,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "sword:sw_side:A": {
+  "hash": "bfc66062a7f34d4ec0e4f682",
+  "log": "328306872bf3d7f6e98976a7",
+  "state": "fa6cc8827836f63fefd7656b",
+  "mobs": "dc5e0fe13791b4d7ae049ac0",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "sword:sw_side:B": {
+  "hash": "b202da5bf9744beb0cb5867f",
+  "log": "bbca4ee49304da0418291844",
+  "state": "e10b5988dde76f7ebe4ca7b1",
+  "mobs": "81e28c20b2142f513cbc4047",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "sword:sw_dance:1": {
+  "hash": "8dacdf8b98425ca840576d03",
+  "log": "206fc34925bf6a4b78263572",
+  "state": "5f0fdae489d8d2a1fe4ee533",
+  "mobs": "fcc040ba33662337c7e80615",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "sword:sw_dance:A": {
+  "hash": "9a4d994328de9fef77bddb8a",
+  "log": "55f46ef5f4ae2d6e3d364ede",
+  "state": "02fc64649591ea1aa48154a5",
+  "mobs": "c4b8c68861246c95c5230d73",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "sword:sw_dance:B": {
+  "hash": "9efefd327b994532e78a05f6",
+  "log": "8fa906d3331d54a158d72ba8",
+  "state": "076811afebca76940b178cf1",
+  "mobs": "621d24962dff118e31fcbb3c",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "sword:sw_brave:1": {
+  "hash": "82f93665fc02bb870d3309ef",
+  "log": "a0e16ac7cb90873a6414aff3",
+  "state": "3c4171debe6441bfb14c8fd9",
+  "mobs": "cd31182043ac451a5033d005",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "sword:sw_brave:A": {
+  "hash": "1e9fe36bdccf49111efc885b",
+  "log": "d649938e9897648c0a955165",
+  "state": "ea133aa15adae6d197afe0c3",
+  "mobs": "240407abe526e6d5dc52e0c5",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "sword:sw_brave:B": {
+  "hash": "97b5a5add58217cac62958e5",
+  "log": "c8272ac7e4a62f69fde8130b",
+  "state": "376ffe372c9723d5294e24ba",
+  "mobs": "1c0a77b4922aa017c2635c4a",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "sword:sw_norm:2": {
+  "hash": "4066dc65348367f63f1f82b4",
+  "log": "cf43310b86fda64fdca1c112",
+  "state": "a3104da26f4521a5cbb57af2",
+  "mobs": "a7eb016fd150bfee565e304c",
+  "hits": [
+   [
+    105,
+    0,
+    0,
+    ""
+   ],
+   [
+    115,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "sword:sw_norm:A": {
+  "hash": "9ea0ea9fcbfd60f977f4c6ca",
+  "log": "e76ce89cd3a273988df21c7f",
+  "state": "04a6f4eaef1f4c34787605b8",
+  "mobs": "961f65942a237c636d2cccf6",
+  "hits": [
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    90,
+    0,
+    0,
+    ""
+   ],
+   [
+    98,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "sword:sw_norm:B": {
+  "hash": "770c215342fc539c0f23ebfd",
+  "log": "876f7f8821d66f77becb1fd3",
+  "state": "10237987ec9106f2d3b16f42",
+  "mobs": "19c4e7e5a36621a48e87e414",
+  "hits": [
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "sword:sw_light:2": {
+  "hash": "de163790f49c89a3c96a735f",
+  "log": "6d408a6c22a3eebfe66595a0",
+  "state": "8dbd2c7d02ba2ac766217ceb",
+  "mobs": "356e86b070e80938da0e2ad6",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "sword:sw_light:A": {
+  "hash": "d8838e9d231f8599155c9ae4",
+  "log": "dd2c2ffe721404104ba5b590",
+  "state": "fe976df614a1651e326bdee4",
+  "mobs": "57efc1ec48703f9ce6404bc3",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "sword:sw_light:B": {
+  "hash": "0c1908496043fadeca415727",
+  "log": "921e6274c861462085c3e0aa",
+  "state": "dbd66c5a5fd9d6c1aa0b0e55",
+  "mobs": "f3f8cf765e61c0f49a9b71ef",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "sword:sw_cycle:2": {
+  "hash": "7156cf0102e3c7b596810fa9",
+  "log": "35e89ebde7370439548f26a5",
+  "state": "a5c67c686cadd1cf63a37540",
+  "mobs": "a4d95f67014b71a4ed86617a",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 5,
+   "absorb": 4
+  }
+ },
+ "sword:sw_cycle:A": {
+  "hash": "62340c0ddd6a614a51be35ec",
+  "log": "045e9ac34ba27e94bdf8dddb",
+  "state": "4a7ebd835207e9a81e9b7922",
+  "mobs": "5fa7e067f8f8985659f5ffff",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "sword:sw_cycle:B": {
+  "hash": "ff944eeccec0879f30dd5954",
+  "log": "5605b7c4e0274bd6ed6485f4",
+  "state": "83779709ca83584d10bc88a5",
+  "mobs": "6c2c76f089469b5858c4c8e2",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "sword:sw_edge:2": {
+  "hash": "57e1fe72bc5ee4cb6e3b526f",
+  "log": "f39fca40d70152a44242c6a4",
+  "state": "d058863c6939a79a03887d56",
+  "mobs": "e44e2b55f78fa687ed503334",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "sword:sw_edge:A": {
+  "hash": "4a886453ce4ddbe1fff6f804",
+  "log": "71c2606d3afc51adf2f40a91",
+  "state": "20c4b616ad01cbf3374ba9ba",
+  "mobs": "79588995f094cd26db21cce1",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "sword:sw_edge:B": {
+  "hash": "deb3c7c7470cf55936373b97",
+  "log": "b714e431a3f8288e651c0df8",
+  "state": "16ba45c511c4fcf32af0ff06",
+  "mobs": "0c25f28080e887453d1f2fa6",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "sword:sw_tough:2": {
+  "hash": "768db775f47a6921417b9347",
+  "log": "3e1c9f10a36b903cc1f20d2c",
+  "state": "514214a928d1ba4c656c20d1",
+  "mobs": "2c7e27d2afb215cf71e4df69",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "sword:sw_tough:A": {
+  "hash": "aabcd690786eecf115317ed8",
+  "log": "94bfde49d8ae75d54af6a91e",
+  "state": "e4656d091c7ae825ead99484",
+  "mobs": "f3d019ef304454124b77fa05",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    232,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 7,
+   "absorb": 3
+  }
+ },
+ "sword:sw_tough:B": {
+  "hash": "6ad9b20a2fbcc474a2097457",
+  "log": "874a5aa00d36858d37673eda",
+  "state": "0a651b00f280f0e9555bed89",
+  "mobs": "8b4620ad1b2cd0d44cccdf15",
+  "hits": [
+   [
+    78,
+    0,
+    0,
+    ""
+   ],
+   [
+    86,
+    0,
+    0,
+    ""
+   ],
+   [
+    125,
+    0,
+    0,
+    ""
+   ],
+   [
+    266,
+    0,
+    0,
+    ""
+   ],
+   [
+    78,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 5,
+   "absorb": 4
+  }
+ },
+ "sword:errors": [],
+ "greatsword:base": {
+  "hash": "daba4567c269b189074e019a",
+  "log": "389a73046c95b3b32c82b560",
+  "state": "b1a7b8f3a0ecc23cfcd5e274",
+  "mobs": "75a418261e582a314901ad2c",
+  "hits": [
+   [
+    26,
+    0,
+    0,
+    ""
+   ],
+   [
+    28,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    14,
+    0,
+    0,
+    ""
+   ],
+   [
+    14,
+    0,
+    0,
+    ""
+   ],
+   [
+    14,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 109,
+   "hit": 8,
+   "absorb": 3
+  }
+ },
+ "greatsword:gt_wave": {
+  "hash": "230ad727661e628649b25a6e",
+  "log": "c45688f4064f03bcf31fe583",
+  "state": "3bd8d8f993741d8371a10fa3",
+  "mobs": "449371baa319d7d9acccdf4e",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    136,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2
+  }
+ },
+ "greatsword:gt_blow": {
+  "hash": "92675aa28d59b85c86c06276",
+  "log": "be0be86851c516ccfa89ca81",
+  "state": "5b0e3f57888bd004123f621f",
+  "mobs": "3283acbf84e8b39f5858c7ab",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_counter": {
+  "hash": "92bddc5f0e9caa19512e9702",
+  "log": "c24510cbc4e11d1a9da7c49e",
+  "state": "b3f8a27ccdd70a961d66dbbb",
+  "mobs": "cb3a7cd230a5e269d5c4b164",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_wave+gt_fullmoon": {
+  "hash": "adfe3eb7bdc0b2256a34db36",
+  "log": "d30d811d640b2258314af282",
+  "state": "8e8826b74a2fa0b0b10e12f7",
+  "mobs": "d45e3434da59e5ddfc022514",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_wave+gt_eclipse": {
+  "hash": "18881bcc1499bb3feacf2909",
+  "log": "ef025a40f05f0137b50246e8",
+  "state": "00e1909d7294574da7c951d7",
+  "mobs": "7900a6e8c2fa2b77bec42728",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_blow+gt_judge": {
+  "hash": "5326da8ca781647296c38110",
+  "log": "9e05f252a5717fd8d9f95bee",
+  "state": "3e6a8e25a93b3bfe61485bd3",
+  "mobs": "3fd89d78895ebc8bb2b91026",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ],
+   [
+    439,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_blow+gt_unyield": {
+  "hash": "820b4ff49067b3866851a9ce",
+  "log": "994c6c1be40fafb53bce6bc4",
+  "state": "cf7d729930bf7f7128232b4a",
+  "mobs": "7c34df5bf4c0e8b8621077cd",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2
+  }
+ },
+ "greatsword:gt_counter+gt_iai": {
+  "hash": "27cebb90c483c2e9f2c03e9f",
+  "log": "00008dd8e37e821f67d76223",
+  "state": "1e3b722be8fd39eb0476cabf",
+  "mobs": "1f216ddce9e8647a6cb960e4",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_counter+gt_mirror": {
+  "hash": "e0071b49f952a3a91f8f8af5",
+  "log": "79f870395586e6076e7e3b32",
+  "state": "4173d11cd8b7fda51fc62c46",
+  "mobs": "a6ceb8064e58177c7c97d9d3",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_rising:1": {
+  "hash": "8d86f9c738255a1c74451dee",
+  "log": "4d087533ba87d1b29ad04ac5",
+  "state": "0c2acbaa0513e052f8f116c3",
+  "mobs": "89eefe59c0f0b3f04f4c0beb",
+  "hits": [
+   [
+    286,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_rising:A": {
+  "hash": "5954a7421a9e1de6b1653255",
+  "log": "65ce491a0e39ddbe661fbb5e",
+  "state": "e88446ddc61ca2b8c0d2b712",
+  "mobs": "d246a119cf938fab394b54de",
+  "hits": [
+   [
+    354,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_rising:B": {
+  "hash": "b2dcdc93378304c226e953ed",
+  "log": "b6a090a26fdbec20f63c1fbb",
+  "state": "45b38a5f6ad25b8adde955ce",
+  "mobs": "a904bd38e744da051ec747c3",
+  "hits": [
+   [
+    354,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_broad:1": {
+  "hash": "06e2459471ef692af80c4018",
+  "log": "450d1b0a94adde7c0702793b",
+  "state": "2c9d078b5fca228cfe2baea7",
+  "mobs": "5e25bee2167e71976c87d68c",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_broad:A": {
+  "hash": "ace6695ba69810b43ebc1866",
+  "log": "2f843f9ef89f85bd5eaceb1e",
+  "state": "313326a5c7239908b70011e9",
+  "mobs": "cc92fd5c46fddd091429179d",
+  "hits": [
+   [
+    361,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "absorb": 1,
+   "hit": 1
+  }
+ },
+ "greatsword:gt_broad:B": {
+  "hash": "a87ea33d23f41c4bdc9cb1a8",
+  "log": "430d3f9089db83d4bf4b338e",
+  "state": "49660521de81cdccee8a7264",
+  "mobs": "3b91bfb8c2c88e1d0a15c3e3",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_recoil:1": {
+  "hash": "e6786601d27d891d11bd5877",
+  "log": "eafa8e07ebc44592ff4cf63a",
+  "state": "3948e7602be44b9db4dc1f26",
+  "mobs": "a214086c3e417dbcd4b337d7",
+  "hits": [
+   [
+    341,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "greatsword:gt_recoil:A": {
+  "hash": "7ce6718102e291c9168bc2d1",
+  "log": "aba59409ea1fdd780958a357",
+  "state": "098cb9d32271749d11a5330f",
+  "mobs": "afa7b446039df495e8cca7a1",
+  "hits": [
+   [
+    305,
+    0,
+    0,
+    ""
+   ],
+   [
+    305,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_recoil:B": {
+  "hash": "5c61cbbd9d9f90a785739b7a",
+  "log": "19aefb6328d0853274a7a1a9",
+  "state": "ce835c515a18337a8326e2a2",
+  "mobs": "87c428a03c2ec0460e95b4a7",
+  "hits": [
+   [
+    501,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "greatsword:gt_guillo:1": {
+  "hash": "53546ef627c30dcbef51fc28",
+  "log": "ce4ea6d3fafd8e1cbfb09ce7",
+  "state": "358096573638a4266f23ee08",
+  "mobs": "0c75625ae248af3b42d8bdf3",
+  "hits": [
+   [
+    443,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_guillo:A": {
+  "hash": "4751bff6f0b3fce37c73265c",
+  "log": "18516613f1f49d8c7515d84b",
+  "state": "10ae1101271bc62861be29d9",
+  "mobs": "a919357e177edbf0c6f9a926",
+  "hits": [
+   [
+    545,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_guillo:B": {
+  "hash": "17e7c5bb0a8d72c36b59dec9",
+  "log": "5ecd7d681072fa0259a3f5e9",
+  "state": "c616bed45c7b6e61f69ae2eb",
+  "mobs": "83693995b1fd7617fb87b549",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_slam:1": {
+  "hash": "df7d934646325cf2b0e1d444",
+  "log": "8bbca3c72d5e87b5507abf11",
+  "state": "cc6a5c93d3bb9efeeae09905",
+  "mobs": "fc005ec0f3ad13c5b32ca9fc",
+  "hits": [
+   [
+    354,
+    0,
+    0,
+    ""
+   ],
+   [
+    354,
+    0,
+    0,
+    ""
+   ],
+   [
+    354,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_slam:A": {
+  "hash": "e0ec6e3423944c2eacec5a90",
+  "log": "5cef3104bdccce21420e3330",
+  "state": "9388529aacfc76e523a73753",
+  "mobs": "f96a7f036c085ad9dc47bc1a",
+  "hits": [
+   [
+    443,
+    0,
+    0,
+    ""
+   ],
+   [
+    443,
+    0,
+    0,
+    ""
+   ],
+   [
+    443,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 3
+  }
+ },
+ "greatsword:gt_slam:B": {
+  "hash": "abf7f39edc29338c6cb8eb5f",
+  "log": "78097543851629ff927b2911",
+  "state": "4e0c10d36f980457dd68641b",
+  "mobs": "23c627b85ce033dfe0a242fc",
+  "hits": [
+   [
+    443,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_siege:1": {
+  "hash": "1ac16941f0a9b6db64245064",
+  "log": "a17b84e173bc63e5b248079d",
+  "state": "8345cab73a1807d62acde081",
+  "mobs": "297f3d240269af3c484921f8",
+  "hits": [],
+  "types": {
+   "st": 40,
+   "absorb": 3
+  }
+ },
+ "greatsword:gt_siege:A": {
+  "hash": "aa77ead5d299929897fbb4eb",
+  "log": "0a22a1db62f8cb41e0aac2dd",
+  "state": "6d2f47f1a5e386612b7a0d0c",
+  "mobs": "3119cfedb87a15804cf8ff20",
+  "hits": [],
+  "types": {
+   "st": 40,
+   "absorb": 5
+  }
+ },
+ "greatsword:gt_siege:B": {
+  "hash": "03478ebaa74af55eb4956bc9",
+  "log": "f4a69a276964ce4d5822e365",
+  "state": "a547d1d4fb0b19cdd6a11914",
+  "mobs": "6595e543dcb920dede8d95f0",
+  "hits": [],
+  "types": {
+   "st": 40,
+   "absorb": 3
+  }
+ },
+ "greatsword:gt_charge:2": {
+  "hash": "9539f1a6205b8ee587635a04",
+  "log": "4aeadaba8718443600ca120e",
+  "state": "e3c13f29dd669d9e7755cecc",
+  "mobs": "42eaf9b663645231befb2e5b",
+  "hits": [
+   [
+    347,
+    0,
+    0,
+    ""
+   ],
+   [
+    347,
+    0,
+    0,
+    ""
+   ],
+   [
+    347,
+    0,
+    0,
+    ""
+   ],
+   [
+    533,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "absorb": 2,
+   "st": 104,
+   "hit": 4
+  }
+ },
+ "greatsword:gt_charge:A": {
+  "hash": "469c78b339848efd06559f51",
+  "log": "898e82eda1589b629cafc524",
+  "state": "e9ae445fbdb6052eb97c1034",
+  "mobs": "b28b0e9ff8bd12663dbb1fd9",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ],
+   [
+    392,
+    0,
+    0,
+    ""
+   ],
+   [
+    392,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_charge:B": {
+  "hash": "357cc77c0e04a26f97979022",
+  "log": "447ed5f0aa752c50e4285554",
+  "state": "e28d1e3507f3d83ec21ad504",
+  "mobs": "1d2a43ec48956830a0b9dc21",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_armor:2": {
+  "hash": "360ed52d12205e40eb858196",
+  "log": "84a7fd9f5c9ef4279f490e22",
+  "state": "e34cf827ae5fe5dc84695651",
+  "mobs": "0c53079bbabd0373b1ffb01a",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_armor:A": {
+  "hash": "fff278e059fc16d578e232be",
+  "log": "4dab32cbd2d0f331774f2c88",
+  "state": "a89af86ad1b3d5f7ff0350c9",
+  "mobs": "6d7f6741798ce56940e3ac53",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_armor:B": {
+  "hash": "a51edceee02da4bbae38d220",
+  "log": "a47a3ffcb306446ac7001eb6",
+  "state": "39b1c6a9b84402bfdb16a19c",
+  "mobs": "4541779f3bde9fcc5a11c9aa",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_moon:2": {
+  "hash": "38410f973bf51e915126929e",
+  "log": "822e39a889d73d8e19d942e2",
+  "state": "95242f5d96a5048b9b6b1c11",
+  "mobs": "d896f9339646f1aa89ae61ea",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "greatsword:gt_moon:A": {
+  "hash": "f30c446af80d517111d0e381",
+  "log": "fe6cda89e707b79b1315697c",
+  "state": "7e1960bb63c072e9faa620fd",
+  "mobs": "f1adeeba165be688b330aed9",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_moon:B": {
+  "hash": "590f10501dce249f64ea595c",
+  "log": "e5c7cd0cb781ea4541904e17",
+  "state": "da02d776006ddadff1ff63c4",
+  "mobs": "9c5fcf706600118be65933de",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_break:2": {
+  "hash": "b42ee359ef6ee7823381f2d0",
+  "log": "1593d4070d4c5fc6023793c3",
+  "state": "f9ec853835246f64066069c3",
+  "mobs": "71ba48c83df75f0edd14bcbc",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 10,
+   "absorb": 5
+  }
+ },
+ "greatsword:gt_break:A": {
+  "hash": "0c161d9e17483bec16c20b3a",
+  "log": "5b454ab807fb0d8aa699e8f8",
+  "state": "15db4b25849f5b6bd780c0d1",
+  "mobs": "11bf0e0d2345db1e780cfec2",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_break:B": {
+  "hash": "2f49f19409aecbfecc28b428",
+  "log": "caa5a2695d7bbf055e2d9fc6",
+  "state": "b1ecbd85783a80c0d2aaa2f9",
+  "mobs": "6969239ab8bad990c8e8e5f5",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    174,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_eye:2": {
+  "hash": "89e68da8bb6dca5d1c96232a",
+  "log": "b3df03c60c1ffa1c33bda5c5",
+  "state": "4aa9a2f8164de40172191d41",
+  "mobs": "4c44e4fbed7a552e4925ae71",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_eye:A": {
+  "hash": "464da00964bdae56721cb871",
+  "log": "a4fc372516affdb557268bbd",
+  "state": "698762dedc4a9acbffe94219",
+  "mobs": "b8c56e807bef83ee250544b3",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "greatsword:gt_eye:B": {
+  "hash": "d92b95a3489a3cf95d2a13ad",
+  "log": "21193dfa6d908c39a3cee1d9",
+  "state": "22c239ff5e898a63f580d92a",
+  "mobs": "b69d0449568c6f7cd9c78cda",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    313,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "greatsword:errors": [],
+ "dagger:base": {
+  "hash": "687cdda835d0b09a8cc0facf",
+  "log": "11835689f9a49ab103a3e63b",
+  "state": "fc4b374ddddabeded0ac5fb7",
+  "mobs": "db8501569952443f08394a2b",
+  "hits": [
+   [
+    11,
+    0,
+    0,
+    ""
+   ],
+   [
+    12,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 110,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_venom": {
+  "hash": "41a7de43aa76b59dd665f3d9",
+  "log": "0af531aea362c95f6a45bc41",
+  "state": "3178af914e398b4eae1f55bc",
+  "mobs": "bf8db52e06ff2a65be51362f",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    5,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    10,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 3
+  }
+ },
+ "dagger:dk_assassin": {
+  "hash": "ae440afb7e70b994c10e3e0f",
+  "log": "30f6dcbaf91d5e4de8984346",
+  "state": "21dbe696e4f508919f1ce274",
+  "mobs": "c30fa610c9ff04cda51eca38",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    343,
+    1,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_blades": {
+  "hash": "eafb31b41b3f5b408f27ed45",
+  "log": "68254332f8013cf35f8408bc",
+  "state": "d7a932fff53418778c7cce09",
+  "mobs": "11fbec6ba859765698620d3c",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_venom+dk_burst": {
+  "hash": "cef2ca5ea2346ed5cb97fb1a",
+  "log": "831b49100ed288e2e4c2b3c3",
+  "state": "34ce04646f18f245a157ae7a",
+  "mobs": "60eed81947d45779be911189",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    5,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    10,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    5,
+    0,
+    0,
+    ""
+   ],
+   [
+    5,
+    0,
+    0,
+    ""
+   ],
+   [
+    5,
+    0,
+    0,
+    ""
+   ],
+   [
+    5,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 10,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_venom+dk_spread": {
+  "hash": "e807e999d85e98beaa00db96",
+  "log": "728f116994a12be5aaa31647",
+  "state": "d5bb854e68d277d5beb93790",
+  "mobs": "3c33ed48776f0637cc96c6ba",
+  "hits": [
+   [
+    48,
+    0,
+    0,
+    ""
+   ],
+   [
+    10,
+    0,
+    0,
+    ""
+   ],
+   [
+    55,
+    0,
+    0,
+    ""
+   ],
+   [
+    15,
+    0,
+    0,
+    ""
+   ],
+   [
+    83,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_assassin+dk_step": {
+  "hash": "f893d514d7f9ea12aee04682",
+  "log": "d353338712845270e5f67ecd",
+  "state": "8f0235c6c68d0fff2a82520d",
+  "mobs": "1da2e5e0e2846e19a0f3eec8",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_assassin+dk_exec": {
+  "hash": "8be7400375abcf046d0a5f45",
+  "log": "cb3bde368e2de89499ff7c76",
+  "state": "7c4e864fa25a96306d0ca2a4",
+  "mobs": "c2d1fa0d267229360e32f8f1",
+  "hits": [
+   [
+    69,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    343,
+    1,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_blades+dk_thousand": {
+  "hash": "d9e8509b86c6656e4a562241",
+  "log": "bc7fd345a6588bd96510308e",
+  "state": "7315d16bba2143800732be51",
+  "mobs": "fdc4d3de586c9f6f94835f7e",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_blades+dk_gale": {
+  "hash": "d2ee011f86c0e2df0b60ebd7",
+  "log": "39e2feba70777c8a33dffc32",
+  "state": "82b583869a284994f4d35742",
+  "mobs": "46ebf9a8beb466b5752b63bd",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 3
+  }
+ },
+ "dagger:dk_flank:1": {
+  "hash": "80a315101e1e8fedb7d6e5e3",
+  "log": "14e1f426e52058beb3b8b830",
+  "state": "a201efd6c89193e6ced669a6",
+  "mobs": "8376807a5edc78d35912fa74",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_flank:A": {
+  "hash": "8fb23274cae61a87ffb2bf5f",
+  "log": "db16d7e19a37a1184012d5d8",
+  "state": "2cd443dd2079b2a3363c4245",
+  "mobs": "6f38020f8924bf18691d1309",
+  "hits": [
+   [
+    102,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_flank:B": {
+  "hash": "2977d21520a9543b716c5770",
+  "log": "e64214184391795ac227a85d",
+  "state": "3ae4faa7064e09e3a3d7ffa0",
+  "mobs": "968f71d2dcfb4b32b52f05e6",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_vital:1": {
+  "hash": "41fd5132e8050ff69fc42fa5",
+  "log": "25f8b25943b864efee77b855",
+  "state": "6213e9cc5a139eab5879aa53",
+  "mobs": "536147bde9672047b8b5c467",
+  "hits": [
+   [
+    368,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "dagger:dk_vital:A": {
+  "hash": "d02f5f134f7bb056f91eec5b",
+  "log": "9b6404ba5042b1da5887a610",
+  "state": "ec6cad6c1079578053782210",
+  "mobs": "0d78233fe8b1cca1534d0e19",
+  "hits": [
+   [
+    245,
+    0,
+    0,
+    ""
+   ],
+   [
+    245,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 2,
+   "absorb": 3
+  }
+ },
+ "dagger:dk_vital:B": {
+  "hash": "397e0144d9c9571b69e8e2ec",
+  "log": "e5fdef727901cbfd48e7f3cd",
+  "state": "5593a0fcdbe42e11c381e4b1",
+  "mobs": "4b9c6626af101b137b9b9a87",
+  "hits": [
+   [
+    245,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "dagger:dk_bleed:1": {
+  "hash": "1fd983b9e94293c042346607",
+  "log": "84b6796d1b0cc5c19a83981c",
+  "state": "d41cf8fed97ea87d99133a3f",
+  "mobs": "12e0f0c465530f6c15fd9214",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_bleed:A": {
+  "hash": "9a863cfa6bbe85fecc6992ee",
+  "log": "25627e890a9497c80dd28f5d",
+  "state": "932fc999c34717f73602b186",
+  "mobs": "0b5f466a08c95381a3d61d6c",
+  "hits": [
+   [
+    129,
+    0,
+    0,
+    ""
+   ],
+   [
+    20,
+    0,
+    0,
+    ""
+   ],
+   [
+    129,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 3,
+   "absorb": 3
+  }
+ },
+ "dagger:dk_bleed:B": {
+  "hash": "a43db890aa06bb6dfd76c6b4",
+  "log": "71e04239d22ebb99bde32e0a",
+  "state": "33bae812dafb47d50a923ce6",
+  "mobs": "23b63145a5b90dc65c36ee00",
+  "hits": [
+   [
+    129,
+    0,
+    0,
+    ""
+   ],
+   [
+    20,
+    0,
+    0,
+    ""
+   ],
+   [
+    129,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 3
+  }
+ },
+ "dagger:dk_poison:1": {
+  "hash": "0bd2938e8e4bbba629eb3a8b",
+  "log": "41a64a4c6a0a09ef640aeb7d",
+  "state": "0aab21405b8816e074b12546",
+  "mobs": "485ab668bf5d906a75ffd7fe",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_poison:A": {
+  "hash": "78d84ef47d416d7af5d8455c",
+  "log": "de42aaca28c26cae08bba7c5",
+  "state": "e95f6faac547c6327ca11677",
+  "mobs": "1447771e2c72882e6d47db7f",
+  "hits": [],
+  "types": {
+   "absorb": 2,
+   "st": 41
+  }
+ },
+ "dagger:dk_poison:B": {
+  "hash": "f2b9b2a6ef9fab48845743fd",
+  "log": "f305dce5bad5dd08105d7e6f",
+  "state": "7b6e08f0a4804e1872dd8a21",
+  "mobs": "e2e9b65aa8a017f96e272b17",
+  "hits": [
+   [
+    15,
+    0,
+    0,
+    ""
+   ],
+   [
+    15,
+    0,
+    0,
+    ""
+   ],
+   [
+    15,
+    0,
+    0,
+    ""
+   ],
+   [
+    15,
+    0,
+    0,
+    ""
+   ],
+   [
+    15,
+    0,
+    0,
+    ""
+   ],
+   [
+    15,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "hit": 6,
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_smoke:1": {
+  "hash": "78c2a7c5df83bdb093091884",
+  "log": "2cabf90d36b8dc83bbd36930",
+  "state": "876e2e615d9de9de18445a29",
+  "mobs": "3eb7254e6c2961615da97ac9",
+  "hits": [
+   [
+    15,
+    0,
+    0,
+    ""
+   ],
+   [
+    15,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 2
+  }
+ },
+ "dagger:dk_smoke:A": {
+  "hash": "fa90674e6675dd95d3ca4866",
+  "log": "09ab973e6ded0f29ade57f32",
+  "state": "e8291671bab414e0bfd1d6fa",
+  "mobs": "cce35848e3be8f96018bdcc3",
+  "hits": [],
+  "types": {
+   "st": 42
+  }
+ },
+ "dagger:dk_smoke:B": {
+  "hash": "e9c88f0b2a298cf35170495b",
+  "log": "4e6cf1629c88546cb7d31ef6",
+  "state": "0e67c544e501cf50a2aa5e5e",
+  "mobs": "a789d809bbbe442b29fec81f",
+  "hits": [],
+  "types": {
+   "st": 42
+  }
+ },
+ "dagger:dk_pin:1": {
+  "hash": "054a31ec923d52bc66c49978",
+  "log": "682731b747a723dd2c12e9f0",
+  "state": "7e399c48bd54f4658e71b639",
+  "mobs": "74e184058dadeed6d45cfeed",
+  "hits": [],
+  "types": {
+   "absorb": 2,
+   "st": 41
+  }
+ },
+ "dagger:dk_pin:A": {
+  "hash": "ccf6d9fad52ad67087b5b680",
+  "log": "71712628da7611af691e4478",
+  "state": "cde57afa1088d64be8bef233",
+  "mobs": "55b1282d27bedb1fa4abf6b6",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_pin:B": {
+  "hash": "f472a3ffac7e90ab8c339686",
+  "log": "ef5ec517f1af4184600f230f",
+  "state": "d64db96febb09a3d2ea9f37f",
+  "mobs": "a10dd6a181f0573ee2094445",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_combo:2": {
+  "hash": "33f63a97b1936c5dac64f9cd",
+  "log": "72812534db8dcaf51879b4de",
+  "state": "067792fcac855bd93485740c",
+  "mobs": "43751b39d6f3f6c5fe7ab356",
+  "hits": [
+   [
+    69,
+    1,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_combo:A": {
+  "hash": "5118aa1f212c0907907be6f3",
+  "log": "1026ab5f104428b2962088f7",
+  "state": "4dbc4b2d40d8a637695465d1",
+  "mobs": "73fa5d5be266aec68bfa50e9",
+  "hits": [
+   [
+    69,
+    1,
+    0,
+    ""
+   ],
+   [
+    76,
+    1,
+    0,
+    ""
+   ],
+   [
+    286,
+    1,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_combo:B": {
+  "hash": "7a71ecb5ef7687b1d62cd076",
+  "log": "3a3c38038c640bb49f47c13a",
+  "state": "2b754f6fe4d67fffdf839e4d",
+  "mobs": "43d3a9d1cdf6924bdc7ee22c",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ],
+   [
+    46,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_agile:2": {
+  "hash": "e7942b5fc795c23ec8364a72",
+  "log": "f09c17ccc40007bb070954cf",
+  "state": "797ac02996f1f4c98bd0f5f1",
+  "mobs": "10282b6ecdabb09e4d9d4acd",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_agile:A": {
+  "hash": "464f091d48caa79eaae4caf6",
+  "log": "2e410b9012bf29a15d5979fb",
+  "state": "53f7c804ac7743587d57998c",
+  "mobs": "fdaba8897397f02e1cc2a593",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_agile:B": {
+  "hash": "44aa970d735cef101d700ac4",
+  "log": "ebcd82dbfdca7f00b472bb9f",
+  "state": "79e5f77662fe5207524609a5",
+  "mobs": "a7604056e983b1c276f5475b",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_vitalp:2": {
+  "hash": "95fa427cac5a511e98630665",
+  "log": "5cc9c31781104eeff6a8f18b",
+  "state": "38885f63638e2ec6664900ce",
+  "mobs": "fa3a2f955af5f75dfee18f6e",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_vitalp:A": {
+  "hash": "5150a95fc0610a3677c0aacc",
+  "log": "677d1da2a29db39a403d2c85",
+  "state": "ac0cce99808ffb663097aa0c",
+  "mobs": "d88c68d7b18596345319c0da",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ],
+   [
+    46,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 6,
+   "absorb": 4
+  }
+ },
+ "dagger:dk_vitalp:B": {
+  "hash": "0686dd25a92e6b43661eb755",
+  "log": "c9e1c96cd12feec266fdd484",
+  "state": "15c14fafc125139ff0085ef0",
+  "mobs": "52b050bc6c03a4e7a3070b87",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 6,
+   "absorb": 3
+  }
+ },
+ "dagger:dk_toxin:2": {
+  "hash": "29a1e1b30a5a6b3143c649db",
+  "log": "ad5b2038410f4a14b3a2db48",
+  "state": "48c1427dd64a055c16569877",
+  "mobs": "7939431450771e031947e81b",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_toxin:A": {
+  "hash": "0eedb3e5c1e243757e41807e",
+  "log": "b9c70a813f814942f35b94dc",
+  "state": "e661266f307ed19d48a22ceb",
+  "mobs": "d61006ba6b978b6217bef69c",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "dagger:dk_toxin:B": {
+  "hash": "4df44b0ac7e4b37d28ead9a2",
+  "log": "3db9f17f61bfdfcefd848c1a",
+  "state": "0842a3c5ac838e692ef1b074",
+  "mobs": "6d31ef18f61580cdf441416f",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    46,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_shadow:2": {
+  "hash": "fd7bbd571b5bd7ad0bdf21df",
+  "log": "e28ce5518df377313761c24d",
+  "state": "1c9b6d8f8a12d24c7d130ace",
+  "mobs": "0a46a6a02e9e8e1a22ee3334",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "dagger:dk_shadow:A": {
+  "hash": "2613ee11349e6c5c8a001856",
+  "log": "af817fe54993c4c696bf88bd",
+  "state": "9da3f32ce0454c34d6bb1bfb",
+  "mobs": "ae4dba2c2f5cbb0170316af5",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3
+  }
+ },
+ "dagger:dk_shadow:B": {
+  "hash": "f5cfb8c0874b102573a974ed",
+  "log": "ecec9e66c42dc8422651e941",
+  "state": "ba7e658fb40b980b4b6b75cc",
+  "mobs": "a75d2d78b4dbce749b6f6af8",
+  "hits": [
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    74,
+    0,
+    0,
+    ""
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 1
+  }
+ },
+ "dagger:errors": [],
+ "spear:base": {
+  "hash": "16d40311d0063db6a5fb611d",
+  "log": "092931fc2b62538d6b27b53b",
+  "state": "c99a6d8ec4ce44368d3f59ef",
+  "mobs": "b0a8128352f94d85dcc14c31",
+  "hits": [
+   [
+    18,
+    0,
+    0,
+    ""
+   ],
+   [
+    19,
+    0,
+    0,
+    ""
+   ],
+   [
+    28,
+    0,
+    0,
+    ""
+   ],
+   [
+    61,
+    0,
+    0,
+    ""
+   ],
+   [
+    61,
+    0,
+    0,
+    ""
+   ],
+   [
+    48,
+    0,
+    0,
+    ""
+   ],
+   [
+    48,
+    0,
+    0,
+    ""
+   ],
+   [
+    18,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 109,
+   "hit": 8,
+   "absorb": 3
+  }
+ },
+ "spear:sp_dragoon": {
+  "hash": "231d904cdb915f0dbca74b51",
+  "log": "690066cda2562e6835b45d7f",
+  "state": "2071df817152e5d8b0cef3df",
+  "mobs": "46687a57e51061ff944b6956",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 106,
+   "hit": 1
+  }
+ },
+ "spear:sp_reach": {
+  "hash": "62b377fc85e7397bca462b36",
+  "log": "1d7e2cfa2d849efa411710e7",
+  "state": "608c48756235f9cbe74e9d12",
+  "mobs": "c374eee659dfe7b29266f323",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2
+  }
+ },
+ "spear:sp_knight": {
+  "hash": "94552f0701512103160a6d35",
+  "log": "33cf206cf1c4810788c413bd",
+  "state": "33403226ddbbe7c9128aa027",
+  "mobs": "d9b114b3e16f46d65529189c",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    204,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "spear:sp_dragoon+sp_fang": {
+  "hash": "ca2137fd2472e05d4a78c1bd",
+  "log": "069f8501a6f6978e24ad3d23",
+  "state": "7968c2fc6cb58b6269d4f5f9",
+  "mobs": "1ba6e534c37e53c3d3824502",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    511,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 106,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "spear:sp_dragoon+sp_soar": {
+  "hash": "d2219b46ff4eee262a8f6e37",
+  "log": "a985ca90c4d1300bf27ebb06",
+  "state": "90894a2bd21432eda4419f07",
+  "mobs": "7da0df58bbe8dc49907e32e0",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    511,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 106,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "spear:sp_reach+sp_pierce": {
+  "hash": "8cf2f886186fc30546c92dae",
+  "log": "74615154b970c81d1d898e0e",
+  "state": "91275cb9ade15e7e93ef12b5",
+  "mobs": "ba06556697f088dc4d8ee7c6",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "spear:sp_reach+sp_hold": {
+  "hash": "952920b07c2557d650139cc7",
+  "log": "ea892f1517debbcfea1656c9",
+  "state": "9e762bf576f1308bce40bf41",
+  "mobs": "d15e111f18c38b5aea3defaf",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    207,
+    0,
+    0,
+    ""
+   ],
+   [
+    383,
+    1,
+    0,
+    "spear_press"
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "spear:sp_knight+sp_banner": {
+  "hash": "9875ef15277f21a7332ace67",
+  "log": "850df7fefea70103a14dafa7",
+  "state": "afe8e1b51043f8c9a0075e48",
+  "mobs": "0ecaa38c6761d4ab21082423",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3
+  }
+ },
+ "spear:sp_knight+sp_bolt": {
+  "hash": "2dc88e421090cd02607f4600",
+  "log": "904ea0c83981e552d4c01543",
+  "state": "7c5e0bb878ad6a24c3801bfe",
+  "mobs": "8d6790a96bae671d2bdca3db",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    204,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "spear:sp_fan:1": {
+  "hash": "04316a81d7c2e6aec0fc8fa8",
+  "log": "7c39b6b058c551fabe02b631",
+  "state": "24f63a668c53dbb7d053fc5d",
+  "mobs": "4b6bc116fc0659394215eb74",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "spear:sp_fan:A": {
+  "hash": "2c62deee926baade3b3e8247",
+  "log": "bae69005e32ab4c00f899ab3",
+  "state": "bc6ee722cb8d14e438ae886f",
+  "mobs": "681f3f75d84f3c5b6b6cb2fc",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    112,
+    0,
+    0,
+    ""
+   ],
+   [
+    112,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "spear:sp_fan:B": {
+  "hash": "fef3c5b66b1270035208c7ca",
+  "log": "2c10dae23bee4e62da3f0d61",
+  "state": "7712e027593bd67e48edac0c",
+  "mobs": "2092cd3edef77e367ce14202",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "spear:sp_sweep:1": {
+  "hash": "18fa468a0cddc8528ddbcd04",
+  "log": "947ee9416cd15871a49c979c",
+  "state": "d5174008579f1e6b4892e7a7",
+  "mobs": "54ca4f4b7b6be586a332b288",
+  "hits": [
+   [
+    163,
+    0,
+    0,
+    "spear_sweep"
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "spear:sp_sweep:A": {
+  "hash": "1900fc6d2f0776fb4a507267",
+  "log": "84a0223770ae01306f9e0c17",
+  "state": "cfdf3fb3fe97d76124490669",
+  "mobs": "144f735d42fa2b4fc813651d",
+  "hits": [
+   [
+    204,
+    0,
+    0,
+    "spear_sweep"
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "spear:sp_sweep:B": {
+  "hash": "183e3a2b832fba70fb84117b",
+  "log": "de26402f71d7f4efb9469917",
+  "state": "8a19e718ba8b2b54934c493a",
+  "mobs": "b9c20333e9a2b20ce383314d",
+  "hits": [
+   [
+    204,
+    0,
+    0,
+    "spear_sweep"
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "spear:sp_bash:1": {
+  "hash": "a138ff0bca5c2a8811dd9317",
+  "log": "5efc2e065552ba50ae81e445",
+  "state": "457dd244368b2a3aa0bdf6d1",
+  "mobs": "a8fccfad1526a2890579b4ab",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "spear:sp_bash:A": {
+  "hash": "2504193273cd68cb60a245e1",
+  "log": "fd0c4d28984071bafedd0e5d",
+  "state": "a0fdbbcf3cd04cf2d5686d2d",
+  "mobs": "62997bafc2032d3b261fdb1f",
+  "hits": [
+   [
+    238,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "threat": 1,
+   "absorb": 1
+  }
+ },
+ "spear:sp_bash:B": {
+  "hash": "5d40c8906cc518a293e337c4",
+  "log": "9f3f2742294d3de3bc10089d",
+  "state": "cd03ab06a436603a318df0e3",
+  "mobs": "7551b228605828688b29f432",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "spear:sp_stake:1": {
+  "hash": "a9166a91c7fb2c522af174ed",
+  "log": "ce5b3efa64dbab57dca452e7",
+  "state": "cf46d337cd596f41009ae990",
+  "mobs": "f7ed98c1dba99f5c18065d9e",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "spear:sp_stake:A": {
+  "hash": "11c093e7f5109cf666793169",
+  "log": "58062f793228f6fae1008905",
+  "state": "c61d23373dba0e78d3cde022",
+  "mobs": "2cf35e08854ce900decbcfa4",
+  "hits": [
+   [
+    327,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "threat": 1,
+   "absorb": 1
+  }
+ },
+ "spear:sp_stake:B": {
+  "hash": "ed7c501c68c331d2ce866092",
+  "log": "0ee97750ee0454a63c216e62",
+  "state": "4c0ae648f0f6d81a0c9b3de1",
+  "mobs": "b5f332603e89c0e310ffbed6",
+  "hits": [
+   [
+    196,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "threat": 1,
+   "absorb": 1
+  }
+ },
+ "spear:sp_intercept:1": {
+  "hash": "56af6d994b696b38c83ab248",
+  "log": "c8be40a7aeae9a9fbf3e6dea",
+  "state": "675dc7367c9ac08f20290f8f",
+  "mobs": "6df70849e53ca847e25babae",
+  "hits": [
+   [
+    102,
+    0,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "taunt": 1,
+   "st": 41,
+   "hit": 2,
+   "threat": 2,
+   "absorb": 1
+  }
+ },
+ "spear:sp_intercept:A": {
+  "hash": "a62c01b12ff0241e2d1ae80c",
+  "log": "1dfbb450199a0bf1129f7f4a",
+  "state": "ee5d683320301c86f5d89dc4",
+  "mobs": "38a4790faf916a5a8ed95875",
+  "hits": [
+   [
+    129,
+    0,
+    0,
+    ""
+   ],
+   [
+    129,
+    0,
+    0,
+    ""
+   ],
+   [
+    129,
+    0,
+    0,
+    ""
+   ],
+   [
+    129,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "taunt": 1,
+   "st": 42,
+   "hit": 4,
+   "threat": 4,
+   "absorb": 1
+  }
+ },
+ "spear:sp_intercept:B": {
+  "hash": "36da77bdd747c2be53454765",
+  "log": "8b872a8d3b93485682e4ccec",
+  "state": "b06c2af26e02ac99dcc05e0e",
+  "mobs": "97cc1949840eae36dda0378d",
+  "hits": [],
+  "types": {
+   "taunt": 1,
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "spear:sp_taunt:1": {
+  "hash": "731f6313010c3e21e0364894",
+  "log": "11121218e68080477dd826eb",
+  "state": "ccbf7c04673ff562d8280355",
+  "mobs": "6702bc05c48973dfa8a9d460",
+  "hits": [],
+  "types": {
+   "taunt": 1,
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "spear:sp_taunt:A": {
+  "hash": "c21061ca31c82269460725bb",
+  "log": "9c0c40a6c07ee695e9ef3d1e",
+  "state": "94f568af4059b2aeb10a8219",
+  "mobs": "961bba5146df9a6e660f25a9",
+  "hits": [],
+  "types": {
+   "taunt": 1,
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "spear:sp_taunt:B": {
+  "hash": "8f683c65642d7c36d05d9de3",
+  "log": "b935d51c9b9af3690536b917",
+  "state": "83c17f391d07465a070deed0",
+  "mobs": "4a5644d2923c3dc820eb551a",
+  "hits": [],
+  "types": {
+   "taunt": 1,
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "spear:sp_iron:2": {
+  "hash": "1fac870f19e36b75f55a6dc5",
+  "log": "1f1e55c56e4d7660145b4d8a",
+  "state": "5207828197903a328655941e",
+  "mobs": "30fcc629d85e39ee4b938dfe",
+  "hits": [
+   [
+    90,
+    0,
+    0,
+    ""
+   ],
+   [
+    99,
+    0,
+    0,
+    ""
+   ],
+   [
+    144,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "spear:sp_iron:A": {
+  "hash": "8b99b923ebdf47dc49e4ba31",
+  "log": "aef6756d30ae630a1f1cb7b1",
+  "state": "30230fbd73fe924df5a27521",
+  "mobs": "2269e0218603021530a7222d",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    204,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "spear:sp_iron:B": {
+  "hash": "b745d6349e5e5a0cc955db05",
+  "log": "8ec876ea1d0e97b0a51c6498",
+  "state": "c1be057d9925d0060e025f6f",
+  "mobs": "1dd58132aaeafc1b974d946c",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    204,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 3
+  }
+ },
+ "spear:sp_shield:2": {
+  "hash": "11915682cdadcdd85ca5aedf",
+  "log": "1bfa3044099fd784ce962dcc",
+  "state": "4c2656b96ce4224ae7a98d38",
+  "mobs": "9aec2216d843ff54d22c79a6",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ],
+   [
+    204,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "spear:sp_shield:A": {
+  "hash": "906429fca74f5f238609aee2",
+  "log": "f993cf0a387f9a398b0c2509",
+  "state": "912b3699ddac2d74fe13acfd",
+  "mobs": "af8d1d4a432da027ffd30637",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2
+  }
+ },
+ "spear:sp_shield:B": {
+  "hash": "817fbb275d48b80fa7fa4334",
+  "log": "042dfbe4b75a17672ba73176",
+  "state": "06f34106cf3279a02a6aa549",
+  "mobs": "fac74b039c95e408cef34890",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ],
+   [
+    204,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "spear:sp_spear:2": {
+  "hash": "f9e01d5a93601fd5531b9b8c",
+  "log": "a666ea3f466b0ab8e6c44cfe",
+  "state": "fa2b4e181636a9896c2ccf61",
+  "mobs": "9d8caf3a785b03371ea07aab",
+  "hits": [
+   [
+    88,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "spear:sp_spear:A": {
+  "hash": "16083247b67d2718c79b643c",
+  "log": "310e5c2a8e64812057dde34b",
+  "state": "ba84bfbf308fbe465b97d4a2",
+  "mobs": "3b99263077a4b463441e9031",
+  "hits": [
+   [
+    88,
+    0,
+    0,
+    ""
+   ],
+   [
+    88,
+    0,
+    0,
+    ""
+   ],
+   [
+    97,
+    0,
+    0,
+    ""
+   ],
+   [
+    97,
+    0,
+    0,
+    ""
+   ],
+   [
+    204,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 1
+  }
+ },
+ "spear:sp_spear:B": {
+  "hash": "125b68ff3b4a8b51eb10a275",
+  "log": "687ac11d63229684a9936511",
+  "state": "527c16194f5c04bcb30a9748",
+  "mobs": "693b968878d1672a999eaca3",
+  "hits": [
+   [
+    88,
+    0,
+    0,
+    ""
+   ],
+   [
+    88,
+    0,
+    0,
+    ""
+   ],
+   [
+    97,
+    0,
+    0,
+    ""
+   ],
+   [
+    97,
+    0,
+    0,
+    ""
+   ],
+   [
+    141,
+    0,
+    0,
+    ""
+   ],
+   [
+    603,
+    0,
+    0,
+    ""
+   ],
+   [
+    603,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 7,
+   "absorb": 5,
+   "threat": 2
+  }
+ },
+ "spear:sp_brk:2": {
+  "hash": "7a6f0aa4fba3781d5b815193",
+  "log": "6d63fa9e9557f634feffff3b",
+  "state": "cd20fcfa042e15e346c8ca03",
+  "mobs": "12c88ef5506e062a20a0937a",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "spear:sp_brk:A": {
+  "hash": "dcbc0ec6ce092c97d2533616",
+  "log": "c78bfa929bcb116654ba43a9",
+  "state": "202638079b93ed7aa02795c2",
+  "mobs": "9e0e799010dffcb4c0a83310",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 5,
+   "absorb": 3
+  }
+ },
+ "spear:sp_brk:B": {
+  "hash": "2b09f7f7837382a3c90f9262",
+  "log": "cfdd803070e078f788b854b6",
+  "state": "a08e43a7ac5d171baf707b7b",
+  "mobs": "7ac4bc78ca880e7497ff68df",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    120,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 9,
+   "absorb": 3
+  }
+ },
+ "spear:sp_ctr:2": {
+  "hash": "db45b8928b7bf61b060065c9",
+  "log": "630424fd9c8b9e976942a213",
+  "state": "b963d91a7774c124f6a2ace0",
+  "mobs": "a93d6dfd14380a76dd5e84f7",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "spear:sp_ctr:A": {
+  "hash": "6f439fb4a1b90dc59f9830b0",
+  "log": "a5b3da844a36f9038e1c70a2",
+  "state": "e73fb9a819fae27fa0bc5c62",
+  "mobs": "1af9a5363763fd8691a4d9a0",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    259,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "spear:sp_ctr:B": {
+  "hash": "e55e1a07f014c0ec8e5816ee",
+  "log": "eaa4507251a9a238261e335a",
+  "state": "270b344c3f798ec9f5be3b66",
+  "mobs": "b7a5aa2f3a67c4353f0c8e38",
+  "hits": [
+   [
+    75,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    690,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 106,
+   "hit": 3,
+   "absorb": 2,
+   "threat": 1
+  }
+ },
+ "spear:errors": [],
+ "axe:base": {
+  "hash": "0b34175e6b331a894fe7fdcc",
+  "log": "1116101e65137b0f0a426037",
+  "state": "e4b80c699c59caad8ae9da0f",
+  "mobs": "0b425344de49e922fa84c2d2",
+  "hits": [
+   [
+    29,
+    0,
+    0,
+    ""
+   ],
+   [
+    32,
+    0,
+    0,
+    ""
+   ],
+   [
+    46,
+    0,
+    0,
+    ""
+   ],
+   [
+    80,
+    0,
+    0,
+    ""
+   ],
+   [
+    80,
+    0,
+    0,
+    ""
+   ],
+   [
+    24,
+    0,
+    0,
+    ""
+   ],
+   [
+    24,
+    0,
+    0,
+    ""
+   ],
+   [
+    24,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 109,
+   "hit": 8,
+   "absorb": 3
+  }
+ },
+ "axe:ax_berserk": {
+  "hash": "6d7b5163fa905eeaed7bb505",
+  "log": "28900cda5003e5b607f7e969",
+  "state": "cafe042eee16cba79f67bcc8",
+  "mobs": "c19b86a0be79e1b1ae27d469",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 1
+  }
+ },
+ "axe:ax_crush": {
+  "hash": "ade64b1336b8431119fde3d7",
+  "log": "95a1e23b3ed395aac78ca6e8",
+  "state": "9968c1407a9c9dd16d41cd93",
+  "mobs": "6b1bb87fb37380ea62cae971",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    341,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "axe:ax_throw": {
+  "hash": "4ef220e09f7151cb0a522492",
+  "log": "9f1c8589cc5fdce1c0502fdf",
+  "state": "483ef81cd8cd03cbc07158a8",
+  "mobs": "225d2ea82e2e8b655d478c94",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 1
+  }
+ },
+ "axe:ax_berserk+ax_undying": {
+  "hash": "ca8f98e541f774de49d1124d",
+  "log": "1ba2cd79a035faa87207ee42",
+  "state": "6d6e99b857cb927446694298",
+  "mobs": "aa86427ae9c741fa9aa992d6",
+  "hits": [
+   [
+    145,
+    0,
+    0,
+    ""
+   ],
+   [
+    159,
+    0,
+    0,
+    ""
+   ],
+   [
+    402,
+    0,
+    0,
+    ""
+   ],
+   [
+    145,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "axe:ax_berserk+ax_reckless": {
+  "hash": "ede89aabab86c3461c3dbade",
+  "log": "96de222145a411dc2dd67b23",
+  "state": "69e87dea8528c8b807f812c1",
+  "mobs": "4bca61eed84b3a6f8e8f38fa",
+  "hits": [
+   [
+    156,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "axe:ax_crush+ax_quake": {
+  "hash": "c2ff8c5395b2690466703c8a",
+  "log": "7fd4456fbe873d14954fb640",
+  "state": "5ad1e876ba62f28e46600b45",
+  "mobs": "dea15e448148244869c3f9be",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "axe:ax_crush+ax_shatter": {
+  "hash": "1278a54b1e075d2edc7d79ab",
+  "log": "2dad2900e4819072056a171e",
+  "state": "9654fb1554d8d6a248819c0a",
+  "mobs": "c88cd62d99a378e1bdd42fe1",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    341,
+    0,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "axe:ax_throw+ax_storm": {
+  "hash": "ea6efe3eb4c4705f0f37a466",
+  "log": "b81014cca9ed2ca8be364340",
+  "state": "f7e30fcab92158f745bebb19",
+  "mobs": "85c4f45ff3d87a6e84b4f255",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "axe:ax_throw+ax_catch": {
+  "hash": "b9779b4ebe64213ea76c0c49",
+  "log": "bdff298c7d0fa4bdb0a7ae1e",
+  "state": "ca3d659e8620ca9d49307b42",
+  "mobs": "e49fc77c2dfece54686ea2c7",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 1
+  }
+ },
+ "axe:ax_hook:1": {
+  "hash": "fea118ecdf7e66482e79a37b",
+  "log": "cb9872a08bac8f17dddb6c28",
+  "state": "7dd5c364ae76437fdc1efecd",
+  "mobs": "82a8ec1179d4d0b192a9dd8a",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    "axe_hook"
+   ],
+   [
+    191,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_hook:A": {
+  "hash": "9b913aa9f6f579a0e9b43c0e",
+  "log": "9e4d543933aae42d792eb5d4",
+  "state": "1f2456037ea7d3c8d7eee4d2",
+  "mobs": "d0e8e1bde774be506cdb3760",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    "axe_hook"
+   ],
+   [
+    245,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_hook:B": {
+  "hash": "40c66acf69ac5aae73003e2a",
+  "log": "4d86597438e2525dfcbbd880",
+  "state": "28e926780344afe20c8e3de0",
+  "mobs": "d1a654ea2ba70c366b8ee946",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "axe:ax_return:1": {
+  "hash": "fd6cbf814d054dfc132fb50b",
+  "log": "3e094a8af6b2da669f02ed30",
+  "state": "0c3a7495f72702dad49a5010",
+  "mobs": "96099797630db0733e9bc747",
+  "hits": [
+   [
+    102,
+    0,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_return:A": {
+  "hash": "0324ff75ccb0b5146d4c0b20",
+  "log": "16f42109525433ded368719c",
+  "state": "0e5b5e98db949e8a3e6330d2",
+  "mobs": "99a8ba91f37471096927eed1",
+  "hits": [],
+  "types": {
+   "st": 42,
+   "absorb": 1
+  }
+ },
+ "axe:ax_return:B": {
+  "hash": "1d12594b0712d4986c5bd752",
+  "log": "43cd3ae83eac13f4c2e05429",
+  "state": "186a47f54c803e824064279f",
+  "mobs": "e3d7052b9be308e15f2cc9da",
+  "hits": [
+   [
+    129,
+    0,
+    0,
+    ""
+   ],
+   [
+    129,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_stomp:1": {
+  "hash": "8de8d21031deaa5e247ba157",
+  "log": "cf9e93d75566a2a9cadd2a9e",
+  "state": "74b484e7682d7cff868106f5",
+  "mobs": "754d0cb66e004f05505d8b7e",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "axe:ax_stomp:A": {
+  "hash": "cdea0e547de7398cb4d7de60",
+  "log": "2fb23f9b3138f6b10839bf99",
+  "state": "1bbc7050aa88055ce89245d2",
+  "mobs": "f7480e1cde030c062a9b30a3",
+  "hits": [
+   [
+    157,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 2
+  }
+ },
+ "axe:ax_stomp:B": {
+  "hash": "7b45195687514f7097c04052",
+  "log": "3d5ff4ed55e761eee57db77d",
+  "state": "9ca1d68aab97fe7d992348fd",
+  "mobs": "c07d658a35d60107609e7c31",
+  "hits": [
+   [
+    157,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "axe:ax_exec:1": {
+  "hash": "d159f234cdfb8eecb5646c4e",
+  "log": "509fe5bba01dd701af7ae29f",
+  "state": "904ec8d138fd48be8c8e623e",
+  "mobs": "f4be5924e52965ab04d88914",
+  "hits": [
+   [
+    463,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "axe:ax_exec:A": {
+  "hash": "378ac5429501fbc8e9e540a7",
+  "log": "33eddbf19800e46d428f9956",
+  "state": "cdd62207c72c6061c57dc18d",
+  "mobs": "906b5db05f469e39bc8bad14",
+  "hits": [
+   [
+    286,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "axe:ax_exec:B": {
+  "hash": "afb171c64ea7dd3f6f769567",
+  "log": "4eaef8ca3f5e3408b84c7732",
+  "state": "c6bb3ba90503e99520d5c2c9",
+  "mobs": "215c6b6ae97b259f795a1fa3",
+  "hits": [
+   [
+    200,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "axe:ax_lust:1": {
+  "hash": "df771aadbce65dc21c333186",
+  "log": "68b26de8db8225f73179919a",
+  "state": "3c9e4927e10bc481d4b7b0ef",
+  "mobs": "e6f5f1b7cc0c878a0e41eb4b",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "axe:ax_lust:A": {
+  "hash": "a331e6122345347f76988c99",
+  "log": "e18e2ac601f4ab44925e9a47",
+  "state": "8b302eb68f6ff4a80e891692",
+  "mobs": "321027f74abe4948cee77ccd",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 3
+  }
+ },
+ "axe:ax_lust:B": {
+  "hash": "08536f6c848a2003190cc19c",
+  "log": "d17ae303a0d45d3a905e6c7b",
+  "state": "2cc78a21ef20abcc30553efb",
+  "mobs": "e458c08523e3ad349ab64db0",
+  "hits": [],
+  "types": {
+   "st": 40,
+   "absorb": 4
+  }
+ },
+ "axe:ax_rush:1": {
+  "hash": "2f9fa54f808b19651947d1b1",
+  "log": "2404d924adbfd12c6d962348",
+  "state": "cff8f2e5d6cea8b8f1265ee4",
+  "mobs": "52a105ea61ea891fe725d741",
+  "hits": [
+   [
+    262,
+    0,
+    0,
+    "axe_rush"
+   ]
+  ],
+  "types": {
+   "absorb": 2,
+   "st": 41,
+   "hit": 1
+  }
+ },
+ "axe:ax_rush:A": {
+  "hash": "a9b07f4723021c33805476e9",
+  "log": "a16232bcf26b2ecb42013f1c",
+  "state": "a7f89de0f31baad8d089018d",
+  "mobs": "89e6d476de00ac698a5618ef",
+  "hits": [],
+  "types": {
+   "st": 42
+  }
+ },
+ "axe:ax_rush:B": {
+  "hash": "db959f95a4ee04346224df5c",
+  "log": "36937a38bf82f22d3d461518",
+  "state": "dc78e78da29340f0649a7e55",
+  "mobs": "0bf910c8e356054fd9104407",
+  "hits": [
+   [
+    163,
+    0,
+    0,
+    ""
+   ],
+   [
+    163,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "absorb": 1,
+   "hit": 2
+  }
+ },
+ "axe:ax_heavy:2": {
+  "hash": "79b6bcd7c69a45f268346c0f",
+  "log": "5e3d83b654952da94fcedda5",
+  "state": "3ac37e451205db917d0b6767",
+  "mobs": "878e03c9ff84f3bab82a6f36",
+  "hits": [
+   [
+    147,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    426,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "axe:ax_heavy:A": {
+  "hash": "d9486ddbcc226e8449152815",
+  "log": "fc6ee5827ac8fd720fe46971",
+  "state": "1939ee971b8302ba47df7e2b",
+  "mobs": "4d41d50d9f8dbf78570baf29",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_heavy:B": {
+  "hash": "3dc31a497986cda92a7b18b4",
+  "log": "93a00c9ef353f1008e8ed715",
+  "state": "4aafc7b8a9f2d9af55e67401",
+  "mobs": "64183a32fd6d3c5c14459a45",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_blood:2": {
+  "hash": "5e0e69077bfc1c38497bacaf",
+  "log": "1d733e0a23970144ae4686b3",
+  "state": "79cd61576f995aa3054b6a9f",
+  "mobs": "ad3e4fbdb2d6530bdb48a9c5",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "axe:ax_blood:A": {
+  "hash": "08508fc92fe3b34ff68edb3a",
+  "log": "a7048ea02adedcae906caa5a",
+  "state": "0313df2d103cdb80765f8eb0",
+  "mobs": "7775fe13b62fb61258f17eb9",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    341,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "axe:ax_blood:B": {
+  "hash": "9128359489ee67f6e5e21ebe",
+  "log": "39ba9dbaa0ff0214c914ea50",
+  "state": "cb858e36eb41797bd37c973a",
+  "mobs": "b2403ab0956088cbfee5bbd5",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 3,
+   "absorb": 4
+  }
+ },
+ "axe:ax_swing:2": {
+  "hash": "1ba28cae87440d0ab1c24611",
+  "log": "5c61c60cb82201ca94a5e52d",
+  "state": "cce50b2effb335d6d2f70129",
+  "mobs": "a63de14fd6a7fc9508124bad",
+  "hits": [
+   [
+    145,
+    0,
+    0,
+    ""
+   ],
+   [
+    145,
+    0,
+    0,
+    ""
+   ],
+   [
+    159,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "axe:ax_swing:A": {
+  "hash": "2900aac2a2aedfc7e3b2b9e5",
+  "log": "d53fbf9bcb50c8ca886be72a",
+  "state": "a0fe61c05426c5c05ecce98b",
+  "mobs": "13850d35021aebf46bfe915e",
+  "hits": [
+   [
+    145,
+    0,
+    0,
+    ""
+   ],
+   [
+    159,
+    0,
+    0,
+    ""
+   ],
+   [
+    145,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "axe:ax_swing:B": {
+  "hash": "7a027a8637a7484cf2b8dbe9",
+  "log": "1d07d49b09593e9fbfb48ecc",
+  "state": "12d765144dd261ade34e6d56",
+  "mobs": "9f8ced129fa011690cab59de",
+  "hits": [
+   [
+    145,
+    0,
+    0,
+    ""
+   ],
+   [
+    145,
+    0,
+    0,
+    ""
+   ],
+   [
+    159,
+    0,
+    0,
+    ""
+   ],
+   [
+    341,
+    0,
+    0,
+    ""
+   ],
+   [
+    145,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 1
+  }
+ },
+ "axe:ax_brk:2": {
+  "hash": "17c1d95222ada7d30f23a9e9",
+  "log": "c2e7a215bbfd1b8caf7c7dcd",
+  "state": "401ad6c90e9e07a465412241",
+  "mobs": "0506ac93a10cb69408149761",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_brk:A": {
+  "hash": "2e61f0270acca6d8c1fdae0f",
+  "log": "42fe6d03f3056f8176eae9ef",
+  "state": "ecee32f71cd97f30c03f9cda",
+  "mobs": "20a1ea173ab1a466785b14cd",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 1
+  }
+ },
+ "axe:ax_brk:B": {
+  "hash": "51e70e98196b09612e750377",
+  "log": "35d36d551f75a70f5f116e16",
+  "state": "55ba60898f28738be3177de4",
+  "mobs": "7a2e77a2e84ca54173c68e34",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    341,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "axe:ax_rage:2": {
+  "hash": "fc1a10a1f48f991fbcab99ca",
+  "log": "e292274db7e8fa497455c1cd",
+  "state": "b31247e107bca60ebe793ac9",
+  "mobs": "29a8f94630e9a07d9a97d1b4",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    ""
+   ],
+   [
+    135,
+    0,
+    0,
+    ""
+   ],
+   [
+    364,
+    0,
+    0,
+    ""
+   ],
+   [
+    364,
+    0,
+    0,
+    ""
+   ],
+   [
+    364,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 5,
+   "absorb": 4
+  }
+ },
+ "axe:ax_rage:A": {
+  "hash": "8eda284c49909903006c44d2",
+  "log": "91ef51e6b5367110db4cf212",
+  "state": "0c13bc1b0242edcbafc36f23",
+  "mobs": "c046729cfb67fc9b04eb5667",
+  "hits": [
+   [
+    131,
+    0,
+    0,
+    ""
+   ],
+   [
+    144,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "axe:ax_rage:B": {
+  "hash": "611f656c398f12ce598971e9",
+  "log": "f801f60db9ce380fcaabcea0",
+  "state": "3d333c247a84260f5caefaf6",
+  "mobs": "08a8bf2065874471ba44681d",
+  "hits": [
+   [
+    131,
+    0,
+    0,
+    ""
+   ],
+   [
+    131,
+    0,
+    0,
+    ""
+   ],
+   [
+    144,
+    0,
+    0,
+    ""
+   ],
+   [
+    144,
+    0,
+    0,
+    ""
+   ],
+   [
+    131,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 5,
+   "absorb": 4
+  }
+ },
+ "axe:errors": [],
+ "bow:base": {
+  "hash": "d6b0bb410532d87c4d06495f",
+  "log": "6960eba480482c93c4bfa6b1",
+  "state": "d2807e92c801efa3a76f406b",
+  "mobs": "c2dd0b6b6c4a295ba6d05ff8",
+  "hits": [
+   [
+    10,
+    0,
+    0,
+    ""
+   ],
+   [
+    11,
+    0,
+    0,
+    ""
+   ],
+   [
+    10,
+    0,
+    0,
+    ""
+   ],
+   [
+    42,
+    0,
+    0,
+    ""
+   ],
+   [
+    42,
+    0,
+    0,
+    ""
+   ],
+   [
+    12,
+    0,
+    0,
+    ""
+   ],
+   [
+    12,
+    0,
+    0,
+    ""
+   ],
+   [
+    12,
+    0,
+    0,
+    ""
+   ],
+   [
+    12,
+    0,
+    0,
+    ""
+   ],
+   [
+    12,
+    0,
+    0,
+    ""
+   ],
+   [
+    10,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 108,
+   "hit": 11,
+   "absorb": 4
+  }
+ },
+ "bow:bw_sniper": {
+  "hash": "9e8cf7527def4e016765f3b8",
+  "log": "c6adf2654ede96c47b7823a4",
+  "state": "c50cb0c0d81431df4c143236",
+  "mobs": "ca4ea95d402de1148fd1dfc2",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    266,
+    1,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "bow:bw_rapid": {
+  "hash": "19b16799e9922d1695254b34",
+  "log": "bc11a946fd0b28e68dcae0c3",
+  "state": "78daf5d3cc3dcd5318117eb4",
+  "mobs": "b83bd906249c5831e3875303",
+  "hits": [
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    34,
+    0,
+    0,
+    ""
+   ],
+   [
+    34,
+    0,
+    0,
+    ""
+   ],
+   [
+    49,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    31,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 9,
+   "absorb": 1
+  }
+ },
+ "bow:bw_trapper": {
+  "hash": "38c64eeb23faf304f33380b3",
+  "log": "d8effa03eb603902f5dc9913",
+  "state": "ce285ad474747abbf1dae26d",
+  "mobs": "76373584fee381fab92ac072",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "bow:bw_sniper+bw_hawk": {
+  "hash": "ee4057b959a6482ac3cc4783",
+  "log": "7ff4e19a6e726bd994e89746",
+  "state": "3b6edaf894fbb294b2a9d678",
+  "mobs": "097b63f7ad9a315545c633cc",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    266,
+    1,
+    0,
+    ""
+   ],
+   [
+    266,
+    1,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    266,
+    1,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 7,
+   "absorb": 3
+  }
+ },
+ "bow:bw_sniper+bw_aim": {
+  "hash": "c2d029fe57e42e06f881fe49",
+  "log": "359e9d11d39e685a18ab67dd",
+  "state": "3db37185b35e18cefab308f2",
+  "mobs": "03722bf6cdac9196c99f9c40",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    136,
+    0,
+    0,
+    "bow_trap"
+   ],
+   [
+    266,
+    1,
+    0,
+    ""
+   ],
+   [
+    292,
+    1,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 11,
+   "absorb": 2
+  }
+ },
+ "bow:bw_rapid+bw_storm": {
+  "hash": "876bae114d1ea1d39c04ea98",
+  "log": "cc1b9f6ec553478101b6e03c",
+  "state": "076075d3d1a0eb217fe1c3c3",
+  "mobs": "332ab2a9f5adff1cf00f0d12",
+  "hits": [
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    34,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    31,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 7,
+   "absorb": 1
+  }
+ },
+ "bow:bw_rapid+bw_quick": {
+  "hash": "6627ca3c2a473c3abcdc94d4",
+  "log": "bce2a499cde4e795831c653f",
+  "state": "7f787388be2f742671e86223",
+  "mobs": "53f5930433fceca1aae2bb89",
+  "hits": [
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    31,
+    0,
+    0,
+    ""
+   ],
+   [
+    34,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 1
+  }
+ },
+ "bow:bw_trapper+bw_shot": {
+  "hash": "cc81c8a75fff38c6071859e5",
+  "log": "b69f4a3501e08bc785fd5648",
+  "state": "78a293ea44847ea4bdc40090",
+  "mobs": "a559e6e5f52e274c760f5dc5",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "bow:bw_trapper+bw_lure": {
+  "hash": "0db82ebed5ec15a53701bd54",
+  "log": "3e751e68c2e8782f95bb5508",
+  "state": "86e06bf7f588be2c3c1757c6",
+  "mobs": "c616c4b6f896b703e734ad6d",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 2
+  }
+ },
+ "bow:bw_double:1": {
+  "hash": "acee699f45c9774862a959a0",
+  "log": "6011acee6baf3f57f3be4acb",
+  "state": "00942a0e4662fdf9389f164e",
+  "mobs": "5acb83f97a88a1e58ae6fa6e",
+  "hits": [],
+  "types": {
+   "st": 40,
+   "absorb": 4
+  }
+ },
+ "bow:bw_double:A": {
+  "hash": "70cc0c8bf08400fee193bff4",
+  "log": "49e48a6bccb5aace3aa3f981",
+  "state": "e8cc7dc2029e15c80f815699",
+  "mobs": "c4aefcbbb1e3f402fe22edbf",
+  "hits": [
+   [
+    78,
+    0,
+    0,
+    ""
+   ],
+   [
+    157,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 3,
+   "absorb": 2
+  }
+ },
+ "bow:bw_double:B": {
+  "hash": "36c152576df4bc92e9adfb86",
+  "log": "fa08282d486aad2235d73e05",
+  "state": "92c7e5b7c8260c338bf47660",
+  "mobs": "cd1f301a59b42dd039d20b63",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "bow:bw_tether:1": {
+  "hash": "28767eff69343a1492787b1f",
+  "log": "0c26b9b18bb4689ba11dc71c",
+  "state": "a31fdf5ad5c14faaa823caa5",
+  "mobs": "541e7e28d0b8e8cfaeb49d90",
+  "hits": [
+   [
+    109,
+    0,
+    0,
+    "bow_tether"
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "bow:bw_tether:A": {
+  "hash": "6325d0a7e35bccd076ef2192",
+  "log": "ec9dbeb6e03826c1a83f3c4d",
+  "state": "26edf759f7c4d7f53f4542ef",
+  "mobs": "9ed482588926d37f0b074162",
+  "hits": [
+   [
+    143,
+    0,
+    0,
+    "bow_tether"
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1,
+   "absorb": 1
+  }
+ },
+ "bow:bw_tether:B": {
+  "hash": "b28d2712b2ae0b3fe9532e0f",
+  "log": "8fcfadbc1dc51571cc073d21",
+  "state": "61f0cf7a1e903e315d893517",
+  "mobs": "844dc274a67fd517c352161e",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 1
+  }
+ },
+ "bow:bw_back:1": {
+  "hash": "58dcb4d124a0fc157278283a",
+  "log": "34d831f6666163c44368407b",
+  "state": "ed47efb92623346b7bbc5ed6",
+  "mobs": "ff5df8bd4482fb9a4bd0ae4f",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 3
+  }
+ },
+ "bow:bw_back:A": {
+  "hash": "05bbdf9c0f782c1bd2801b19",
+  "log": "a1c061d5bdf515a45738062c",
+  "state": "1bf63449ba7484aad31f2eea",
+  "mobs": "367b6216a08cf8e30630574d",
+  "hits": [
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ],
+   [
+    68,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 3
+  }
+ },
+ "bow:bw_back:B": {
+  "hash": "946933adcd1f3e2745c2252b",
+  "log": "5b72a91e60a01ab1687c4df5",
+  "state": "9d7b2538fc446598fe01285e",
+  "mobs": "babe08162de73a9ce12b0e0a",
+  "hits": [],
+  "types": {
+   "st": 42
+  }
+ },
+ "bow:bw_trap:1": {
+  "hash": "3dc5a75c948d0de007254072",
+  "log": "6e8127a1eed3366645ff1dc1",
+  "state": "84920775440f60ffc348a792",
+  "mobs": "b59e967545e19a991114ab34",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 3
+  }
+ },
+ "bow:bw_trap:A": {
+  "hash": "860e5a24c6ecf58d5d806ce9",
+  "log": "546fa2f035d4004b628803b3",
+  "state": "18606b70c2e6ab7f70fda8f8",
+  "mobs": "3124ce9fdde334ce607e2188",
+  "hits": [
+   [
+    135,
+    0,
+    0,
+    "bow_trap"
+   ],
+   [
+    135,
+    0,
+    0,
+    "bow_trap"
+   ],
+   [
+    135,
+    0,
+    0,
+    "bow_trap"
+   ],
+   [
+    135,
+    0,
+    0,
+    "bow_trap"
+   ],
+   [
+    135,
+    0,
+    0,
+    "bow_trap"
+   ],
+   [
+    135,
+    0,
+    0,
+    "bow_trap"
+   ]
+  ],
+  "types": {
+   "absorb": 2,
+   "st": 41,
+   "hit": 6
+  }
+ },
+ "bow:bw_trap:B": {
+  "hash": "f6b7d91c1baad39615f47c54",
+  "log": "d03d89e31f2d11311a102b3c",
+  "state": "5dc7c8a243a0a96ca7ecd90f",
+  "mobs": "e35dd21d37f201f4bb7e757f",
+  "hits": [],
+  "types": {
+   "st": 41,
+   "absorb": 2
+  }
+ },
+ "bow:bw_chime:1": {
+  "hash": "1c04e6f1ff1f3544b88f9c7b",
+  "log": "705523048b6b506d8e545d40",
+  "state": "888cd457890d8bb0e1628029",
+  "mobs": "4eacbbceffa3f3e95d28aa1b",
+  "hits": [
+   [
+    95,
+    0,
+    0,
+    "bow_chime"
+   ],
+   [
+    95,
+    0,
+    0,
+    "bow_chime"
+   ]
+  ],
+  "types": {
+   "absorb": 4,
+   "st": 40,
+   "hit": 2
+  }
+ },
+ "bow:bw_chime:A": {
+  "hash": "d408216ef3935e44b0d2b0e0",
+  "log": "e412e0062fce9db2d448600f",
+  "state": "4a172c47216c621818da656f",
+  "mobs": "c563170f2fe5b8cf70962731",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    "bow_chime"
+   ],
+   [
+    123,
+    0,
+    0,
+    "bow_chime"
+   ],
+   [
+    123,
+    0,
+    0,
+    "bow_chime"
+   ]
+  ],
+  "types": {
+   "st": 41,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "bow:bw_chime:B": {
+  "hash": "19f03ba0af280b4b80f5f316",
+  "log": "b6e65872fcaa253e18ee2b52",
+  "state": "cd4beded1e31808fa3bff211",
+  "mobs": "673e46f452957781408d1ec1",
+  "hits": [
+   [
+    123,
+    0,
+    0,
+    "bow_chime"
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "bow:bw_side:1": {
+  "hash": "82ba53242cc929e808edc933",
+  "log": "c6cef607214690d1b2a5290f",
+  "state": "902df0a55d7c574494188f15",
+  "mobs": "0ca0ae810089796da9a64838",
+  "hits": [
+   [
+    82,
+    0,
+    0,
+    ""
+   ],
+   [
+    82,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 2
+  }
+ },
+ "bow:bw_side:A": {
+  "hash": "f7c242299a3fa83b6c6a658c",
+  "log": "7f00f7f488301dc3330fbba7",
+  "state": "9b0dbf646bf6c67b0c1515db",
+  "mobs": "c1df108861b5f153abe6246e",
+  "hits": [
+   [
+    102,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 1
+  }
+ },
+ "bow:bw_side:B": {
+  "hash": "f95fb6c597f4a6651472939a",
+  "log": "3aa6ed5edb986cd8a4031d4b",
+  "state": "d310e20ec100f471060c6c3a",
+  "mobs": "4bbc5f350124cdce27c86386",
+  "hits": [
+   [
+    153,
+    1,
+    0,
+    ""
+   ],
+   [
+    102,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 42,
+   "hit": 2,
+   "absorb": 1
+  }
+ },
+ "bow:bw_zone:2": {
+  "hash": "2d9c0facb353d59caded9bce",
+  "log": "94c36df2f80cd00813fe54cf",
+  "state": "f1041257a79a814746ef1116",
+  "mobs": "9ba1189aaf59ded736cab91e",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 6,
+   "absorb": 2
+  }
+ },
+ "bow:bw_zone:A": {
+  "hash": "e59a7f8fa2cfc6bc90a15bb0",
+  "log": "613c184a079467a76f7a4e99",
+  "state": "dafe8446809368631e9ac85d",
+  "mobs": "e1a4853f952e9a5c37575910",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "bow:bw_zone:B": {
+  "hash": "6b656c0da240a1a81cc5c211",
+  "log": "84e244bb158dd7d9bf078cf7",
+  "state": "f90d856c799714381713b742",
+  "mobs": "0e052997a873c0a286bf76ad",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    212,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    49,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 6,
+   "absorb": 1
+  }
+ },
+ "bow:bw_draw:2": {
+  "hash": "d19c9a7286b0fad3c776e062",
+  "log": "828d5384d2f9e089fcc6bb41",
+  "state": "5c480740445b7e0c5bfbcead",
+  "mobs": "4cdee599138b91c3b90213e9",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    221,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 7,
+   "absorb": 3
+  }
+ },
+ "bow:bw_draw:A": {
+  "hash": "17e723eeb3d13ed7b65d1480",
+  "log": "bdec7c77dc20d2e7e66eb0fe",
+  "state": "2f7afe6ec36028ea11c84f59",
+  "mobs": "2f8b16b958d562c68f29e033",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    221,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 9,
+   "absorb": 2
+  }
+ },
+ "bow:bw_draw:B": {
+  "hash": "ba781a6a8ec7cdc4560b0629",
+  "log": "3d00061afb2816a0155e5a3f",
+  "state": "0547dab2c5bdbe8b85d3a1d3",
+  "mobs": "f77a4dc76d21069550731d5a",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    221,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "bow:bw_roll:2": {
+  "hash": "84dcc5dc7998a72160dcaebc",
+  "log": "ac0fdac3924f89969cfac5b1",
+  "state": "604650d01ec16936d3065445",
+  "mobs": "1fa4077629ac9ca7caecc653",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "bow:bw_roll:A": {
+  "hash": "6fbdf8f909d314289773d24b",
+  "log": "fb6890ffc8847cd06e17c759",
+  "state": "ca4621201ae49839ef259d11",
+  "mobs": "9b2f7df82a141ecfa4841b91",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 4,
+   "absorb": 1
+  }
+ },
+ "bow:bw_roll:B": {
+  "hash": "5344405087cafa176afb001d",
+  "log": "b2e3cf00cf7d3e366da0699d",
+  "state": "28d924983159c81815e4f3da",
+  "mobs": "6cf01970f11afc9fc6ec1804",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 2
+  }
+ },
+ "bow:bw_crit:2": {
+  "hash": "09262f91371cee29098f4ddd",
+  "log": "433e4b6581f00dfa2dc4ac49",
+  "state": "74d461e0909a86dbf9a4b758",
+  "mobs": "588344136a24728121352c66",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 102,
+   "hit": 9,
+   "absorb": 7
+  }
+ },
+ "bow:bw_crit:A": {
+  "hash": "8e7aad4364321aeb4bc6d469",
+  "log": "33efdd81c7e27b80c93dfa42",
+  "state": "6b182c62825592df6ba7a625",
+  "mobs": "eaf377d570580a18c99a7c55",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 101,
+   "hit": 10,
+   "absorb": 7
+  }
+ },
+ "bow:bw_crit:B": {
+  "hash": "8674fe08b78fbb0ad68aabb7",
+  "log": "60285e7175749394b378dc64",
+  "state": "fa93a95bfa7540ad2c66fe8d",
+  "mobs": "4abfe30aefaf7cc9c629deb7",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 5,
+   "absorb": 2
+  }
+ },
+ "bow:bw_quiver:2": {
+  "hash": "efbc0623917b032da45b9eef",
+  "log": "84333e1aad545d903c10b717",
+  "state": "72cee596e9e71254e326ccfa",
+  "mobs": "8cdc9bfe48d2ea585d98c91a",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 105,
+   "hit": 3,
+   "absorb": 1
+  }
+ },
+ "bow:bw_quiver:A": {
+  "hash": "db6c37db839d8134824bb35c",
+  "log": "9cd41b441a5b38280c2622c8",
+  "state": "bbf4c65a9c836fced4beabaa",
+  "mobs": "09475408ed736cd064feb55c",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 103,
+   "hit": 7,
+   "absorb": 3
+  }
+ },
+ "bow:bw_quiver:B": {
+  "hash": "a12b5b8d4e8f33fa98e449d8",
+  "log": "d7ded64297f84f740644754b",
+  "state": "bd45f3d6016c8d02a78a86d9",
+  "mobs": "c80cebcd5af38dab21389498",
+  "hits": [
+   [
+    41,
+    0,
+    0,
+    ""
+   ],
+   [
+    45,
+    0,
+    0,
+    ""
+   ],
+   [
+    65,
+    0,
+    0,
+    ""
+   ],
+   [
+    177,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    51,
+    0,
+    0,
+    ""
+   ],
+   [
+    41,
+    0,
+    0,
+    ""
+   ]
+  ],
+  "types": {
+   "st": 104,
+   "hit": 7,
+   "absorb": 3
+  }
+ },
+ "bow:errors": []
+}

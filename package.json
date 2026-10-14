@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:golden": "node --test e2e/combat.golden.e2e.mjs e2e/app.golden.e2e.mjs e2e/render.golden.e2e.mjs",
+    "perf": "node e2e/perf.mjs"
   },
   "repository": {
     "type": "git",

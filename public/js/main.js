@@ -3447,7 +3447,7 @@ function loop() {
   // ヒットストップ: 被弾の瞬間だけ動きをほぼ止めて、手応えを出す
   if (hitStop > 0) { hitStop -= dt; dt *= 0.1; }
   if (started) update(dt);
-  composer.render();
+  if (!window.__noRender) composer.render(); // 自動テスト（挙動の記録）は描画を省いて速く回す
 }
 
 // ======================================================================
@@ -3566,6 +3566,6 @@ loop();
 
 window.__game = { me, others, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, camera, coins, audio, api: game,
   // 自動テスト用の操作（通常攻撃・強攻撃・スキル）
-  dbg: { canAct, hit: (mb, mult, o) => dealDamage(mb, mult, o), press: (on) => (on ? input.pointerDown(0) : input.pointerUp(0)), swing: () => { if (canAct() && me.swingT >= me.swingDur) doSwing(); }, heavy: doHeavy, tree: tryTreeSkill, ws: tryWeaponSkill, dodge: tryDodge },
+  dbg: { canAct, hit: (mb, mult, o) => dealDamage(mb, mult, o), press: (on) => (on ? input.pointerDown(0) : input.pointerUp(0)), swing: () => { if (canAct() && me.swingT >= me.swingDur) doSwing(); }, heavy: doHeavy, tree: tryTreeSkill, ws: tryWeaponSkill, dodge: tryDodge, mouse, hurt: (raw, src, kd) => takeDamage(raw, src, kd) },
 };
 

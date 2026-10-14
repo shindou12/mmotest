@@ -1,0 +1,115 @@
+{
+ "save/legacyTrees": {
+  "char": "4227626f0482d59e88087f91",
+  "stored": "a8e782d02acc5e2657875f7a",
+  "S": "7634131ad9207556707ff031",
+  "wt": {
+   "sword": {
+    "lv": {},
+    "br": {},
+    "ks1": null,
+    "ks2": null
+   }
+  },
+  "slots": [
+   null,
+   null
+  ],
+  "tree": {
+   "st_str": 2
+  },
+  "errors": []
+ },
+ "save/newTrees": {
+  "char": "4b6f959a0414a3459be84075",
+  "stored": "4b6f959a0414a3459be84075",
+  "S": "c4d324113e201a0488969eb1",
+  "wt": {
+   "dagger": {
+    "lv": {
+     "dk_flank": 3,
+     "dk_agile": 2,
+     "dk_venom": 1
+    },
+    "br": {
+     "dk_flank": "A"
+    },
+    "ks1": "dk_venom",
+    "ks2": null
+   }
+  },
+  "slots": [
+   "dk_flank",
+   null
+  ],
+  "tree": {},
+  "errors": []
+ },
+ "dom/town": {
+  "hash": "e94357786f33335df5ede2c0",
+  "size": 11678
+ },
+ "dom/inventory": {
+  "hash": "8a1144c6cb9a537a83fa6a50",
+  "size": 13299
+ },
+ "dom/tree": {
+  "hash": "090174db2fe377bbb708236b",
+  "size": 24552
+ },
+ "dom/map": {
+  "hash": "cb022d335b8cc585247c192e",
+  "size": 24571
+ },
+ "dom/settings": {
+  "hash": "286baea1a8fb1509471912ba",
+  "size": 24599
+ },
+ "dom/closed": {
+  "hash": "1da885531058065335684f07",
+  "size": 24606
+ },
+ "run": {
+  "area": "f1_field",
+  "sent": [
+   [
+    "wp",
+    1
+   ],
+   [
+    "st",
+    91
+   ],
+   [
+    "hit",
+    6
+   ],
+   [
+    "absorb",
+    3
+   ]
+  ],
+  "slots": [
+   "sw_aircut",
+   null
+  ],
+  "wt": {
+   "lv": {
+    "sw_aircut": 1,
+    "sw_light": 1
+   },
+   "br": {},
+   "ks1": null,
+   "ks2": null
+  },
+  "hp": 49,
+  "mobHp": 16,
+  "xp": 0,
+  "lv": 1
+ },
+ "dom/after-run": {
+  "hash": "263755dbe7c84d65c8956f5b",
+  "size": 24689
+ },
+ "errors": []
+}

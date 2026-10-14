@@ -1,0 +1,1 @@
+{"note":"リファクタリング前（ab1ce9e + テスト用の口）。node e2e/perf.mjs の2回の結果","runs":[{"update":{"msPerFrameMedian":0.65,"msPerFrameMin":0.6},"render":{"msPerFrameMedian":157.27,"msPerFrameMin":154.46}},{"update":{"msPerFrameMedian":0.74,"msPerFrameMin":0.42},"render":{"msPerFrameMedian":150.08,"msPerFrameMin":143.07}}]}
