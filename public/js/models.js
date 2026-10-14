@@ -6,6 +6,8 @@ import { GRIP_Y } from './weapon-pose.js';
 import { RARITIES } from '../shared/data.js';
 import { toon, glow, outline, compact, gradientMap } from './toon.js';
 import { buildGraz } from './graz-model.js';
+import { buildYugdra, animateYugdra } from './yugdra-model.js';
+import { buildSkorpio, animateSkorpio } from './skorpio-model.js';
 
 function mesh(geo, mat, pos, rot, scale) {
   const m = new THREE.Mesh(geo, mat);
@@ -583,6 +585,10 @@ export function makeMob(t, color, scale = 1, accent = null, boss = false, appear
   const parts = { body, root };
   if (boss && appearance === 'graz') {
     Object.assign(parts, buildGraz(body, ac));
+  } else if (boss && appearance === 'yugdra') {
+    Object.assign(parts, buildYugdra(body, ac));
+  } else if (boss && appearance === 'skorpio') {
+    Object.assign(parts, buildSkorpio(body, ac));
   } else switch (t) {
     case 'slime': {
       const jelly = toon(c, { transparent: true, opacity: 0.82 });
@@ -858,6 +864,8 @@ export function animateMob(model, s) {
   if (u.float) { u.body.position.y = Math.sin(t * 2.5) * 0.3; if (u.shell) { u.shell.rotation.y = t * 2; u.shell.rotation.x = Math.sin(t) * 0.4; } }
   if (u.sigil) { u.sigil.rotation.z = t; u.sigil.scale.setScalar(s.enraged ? 2.2 + Math.sin(t * 8) * 0.2 : 1.8); }
   u.body.rotation.x = wind ? -0.2 : atk ? 0.22 : 0;
+  if (u.identity === 'yugdra') animateYugdra(u, s);
+  if (u.identity === 'skorpio') animateSkorpio(u, s);
   const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0;
   for (const mm of u.mats) {
     if (flash > 0) { mm.m.emissive.setRGB(1, 1, 1); mm.m.emissiveIntensity = flash * 1.5; }

@@ -374,7 +374,7 @@ export const FLOORS = [
       { t: 'wisp', name: 'フォレストウィスプ', color: 0x8cffb0 }, { t: 'beast', name: 'ミストウルフ', color: 0x8a9a9a },
       { t: 'mushroom', name: 'ミストマタンゴ', color: 0x7a8ad0 }, { t: 'mage', name: 'ゴブリンシャーマン', color: 0x4a7a3a },
     ],
-    boss: { name: '霧の大樹 ユグドラ', t: 'golem', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['rain', 'shock', 'combo', 'cage', 'summon', 'cone', 'shot', 'checker', 'haven'], p3: ['spiral', 'nova'] },
+    boss: { name: '霧の大樹 ユグドラ', t: 'golem', appearance: 'yugdra', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['rain', 'shock', 'combo', 'cage', 'summon', 'cone', 'shot', 'checker', 'haven'], p3: ['spiral', 'nova'] },
   },
   {
     n: 3, name: '砂塵の荒野', ground: 0xc9a066, ground2: 0xe0bf86, fog: 0xf0d6a8, skyTop: 0xf0b070, skyBot: 0xffe6c0,
@@ -386,7 +386,7 @@ export const FLOORS = [
       { t: 'beast', name: 'デザートスコーピオン', color: 0xc08040 }, { t: 'golem', name: 'サンドゴーレム', color: 0xd0aa70 },
       { t: 'scorpion', name: 'ジャイアントスコーピオン', color: 0x8a3a2a }, { t: 'mage', name: '砂漠の呪術師', color: 0xa0702a },
     ],
-    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo', 'shot', 'charge', 'fissure', 'checker'], p3: ['spiral', 'cross', 'cage'] },
+    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', appearance: 'skorpio', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo', 'shot', 'charge', 'fissure', 'checker'], p3: ['spiral', 'cross', 'cage'] },
   },
   {
     n: 4, name: '水晶洞窟', ground: 0x2a2a44, ground2: 0x3a3a60, fog: 0x1a1a38, skyTop: 0x0a0a1a, skyBot: 0x202048,
