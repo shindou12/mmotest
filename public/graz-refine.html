@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Grasz · Model refinement</title>
+<script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script>
+<style>
+body{margin:0;background:#e7e6df;color:#28343b;font-family:Arial,sans-serif}#root{position:relative;width:1800px;height:1250px}canvas{position:absolute;inset:0}header{position:absolute;top:29px;left:38px;font-size:13px;letter-spacing:3px;color:#677169}h1{position:absolute;top:44px;left:38px;font-size:34px;font-weight:500;letter-spacing:-.5px}.label{position:absolute;top:130px;left:38px;font-size:15px;letter-spacing:2px}.sub{position:absolute;top:159px;left:38px;color:#6d776f;font-size:13px}.bottom{top:756px}.bottom.sub{top:784px}footer{position:absolute;bottom:20px;left:38px;font-size:12px;letter-spacing:1px;color:#677169}#status{position:absolute;bottom:34px;left:38px;font-size:14px;color:#49594f;display:none}
+</style></head><body><main id="root"><canvas></canvas><header>MMOTEST / BOSS MODEL REFINEMENT</header><h1>Grasz, the Kobold King</h1>
+<div class="label">EXISTING</div><div class="sub">Shared knight model</div>
+<div class="label" style="left:638px">REFINED</div><div class="sub" style="left:638px">Canine face / crown / royal cleaver</div>
+<div class="label" style="left:1238px">FRONT</div><div class="sub" style="left:1238px">Iron / brass / russet fur / crimson</div>
+<div class="label bottom">FACE &amp; CROWN</div><div class="sub bottom">Actual geometry</div>
+<div class="label bottom" style="left:638px">BACK</div><div class="sub bottom" style="left:638px">Short mantle / tail / shield</div>
+<div class="label bottom" style="left:1238px">GAME CAMERA SCALE</div><div class="sub bottom" style="left:1238px">Existing / refined / player</div>
+<div id="status"></div><footer>ACTUAL THREE.JS MODELS · SAME TOON MATERIALS / LIGHTING / SCALE · EXISTING BOSS STATES AND ATTACK PIVOTS</footer></main>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {makeMob,animateMob,makePlayer} from './js/models.js';
+import {FLOORS} from './shared/data.js';
+
+// Passive views receive render parameters. External automation events bubble
+// through Root and are adjudicated by the preview's state-machine mediator.
+class SceneView {
+  constructor(canvas){
+    this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
+    this.renderer.setSize(1800,1250);this.renderer.setClearColor(0xe7e6df);
+    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    this.scene=new THREE.Scene();this.scene.add(new THREE.HemisphereLight(0xfff6dd,0x778886,2));
+    const sun=new THREE.DirectionalLight(0xfff2d8,2.6);sun.position.set(-3,6,5);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-4,right:4,top:5,bottom:-4,near:.1,far:20});sun.shadow.bias=-.001;this.scene.add(sun);
+    const fill=new THREE.DirectionalLight(0xc6e1ed,.75);fill.position.set(3,2,-4);this.scene.add(fill);
+    this.ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0xe7e6df,roughness:1}));this.ground.rotation.x=-Math.PI/2;this.ground.position.y=-.012;this.ground.receiveShadow=true;this.scene.add(this.ground);
+    const b=FLOORS[0].boss;
+    this.actors=[makeMob(b.t,b.color,1,b.accent,true),makeMob(b.t,b.color,1,b.accent,true,b.appearance),makePlayer('#3aa0ff')];
+    this.actors.forEach(m=>{this.scene.add(m);if(m.userData.aura)m.userData.aura.visible=false;});
+  }
+  render(p){
+    const r=this.renderer;r.setSize(p.width,p.height);r.setScissorTest(false);r.clear();r.setScissorTest(true);
+    for(const v of p.views){
+      this.actors.forEach((m,i)=>{const spec=v.actors.find(a=>a.index===i);m.visible=!!spec;if(!spec)return;m.position.set(...(spec.position||[0,0,0]));m.rotation.set(0,spec.turn||0,0);m.scale.setScalar(spec.scale||1);});
+      const h=v.frustum||3.6,w=h*v.w/v.h,camera=new THREE.OrthographicCamera(-w/2,w/2,h/2,-h/2,.01,150);camera.position.set(...v.eye);camera.lookAt(...v.target);
+      r.setViewport(v.x,v.y,v.w,v.h);r.setScissor(v.x,v.y,v.w,v.h);r.render(this.scene,camera);
+    }
+    r.setScissorTest(false);
+  }
+}
+class TextView {
+  constructor(root){this.root=root;this.status=root.querySelector('#status');}
+  render(p){this.root.style.width=p.width+'px';this.root.style.height=p.height+'px';if(p.video){this.root.querySelector('h1').textContent='Grasz · Existing / Refined';this.root.querySelectorAll('.label,.sub,footer').forEach(e=>e.style.display='none');this.status.style.display='block';this.status.textContent=p.status;}}
+}
+class Presenter {
+  static comparison(){const actor=index=>[{index}];return{width:1800,height:1250,views:[
+    {x:0,y:520,w:600,h:550,eye:[4,2.8,6],target:[0,1.38,.35],actors:actor(0)},
+    {x:600,y:520,w:600,h:550,eye:[4,2.8,6],target:[0,1.38,.35],actors:actor(1)},
+    {x:1200,y:520,w:600,h:550,eye:[0,2.3,7],target:[0,1.38,.15],actors:actor(1)},
+    {x:0,y:42,w:600,h:398,eye:[2,2.4,6],target:[0,2.14,.13],frustum:1.35,actors:actor(1)},
+    {x:600,y:42,w:600,h:398,eye:[-3,2.6,-6],target:[0,1.35,-.1],frustum:3.4,actors:actor(1)},
+    {x:1200,y:42,w:600,h:398,eye:[12,16,23],target:[0,3,.4],frustum:17,actors:[{index:0,position:[-5,0,0],scale:2.8},{index:1,position:[1.7,0,0],scale:2.8},{index:2,position:[6,0,0]}]},
+  ]};}
+  static video(t){const phase=t%8,st=phase<2?0:phase<4?1:phase<5.3?2:phase<6.2?3:0,word=st===0?'IDLE':st===1?'WALK':st===2?'ATTACK WIND-UP':'ATTACK';return{width:1280,height:720,video:true,status:word+' · '+(t>=8?'ENRAGED':'NORMAL')+' · LEFT: EXISTING / RIGHT: REFINED',state:{t,st,enraged:t>=8},views:[0,1].map(i=>({x:i*640,y:58,w:640,h:532,eye:[4,2.8,6],target:[0,1.35,.4],frustum:5,actors:[{index:i,turn:.15+Math.sin(t*.3)*.22}]}))};}
+}
+class Mediator {
+  constructor(scene,text){this.scene=scene;this.text=text;this.state='comparison';}
+  async handle(e){
+    if(e.type==='comparison'){this.state='comparison';const p=Presenter.comparison();this.scene.actors.slice(0,2).forEach(m=>animateMob(m,{t:0,st:0}));this.text.render(p);this.scene.render(p);return;}
+    if(e.type==='video'){this.state='video';return this.handle({type:'frame',t:0});}
+    if(e.type==='frame'&&this.state==='video'){const p=Presenter.video(e.t);this.scene.actors.slice(0,2).forEach(m=>animateMob(m,p.state));this.text.render(p);this.scene.render(p);return;}
+    if(e.type==='export')return exportModel();
+    if(e.type==='verify')return verify();
+  }
+}
+class Root {
+  constructor(element){this.scene=new SceneView(element.querySelector('canvas'));this.text=new TextView(element);this.mediator=new Mediator(this.scene,this.text);}
+  dispatch(e){return this.mediator.handle(e);}
+}
+const root=new Root(document.getElementById('root'));
+function verify(){
+  const b=FLOORS[0].boss,old=makeMob(b.t,b.color,1,b.accent,true),fresh=makeMob(b.t,b.color,1,b.accent,true,b.appearance);
+  let states=0,difference=0;for(const st of [0,1,2,3])for(const enraged of [false,true])for(const flash of [0,.7])for(let t=0;t<3;t+=.125){
+    const s={t,st,enraged,flash};animateMob(old,s);animateMob(fresh,s);old.updateMatrixWorld(true);fresh.updateMatrixWorld(true);
+    for(const key of ['body','arm','cape','sigil','aura']){const a=old.userData[key].matrixWorld.elements,b=fresh.userData[key].matrixWorld.elements;for(let i=0;i<16;i++)difference=Math.max(difference,Math.abs(a[i]-b[i]));}
+    for(let leg=0;leg<2;leg++){const a=old.userData.legs2[leg].matrixWorld.elements,b=fresh.userData.legs2[leg].matrixWorld.elements;for(let i=0;i<16;i++)difference=Math.max(difference,Math.abs(a[i]-b[i]));}
+    fresh.traverse(o=>{if(!o.matrixWorld.elements.every(Number.isFinite))throw Error('Non-finite model transform');});
+    if(fresh.userData.weaponModel.parent!==fresh.userData.grip)throw Error('Sword detached');states++;
+  }
+  if(difference>1e-9)throw Error('Boss animation pivot changed');let triangles=0,meshes=0;fresh.traverse(o=>{if(o.isMesh&&o.material.side!==THREE.BackSide){meshes++;triangles+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;}});return{states,pivotDifference:difference,triangles,meshes};
+}
+async function exportModel(){
+  const b=FLOORS[0].boss,model=makeMob(b.t,b.color,1,b.accent,true,b.appearance);model.name='Grasz the Kobold King';animateMob(model,{t:0,st:0});
+  // Reference-containing animation metadata stays in the native factory.
+  model.traverse(o=>o.userData={});const remove=[];model.traverse(o=>{if(o.isLight){remove.push(o);return;}if(!o.isMesh)return;if(o.material.side===THREE.BackSide||o.geometry.type==='RingGeometry'){remove.push(o);return;}const m=o.material;o.material=new THREE.MeshStandardMaterial({color:m.color,emissive:m.isMeshBasicMaterial?m.color:0x000000,emissiveIntensity:m.isMeshBasicMaterial?.7:0,roughness:.85,metalness:0,side:m.side});});remove.forEach(o=>o.removeFromParent());model.updateMatrixWorld(true);
+  const binary=await new GLTFExporter().parseAsync(model,{binary:true});const loaded=await new GLTFLoader().parseAsync(binary,'');const a=new THREE.Box3().setFromObject(model),c=new THREE.Box3().setFromObject(loaded.scene);if(a.min.distanceTo(c.min)>1e-5||a.max.distanceTo(c.max)>1e-5)throw Error('GLB shape changed');
+  let text='';for(const byte of new Uint8Array(binary))text+=String.fromCharCode(byte);return btoa(text);
+}
+await root.dispatch({type:'comparison'});
+window.ready=true;window.verify=()=>root.dispatch({type:'verify'});window.exportModel=()=>root.dispatch({type:'export'});window.prepareVideo=()=>root.dispatch({type:'video'});window.drawFrame=t=>root.dispatch({type:'frame',t});
+</script></body></html>

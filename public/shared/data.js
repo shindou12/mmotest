@@ -362,7 +362,7 @@ export const FLOORS = [
       { t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 },
       { t: 'bat', name: 'ケイブバット', color: 0x5a4a6a }, { t: 'mushroom', name: 'ドクキノコ', color: 0xc84a6a },
     ],
-    boss: { name: 'コボルド王 グラズ', t: 'knight', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, patterns: ['combo', 'cone', 'charge', 'sweep', 'slam', 'shot', 'fissure', 'barrage'], p3: ['chase', 'shock'] },
+    boss: { name: 'コボルド王 グラズ', t: 'knight', appearance: 'graz', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, patterns: ['combo', 'cone', 'charge', 'sweep', 'slam', 'shot', 'fissure', 'barrage'], p3: ['chase', 'shock'] },
   },
   {
     n: 2, name: '霧の森', ground: 0x2f5a3a, ground2: 0x3f6f4a, fog: 0x9ab8b0, skyTop: 0x6a8a90, skyBot: 0xb7cfc8,

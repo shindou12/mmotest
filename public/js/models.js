@@ -5,6 +5,7 @@ export { animatePlayer } from './player-motion.js';
 import { GRIP_Y } from './weapon-pose.js';
 import { RARITIES } from '../shared/data.js';
 import { toon, glow, outline, compact, gradientMap } from './toon.js';
+import { buildGraz } from './graz-model.js';
 
 function mesh(geo, mat, pos, rot, scale) {
   const m = new THREE.Mesh(geo, mat);
@@ -571,7 +572,7 @@ function makeShield(rarityIn, armL) {
 // ---------------------------------------------------------------------------
 // モンスター
 // ---------------------------------------------------------------------------
-export function makeMob(t, color, scale = 1, accent = null, boss = false) {
+export function makeMob(t, color, scale = 1, accent = null, boss = false, appearance = null) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
   const c = new THREE.Color(color);
@@ -580,7 +581,9 @@ export function makeMob(t, color, scale = 1, accent = null, boss = false) {
   const eyeM = glow(ac.clone().multiplyScalar(1.6));
   const horn = toon(0xf0e6d0);
   const parts = { body, root };
-  switch (t) {
+  if (boss && appearance === 'graz') {
+    Object.assign(parts, buildGraz(body, ac));
+  } else switch (t) {
     case 'slime': {
       const jelly = toon(c, { transparent: true, opacity: 0.82 });
       const b = new THREE.Group(); b.position.y = 0.55; body.add(b);

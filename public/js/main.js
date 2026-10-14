@@ -730,7 +730,7 @@ function onSnap(m) {
       let model, name, rad;
       if (kind === 2) {
         const b = fdef.boss;
-        model = makeMob(b.t, b.color, b.scale, b.accent, true);
+        model = makeMob(b.t, b.color, b.scale, b.accent, true, b.appearance);
         name = b.name; rad = 0.9 * b.scale;
       } else {
         const md = fdef.mobs[d];
