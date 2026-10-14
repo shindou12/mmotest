@@ -13,7 +13,7 @@
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
 import {
   FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT, BOW_ZONE,
-  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, transcendCount, displayName, itemQuality, affixText, tierLabel, tierColor,
+  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, transcendCount, displayName, affixText, tierLabel, tierColor,
   enhMult, TITLES, TITLE_REQ, titleReqOk, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost, CRAFT_MAX_TIER, affixName, FX_REQ,
 } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, WEATHERS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
@@ -284,10 +284,7 @@ export function createUI(game) {
         + (it.lore ? `<div class="lore">${esc(it.lore)}</div>` : '');
     }
     const type = it.slot === 'weapon' ? WEAPONS[it.kind].name : it.slot === 'armor' ? `防具（${ARMOR_CLASSES[it.armor || 'medium'].name}${atype ? '・' + atype.name : ''}）` : '装飾品';
-    let h = `<div class="tn" style="color:${r.color}">${esc(displayName(it))}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
-    // 出来（このアイテムレベルで出せる最高の物を100%として）。レアリティ（粗悪〜傑作）はこれで決まる
-    if (it.rarity < 6) h += `<div class="dim">出来 <b style="color:${r.color}">${Math.round(itemQuality(it) * 100)}%</b>（基本値・特性の数とティア・強化から）</div>`;
-    const e = enhMult(it), ev = (v) => Math.round(v * e * 10) / 10;
+    let h = `<div class="tn" style="color:${r.color}">${esc(displayName(it))}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;    const e = enhMult(it), ev = (v) => Math.round(v * e * 10) / 10;
     h += '<div class="base">';
     if (it.atk) h += `<div>攻撃力 <b>+${ev(it.atk)}</b></div>`;
     if (it.hp) h += `<div>HP <b>+${ev(it.hp)}</b></div>`;
