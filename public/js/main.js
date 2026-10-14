@@ -28,7 +28,7 @@ import {
   spTotal, spSpent, canLearn, treeEffects,
 } from './skills.js';
 import {
-  hasWTree, wtEffects, profLevel, profOf, gainProf, wtLearn, wtChoose, wtReset, wtOf, wtSpent, WT_NODE, WT_RESET_COST,
+  hasWTree, wtEffects, LIGHT_COLOR, profLevel, profOf, gainProf, wtLearn, wtChoose, wtReset, wtOf, wtSpent, WT_NODE, WT_RESET_COST,
 } from './weapon-tree.js';
 import { QUESTS, QUEST_INDEX, questState, questAvailable, questProgress } from './quests.js';
 import { createUI } from './ui/app.js';
@@ -131,7 +131,7 @@ const me = {
   staggerT: 0, hurtT: 0, downT: 0, downStart: -99, noDownT: 0, kbT: 0, kbX: 0, kbZ: 0, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
   // 武器ツリー（片手剣）の状態: 攻撃の通し番号 / 勢い / 魔剣士の時間 / 幻剣 / 受け流し / 報復 など
   act: 0, mom: 0, mageT: 0, cycleAct: -1, danceAct: -1, danceExt: 0, normHealAct: -1, normHeals: 0, edgeT: 0, edgeHealT: 0,
-  afterJust: false, revenge: 0, phantom: null, phantomUntil: 0, parryUntil: 0, parryDone: true, saintOn: false, paladinT: 0,
+  afterJust: false, revenge: 0, chargeStart: 0, eyeCharge: false, eyeT: -99, iaiReady: false, primeCharge: 0, lastHeavyLv: 0, lastHeavyT: -99, phantom: null, phantomUntil: 0, parryUntil: 0, parryDone: true, saintOn: false, paladinT: 0,
   model: null,
 };
 const world = { area: 'f1_town', def: AREAS.f1_town, floor: 1, unlocked: 1, bossState: 'idle', door: false, plates: [] };
@@ -211,7 +211,7 @@ function calcStats() {
   const W = WEAPONS[wk];
   // 武器パッシブ
   const P = {
-    heavy: wk === 'greatsword' ? 20 : wk === 'axe' ? 25 : 0,
+    heavy: wk === 'axe' ? 25 : 0, // 大剣の強攻撃+20%は武器ツリー「溜めの心得」に移った
     vamp: wk === 'axe' ? 3 : 0,
     def: wk === 'spear' ? 10 : 0,
     dodge: wk === 'dagger' ? 0.75 : 1,
@@ -219,7 +219,8 @@ function calcStats() {
   };
   S = {
     wk, W, atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: WT ? new Set([...T.actives, ...WT.actives]) : T.actives,
-    wt: WT, guard: !!W.guard || WT?.ks1 === 'sw_guard', dodgeDist: WT?.br('sw_light') === 'B' ? 1.3 : 1,
+    wt: WT, guard: !!W.guard || WT?.ks1 === 'sw_guard',
+    chargeMax: CHARGE_MAX * (WT?.ks1 === 'gt_blow' ? 1.25 : 1) * (WT?.br('gt_charge') === 'A' ? 0.8 : 1), dodgeDist: WT?.br('sw_light') === 'B' ? 1.3 : 1,
     crit: 5 + m('crit'), critd: 150 + m('critd'), aspd: m('aspd'), move: m('move'),
     vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0) + P.vamp, cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
     // 生存本能: 近接武器は常に被ダメ軽減
@@ -242,7 +243,7 @@ function calcStats() {
 // 弓の適性エリア: 外側の円（適性距離）から内側へ、引き絞るほど広がる
 function bowZoneWidth() {
   if (!me.charging) return BOW_ZONE.min;
-  const k = clamp(me.chargeT / CHARGE_MAX, 0, 1);
+  const k = clamp(me.chargeT / S.chargeMax, 0, 1);
   return BOW_ZONE.min + (S.zoneMax - BOW_ZONE.min) * k;
 }
 function bowZone(w = BOW_ZONE.min) { const outer = S.optimal; return [Math.max(0, outer - w), outer]; }
@@ -327,7 +328,7 @@ const input = {
     audio.init();
     if (!started) return;
     // 長押しで強攻撃の溜め（盾槍は溜めている間ガードを構える）
-    if (button === 0) { mouse.l = true; me.lootGo = 0; if (me.downT <= 0 && !me.crawl) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; } }
+    if (button === 0) { mouse.l = true; me.lootGo = 0; if (me.downT <= 0 && !me.crawl) { me.charging = true; me.chargeT = 0; me.chargeLv = 0; me.chargeStart = now(); wtChargeStart(); } }
     if (button === 2) { mouse.r = true; tryWeaponSkill(); }
   },
   pointerUp(button) {
@@ -858,6 +859,7 @@ function resolveTele(te) {
   const hit = te.sh.some((s) => inShape(s, me.x, me.z));
   if (!hit) return;
   if (me.iframe > 0) { onJustDodge(); return; }
+  if (wtCounter(mobs.get(te.src) || te.sh[0])) return; // 大剣カウンター: 強攻撃を押した直後に受けると受け流す
   if (te.src) net.send({ t: 'absorb', id: te.src }); // 狙われ役が攻撃を受けるとヘイトのリセットが少し延びる
   if (S.fx.has('aegis') && Math.random() < 0.25) {
     floatText(me.x, 2.4, me.z, '無効化!', 'info');
@@ -914,8 +916,9 @@ function knockFrom(src, dist, dur) {
 }
 function hitReaction(dmg, src, kd) {
   me.hurtT = 0.28;
-  const armor = S.wk === 'greatsword' && me.charging; // 大剣の溜め中はスーパーアーマー
-  const canDown = now() >= (me.noDownT || 0) && !armor;
+  // 大剣の「剛体」: 溜め中はスーパーアーマー（破城の構えAの効果中も）。剛体Bは溜め中に吹き飛ばされない
+  const armor = (me.charging && (S.wt?.lv('gt_armor') ?? 0) >= 1) || (S.wt?.br('gt_siege') === 'A' && hasBuff('gt_siege'));
+  const canDown = now() >= (me.noDownT || 0) && !armor && !(me.charging && S.wt?.br('gt_armor') === 'B');
   if ((dmg >= S.mhp * REACT.down || kd) && canDown) {
     // ダウン（吹き飛び）
     hitStop = 0.09;
@@ -960,7 +963,7 @@ function takeDamage(raw, src = null, kd = false, guarded = false) {
   if (now() < (me.brokenT || 0)) raw *= GUARD.breakDmg; // ガードブレイク中は被ダメージ1.5倍
   if (S.wt?.ks2 === 'sw_berserk') raw *= 1 + 0.02 * me.mom; // 狂剣士: 勢いの分だけ被ダメージが増える
   const backB = S.wt?.br('sw_tough') === 'B' && me.hp < S.mhp * 0.5 ? 15 : 0; // 不撓B「背水」
-  const dr = clamp(buffMod('dr') + backB + (tf('t_relic') ? 8 : 0) + (tf('t_shell') ? 12 : 0) - (tf('t_berserk') ? 15 : 0), -100, 90);
+  const dr = clamp(buffMod('dr') + backB + wtDr() + (tf('t_relic') ? 8 : 0) + (tf('t_shell') ? 12 : 0) - (tf('t_berserk') ? 15 : 0), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   me.hp -= dmg;
   me.lastHurt = now();
@@ -987,6 +990,7 @@ function onJustDodge() {
   fx.ringWave(me.x, me.z, 0x9affff, 3, 0.3);
   if (S.justbuff > 0) addBuff('just', '見切り', 3, { dmgp: S.justbuff }, 0x9affff);
   if (S.wt?.br('sw_light') === 'A') { me.afterJust = true; floatText(me.x, 3.0, me.z, '後の先', 'just'); }
+  wtEye();
   if (S.counter > 0) {
     combat.circle(me.x, me.z, 5, S.counter / 100, { type: 'proc', noProc: true });
     fx.ringWave(me.x, me.z, 0xbff8ff, 5.5, 0.35);
@@ -1121,7 +1125,7 @@ function dealDamage(mb, mult, o = {}) {
   if (!mb || mb.hp <= 0) return;
   const skill = o.type === 'wskill' || o.type === 'tskill';
   const tough = mb.kind === 2 || !!mb.elite;
-  let crit = o.crit || (S.wt && hasBuff('sw_saint') && o.type !== 'dot') || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + (tough && tf('t_shark') ? 15 : 0) + (tf('t_night') && indoorNow() ? 10 : 0) + (tf('t_lucky') ? 8 : 0) || (skill && S.fx.has('skillcrit'));
+  let crit = o.crit || (S.wt && hasBuff('sw_saint') && o.type !== 'dot') || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + wtCritAdd(o) + (tough && tf('t_shark') ? 15 : 0) + (tf('t_night') && indoorNow() ? 10 : 0) + (tf('t_lucky') ? 8 : 0) || (skill && S.fx.has('skillcrit'));
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; }
   const typeMult = 1 + ((S[TYPE_MOD[o.type]] || 0) + buffMod(TYPE_MOD[o.type])) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
@@ -1130,7 +1134,7 @@ function dealDamage(mb, mult, o = {}) {
   const guardBonus = now() < me.atkBonusT ? me.atkBonus : 1;
   const bossT = mb.kind === 2 && tf('t_boss1') ? 1.15 : 1;
   let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus * bossT * titleDmg(mb)
-    * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1) * wtDmgMult(o);
+    * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1) * wtDmgMult(o, mb);
   dmg = Math.max(1, Math.round(dmg));
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
   // スタン値: 強攻撃で大きく溜まる。近接武器ほど溜めやすい
@@ -1196,10 +1200,16 @@ function setMom(n) {
   me.buffs = me.buffs.filter((b) => b.id !== 'sw_mom');
   if (n > 0) me.buffs.push({ id: 'sw_mom', label: `勢い ${n}`, t: 1e9, max: 1e9, mods: {}, color: 0xff9a2e });
 }
-function wtDmgMult(o) {
+function wtDmgMult(o, mb) {
   const W = S.wt;
   if (!W || o.type === 'dot') return 1;
   let k = 1;
+  // 大剣
+  const maxHeavy = o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8;
+  if (W.ks1 === 'gt_wave' && o.type === 'heavy' && !o.wave) k *= 0.85;
+  if (W.ks1 === 'gt_blow' && maxHeavy) k *= 1.4;
+  if (W.br('gt_break') === 'A' && mb?.stunT > 0) k *= 1.2;
+  if (o.exec && mb && mb.hp < mb.mhp * 0.3) k *= o.exec;
   if (W.ks1 === 'sw_glad') k *= 1 + me.mom * 0.03;
   if (W.br('sw_tough') === 'B' && me.hp < S.mhp * 0.5) k *= 1.15;
   if (o.wave && W.br('sw_dance') === 'B' && hasBuff('sw_dance')) k *= 1.5;
@@ -1234,6 +1244,12 @@ function wtOnHit(mb, dmg, crit, o) {
     const b = me.buffs.find((q) => q.id === 'sw_dance');
     if (b) { me.danceAct = me.act; me.danceExt += 0.2; b.t += 0.2; b.max = Math.max(b.max, b.t); }
   }
+  // 月蝕: 光波が最初に当たった敵のところで爆ぜる
+  if (o.proj?.eclipse && !o.proj.boomed) {
+    o.proj.boomed = true;
+    const x = mb.x, z = mb.z;
+    later(0.05, () => { combat.circle(x, z, 3, 1.5, { type: 'proc', wtNo: true }); fx.ringWave(x, z, LIGHT_COLOR, 3.4, 0.35); fx.flash(x, 1.2, z, LIGHT_COLOR, 30, 0.25); audio.sfx('wave'); });
+  }
   // 天剣: 斬撃波1発につき1回
   if (o.wave && W.ks2 === 'sw_heaven' && o.proj && !o.proj.heaven) { o.proj.heaven = true; cutCds(0.15); }
 }
@@ -1267,6 +1283,10 @@ function wtOnHurt(guarded) {
     if (W.br('sw_parry') === 'B') addBuff('sw_parryB', '奮い立ち', 5, { atkp: 25 }, 0xffb040);
     return;
   }
+  if (me.charging) {
+    if (W.ks2 === 'gt_unyield') me.chargeT = Math.max(me.chargeT, S.chargeMax);
+    else if (W.br('gt_armor') === 'A') me.chargeT += 0.3;
+  }
   if (guarded) return;
   if (W.br('sw_tough') === 'A') cutCds(1);
   if (W.ks1 === 'sw_glad' && W.ks2 !== 'sw_berserk') setMom(0);
@@ -1293,6 +1313,70 @@ function wtRevenge() {
     fx.ringWave(me.x, me.z, 0xff6a5a, 4, 0.4); fx.flash(me.x, 1.5, me.z, 0xff6a5a, 40, 0.3);
     floatText(me.x, 3.2, me.z, '報復!', 'just'); addShake(0.3);
   });
+}
+// 大剣: 溜め中の被ダメージ軽減（剛体lv2・剛体B・一撃）と破城の構えA
+function wtDr() {
+  const W = S.wt;
+  if (!W) return 0;
+  let dr = 0;
+  if (me.charging) {
+    if (W.lv('gt_armor') >= 2) dr += 15;
+    if (W.br('gt_armor') === 'B') dr += 10;
+    if (W.ks1 === 'gt_blow') dr += 30;
+  }
+  if (W.br('gt_siege') === 'A' && hasBuff('gt_siege')) dr += 20;
+  return dr;
+}
+// 断罪: 最大溜めの強攻撃の会心率 +35%
+const wtCritAdd = (o) => (S.wt?.ks2 === 'gt_judge' && o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8 ? 35 : 0);
+// 強攻撃の押し始め: 居合・踏み込み溜めで、溜めた状態から始める
+function wtChargeStart() {
+  if (!S?.wt) return;
+  if (me.iaiReady) { me.iaiReady = false; me.chargeT = S.chargeMax; floatText(me.x, 3, me.z, '居合', 'just'); }
+  else if (me.primeCharge > 0) { me.chargeT = S.chargeMax * me.primeCharge; me.primeCharge = 0; }
+}
+// 強攻撃を振ったとき: 光波・月の残滓・破城の構えB
+function wtHeavy(lv) {
+  const W = S.wt;
+  me.lastHeavyLv = lv; me.lastHeavyT = now(); me.eyeCharge = false;
+  if (!W) return;
+  const a = aimAngle();
+  if (W.ks1 === 'gt_wave') {
+    const big = lv === 2, moon = big && W.ks2 === 'gt_fullmoon';
+    combat.proj({ a, mult: (big ? 2.0 : 1.0) * (moon ? 1.75 : 1), type: 'heavy', speed: big ? 22 : 24, life: big ? 0.75 : 0.55, rad: moon ? 3.4 : big ? 2.0 : 1.2, color: LIGHT_COLOR, stun: W.br('gt_break') === 'B' ? 6 : 1.5, eclipse: W.ks2 === 'gt_eclipse' });
+    if (big) fx.flash(me.x, 1.5, me.z, LIGHT_COLOR, moon ? 60 : 35, 0.3);
+  }
+  if (W.lv('gt_moon')) {
+    const n = W.br('gt_moon') === 'A' ? 2 : 1, m = W.lv('gt_moon') >= 2 ? 0.8 : 0.5;
+    const stun = W.br('gt_moon') === 'B' || W.br('gt_break') === 'B' ? 4 : 0.5;
+    for (let i = 0; i < n; i++) later(0.12 + i * 0.12, () => combat.proj({ a: a + (n > 1 ? (i ? 0.12 : -0.12) : 0), mult: m, type: 'proc', speed: 24, life: 0.5, rad: 0.9, color: LIGHT_COLOR, wtNo: true, stun }));
+  }
+  if (W.br('gt_siege') === 'B' && hasBuff('gt_siege')) combat.proj({ a, mult: 1.2, type: 'heavy', speed: 22, life: 0.6, rad: 1.6, color: LIGHT_COLOR, stun: 1.5 });
+}
+// 大剣カウンター: 強攻撃を押した直後に攻撃を受けたら、無傷で受け流して反撃する
+function wtCounter(src) {
+  if (S.wt?.ks1 !== 'gt_counter' || !me.charging || now() - me.chargeStart > 0.35) return false;
+  me.charging = false; me.chargeT = 0; me.chargeLv = 0;
+  me.iframe = Math.max(me.iframe, 0.4);
+  const a = src ? Math.atan2(src.x - me.x, src.z - me.z) : me.a;
+  me.a = a; me.swingT = 0; me.swingDur = 0.5; me.combo = 2; me.sw++; me.act++;
+  floatText(me.x, 3.1, me.z, '見切り!', 'just');
+  audio.sfx('perfect'); audio.sfx('block');
+  fx.ringWave(me.x, me.z, 0xffffff, 3, 0.3); fx.flash(me.x, 1.5, me.z, 0xffffff, 40, 0.25);
+  later(0.08, () => { combat.arc(4, 200, 3.5, { type: 'heavy', a, stun: 8 }); fx.slash(me.x, me.z, a, 4, 200, 0xffffff, 1.6); audio.sfx('swing', { heavy: true }); addShake(0.25); });
+  if (S.wt.ks2 === 'gt_iai') me.iaiReady = true;
+  if (S.wt.ks2 === 'gt_mirror') addBuff('gt_mirror', '明鏡', 5, { dmgp: 30 }, 0xe0f0ff);
+  wtEye();
+  return true;
+}
+// 見切り眼: JUST回避・受け流しのあと3秒間ダメージアップ（6秒に1回まで）
+function wtEye() {
+  const W = S.wt;
+  if (!W?.lv('gt_eye') || now() - me.eyeT < 6) return;
+  me.eyeT = now();
+  quietBuff('gt_eye', '見切り眼', 3, { dmgp: W.lv('gt_eye') >= 2 ? 25 : 15 }, 0x9affff);
+  if (W.br('gt_eye') === 'A') me.eyeCharge = true;
+  if (W.br('gt_eye') === 'B') cutCds(2);
 }
 // 熟練度: 今の武器で経験値を得ると上がる
 function gainWeaponProf(n) {
@@ -1343,10 +1427,10 @@ function wtResetTree(wk) {
 function migrateWeaponTrees() {
   char.prof = char.prof || {}; char.wt = char.wt || {};
   let back = 0;
-  for (const id of Object.keys(char.tree)) if (id.startsWith('sword_')) { back += char.tree[id]; delete char.tree[id]; }
-  const gone = ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance'];
+  for (const id of Object.keys(char.tree)) if (id.startsWith('sword_') || id.startsWith('greatsword_') || id.startsWith('gs_')) { back += char.tree[id]; delete char.tree[id]; }
+  const gone = ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance', 'gslam', 'fortress', 'gs_guillotine', 'gs_rising', 'gs_broad', 'gs_recoil', 'gs_siege'];
   char.slots = char.slots.map((id) => (id && (gone.includes(id) || !TREE_SKILLS[id]) ? null : id));
-  if (back) later(1, () => toast(`片手剣は新しい武器ツリーになりました。旧ツリーの ${back} ポイントを返しました`, '#ffd84a'));
+  if (back) later(1, () => toast(`片手剣・大剣は新しい武器ツリーになりました。旧ツリーの ${back} ポイントを返しました`, '#ffd84a'));
   if (params.has('prof')) {
     const wk = char.eq.weapon?.kind || 'sword', p = profOf(char, wk);
     p.lv = clamp(Math.round(+params.get('prof')) || 1, 1, 20); p.xp = 0;
@@ -1532,6 +1616,7 @@ const combat = {
   fx,
   S: () => S,
   wt: () => S.wt,
+  primeCharge(frac) { me.primeCharge = frac; },
   parry(sec, dr) { addBuff('sw_parry', '受け流し', sec, { dr }, 0xbfe0ff); me.parryUntil = now() + sec; me.parryDone = false; },
   aim: aimAngle,
   col: () => RARITIES[S.wr].color,
@@ -1591,7 +1676,7 @@ const combat = {
     const color = o.color ?? RARITIES[S.wr].color;
     const mesh = o.shape === 'axe' ? phantomAxe(color) : fx.waveMesh(color);
     mesh.position.set(o.sx ?? me.x, 1, o.sz ?? me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, x: o.sx ?? me.x, z: o.sz ?? me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast, wave: o.shape !== 'axe', wtNo: !!o.wtNo });
+    projs.push({ mesh, x: o.sx ?? me.x, z: o.sz ?? me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast, wave: o.shape !== 'axe', wtNo: !!o.wtNo, stun: o.stun, eclipse: !!o.eclipse });
     audio.sfx('wave');
   },
   dash(a, dist, dur, iframe) {
@@ -1679,6 +1764,7 @@ function doHeavy(lv) {
   if (!canAct() || lv < 1) return;
   startAttack(); me.act++;
   wtRevenge();
+  wtHeavy(lv);
   me.a = aimAngle();
   me.swingT = 0; me.swingDur = 0.5; me.combo = 2; me.sw++;
   audio.sfx('heavy');
@@ -1820,7 +1906,7 @@ function updateProjs(dt) {
     fx.parts.emit(w.x, 1, w.z, { color: w.color ?? w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
     for (const mb of [...mobs.values()]) {
       if (w.hit.has(mb.id)) continue;
-      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, tech: w.tech, noProc: true, sv: w.sv, cast: w.cast, wave: w.wave, proj: w, wtNo: w.wtNo }); }
+      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); dealDamage(mb, w.mult, { type: w.type, tech: w.tech, noProc: true, sv: w.sv, cast: w.cast, wave: w.wave, proj: w, wtNo: w.wtNo, stun: w.stun }); }
     }
     projRevive(w, false);
     const c = collide(world.def, w.x, w.z, 0.1, world.door);
@@ -1856,6 +1942,9 @@ function updateBossProjs(dt) {
         audio.sfx('block');
         fx.parts.burst(p.x, 1.3, p.z, 20, { color: 0xbfe0ff, speed: 6, size: 0.4, life: 0.35 });
         gone = true;
+      } else if (wtCounter(p)) {
+        net.send({ t: 'pblock', id: p.id });
+        gone = true; // 大剣カウンターで弾を受け流す
       } else if (me.iframe > 0) {
         if (!p.dodged) { p.dodged = true; onJustDodge(); }
       } else {
@@ -2599,7 +2688,7 @@ function updateBowGuide(t) {
   G.group.visible = !!S.W.ranged && !me.dead;
   if (!G.group.visible) return;
   const w = bowZoneWidth(), [rin, rout] = bowZone(w);
-  const charge = me.charging ? clamp(me.chargeT / CHARGE_MAX, 0, 1) : 0;
+  const charge = me.charging ? clamp(me.chargeT / S.chargeMax, 0, 1) : 0;
   G.group.position.set(me.x, heightAt(me.x, me.z) + 0.1, me.z);
   for (const m of [G.band, G.outer]) m.scale.set(rout, rout, 1);
   G.inner.scale.set(Math.max(0.05, rin), Math.max(0.05, rin), 1);
@@ -2764,10 +2853,10 @@ function update(dt) {
 
     // 溜め
     if (me.charging) {
-      me.chargeT += dt * (1 + buffMod('chargeRate') / 100); // 集中で溜めが速くなる
+      me.chargeT += dt * (1 + buffMod('chargeRate') / 100) * (me.eyeCharge ? 2 : 1); // 集中・見切り眼Aで溜めが速くなる
       if (me.chargeT >= CHARGE_MIN) {
         me.a = aimAngle();
-        const lv = me.chargeT >= CHARGE_MAX ? 2 : 1;
+        const lv = me.chargeT >= S.chargeMax ? 2 : 1;
         if (lv !== me.chargeLv) {
           me.chargeLv = lv;
           audio.sfx(lv === 2 ? 'charged' : 'charge', { lv });
@@ -2832,7 +2921,7 @@ function update(dt) {
     down: me.crawl ? 1 : me.downT > 0 ? Math.min(1, (REACT.downT - me.downT) / 0.12, me.downT / 0.25) : 0,
     hurt: me.hurtT > 0 ? Math.sin(me.hurtT / 0.28 * Math.PI) : 0,
     motion: me.motion, motionT: me.motionT,
-    charging: me.charging, charge: Math.min(1, me.chargeT / CHARGE_MAX),
+    charging: me.charging, charge: Math.min(1, me.chargeT / (S?.chargeMax || CHARGE_MAX)),
     gg: me.gg / GUARD.max, // 盾の縁の光（ガードゲージの残り）
     sweep: me.sweepT > 0 ? sweepAngle(me.sweepT) : -1, // ガードカウンターの回転なぎ払い（回った角度）
   });
@@ -3020,7 +3109,7 @@ const game = {
   get characterLost() { return characterStore.lost; },
   get S() { return S; },
   me, world, settings, others, mobs, npcs, drops, input,
-  CHARGE_MIN, CHARGE_MAX,
+  CHARGE_MIN, get CHARGE_MAX() { return S?.chargeMax || CHARGE_MAX; },
   env: () => env,
   roster: () => roster,
   boss: () => [...mobs.values()].find((m) => m.kind === 2),
@@ -3094,6 +3183,6 @@ loop();
 
 window.__game = { me, others, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, camera, coins, audio, api: game,
   // 自動テスト用の操作（通常攻撃・強攻撃・スキル）
-  dbg: { canAct, swing: () => { if (canAct() && me.swingT >= me.swingDur) doSwing(); }, heavy: doHeavy, tree: tryTreeSkill, ws: tryWeaponSkill },
+  dbg: { canAct, press: (on) => (on ? input.pointerDown(0) : input.pointerUp(0)), swing: () => { if (canAct() && me.swingT >= me.swingDur) doSwing(); }, heavy: doHeavy, tree: tryTreeSkill, ws: tryWeaponSkill },
 };
 

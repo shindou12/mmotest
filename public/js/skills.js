@@ -561,8 +561,7 @@ const weaponTree = (k, names, a1, a2, cap) => [
 ];
 
 export const TREES = {
-  // 片手剣は新しい武器ツリー（weapon-tree.js）に移った
-  greatsword: { name: '大剣', nodes: weaponTree('greatsword', ['大剣の心得'], 'gslam', 'fortress', { name: '大地割り', flag: 'quake', desc: '兜割りの後、さらに大きな衝撃波が広がる' }) },
+  // 片手剣・大剣は新しい武器ツリー（weapon-tree.js）に移った
   spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ガードカウンターの威力 +30%' }) },
   dagger: { name: '短剣', nodes: weaponTree('dagger', ['短剣の心得'], 'poison', 'smoke', { name: '暗殺術', mods: { crit: 8, critd: 40 }, desc: '会心率 +8%、会心ダメージ +40%' }) },
   axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },

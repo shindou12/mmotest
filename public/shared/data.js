@@ -53,7 +53,7 @@ export const WEAPONS = {
   },
   greatsword: {
     name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true,
-    passive: ['強攻撃ダメージ +20%', '溜め中はひるまない'],
+    passive: [], // 大剣は武器ツリー（熟練度）で決める
     skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
   },
   spear: {

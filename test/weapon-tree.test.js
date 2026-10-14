@@ -112,3 +112,29 @@ test('sword skills scale with lv and change shape with the chosen branch', () =>
   assert.deepEqual(ev.find((e) => e.m === 'parry').a, [0.4, 70]);
   assert.equal(ev.find((e) => e.m === 'line').a[2], 2.2);
 });
+
+test('greatsword: same tree shape, light-wave / one-blow / counter classes, and skills scale with lv', () => {
+  const c = fresh();
+  profOf(c, 'greatsword').lv = 20;
+  assert.equal(TREES.greatsword, undefined, 'old greatsword tree is gone');
+  assert.ok(wtLearn(c, 'gt_counter'));
+  assert.ok(!wtCanLearn(c, 'gt_wave'), 'one class');
+  assert.ok(!wtCanLearn(c, 'gt_judge'), 'master must follow the class');
+  assert.ok(wtLearn(c, 'gt_iai'));
+  wtLearn(c, 'gt_charge'); wtLearn(c, 'gt_charge');
+  wtLearn(c, 'gt_break');
+  const E = wtEffects(c, 'greatsword');
+  assert.equal(E.mods.heavyp, 25, 'the old +20% heavy passive now lives in the tree');
+  assert.equal(E.mods.stunp, 20);
+  const run = (id) => { const k = ctx(wtEffects(c, 'greatsword')); k.c.shake = () => {}; k.c.primeCharge = (f) => k.events.push({ m: 'prime', a: [f] }); TREE_SKILLS[id].run(k.c); k.run(); return k.events; };
+  wtLearn(c, 'gt_recoil'); wtLearn(c, 'gt_recoil'); wtLearn(c, 'gt_recoil'); wtChoose(c, 'gt_recoil', 'A');
+  const waves = run('gt_recoil').filter((e) => e.m === 'proj');
+  assert.equal(waves.length, 2, 'twin light waves');
+  assert.ok(Math.abs(waves[0].a[0].mult - 6.4 * 0.7) < 1e-9);
+  wtLearn(c, 'gt_slam'); wtLearn(c, 'gt_slam'); wtLearn(c, 'gt_slam'); wtChoose(c, 'gt_slam', 'B');
+  const slam = run('gt_slam');
+  assert.equal(slam.find((e) => e.m === 'circle').a[3], 6.5);
+  assert.deepEqual(slam.find((e) => e.m === 'prime').a, [0.5], 'landing primes half a charge');
+  wtLearn(c, 'gt_guillo');
+  assert.equal(run('gt_guillo').find((e) => e.m === 'line').a[2], 6.5);
+});
