@@ -179,6 +179,61 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .slotbtns { position: absolute; top: 6px; right: 6px; display: flex; gap: 3px; }
 .slotbtns button { padding: 1px 7px; font-size: 11px; }
 .slotbtns button.on { background: #8a6aff; border-color: #c9b4ff; }
+/* 新しい武器ツリー（熟練度） */
+.wt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.3); }
+.wt-prof { font-size: 13px; color: var(--dim); } .wt-prof b { font-size: 20px; color: var(--acc); margin: 0 3px; }
+.wt-bar { flex: 1; min-width: 120px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.wt-bar i { display: block; height: 100%; background: var(--acc); }
+.wt-head .dim { flex-basis: 100%; }
+.wt-row { display: grid; grid-template-columns: 62px 1fr; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.wt-req { text-align: center; padding-top: 4px; } .wt-req b { display: block; font-size: 17px; color: var(--acc); } .wt-req small { font-size: 10px; color: var(--dim); }
+.wt-row.locked .wt-nodes { filter: grayscale(.8); opacity: .4; pointer-events: none; } .wt-row.locked .wt-req b { color: var(--dim); }
+.wt-excl { text-align: center; font-size: 11px; color: #ff9a2e; margin-bottom: 5px; } .wt-excl.k2 { color: #ff3d63; }
+.wt-nodes { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wt-nodes.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 68%; margin: 0 auto; }
+@media (max-width: 700px) { .wt-nodes, .wt-nodes.n2 { grid-template-columns: 1fr; width: auto; } }
+.wt-node { position: relative; padding: 7px 9px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.35); cursor: pointer; min-width: 0; }
+.wt-node.can { border-color: #ffd84a; box-shadow: 0 0 10px rgba(255,216,74,.2) inset; }
+.wt-node.can:hover { background: rgba(255,216,74,.1); }
+.wt-node.have { border-color: rgba(98,220,106,.6); background: rgba(98,220,106,.07); }
+.wt-top { display: flex; align-items: center; gap: 6px; padding-right: 48px; }
+.wt-ic { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; background: rgba(255,255,255,.08); flex: none; }
+.wt-node.skill .wt-ic { border-radius: 50%; }
+.wt-nm { font-size: 13px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-top .pips { margin: 0; } .wt-top .pips i { width: 9px; height: 9px; } .wt-top .pips i.on { background: #62dc6a; }
+.wt-node.ks .wt-top { padding-right: 0; }
+.wt-val, .wt-desc { font-size: 11px; color: #c8d4e4; margin: 4px 0; line-height: 1.5; }
+.wt-val b { color: #fff; font-weight: normal; }
+.wt-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.wt-tag { font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid currentColor; line-height: 1.5; }
+.wt-tag.t-wave { color: #6ad0ff; } .wt-tag.t-cd { color: #b86cff; } .wt-tag.t-crit { color: #ffd84a; } .wt-tag.t-dodge { color: #62dc6a; } .wt-tag.t-hurt { color: #ff7a6a; }
+.wt-br { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
+.wt-br div { border: 1px dashed var(--line); border-radius: 6px; padding: 3px 6px; font-size: 10.5px; line-height: 1.45; color: var(--dim); }
+.wt-br div b { display: block; font-size: 11px; color: var(--txt); }
+.wt-br div.pick { cursor: pointer; border-style: solid; border-color: #ffd84a; color: var(--txt); animation: wtGlow 1.4s ease-in-out infinite; }
+.wt-br div.pick:hover { background: rgba(255,216,74,.14); }
+.wt-br div.chosen { border-style: solid; border-color: #ffd84a; background: rgba(255,216,74,.14); color: var(--txt); }
+.wt-br div.lost { opacity: .3; }
+@keyframes wtGlow { 50% { box-shadow: 0 0 10px rgba(255,216,74,.5); } }
+/* 種類の見分け: スキル=青の丸・左に青の帯 / パッシブ=緑の四角・点線の帯 / クラス・マスター=菱形・色付きの背景 */
+.wt-kind { display: inline-block; margin-right: 3px; font-size: 9.5px; padding: 0 5px; border-radius: 4px; line-height: 1.6; white-space: nowrap; flex: none; }
+.wt-kind.k-skill { color: #0a1424; background: #6ad0ff; }
+.wt-kind.k-passive { color: #9ee6a0; border: 1px solid rgba(98,220,106,.6); }
+.wt-kind.k-ks1 { color: #1a0e00; background: #ff9a2e; } .wt-kind.k-ks2 { color: #fff; background: #ff3d63; }
+.wt-node.skill { border-left: 3px solid #6ad0ff; }
+.wt-node.skill .wt-ic { background: rgba(106,208,255,.2); box-shadow: 0 0 8px rgba(106,208,255,.35); }
+.wt-node.passive { border-left: 3px dotted #62dc6a; background: rgba(20,30,20,.35); }
+.wt-node.passive .wt-ic { background: rgba(98,220,106,.16); border-radius: 4px; }
+.wt-node.ks { border-width: 2px; border-color: rgba(255,154,46,.45); background: linear-gradient(160deg, rgba(255,154,46,.14), rgba(0,0,0,.4) 60%); }
+.wt-node.ks.k2 { border-color: rgba(255,61,99,.45); background: linear-gradient(160deg, rgba(255,61,99,.16), rgba(0,0,0,.4) 60%); }
+.wt-node.ks .wt-ic { transform: rotate(45deg); border-radius: 3px; background: rgba(255,154,46,.3); border: 1px solid #ff9a2e; }
+.wt-node.ks.k2 .wt-ic { background: rgba(255,61,99,.3); border-color: #ff3d63; }
+.wt-ic > span { display: inline-block; }
+.wt-node.ks .wt-ic > span { transform: rotate(-45deg); }
+.wt-node.ks .wt-nm { color: #ff9a2e; } .wt-node.ks.k2 .wt-nm { color: #ff3d63; }
+.wt-node.ks.have { border-color: #ff9a2e; background: linear-gradient(160deg, rgba(255,154,46,.32), rgba(0,0,0,.35) 70%); box-shadow: 0 0 14px rgba(255,154,46,.3); }
+.wt-node.ks.k2.have { border-color: #ff3d63; background: linear-gradient(160deg, rgba(255,61,99,.32), rgba(0,0,0,.35) 70%); box-shadow: 0 0 14px rgba(255,61,99,.35); }
+.wt-node.ks.other { opacity: .35; }
 
 /* 設定 */
 #settings { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, 94vw); padding: 14px; z-index: 20; display: flex; flex-direction: column; gap: 12px; }

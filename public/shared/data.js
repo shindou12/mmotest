@@ -48,7 +48,7 @@ export const DROP_GRADES = [
 export const WEAPONS = {
   sword: {
     name: '片手剣', range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4, stun: 1.0, melee: true,
-    passive: ['回避の無敵時間 +0.1秒', '攻撃を当てるたびにスキルのクールタイムが0.15秒縮む'],
+    passive: [], // 片手剣は武器ツリー（熟練度）で決める
     skill: { name: 'ヴォーパル・ストライク', cd: 5, desc: '前方へ突進しながら貫く', mult: 3.2 },
   },
   greatsword: {
