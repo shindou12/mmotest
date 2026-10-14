@@ -3,7 +3,7 @@ import { SPEAR_TIMINGS } from '../../shared/skill-timings.js';
 import { counterAngle } from '../spear-motion.js';
 import { BALANCE } from '../../shared/balance.js';
 import * as THREE from 'three';
-import { MAX_LEVEL, RARITIES, xpToNext } from '../../shared/data.js';
+import { MAX_LEVEL, RARITIES, WEAPONS, xpToNext } from '../../shared/data.js';
 import { collide } from '../../shared/areas.js';
 import { makeWeapon } from '../models.js';
 import { HEAVY, TREE_SKILLS } from '../skills.js';
@@ -131,7 +131,7 @@ export function doSwing() {
   }
   const range = W.range * fxReduce('reach', 1, true);
   fx.slash(me.x, me.z, me.a, range, W.arc, fxReduce('swingColor', col), 1.0, me.combo % 2 === 1);
-  audio.sfx('swing', { heavy: S.wk === 'greatsword' || S.wk === 'axe' || me.combo === 2 });
+  audio.sfx('swing', { heavy: !!WEAPONS[S.wk]?.twoHanded || me.combo === 2 });
   later(0.06, () => combat.arc(range, W.arc, mult, { a, type: 'normal' }));
   fxCall('swingExtra', a, range, col); // 連突き・一点突破 など
   const waved = me.combo === 2 && S.fx.has('wave');

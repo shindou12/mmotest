@@ -44,7 +44,7 @@ export const DROP_GRADES = [
 // --- 武器種 ---------------------------------------------------------------
 // weight: 装備重量（回避のクールタイムに影響）
 // stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ
-// melee: 近接武器（生存本能を持つ）
+// melee: 近接武器（生存本能を持つ） / twoHanded: 両手で振る重い武器（構え・振りの動きと音が変わる）
 export const WEAPONS = {
   sword: {
     name: '片手剣', range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4, stun: 1.0, melee: true,
@@ -52,7 +52,7 @@ export const WEAPONS = {
     skill: { name: 'ヴォーパル・ストライク', cd: 5, desc: '前方へ突進しながら貫く', mult: 3.2 },
   },
   greatsword: {
-    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true,
+    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true, twoHanded: true,
     passive: [], // 大剣は武器ツリー（熟練度）で決める
     skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
   },
@@ -68,7 +68,7 @@ export const WEAPONS = {
     skill: { name: 'シャドウ・ダンス', cd: 4.5, desc: '目にも止まらぬ五連撃', mult: 1.0 },
   },
   axe: {
-    name: '大斧', range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true,
+    name: '大斧', range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true, twoHanded: true,
     passive: [], // 大斧は武器ツリー（熟練度）で決める
   },
   // 弓: 矢を飛ばす。弓を引くと足元から射程の円が広がり、矢はその円の端まで届く

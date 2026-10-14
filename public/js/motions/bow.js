@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { aimHand, clamp } from '../pose-rig.js';
+import { aimHand, clamp, ease } from '../pose-rig.js';
 
 export function applyBowPose(u, s) {
     const active = s.charging || s.swing >= 0;
@@ -30,4 +30,14 @@ export function applyBowSwing(u, s, e) {
   u.armR.rotation.set(-Math.PI / 2, 0, 0.1);u.armR.position.z = 0;
   u.armL.rotation.set(-Math.PI / 2 + 0.2, 0, -0.6 + e * 0.3);
   u.body.rotation.y = 0;
+}
+
+// 技（矢の技）の姿勢: 引き具合 p.draw で弓を引き、始めと終わりは構えから溶け込む
+export function applyBowTechnique(u, s, t, p) {
+  const time=s.motionT||0,blend=ease(Math.min(1,time/.08))*ease(Math.max(0,Math.min(1,(t.duration-time)/.12)));
+  applyBowPose(u,{...s,charging:true,charge:p.draw,swing:-1,bowStance:1+p.bodyYaw,bowHeight:1.25+.11*blend});
+  const idle=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.25,0,.12));u.armR.quaternion.copy(idle.slerp(u.armR.quaternion.clone(),blend));
+  u.elbowR.quaternion.slerp(new THREE.Quaternion(),1-blend);
+  u.weaponModel.userData.bow.arrow.visible=p.draw>.03;
+  u.body.rotation.x=p.lean;u.body.position.y+=p.lift;
 }

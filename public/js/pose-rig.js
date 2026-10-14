@@ -5,6 +5,7 @@ const down = new THREE.Vector3(0, -1, 0);
 const width = new THREE.Vector3(), shaft = new THREE.Vector3(), normal = new THREE.Vector3();
 const basis = new THREE.Matrix4(), desired = new THREE.Quaternion();
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+export const ease = (k) => k * k * (3 - 2 * k);
 
 // Two equal arm segments. Targets and orientations are expressed in body space.
 export function aimHand(arm, elbow, goal, bend) {

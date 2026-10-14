@@ -1,8 +1,5 @@
-// Shared attack precedence; weapon-specific arm/torso poses are delegated.
-import { applyBowSwing } from './motions/bow.js';
-import { applySpearSwing } from './motions/spear.js';
-import { applyMeleeSwing } from './motions/melee.js';
-const swings = { spear: applySpearSwing, bow: applyBowSwing };
+// Shared attack precedence; weapon-specific arm/torso poses are delegated (motions/index.js の登録表).
+import { weaponMotion } from './motions/index.js';
 export function applyAttackMotion(u, s, walk) {
   if (s.sweep >= 0) {
     u.body.rotation.y = s.sweep;
@@ -11,12 +8,12 @@ export function applyAttackMotion(u, s, walk) {
     const k = s.swing;
     const e = k < 0.25 ? k / 0.25 : 1 - (k - 0.25) / 0.75 * 0.3;
     const dir = s.combo % 2 === 0 ? 1 : -1;
-    (swings[s.kind] || applyMeleeSwing)(u, s, e, dir);
-    if (u.wKind === 'bow' && u.weapon) u.weapon.rotation.x = Math.PI / 2;
+    weaponMotion(s.kind).swing(u, s, e, dir);
+    weaponMotion(u.wKind).afterSwing?.(u);
   } else if (s.spin >= 0) {
     u.body.rotation.y = s.spin * Math.PI * 4;u.armR.rotation.set(-Math.PI / 2, 0, 0);
   } else {
     u.armR.rotation.set(walk * 0.4 - 0.25, 0, 0.12);u.armR.position.z = 0;u.body.rotation.y = 0;
-    if (u.wKind === 'bow' && u.weapon) u.weapon.rotation.x = 0;
+    weaponMotion(u.wKind).rest?.(u);
   }
 }

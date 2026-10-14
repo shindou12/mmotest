@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { aimHand, orientWeapon, clamp } from '../pose-rig.js';
+import { WEAPONS } from '../../shared/data.js';
 
 export function applyMeleePose(u, s) {
   if (s.guard && u.wKind === 'sword') {
@@ -12,7 +13,7 @@ export function applyMeleePose(u, s) {
     orientWeapon(u, yaw, pitch);
     return;
   }
-  const heavyWeapon = u.wKind === 'greatsword' || u.wKind === 'axe';
+  const heavyWeapon = !!WEAPONS[u.wKind]?.twoHanded;
   const k = clamp(s.swing ?? -1, 0, 1), dir = (s.combo || 0) % 2 === 0 ? 1 : -1;
   let yaw = -.2, pitch = .25;
   if (s.swing >= 0) {
@@ -36,4 +37,16 @@ export function applyMeleePose(u, s) {
 export function applyMeleeSwing(u, s, e, dir) {
   u.armR.rotation.set(-1.4 + e * 0.2, 0, dir * (1.4 - e * 2.8));u.armR.position.z = 0;
   u.body.rotation.y = dir * (0.5 - e) * 0.6;
+}
+
+// 技の姿勢: 右手の位置と武器の向き。両手持ちは左手も柄に添える
+export function applyMeleeTechnique(u, s, t, p) {
+  const twoHanded = !!WEAPONS[t.kind]?.twoHanded;
+  u.armR.position.z=0;u.body.rotation.y=p.bodyYaw;u.body.rotation.x=p.lean;u.body.position.y+=p.lift;
+  const grip=aimHand(u.armR,u.elbowR,new THREE.Vector3(twoHanded?p.x-.34:p.x,p.y,p.z),new THREE.Vector3(1,-.6,-.3));
+  if(twoHanded){
+   const yaw=p.yaw-p.bodyYaw,axis=new THREE.Vector3(Math.sin(yaw)*Math.cos(p.pitch),Math.sin(p.pitch),Math.cos(yaw)*Math.cos(p.pitch));
+   aimHand(u.armL,u.elbowL,grip.clone().addScaledVector(axis,-.18),new THREE.Vector3(-1,-.6,-.2));
+  }else if(p.guard>0){u.armL.rotation.set(-1.15*p.guard,0,-.3);u.elbowL.rotation.x=-.4*p.guard;}
+  orientWeapon(u,p.yaw-p.bodyYaw,p.pitch);u.head.rotation.y=-p.bodyYaw*.6;
 }
