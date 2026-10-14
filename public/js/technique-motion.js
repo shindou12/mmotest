@@ -78,6 +78,8 @@ const CUSTOM={
  dive:[{at:0},{at:.1,pitch:.4,y:1.3,z:.22,lift:-.18,lean:.2,leg:.4},{at:.28,pitch:1.3,y:1.72,z:.16,lift:1.35,lean:-.22,leg:-.3},{at:.44,pitch:-1.2,y:1.5,z:.42,lift:1.0,lean:.35,leg:-.1},{at:.55,pitch:-1.3,y:1.1,z:.5,lift:0,lean:.32,leg:.45},{at:.7,pitch:-1.2,y:1.12,z:.48,lift:-.08,lean:.25,leg:.35},{at:.85}],
  fanleap:[{at:0},{at:.08,pitch:.3,z:.2,lift:-.12,leg:.35},{at:.2,pitch:.6,y:1.5,z:.2,lift:.9,lean:-.1,leg:-.2},{at:.24,yaw:-.5,pitch:-.6,z:.55,lift:.5,lean:.3},{at:.32,yaw:0,pitch:-.6,z:.58,lift:.2,lean:.3},{at:.4,yaw:.5,pitch:-.6,z:.55,lift:0,lean:.3,leg:.35},{at:.75}],
  stomp:[{at:0},{at:.12,pitch:.5,y:1.4,z:.25,lean:-.12,lift:.12,leg:-.6},{at:.24,pitch:.7,y:1.45,z:.22,lean:-.18,lift:.2,leg:-.75},{at:.3,pitch:.2,y:1.2,z:.35,lean:.2,lift:-.12,leg:.5},{at:.45,pitch:.2,y:1.22,z:.33,lean:.15,lift:-.08,leg:.4},{at:.6}],
+ fullshot:[{at:0,draw:1,lean:.04},{at:.04,draw:0,lean:-.2,bodyYaw:.18,lift:.04},{at:.18,draw:0,lean:-.1,bodyYaw:.1},{at:.4}],
+ chimeleap:[{at:0},{at:.1,draw:.3,guard:1},{at:.2,draw:0,bodyYaw:-.2,lean:-.1,guard:1},{at:.4,draw:0,lean:-.3,lift:.35,guard:.5},{at:.6,lean:-.1,lift:.05},{at:.75}],
  slam:[{at:0},{at:.09,pitch:.9,y:1.32,z:.2,lift:-.16,lean:.18,leg:.35},{at:.22,pitch:1.55,y:1.74,z:.16,lift:1.15,lean:-.18,leg:-.25},{at:.36,pitch:-.5,y:1.1,z:.52,lift:0,lean:.26,leg:.4},{at:.52,pitch:-.45,y:1.1,z:.5,lift:-.06,lean:.22,leg:.35},{at:.8}],
 };
 export const ALL_MOTIONS=Object.freeze({...TECHNIQUES,...TREE_MOTIONS});

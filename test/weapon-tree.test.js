@@ -257,13 +257,13 @@ test('axe: berserker / crush / throw classes, the old heavy +25% and lifesteal m
   assert.equal(hk[0].a[1], 360, 'pulls from all around'); assert.equal(hk[0].a[3].tech, 'axe_hook');
 });
 
-test('bow: sniper / rapid / trapper classes, zone passives, skills scale and branch', () => {
+test('bow: sniper / rapid / trapper classes, range passives, skills scale and branch', () => {
   const c = fresh();
   profOf(c, 'bow').lv = 20;
   assert.equal(TREES.bow, undefined, 'old bow tree is gone');
   wtLearn(c, 'bw_zone'); wtLearn(c, 'bw_zone'); wtLearn(c, 'bw_draw'); wtLearn(c, 'bw_draw');
   const E = wtEffects(c, 'bow');
-  assert.equal(E.v('bw_zone', 'zw'), 3); assert.equal(E.mods.heavyp, 25);
+  assert.equal(E.v('bw_zone', 'rng'), 5); assert.equal(E.mods.heavyp, 25);
   assert.ok(wtLearn(c, 'bw_trapper')); assert.ok(!wtCanLearn(c, 'bw_sniper')); assert.ok(!wtCanLearn(c, 'bw_hawk')); assert.ok(wtLearn(c, 'bw_shot'));
   const run = (id) => {
     const k = ctx(wtEffects(c, 'bow'));

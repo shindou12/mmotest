@@ -10,7 +10,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
-  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE, SKILL_VARIANTS, SV, isVariant, transcendCount, displayName, isLegend, gradeItem, affixVal, enhMult, titleReqOk,
+  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, SKILL_VARIANTS, SV, isVariant, transcendCount, displayName, isLegend, gradeItem, affixVal, enhMult, titleReqOk,
   migrateItem, makeTitle, TITLES, TITLE_DROPS, salvageMats, affixName, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost,
   CRAFT_MAX_TIER, weightedTier, loreTitle,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
@@ -235,9 +235,10 @@ function calcStats() {
     ws: WEAPON_SKILLS[weaponSkillId()], weight, wc,
     dodgeCd: DODGE_CD * wc.cd * (1 - Math.min(60, m('dodgecd')) / 100) * P.dodge,
     iframeBonus: P.iframe + (WT ? WT.v('sw_light', 'iframe') : 0) + (WT?.br('bw_roll') === 'B' ? 0.1 : 0), stunp: m('stunp'),
-    // 弓: 適性距離（遠矢で +3m）と適性エリアの幅（鷹の目の心得で広がる）
-    optimal: (W.optimal || 0) + (WT?.br('bw_zone') === 'B' ? 3 : 0), zoneMin: BOW_ZONE.min + (WT ? WT.v('bw_zone', 'zw') : 0), zoneMax: BOW_ZONE.max + m('zone') + (WT ? WT.v('bw_zone', 'zw') : 0),
+    // 弓: 引かずに撃つ射程（張り弦 +4m）・最大射程（遠見の心得）・弓を引く速さ（速引き +30%）
+    bowBase: (W.baseRange || 0) + (WT?.br('bw_zone') === 'A' ? 4 : 0), bowMax: (W.range || 0) + (WT ? WT.v('bw_zone', 'rng') : 0), bowDraw: (W.draw || 1) * (WT?.br('bw_draw') === 'A' ? 1.3 : 1),
   };
+  if (W.ranged) S.chargeMax = Math.max(0.3, (S.bowMax - S.bowBase) / S.bowDraw); // 弓: 最大射程まで引いたら最大の溜め
   me.hp = Math.min(me.hp, S.mhp);
   if (S.wt?.ks1 !== 'sw_glad' && me.mom) setMom(0);
   S.wst = weaponStyle(eq.weapon);
@@ -246,13 +247,11 @@ function calcStats() {
   ui?.refresh();
 }
 
-// 弓の適性エリア: 外側の円（適性距離）から内側へ、引き絞るほど広がる
-function bowZoneWidth() {
-  if (!me.charging) return S.zoneMin;
-  const k = clamp(me.chargeT / S.chargeMax, 0, 1);
-  return S.zoneMin + (S.zoneMax - S.zoneMin) * k;
+// 弓の射程: 引くほど足元の円が広がり（弓を引く速さ）、最大射程で止まる。引かずに撃つ矢は bowBase まで
+function bowRange() {
+  if (!me.charging) return S.bowBase;
+  return Math.min(S.bowMax, S.bowBase + S.bowDraw * me.chargeT);
 }
-function bowZone(w = S.zoneMin) { const outer = S.optimal; return [Math.max(0, outer - w), outer]; }
 
 function itemPower(it) {
   if (!it) return 0;
@@ -343,7 +342,7 @@ const input = {
     if (button === 0) {
       mouse.l = false;
       if (me.charging && started) {
-        me.releaseZoneW = S ? bowZoneWidth() : BOW_ZONE.min;
+        me.releaseRange = S?.W.ranged ? bowRange() : 0;
         me.charging = false;
         endGuard(); // 盾槍: 離したらガードを解いて強攻撃（ガードで受けていればガードカウンター）
         if (me.chargeT < CHARGE_MIN) me.queued = now() + 0.45; // 短押し → 通常攻撃（入力を少しの間覚えておく）
@@ -1407,7 +1406,7 @@ function wtDr() {
   return dr;
 }
 // 断罪: 最大溜めの強攻撃の会心率 +35%
-const wtCritAdd = (o) => (S.wt?.ks2 === 'gt_judge' && o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8 ? 35 : 0) + (S.wt?.br('bw_crit') === 'A' && o.zoneHit ? 10 : 0); // 急所射ち: 適性エリアで +10%
+const wtCritAdd = (o) => (S.wt?.ks2 === 'gt_judge' && o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8 ? 35 : 0) + (S.wt?.br('bw_crit') === 'A' && o.full ? 15 : 0) + (S.wt?.br('bw_quiver') === 'A' && o.type === 'tskill' && S.wk === 'bow' ? 15 : 0); // 急所射ち・鋭矢
 // 強攻撃の押し始め: 居合・踏み込み溜めで、溜めた状態から始める
 function wtChargeStart() {
   if (!S?.wt) return;
@@ -1610,12 +1609,12 @@ function spBanner(x, z) {
   fx.beam(x, z, 0x6ab0ff, 4, 0.5, 0.5);
 }
 // ---- 弓 ----
-// 最大溜めの矢（狙撃手）が当たった / 外れた: 鷹の目・狙い澄まし
-function bwSnipe(inZone) {
+// 最大まで引いた矢（狙撃手）が当たった / 外れた: 鷹の目・狙い澄まし
+function bwSnipe(hit) {
   const W = S.wt;
-  if (W?.ks2 === 'bw_hawk' && inZone && now() - me.hawkT > 8) { me.hawkT = now(); me.iaiReady = true; fx.ringWave(me.x, me.z, 0xffd84a, 2, 0.3); }
+  if (W?.ks2 === 'bw_hawk' && hit && now() - me.hawkT > 8) { me.hawkT = now(); me.iaiReady = true; fx.ringWave(me.x, me.z, 0xffd84a, 2, 0.3); }
   if (W?.ks2 === 'bw_aim') {
-    me.aimN = inZone ? Math.min(3, me.aimN + 1) : 0;
+    me.aimN = hit ? Math.min(3, me.aimN + 1) : 0;
     me.buffs = me.buffs.filter((b) => b.id !== 'bw_aim');
     if (me.aimN > 0) me.buffs.push({ id: 'bw_aim', label: `狙い澄まし +${me.aimN * 10}%`, t: 1e9, max: 1e9, mods: {}, color: 0xffd84a });
   }
@@ -1676,6 +1675,7 @@ function bwBlast(t) {
 function wtOnDodge() {
   const W = S.wt;
   if (!W) return;
+  if (W.br('bw_roll') === 'A') quietBuff('bw_rollA', '受け身引き', 1.4, { chargeRate: 100 }, 0x9ae8ff);
   if (W.ks2 === 'bw_quick') quietBuff('bw_quick', '速射', 1.5 + 0.38, { aspd: 40 }, 0x9affc8);
   if (W.ks1 === 'bw_trapper' && now() - me.trapT >= 2) {
     me.trapT = now();
@@ -1973,12 +1973,14 @@ const combat = {
   point: aimPoint,
   area: () => world.area,
   targets: (x,z,r) => [...mobs.values()].filter(m=>m.hp>0&&Math.hypot(m.x-x,m.z-z)<r+m.rad),
-  zone: () => bowZone(me.releaseZoneW ?? BOW_ZONE.min),
+  range: () => me.releaseRange || S.bowMax, // 弓: 離したときの射程
   arrow(o) {
     const color = o.color ?? RARITIES[S.wr].color;
     const mesh = arrowMesh(color, o.big);
     mesh.position.set(me.x, 1.2, me.z); mesh.rotation.y = o.a;
-    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (WEAPONS.bow.range + 4) / (o.speed ?? 42), rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), zone: o.noZone || (o.type === 'tskill' && S.wt?.br('bw_quiver') === 'A') ? null : o.zone ?? bowZone(), color, sv: o.sv, cast: o.cast, tech: o.tech, poison: o.poison || 0, crit: o.crit, snipe: o.snipe, onHit: o.onHit });
+    // 射程: 指定がなければ、弓の通常攻撃は引かずに撃つ射程・スキルは最大射程（弓以外の投げナイフなどは24m）
+    const range = o.range ?? (S.W.ranged ? (o.type === 'normal' ? S.bowBase : S.bowMax) : 24);
+    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (range + 0.6) / (o.speed ?? 42), range, rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), color, sv: o.sv, cast: o.cast, tech: o.tech, poison: o.poison || 0, crit: o.crit, snipe: o.snipe, full: o.full, onHit: o.onHit });
     // 射出の閃光
     const fx0 = me.x + Math.sin(o.a) * 0.9, fz0 = me.z + Math.cos(o.a) * 0.9;
     fx.flash(fx0, 1.3, fz0, color, o.big ? 14 : 8, 0.15, 6);
@@ -2035,8 +2037,6 @@ const combat = {
 };
 
 function canAct() { return S && !me.dead && !me.crawl &&me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0 && me.downT <= 0 && !(me.sweepT > 0); }
-// 弓は回避中も通常攻撃ができる（転がり撃ち）
-const canShootInDodge = () => S.W.ranged && !me.dead && !me.crawl &&me.dodgeT > 0 && me.skillT < 0 && me.staggerT <= 0;
 
 // 攻撃を始めるとき、盾槍のガードボーナスをこの攻撃に乗せる
 function startAttack() {
@@ -2058,12 +2058,10 @@ function doSwing() {
   const col = RARITIES[S.wr].color;
   const a = me.a;
   if (W.ranged) {
-    const k = me.dodgeT > 0 && S.wt?.br('bw_roll') === 'A' ? 1.3 : 1; // 転がり撃ち
     if (S.wt?.ks1 === 'bw_rapid') { // 連射: 2本ずつ
-      for (const d of [-0.04, 0.04]) combat.arrow({ a: a + d, mult: mult * 0.75 * k, type: 'normal' });
+      for (const d of [-0.04, 0.04]) combat.arrow({ a: a + d, mult: mult * 0.75, type: 'normal' });
       if (S.wt.ks2 === 'bw_storm' && ++me.stormN % 5 === 0) bwRain(aimPoint());
-    } else combat.arrow({ a, mult: mult * k, type: 'normal' });
-    if (me.dodgeT > 0) floatText(me.x, 2.4, me.z, '転がり撃ち', 'info');
+    } else combat.arrow({ a, mult, type: 'normal' });
     return;
   }
   const range = W.range * spReach(true);
@@ -2155,6 +2153,7 @@ function doHeavy(lv) {
   if (S.wt?.ks1 === 'ax_throw') { axThrow(lv); return; }
   if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; spPierce(me.a); }
   if (S.wk === 'dagger') { me.motion = 'dk_blink'; me.motionT = 0; } // 瞬影: 低く駆け抜けながら斬る
+  if (S.wk === 'bow' && lv === 2) { me.motion = 'bw_full'; me.motionT = 0; fx.ringWave(me.x, me.z, 0xffd84a, S.bowMax, 0.35); } // 最大まで引いた矢: 反動と、射程いっぱいの輪
   HEAVY[S.wk].run(combat, lv);
   if (S.wk === 'dagger' && S.wt?.ks2 === 'dk_step') later(0.24, () => { me.a += Math.PI; me.afterJust = true; me.motion = 'dk_step_turn'; me.motionT = 0; floatText(me.x, 3, me.z, '影渡り', 'just'); fx.ringWave(me.x, me.z, 0xcab4ff, 2.2, 0.3); }); // 影渡り: すり抜けたら敵のほうへ向き直る
 }
@@ -2262,7 +2261,7 @@ function updateProjs(dt) {
     w.t += dt;
     w.x += Math.sin(w.a) * w.speed * dt; w.z += Math.cos(w.a) * w.speed * dt;
     if (w.arrow) {
-      // 矢: 適性エリア（2つの円の間）にいる敵にだけ本来のダメージ
+      // 矢: 射程（離したときの円の大きさ）まで飛ぶ
       w.mesh.position.set(w.x, 1.2, w.z);
       if (Math.random() < 0.7) fx.parts.emit(w.x, 1.2, w.z, { color: w.color, size: 0.35, life: 0.25, speed: 0.4, gravity: 0 });
       let done = false;
@@ -2273,18 +2272,14 @@ function updateProjs(dt) {
       for (const mb of [...mobs.values()]) {
         if (w.hit.has(mb.id) || Math.hypot(mb.x - w.x, mb.z - w.z) > w.rad + mb.rad) continue;
         w.hit.add(mb.id);
-        const d = Math.hypot(mb.x - w.sx, mb.z - w.sz);
-        // 投げナイフなど（zone なし）は距離に関係なく本来のダメージ
-        const inZone = !w.zone || (d >= w.zone[0] - mb.rad && d <= w.zone[1] + mb.rad);
-        const hawk = w.zone && inZone && tf('t_hawk') && Math.random() < 0.3;
-        dealDamage(mb, w.mult, { type: w.type, tech: w.tech, falloff: inZone ? 1 : S.wt?.br('bw_zone') === 'A' ? 0.6 : BOW_ZONE.outside, sv: w.sv, cast: w.cast, crit: hawk || w.crit || undefined, poison: w.poison, zoneHit: !!w.zone && inZone, snipe: w.snipe });
+        // 射程の中はどこでも本来のダメージ。遠矢: 射程の端（8割より先）で当たると +20%
+        const d = Math.hypot(mb.x - w.sx, mb.z - w.sz), edge = S.wt?.br('bw_zone') === 'B' && d >= w.range * 0.8;
+        const hawk = w.full && tf('t_hawk') && Math.random() < 0.3;
+        dealDamage(mb, w.mult * (edge ? 1.2 : 1), { type: w.type, tech: w.tech, sv: w.sv, cast: w.cast, crit: hawk || w.crit || undefined, poison: w.poison, full: w.full, snipe: w.snipe });
         if (w.onHit) w.onHit(mb);
-        if (w.snipe && !w.snipeDone) { w.snipeDone = true; bwSnipe(inZone); }
-        if (!w.zone) { /* 表示なし */ } else if (inZone) {
-          floatText(mb.x, 3.4, mb.z, '適性!', 'info');
-          fx.ringWave(mb.x, mb.z, 0x9affc8, 1.6, 0.25);
-        } else floatText(mb.x, 3.4, mb.z, d < w.zone[0] ? '近い' : '遠い', 'info');
-        fx.parts.burst(w.x, 1.2, w.z, inZone ? 16 : 6, { color: inZone ? 0x9affc8 : 0xffffff, speed: 5, size: 0.4, life: 0.3 });
+        if (w.snipe && !w.snipeDone) { w.snipeDone = true; bwSnipe(true); }
+        if (edge) floatText(mb.x, 3.4, mb.z, '遠矢', 'info');
+        fx.parts.burst(w.x, 1.2, w.z, w.full ? 18 : 8, { color: w.full ? 0xffd84a : 0xffffff, speed: 5, size: 0.4, life: 0.3 });
         if (!w.pierce) { done = true; break; }
       }
       if (!done) done = projRevive(w, true);
@@ -3048,54 +3043,40 @@ function setSetting(k, v) {
 let lastT = now();
 let sendT = 0;
 let saveT = 0;
-// ---- 弓の照準ガイド: 足元の2つの円（外=適性距離、内=引き絞るほど内側へ広がる）と狙いの線 ----
+// ---- 弓の照準ガイド: 足元の射程の円（引くほど広がり、最大射程で止まる）と狙いの線 ----
 let bowGuide = null;
 function makeBowGuide() {
   const group = new THREE.Group();
-  const U = { uIn: { value: 0.8 }, uTime: { value: 0 }, uCharge: { value: 0 } };
-  // 2つの円の間の帯（ここに入った敵に本来のダメージ）
-  const band = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
-    uniforms: U, transparent: true, depthWrite: false, depthTest: false,
-    vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform float uIn; uniform float uTime; uniform float uCharge; varying vec2 vP;
-      void main(){
-        float r = length(vP); if (r > 1.0 || r < uIn) discard;
-        float edge = smoothstep(0.0, 0.012, 1.0 - r) * smoothstep(0.0, 0.012, r - uIn);
-        float stripes = 0.5 + 0.5 * sin((atan(vP.y, vP.x) * 24.0) + uTime * 3.0);
-        vec3 c = mix(vec3(0.45, 1.0, 0.8), vec3(1.0, 0.9, 0.4), uCharge);
-        gl_FragColor = vec4(c, (0.16 + 0.1 * stripes) * edge + 0.0);
-      }`,
-  }));
-  band.rotation.x = -Math.PI / 2;
-  const ringMat = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, depthTest: false });
-  const outer = new THREE.Mesh(new THREE.RingGeometry(0.975, 1, 128), ringMat(0x9affd8));
-  const inner = new THREE.Mesh(new THREE.RingGeometry(0.975, 1, 128), ringMat(0xffffff));
-  outer.rotation.x = inner.rotation.x = -Math.PI / 2;
-  // 狙いの線（引き絞り中）
+  const flat = (geo, c, op) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, depthTest: false })); m.rotation.x = -Math.PI / 2; return m; };
+  const disc = flat(new THREE.CircleGeometry(1, 96), 0x9affd8, 0.05); // 射程の内側（うっすら）
+  const ring = flat(new THREE.RingGeometry(0.975, 1, 128), 0x9affd8, 0.6); // いまの射程
+  const max = flat(new THREE.RingGeometry(0.99, 1, 128), 0xffffff, 0.2); // 最大射程（引いている間だけ）
+  // 狙いの線（引いている間）
   const aim = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 1), new THREE.MeshBasicMaterial({ color: 0xfff0a0, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
   aim.geometry.translate(0, 0.5, 0);
   aim.geometry.rotateX(Math.PI / 2); // +z 方向へ伸びる
-  for (const m of [band, outer, inner, aim]) { m.renderOrder = 4; group.add(m); }
-  return { group, band, outer, inner, aim, U };
+  for (const m of [disc, ring, max, aim]) { m.renderOrder = 4; group.add(m); }
+  return { group, disc, ring, max, aim };
 }
 function updateBowGuide(t) {
   if (!bowGuide) return;
   const G = bowGuide;
   G.group.visible = !!S.W.ranged && !me.dead;
   if (!G.group.visible) return;
-  const w = bowZoneWidth(), [rin, rout] = bowZone(w);
-  const charge = me.charging ? clamp(me.chargeT / S.chargeMax, 0, 1) : 0;
+  const r = bowRange(), drawing = me.charging && me.chargeT >= CHARGE_MIN, full = drawing && r >= S.bowMax - 0.01;
   G.group.position.set(me.x, heightAt(me.x, me.z) + 0.1, me.z);
-  for (const m of [G.band, G.outer]) m.scale.set(rout, rout, 1);
-  G.inner.scale.set(Math.max(0.05, rin), Math.max(0.05, rin), 1);
-  G.U.uIn.value = rin / rout; G.U.uTime.value = t; G.U.uCharge.value = charge;
-  G.inner.material.color.set(charge >= 1 ? 0xffd84a : 0xffffff);
-  G.outer.material.opacity = G.inner.material.opacity = me.charging ? 0.95 : 0.55;
-  G.aim.visible = me.charging && me.chargeT >= CHARGE_MIN;
+  G.disc.scale.set(r, r, 1); G.ring.scale.set(r, r, 1); G.max.scale.set(S.bowMax, S.bowMax, 1);
+  G.ring.material.color.set(full ? 0xffd84a : drawing ? 0xffffff : 0x9affd8);
+  G.ring.material.opacity = drawing ? 0.9 : 0.4;
+  G.disc.material.color.set(full ? 0xffd84a : 0x9affd8);
+  G.disc.material.opacity = drawing ? 0.07 + (full ? 0.04 * Math.sin(t * 10) : 0) : 0.03;
+  G.max.visible = drawing && !full;
+  G.aim.visible = drawing;
   if (G.aim.visible) {
+    const k = clamp(me.chargeT / S.chargeMax, 0, 1);
     G.aim.rotation.y = aimAngle();
-    G.aim.scale.set(1 + charge, 1, WEAPONS.bow.range);
-    G.aim.material.opacity = 0.35 + 0.4 * charge + 0.15 * Math.sin(t * 20);
+    G.aim.scale.set(1 + k, 1, r);
+    G.aim.material.opacity = 0.35 + 0.4 * k + 0.15 * Math.sin(t * 20);
   }
 }
 
@@ -3269,7 +3250,7 @@ function update(dt) {
 
     // 通常攻撃（短押しの入力を少し保持してコンボをつなぐ）
     me.swingT += dt;
-    if (me.queued > t && (canAct() || canShootInDodge()) && me.swingT >= me.swingDur && !safe) { me.queued = 0; doSwing(); }
+    if (me.queued > t && canAct() && me.swingT >= me.swingDur && !safe) { me.queued = 0; doSwing(); }
     if (me.skillT >= 0) { me.skillT += dt; if (me.skillT > (me.skillDuration || .55)) me.skillT = -1; }
 
     // ハザード: 毒沼は踏んでいる間ダメージ、流砂は足が遅くなる（移動のところ）

@@ -8,7 +8,7 @@ import { SPEAR_TIMINGS, repeatHitAt } from '../shared/skill-timings.js';
 //   c.me, c.aim(), c.col(), c.later(sec, fn), c.arc(range, deg, mult, o), c.line(len, w, mult, o),
 //   c.circle(x, z, r, mult, o), c.proj(o), c.dash(a, dist, dur, iframe), c.buff(id, label, sec, mods, color),
 //   c.heal(frac), c.text(str, cls), c.shake(v), c.sfx(name, opt), c.fx, c.nearest(range)
-//   c.arrow(o) 矢を放つ（弓。適性距離より遠いとダメージ減）, c.point() マウスの地面座標
+//   c.arrow(o) 矢を放つ（弓。射程の端まで飛ぶ）, c.point() マウスの地面座標
 // o.type: 'normal' | 'heavy' | 'wskill' | 'tskill'（ツリーの強化倍率とスタン値の基準を決める）
 // o.stun: ボスに溜めるスタン値を直接指定（省略時は type から計算）
 
@@ -67,12 +67,12 @@ export const HEAVY = {
     },
   },
   bow: {
-    name: '溜め撃ち', desc: '弓を引き絞り、貫通する矢を放つ',
+    name: '溜め撃ち', desc: '弓を引いて、貫通する矢を放つ（引くほど遠くまで届く）',
     run(c, lv) {
-      // 適性エリアは引き絞った長さで広がる（main の c.zone()）
+      // 射程は離したときの円の大きさ（main の c.range()）。最大射程まで引くと最大の溜め
       // 武器ツリー: 狙撃手は最大溜めが必ず会心 / 重矢は矢が太い
       const W = c.S?.().wt, snipe = lv === 2 && W?.ks1 === 'bw_sniper', fat = W?.br('bw_draw') === 'B' ? 1.5 : 1;
-      c.arrow({ a: c.aim(), mult: lv === 2 ? 2.6 : 1.6, type: 'heavy', pierce: true, speed: 55, rad: (lv === 2 ? 1.2 : 0.8) * fat, big: true, zone: c.zone(), crit: snipe || undefined, snipe });
+      c.arrow({ a: c.aim(), mult: lv === 2 ? 2.6 : 1.6, type: 'heavy', pierce: true, speed: 55, rad: (lv === 2 ? 1.2 : 0.8) * fat, big: true, range: c.range?.(), crit: snipe || undefined, snipe, full: lv === 2 });
     },
   },
   dagger: {
@@ -391,7 +391,7 @@ Object.assign(WEAPON_SKILLS, {
     },
   },
   snipe: {
-    name: 'スナイプ', kind: 'bow', cd: 8, desc: '一瞬狙いを定め、遠くまで貫く強力な一矢を放つ（距離でダメージが落ちない）',
+    name: 'スナイプ', kind: 'bow', cd: 8, desc: '一瞬狙いを定め、最大射程まで貫く強力な一矢を放つ',
     run(c) {
       const a = c.aim();
       c.fx.parts.burst(c.me.x, 1.3, c.me.z, 16, { color: c.col(), speed: 2, size: 0.4, life: 0.35, gravity: 0 });

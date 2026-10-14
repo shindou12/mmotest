@@ -71,15 +71,14 @@ export const WEAPONS = {
     name: '大斧', range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true,
     passive: [], // 大斧は武器ツリー（熟練度）で決める
   },
-  // 弓: 矢を飛ばす。適性エリア（外円=optimal と、引き絞るほど内側へ広がる内円の間）でだけ本来のダメージ
+  // 弓: 矢を飛ばす。弓を引くと足元から射程の円が広がり、矢はその円の端まで届く
+  //   baseRange: 引かずに撃つ矢の射程 / range: 最大射程 / draw: 弓を引く速さ（円が広がる速さ m/秒）。最大射程まで引くと最大の溜め撃ち
   bow: {
-    name: '弓', range: 24, arc: 0, speed: 0.4, mult: 0.7, weight: 3, stun: 0.3, ranged: true, optimal: 10,
-    passive: ['回避中も攻撃できる（転がり撃ち）', '適性エリア（足元の2つの円の間）の敵にだけ本来のダメージ。引き絞るほどエリアが内側へ広がる'],
+    name: '弓', range: 22, arc: 0, speed: 0.4, mult: 0.6, weight: 3, stun: 0.3, ranged: true, baseRange: 9, draw: 14,
+    passive: ['弓を引くと足元から射程の円が広がる（引かずに撃つ矢は9m・最大射程22m）', '最大射程まで引くと最大の溜め撃ち（弓を引く速さ 毎秒14m）'],
   },
 };
 export const WEAPON_KINDS = Object.keys(WEAPONS);
-// 弓の適性エリア: 外円 = 適性距離、内円 = 外円 - 幅。幅は引き絞り具合で BOW_ZONE.min〜max
-export const BOW_ZONE = { min: 2, max: 8, outside: 0.35 };
 // 生存本能（近接武器のパッシブ）: 常に被ダメージを少し軽減する
 export const INSTINCT = { dr: 8 };
 // 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
@@ -590,7 +589,7 @@ export const TITLES = {
   t_shark: { name: '砂鮫狩り', rarity: 6, desc: '精鋭・ネームド・ボスへの会心率 +15%', src: '砂鮫ギルガの討伐' },
   t_wind: { name: '疾風', rarity: 3, desc: '回避した後の1.5秒間、移動速度 +40%', src: 'クエスト「猪狩り」' },
   t_blood: { name: '血の渇き', rarity: 4, req: 'melee', desc: '敵を倒すとHPを6%回復する', src: 'クエスト「霧の狼」' },
-  t_hawk: { name: '鷹の眼', rarity: 4, req: 'bow', desc: '適性エリアに当たった矢は会心率 +30%', src: 'クエスト「砂の巨人」' },
+  t_hawk: { name: '鷹の眼', rarity: 4, req: 'bow', desc: '最大まで引いた矢は会心率 +30%', src: 'クエスト「砂の巨人」' },
   t_guard: { name: '不落の盾', rarity: 4, req: 'spear', desc: 'ガードカウンターを出すと4秒間 被ダメージ -40%', src: 'クエスト「スライム退治」' },
   t_phoenix: { name: '不死鳥', rarity: 6, desc: '倒れたとき、その場でHP30%で一度だけ復活する（5分に1回）', src: 'クエスト「砂塵の王」' },
   // ---- クエスト報酬 ----

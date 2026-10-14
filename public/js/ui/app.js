@@ -12,7 +12,7 @@
 // クリックやキー入力は UI イベントとして親へバブリングし、途中の link() が文脈（どのパネルのどの項目か）を足す。
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
 import {
-  FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT, BOW_ZONE,
+  FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT,
   WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, transcendCount, displayName, affixText, tierLabel, tierColor,
   enhMult, TITLES, TITLE_REQ, titleReqOk, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost, CRAFT_MAX_TIER, affixName, FX_REQ,
 } from '../../shared/data.js';
@@ -338,7 +338,7 @@ export function createUI(game) {
       ['攻撃速度', '+' + S.aspd.toFixed(1) + '%'], ['移動速度', '+' + S.move.toFixed(1) + '%'], ['被ダメ軽減', S.def.toFixed(1) + '%'],
       ['HP吸収', S.vamp.toFixed(1) + '%'], ['スキル短縮', S.cdr.toFixed(0) + '%'],
     ];
-    if (S.W.ranged) st.push(['適性エリア', `${S.optimal}m の内側 ${BOW_ZONE.min}〜${S.zoneMax}m`]);
+    if (S.W.ranged) st.push(['射程', `${S.bowBase}m（最大射程 ${S.bowMax}m）`], ['弓を引く速さ', `毎秒${+S.bowDraw.toFixed(1)}m（最大まで${S.chargeMax.toFixed(2)}秒）`]);
     INV.stats.set({
       html: `<b>Lv${char.lv} ${esc(char.name)}</b> <span class="dim">${S.W.name}</span>`
         + `<div><span class="dim">所持ゴールド</span><span style="color:#ffd86a">${(char.gold || 0).toLocaleString()} G</span></div>`

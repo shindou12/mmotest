@@ -57,6 +57,10 @@ export const TREE_MOTIONS = Object.freeze({
   ax_rush_twin: m('ax_rush_twin', 'axe', 1.0, [0.32, 0.62], 'rushtwin'),
   // 大斧・投斧（強攻撃）: 振りかぶって斧を投げる
   ax_throw: m('ax_throw', 'axe', 0.5, [0.18], 'axethrow'),
+  // 弓・最大まで引いた矢: 放った反動で上体が少し跳ね返る
+  bw_full: m('bw_full', 'bow', 0.4, [0.04], 'fullshot'),
+  // 弓・弦鳴りB「跳び退き」: 弦を弾いてから後ろへ跳ぶ
+  bw_chime_leap: m('bw_chime_leap', 'bow', 0.75, [0.2], 'chimeleap'),
   // 弓・バックショット: 後ろへ跳びながら、のけぞって放つ
   bw_back: m('bw_back', 'bow', 0.45, [0.1], 'backshot'),
   // 弓・二段射ちA「三段」/ 跳弦射撃A「三連」: もう1本続けて放つ

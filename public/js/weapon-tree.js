@@ -24,7 +24,7 @@ export const WT_TAGS = {
   charge: { name: '溜め', icon: '◎' }, light: { name: '光波', icon: '☾' }, recv: { name: '受け', icon: '⛉' },
   poison: { name: '毒', icon: '☠' }, move: { name: '機動', icon: '»' },
   shield: { name: '盾', icon: '⛉' }, thrust: { name: '突き', icon: '➹' }, break: { name: '崩し', icon: '✸' },
-  blood: { name: '血', icon: '♥' }, throw: { name: '投擲', icon: '⟳' }, zone: { name: '適性距離', icon: '◎' }, trap: { name: '罠', icon: '⌖' },
+  blood: { name: '血', icon: '♥' }, throw: { name: '投擲', icon: '⟳' }, zone: { name: '射程', icon: '◎' }, trap: { name: '罠', icon: '⌖' },
 };
 
 const SWORD = {
@@ -272,8 +272,8 @@ const AXE = {
     ] },
   ],
 };
-// 弓: 「適性距離」「手数」「罠」。クラスは 狙撃手（最大溜め）/ 連射（通常攻撃）/ 罠師（回避で罠）
-// 回避中も撃てる（転がり撃ち）・適性エリアの仕組みは弓の基本の操作
+// 弓: 「射程」「手数」「罠」。クラスは 狙撃手（最大まで引く）/ 連射（通常攻撃）/ 罠師（回避で罠）
+// 弓を引くと射程の円が広がる仕組み（最大射程・弓を引く速さ）は弓そのものの特性
 const BOW = {
   name: '弓',
   rows: [
@@ -283,26 +283,26 @@ const BOW = {
       { id: 'bw_tether', icon: '⊸', name: '足留め矢', base: '当たったボス以外の敵の足を4秒遅くする', lv: ['威力160%', '威力210%', L3], tags: ['zone'],
         A: { name: '拡散', desc: '当たった敵の周り3mにも足留め（50%）' }, B: { name: '狙い印', desc: '当てると5秒間、ダメージ +15%' } },
       { id: 'bw_back', icon: '↶', name: 'バックショット', base: '後ろへ跳びながら3本放つ（跳んでいる間は無敵）', lv: ['各100%', '各125%', L3], tags: ['dodge'],
-        A: { name: '扇撃ち', desc: '5本を扇に放つ（各80%）' }, B: { name: '影走り', desc: '跳んだあと2秒間、引き絞りが2倍速い', tags: ['charge'] } },
+        A: { name: '扇撃ち', desc: '5本を扇に放つ（各80%）' }, B: { name: '影走り', desc: '跳んだあと2秒間、弓を引く速さ2倍', tags: ['charge'] } },
     ] },
     { kind: 'passive', nodes: [
-      { id: 'bw_zone', icon: '◎', name: '鷹の目の心得', base: '適性エリアの幅', lv: ['+2m', '+3m', L3], tags: ['zone'], zw: [2, 3],
-        A: { name: '広い的', desc: '適性エリアの外に当たった矢の威力 35% → 60%' }, B: { name: '遠矢', desc: '適性距離（外側の円）+3m' } },
-      { id: 'bw_draw', icon: '◉', name: '引き絞りの心得', base: '強攻撃のダメージ', lv: ['+15%', '+25%', L3], tags: ['charge'], mods: [{ heavyp: 15 }, { heavyp: 25 }],
-        A: { name: '速引き', desc: '引き絞りの時間 -20%' }, B: { name: '重矢', desc: '強攻撃の矢が太くなり、ボスを崩す力 +50%' } },
+      { id: 'bw_zone', icon: '◎', name: '遠見の心得', base: '最大射程', lv: ['+3m', '+5m', L3], tags: ['zone'], rng: [3, 5],
+        A: { name: '張り弦', desc: '引かずに撃つ矢の射程 +4m' }, B: { name: '遠矢', desc: '射程の端（8割より先）で当たった矢のダメージ +20%' } },
+      { id: 'bw_draw', icon: '◉', name: '弓引きの心得', base: '強攻撃のダメージ', lv: ['+15%', '+25%', L3], tags: ['charge'], mods: [{ heavyp: 15 }, { heavyp: 25 }],
+        A: { name: '速引き', desc: '弓を引く速さ +30%' }, B: { name: '重矢', desc: '強攻撃の矢が太くなり、ボスを崩す力 +50%' } },
       { id: 'bw_roll', icon: '➶', name: '身のこなし', base: '回避のクールタイム', lv: ['-10%', '-18%', L3], tags: ['dodge'], mods: [{ dodgecd: 10 }, { dodgecd: 18 }],
-        A: { name: '転がり撃ち', desc: '回避中の通常攻撃のダメージ +30%' }, B: { name: 'すり抜け', desc: '回避の無敵時間 +0.1秒' } },
+        A: { name: '受け身引き', desc: '回避のあと1秒間、弓を引く速さ2倍', tags: ['charge'] }, B: { name: 'すり抜け', desc: '回避の無敵時間 +0.1秒' } },
     ] },
     { kind: 'ks1', nodes: [
-      { id: 'bw_sniper', icon: '◎', name: '狙撃手', desc: '最大まで引き絞った矢は必ず会心になる', tags: ['charge', 'crit'] },
+      { id: 'bw_sniper', icon: '◎', name: '狙撃手', desc: '最大まで引いた矢は必ず会心になる', tags: ['charge', 'crit'] },
       { id: 'bw_rapid', icon: '⇶', name: '連射', desc: '通常攻撃で矢を2本ずつ放つ（各75%）', tags: ['zone'] },
       { id: 'bw_trapper', icon: '⌖', name: '罠師', desc: '回避すると、その場に罠を置く（2秒に1回・同時に2つまで）。踏んだ敵に200%、ボス以外の足を遅くする', tags: ['trap', 'dodge'] },
     ] },
     { kind: 'passive', nodes: [
       { id: 'bw_crit', icon: '✦', name: '急所の心得', base: '会心率', lv: ['+5%', '+8%', L3], tags: ['crit'], mods: [{ crit: 5 }, { crit: 8 }],
-        A: { name: '急所射ち', desc: '適性エリアで当たった矢の会心率がさらに +10%', tags: ['zone'] }, B: { name: '致命', desc: '会心ダメージ +25%' } },
+        A: { name: '急所射ち', desc: '最大まで引いた矢の会心率 +15%', tags: ['charge'] }, B: { name: '致命', desc: '会心ダメージ +25%' } },
       { id: 'bw_quiver', icon: '⟲', name: '矢筒の心得', base: 'スキルのクールタイム', lv: ['-8%', '-12%', L3], tags: ['cd'], mods: [{ cdr: 8 }, { cdr: 12 }],
-        A: { name: '必中', desc: 'スキルの矢は適性エリアの外でも本来の威力', tags: ['zone'] }, B: { name: '余勢', desc: 'スキルを使ったあと2秒間、攻撃の速さ +25%' } },
+        A: { name: '鋭矢', desc: 'スキルの矢の会心率 +15%', tags: ['crit'] }, B: { name: '余勢', desc: 'スキルを使ったあと2秒間、攻撃の速さ +25%' } },
     ] },
     { kind: 'skill', nodes: [
       { id: 'bw_trap', icon: '⌖', name: '置き矢', base: '8m以内に罠を置く（5秒）。踏んだ敵に大ダメージ、ボス以外の足を遅くする', lv: ['威力260%', '威力330%', L3], tags: ['trap'],
@@ -313,8 +313,8 @@ const BOW = {
         A: { name: '三連', desc: '3本放つ' }, B: { name: '回り込み', desc: '跳ぶ距離 +50%・最初の1本は必ず会心', tags: ['crit'] } },
     ] },
     { kind: 'ks2', nodes: [
-      { id: 'bw_hawk', from: 'bw_sniper', icon: '⚡', name: '鷹の目', desc: '最大まで引き絞った矢が適性エリアで当たると、次の強攻撃は溜めなしで最大になる（8秒に1回）', tags: ['charge', 'zone'] },
-      { id: 'bw_aim', from: 'bw_sniper', icon: '◎', name: '狙い澄まし', desc: '最大まで引き絞った矢を適性エリアで続けて当てると、1回ごとに威力 +10%（最大 +30%）。外すと戻る', tags: ['charge', 'zone'] },
+      { id: 'bw_hawk', from: 'bw_sniper', icon: '⚡', name: '鷹の目', desc: '最大まで引いた矢が当たると、次の強攻撃は引かずに最大になる（8秒に1回）', tags: ['charge', 'zone'] },
+      { id: 'bw_aim', from: 'bw_sniper', icon: '◎', name: '狙い澄まし', desc: '最大まで引いた矢を続けて当てると、1回ごとに威力 +10%（最大 +30%）。外すと戻る', tags: ['charge', 'zone'] },
       { id: 'bw_storm', from: 'bw_rapid', icon: '☔', name: '矢嵐', desc: '通常攻撃を5回放つごとに、狙った場所へ矢の雨が降る（5本・各50%）', tags: ['zone'] },
       { id: 'bw_quick', from: 'bw_rapid', icon: '»', name: '速射', desc: '回避のあと1.5秒間、攻撃の速さ +40%', tags: ['dodge'] },
       { id: 'bw_shot', from: 'bw_trapper', icon: '✸', name: '射抜き', desc: '自分の罠を矢で射抜くと大爆発する（350%・半径3.5m）', tags: ['trap'] },
@@ -818,6 +818,7 @@ Object.assign(WT_SKILLS, {
   },
   bw_chime: {
     name: '弦鳴り', kind: 'bow', cd: 15.6, motion: 'bow_chime', duration: T.bow_chime.duration,
+    motionOf: (W) => (W.br('bw_chime') === 'B' ? 'bw_chime_leap' : 'bow_chime'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('bw_chime') >= 2 ? 1.8 : 1.4, b = W.br('bw_chime');
       const ring = (mult) => { c.circle(c.me.x, c.me.z, 3, mult, { type: 'tskill', tech: 'bow_chime' }); c.fx.ringWave(c.me.x, c.me.z, 0x85d9ff, 3.2, 0.3); c.sfx('wave'); };
