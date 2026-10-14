@@ -60,6 +60,12 @@ function profile(style,i){
  case 'roar':return [{pitch:.6,y:1.4,z:.25,lean:.1},{pitch:1.5,y:1.8,z:.1,lean:-.25,guard:1,leg:.25}];
  case 'rushtwin':return i===0?[{pitch:.1,z:.3,lean:.2},{pitch:-.35,z:.55,lean:.28,leg:.4}]:[{pitch:1.4,y:1.7,z:.14,lean:-.1,bodyYaw:-.25},{pitch:-.6,y:1.05,z:.48,lean:.32,leg:.45,bodyYaw:.15}];
  case 'axethrow':return [{yaw:.4,pitch:1.5,y:1.75,z:.05,lean:-.2,bodyYaw:-.35},{yaw:-.1,pitch:.1,y:1.35,z:.6,lean:.25,bodyYaw:.3,leg:.35}];
+ case 'broadwide':return [{yaw:-1.6,pitch:.05,bodyYaw:-1.0,lean:-.05,leg:.2},{yaw:1.6,pitch:.05,bodyYaw:1.15,z:.48,lean:.15,leg:.4}];
+ case 'pinfan':return [{yaw:-1.2,pitch:.35,y:1.35,z:.2,bodyYaw:-.45},{yaw:1.0,pitch:.1,y:1.3,z:.56,bodyYaw:.4,lean:.12,leg:.2}];
+ case 'staketri':{const s2=[.4,0,-.4][i];return [{yaw:s2,pitch:.35,y:1.38,z:.3,bodyYaw:s2*.5,lean:.1},{yaw:s2,pitch:-.45,y:1.15,z:.48,bodyYaw:s2*.5,lean:.22,leg:.2}];}
+ case 'hookspin':return i===0?[{yaw:.9,pitch:-.05,z:.45,bodyYaw:-.5},{yaw:-.6,pitch:-.05,z:.4,bodyYaw:Math.PI*2-.4,lean:.1,leg:.25}]:[{pitch:1.2,y:1.65,z:.16,bodyYaw:Math.PI*2},{pitch:-.3,z:.51,lean:.2,leg:.2,bodyYaw:Math.PI*2}];
+ case 'returntri':return i===0?[{yaw:-1.3,pitch:.5,y:1.45,bodyYaw:-.6},{yaw:1.2,pitch:.1,z:.55,bodyYaw:.55,lean:.1}]:[{pitch:.05,z:.53},{pitch:.8,z:.23,bodyYaw:-.15}];
+ case 'execsweep':return [{yaw:-1.5,pitch:.15,y:1.25,bodyYaw:-.8,lean:-.05},{yaw:1.4,pitch:0,y:1.15,z:.5,bodyYaw:.85,lean:.2,leg:.4}];
  case 'chime':return [{draw:.3,guard:1},{draw:0,bodyYaw:-.2,lean:-.1,guard:1}];
  default:return [{},{z:.5}];
  }
@@ -80,7 +86,7 @@ export const TECHNIQUE_FRAMES=Object.freeze(Object.fromEntries(Object.values(ALL
  t.hits.forEach((hit,i)=>{const [wind,impact]=profile(t.style,i),previous=t.hits[i-1]||0,next=t.hits[i+1]||t.duration;
  frames.push({at:Math.max(previous+.02,hit-.12),...base,...wind},{at:hit,...base,...impact},{at:Math.min(hit+.10,next-.02),...base,...impact});});
  // 一回転で終わる動き（旋）は、最後の向きを一周ぶんにして巻き戻らないようにする
- frames.push({at:t.duration,...base,bodyYaw:t.style==='slantspin'||t.style==='bleedspin'||t.style==='lowspin'?Math.PI*2:0});return [t.id,frames.sort((a,b)=>a.at-b.at)];
+ frames.push({at:t.duration,...base,bodyYaw:t.style==='slantspin'||t.style==='bleedspin'||t.style==='lowspin'||t.style==='hookspin'?Math.PI*2:0});return [t.id,frames.sort((a,b)=>a.at-b.at)];
 })));
 export function sampleTechnique(id,time){
  const frames=TECHNIQUE_FRAMES[id];if(!frames)return null;

@@ -697,7 +697,7 @@ function onSnap(m) {
   world.plates = m.pl || [];
   const seenP = new Set();
   for (const p of m.p) {
-    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm, rc, pm = '', pt = 0, rv = -1] = p;
+    const [id, name, x, z, a, hp, mhp, lv, color, wk, wr, sw, sk, dead, dg, gd, wst, arm, rc, pm = '', pt = 0, rv = -1, cl = 0] = p;
     if (id === me.id) { if (me.crawl && rv >= 0) me.rv = rv; continue; }
     seenP.add(id);
     let o = others.get(id);
@@ -706,7 +706,7 @@ function onSnap(m) {
       scene.add(o.model);
       others.set(id, o);
     }
-    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd, rc: rc | 0, motion: pm, motionT: pt, rv });
+    Object.assign(o, { tx: x, tz: z, ta: a, hp, mhp, lv, name, dead, dg, wk, wr, gd, rc: rc | 0, motion: pm, motionT: pt, rv, cl: cl | 0 });
     setPlayerWeapon(o.model, wk, wr, wst | 0);
     setPlayerArmor(o.model, arm | 0);
     if (sw !== o.sw) {
@@ -3262,7 +3262,7 @@ function update(dt) {
     if (moving) o.walkT += dt;
     o.model.position.set(o.x, heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
-    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (o.wk === 'greatsword' || o.motion === 'whirlspear' || o.motion === 'whirl') ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
+    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, shieldBack: o.wk === 'spear' && (o.cl & 1) > 0, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (o.wk === 'greatsword' || o.motion === 'whirlspear' || o.motion === 'whirl') ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
   }
 
   // モンスター
@@ -3312,7 +3312,7 @@ function update(dt) {
   sendT -= dt;
   if (sendT <= 0) {
     sendT = 0.066;
-    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm, pm: me.motion || '', pt: +(me.motionT || 0).toFixed(3), rc: me.downT > 0 ? 2 : me.hurtT > 0 ? 1 : 0 });
+    net.send({ t: 'st', x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +me.a.toFixed(2), hp: Math.round(me.hp), mhp: S.mhp, lv: char.lv, dead: me.dead, wk: S.wk, wr: S.wr, sw: me.sw, sk: me.sk, dg: me.dodgeT > 0 ? 1 : 0, gd: me.guarding ? 1 : 0, wst: S.wst, arm: S.arm, pm: me.motion || '', pt: +(me.motionT || 0).toFixed(3), rc: me.downT > 0 ? 2 : me.hurtT > 0 ? 1 : 0, cl: S.wt?.ks1 === 'sp_dragoon' ? 1 : 0 }); // cl: クラスの見た目（1 = 竜騎士の背負った盾）
   }
   saveT -= dt;
   if (saveT <= 0) { saveT = 10; saveChar(); }

@@ -444,6 +444,7 @@ Object.assign(WT_SKILLS, {
   },
   gt_broad: {
     name: '横一文字', kind: 'greatsword', cd: 12, motion: 'gs_broad', duration: T.gs_broad.duration,
+    motionOf: (W) => (W.br('gt_broad') === 'A' ? 'gt_broad_wide' : 'gs_broad'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('gt_broad') >= 2 ? 5.3 : 4.2, b = W.br('gt_broad');
       at(c, T.gs_broad.hits[0], () => {
@@ -567,6 +568,7 @@ Object.assign(WT_SKILLS, {
   },
   dk_pin: {
     name: '影縫い', kind: 'dagger', cd: 12, motion: 'dagger_pin', duration: T.dagger_pin.duration,
+    motionOf: (W) => (W.br('dk_pin') === 'A' ? 'dk_pin_fan' : 'dagger_pin'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('dk_pin') >= 2 ? 3.4 : 2.6, b = W.br('dk_pin');
       at(c, T.dagger_pin.hits[0], () => {
@@ -615,13 +617,18 @@ Object.assign(WT_SKILLS, {
   },
   sp_stake: {
     name: '杭打ち', kind: 'spear', cd: 13.2, motion: 'spear_stake', duration: T.spear_stake.duration,
+    motionOf: (W) => (W.br('sp_stake') === 'B' ? 'sp_stake_tri' : 'spear_stake'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('sp_stake') >= 2 ? 4.8 : 3.8, b = W.br('sp_stake');
       const p = c.point(), d = Math.min(6, Math.hypot(p.x - c.me.x, p.z - c.me.z)), spot = spOff(c.me.x, c.me.z, a, d);
       const spots = b === 'B' ? [spot, spOff(spot.x, spot.z, a + 2.1, 1.8), spOff(spot.x, spot.z, a - 2.1, 1.8)] : [spot];
       for (const q of spots) c.fx.ringWave(q.x, q.z, c.col(), 1.8, 0.4);
+      if (b === 'B') { // 右・正面・左の順に打つ
+        [spots[2], spots[0], spots[1]].forEach((q, i) => at(c, TREE_MOTIONS.sp_stake_tri.hits[i], () => { c.circle(q.x, q.z, 1.8, m * 0.6, { type: 'tskill', threat: 3, stun: 5 }); c.fx.lightning(q.x, q.z, c.col()); c.sfx('thunder'); }));
+        return;
+      }
       at(c, T.spear_stake.hits[0], () => {
-        for (const q of spots) { c.circle(q.x, q.z, 1.8, m * (b === 'B' ? 0.6 : 1), { type: 'tskill', threat: 3, stun: b === 'B' ? 5 : 10 }); c.fx.lightning(q.x, q.z, c.col()); }
+        for (const q of spots) { c.circle(q.x, q.z, 1.8, m, { type: 'tskill', threat: 3, stun: 10 }); c.fx.lightning(q.x, q.z, c.col()); }
         c.sfx('thunder');
         if (b === 'A') for (let k = 1; k <= 6; k++) at(c, k * 0.5, () => { c.circle(spot.x, spot.z, 1.8, 0.4, { type: 'tskill', stun: 1 }); c.fx.lightning(spot.x, spot.z, 0xbfd8ff); });
       });
@@ -651,7 +658,7 @@ const inFront = (c, t, a, deg) => Math.abs(Math.atan2(Math.sin(Math.atan2(t.x - 
 Object.assign(WT_SKILLS, {
   ax_hook: {
     name: '引き裂き', kind: 'axe', cd: 10.8, motion: 'axe_hook', duration: T.axe_hook.duration,
-    motionOf: (W) => (W.br('ax_hook') === 'B' ? 'ax_hook_twin' : 'axe_hook'),
+    motionOf: (W) => ({ A: 'ax_hook_spin', B: 'ax_hook_twin' })[W.br('ax_hook')] || 'axe_hook',
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('ax_hook') >= 2 ? 3.6 : 2.8, b = W.br('ax_hook'), deg = b === 'A' ? 360 : 110;
       at(c, T.axe_hook.hits[0], () => { c.arc(b === 'A' ? 6 : 4.6, deg, 1, { type: 'tskill', a, tech: 'axe_hook', stun: 2 }); c.fx.slash(c.me.x, c.me.z, a, b === 'A' ? 6 : 4.6, deg, c.col(), 1.0); c.sfx('swing'); });
@@ -661,6 +668,7 @@ Object.assign(WT_SKILLS, {
   },
   ax_return: {
     name: '返り刃', kind: 'axe', cd: 10.8, motion: 'axe_return', duration: T.axe_return.duration,
+    motionOf: (W) => (W.br('ax_return') === 'A' ? 'ax_return_tri' : 'axe_return'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('ax_return') >= 2 ? 1.9 : 1.5, b = W.br('ax_return'), sx = c.me.x, sz = c.me.z;
       const far = spOff(sx, sz, a, 8), wait = b === 'B' ? 1.5 : 0;
@@ -683,6 +691,7 @@ Object.assign(WT_SKILLS, {
   },
   ax_exec: {
     name: '処刑斬', kind: 'axe', cd: 13.2, motion: 'axe_execute', duration: T.axe_execute.duration,
+    motionOf: (W) => (W.br('ax_exec') === 'B' ? 'ax_exec_sweep' : 'axe_execute'),
     run(c) {
       const W = c.wt(), a = c.aim(), m = W.lv('ax_exec') >= 2 ? 4.2 : 3.4, b = W.br('ax_exec');
       at(c, T.axe_execute.hits[0], () => {

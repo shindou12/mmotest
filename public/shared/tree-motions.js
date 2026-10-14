@@ -57,4 +57,17 @@ export const TREE_MOTIONS = Object.freeze({
   ax_rush_twin: m('ax_rush_twin', 'axe', 1.0, [0.32, 0.62], 'rushtwin'),
   // 大斧・投斧（強攻撃）: 振りかぶって斧を投げる
   ax_throw: m('ax_throw', 'axe', 0.5, [0.18], 'axethrow'),
+  // 分岐で形が変わる技の動き
+  // 大剣・横一文字A「大薙ぎ」: 体ごと大きくひねって、ほぼ一周を薙ぐ
+  gt_broad_wide: m('gt_broad_wide', 'greatsword', 0.85, [0.32], 'broadwide'),
+  // 短剣・影縫いA「三本縫い」: 腕を横に払いながら3本を扇に投げる
+  dk_pin_fan: m('dk_pin_fan', 'dagger', 0.6, [0.18], 'pinfan'),
+  // 盾槍・杭打ちB「三連杭」: 右・正面・左へ順に杭を打ち込む
+  sp_stake_tri: m('sp_stake_tri', 'spear', 0.85, [0.28, 0.43, 0.58], 'staketri'),
+  // 大斧・引き裂きA「大引き」: 一回転して周りを引っかけてから叩く
+  ax_hook_spin: m('ax_hook_spin', 'axe', 0.9, [0.22, 0.55], 'hookspin'),
+  // 大斧・返り刃A「双刃」: 腕を大きく横へ振って3本を放つ
+  ax_return_tri: m('ax_return_tri', 'axe', 0.85, [0.23, 0.63], 'returntri'),
+  // 大斧・処刑斬B「薙ぎ処刑」: 振り下ろさずに、前を大きく横へ薙ぐ
+  ax_exec_sweep: m('ax_exec_sweep', 'axe', 1.0, [0.48], 'execsweep'),
 });
