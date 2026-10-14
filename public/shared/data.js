@@ -16,14 +16,29 @@ export const baseHp = (lv) => 100 * growth(lv);
 export const mobHp = (mlv) => BALANCE.enemyHp * Math.pow(BALANCE.enemyHpGrowth, mlv - 1);
 export const mobDmg = (mlv) => BALANCE.enemyDamage * Math.pow(BALANCE.enemyDamageGrowth, mlv - 1);
 
-// --- レアリティ -----------------------------------------------------------
+// --- レアリティ（＝装備の出来） ---------------------------------------------
+// 粗悪〜傑作は「中身の出来」で決まる（基本値のぶれ・特性の数・特性のティア・強化。itemQuality）。
+// 伝説・神器は固有の名前と特殊効果を持つ別枠の装備。
 export const RARITIES = [
-  { key: 'common', name: 'コモン', color: '#cfd3da', w: 52, mult: 1.0, affixes: 0 },
-  { key: 'uncommon', name: 'アンコモン', color: '#62dc6a', w: 27, mult: 1.12, affixes: 1 },
-  { key: 'rare', name: 'レア', color: '#4aa8ff', w: 14, mult: 1.25, affixes: 2 },
-  { key: 'epic', name: 'エピック', color: '#b86cff', w: 5.5, mult: 1.42, affixes: 3 },
-  { key: 'legendary', name: '伝説', color: '#ffa236', w: 1.2, mult: 1.7, affixes: 3 },
-  { key: 'divine', name: '神器', color: '#ff3d63', w: 0.22, mult: 2.1, affixes: 4 },
+  { key: 'junk', name: '粗悪', color: '#8c929c' },
+  { key: 'common', name: '並', color: '#e6e9ee' },
+  { key: 'fine', name: '良品', color: '#62dc6a' },
+  { key: 'superior', name: '上質', color: '#4aa8ff' },
+  { key: 'epic', name: '逸品', color: '#b86cff' },
+  { key: 'master', name: '傑作', color: '#ffd84a' },
+  { key: 'legendary', name: '伝説', color: '#ff9a2e' },
+  { key: 'divine', name: '神器', color: '#ff3d63' },
+];
+export const LEGEND = 6; // これ以上は固有装備（伝説・神器）
+export const isLegend = (r) => r >= LEGEND;
+// ドロップの「格」（抽選用。0〜3は特性の数、4・5は伝説・神器）。基本値の倍率の幅も格で少し変わる
+export const DROP_GRADES = [
+  { w: 52, affixes: 0, mult: [0.92, 1.18] },
+  { w: 27, affixes: 1, mult: [0.95, 1.25] },
+  { w: 14, affixes: 2, mult: [1.0, 1.32] },
+  { w: 5.5, affixes: 3, mult: [1.05, 1.4] },
+  { w: 1.2, affixes: 3, mult: [1.7, 1.7], rarity: 6 },
+  { w: 0.22, affixes: 4, mult: [2.1, 2.1], rarity: 7 },
 ];
 
 // --- 武器種 ---------------------------------------------------------------
@@ -127,7 +142,7 @@ export function weightClass(total) {
   return WEIGHT_CLASSES.find((w) => total <= w.max);
 }
 // 装備を分解したときにもらえるゴールド（レアリティとアイテムレベルで決まる）
-const SALVAGE_BASE = [2, 5, 14, 40, 130, 400];
+const SALVAGE_BASE = [1, 2, 5, 14, 40, 80, 130, 400]; // 粗悪〜神器
 export const salvageValue = (it) => Math.round(SALVAGE_BASE[it.rarity] * (1 + (it.ilvl || 1) * 0.15));
 
 const ACC_BASE = ['お守り', '銅の指輪', '銀の首飾り', '翠玉の指輪', '紅玉の護符', '星の耳飾り', '天球の指輪'];
@@ -205,14 +220,39 @@ export function affixText(a) {
   const A = AFFIXES[key];
   return `${A.name} +${affixVal(key, tier)}${A.unit}`;
 }
-// ドロップ時のティア: アイテムレベルとレアリティで上限が決まり、上限に近いほど出やすい
+// ドロップ時のティア: アイテムレベルとドロップの格（DROP_GRADES の番号）で上限が決まり、上限に近いほど出やすい
 // 超越（T6・T7）はアイテムレベル25・30から。さらに出る確率を絞る
-export function rollTier(ilvl, rarity) {
-  const max = Math.max(1, Math.min(MAX_TIER, 1 + Math.floor(ilvl / 5) + (rarity >= 4 ? 1 : 0)));
+export function rollTier(ilvl, grade) {
+  const max = Math.max(1, Math.min(MAX_TIER, 1 + Math.floor(ilvl / 5) + (grade >= 4 ? 1 : 0)));
   let t = weightedTier(Math.min(max, CRAFT_MAX_TIER), true);
-  if (max >= 6 && t === CRAFT_MAX_TIER && Math.random() < 0.25 + rarity * 0.05) t = 6;
-  if (max >= 7 && t === 6 && Math.random() < 0.2 + rarity * 0.04) t = 7;
+  if (max >= 6 && t === CRAFT_MAX_TIER && Math.random() < 0.25 + grade * 0.05) t = 6;
+  if (max >= 7 && t === 6 && Math.random() < 0.2 + grade * 0.04) t = 7;
   return t;
+}
+// ---------------------------------------------------------------------------
+// 装備の出来 → レアリティ（粗悪〜傑作）
+//   そのアイテムレベルで出せる最高の物（特性3つが全部上限のティア・基本値が最高）を 1 として、
+//   特性 70% ＋ 基本値のぶれ 30% ＋ 強化 1段 3%。超越のティアやスキル変化は上限を超えて加点
+// ---------------------------------------------------------------------------
+export const tierCap = (ilvl) => Math.max(1, Math.min(CRAFT_MAX_TIER, 1 + Math.floor((ilvl || 1) / 5)));
+export function itemQuality(it) {
+  const cap = Math.max(3, tierCap(it.ilvl)); // 序盤（T1・T2しか出ない頃）は T3 を満点として測る → 序盤は白・緑が中心
+  const af = (it.affixes || []).reduce((a, [k, t]) => a + (isVariant(k) ? 1.25 : Math.min(1.5, t / cap)), 0) / 3;
+  const base = Math.max(0, Math.min(1, ((it.bm ?? 1.1) - 0.92) / 0.48));
+  return 0.7 * af + 0.3 * base + (it.enh || 0) * 0.03;
+}
+export const QUALITY_STEPS = [0.07, 0.24, 0.45, 0.64, 0.82]; // 粗悪 | 並 | 良品 | 上質 | 逸品 | 傑作 の境目
+export function qualityRarity(q) {
+  let r = 0;
+  while (r < QUALITY_STEPS.length && q >= QUALITY_STEPS[r]) r++;
+  return r;
+}
+// 出来からレアリティを付け直す（作ったとき・鍛冶屋で手を加えたとき・古いセーブを読んだとき）
+export function gradeItem(it) {
+  if (!it || it.slot === 'title' || (it.unique && isLegend(it.rarity))) return it;
+  const r = qualityRarity(itemQuality(it));
+  it.rarity = it.unique ? Math.max(4, r) : r; // ダンジョン固有の装備は逸品以上
+  return it;
 }
 // 1〜max から抽選。high=true なら上が出やすく、false なら下が出やすい（鍛冶屋の特性変更）
 export function weightedTier(max, high) {
@@ -228,19 +268,31 @@ export function migrateItem(it) {
     if (it.skill === 'vorpal') it.skill = 'retreat';
     it.starterSkillVersion = 1;
   }
-  if (!it || it.v === 2) return it;
-  it.affixes = (it.affixes || []).map((a) => {
-    if (a.length === 3) return a;
-    const [key, val] = a;
-    if (!AFFIXES[key]) return null;
-    const ts = AFFIXES[key].tiers;
-    let tier = 1;
-    ts.slice(0, CRAFT_MAX_TIER).forEach((v, i) => { if (val >= v * 0.9) tier = i + 1; });
-    return [key, tier, ts[tier - 1]];
-  }).filter(Boolean);
-  if (it.armor && it.trait) { it.base = it.trait; delete it.trait; } // 防具の種類ごとの効果は「基本効果」に改名
-  it.enh = it.enh || 0;
-  it.v = 2;
+  if (!it || it.v >= 3) return it;
+  if (it.v !== 2) {
+    it.affixes = (it.affixes || []).map((a) => {
+      if (a.length === 3) return a;
+      const [key, val] = a;
+      if (!AFFIXES[key]) return null;
+      const ts = AFFIXES[key].tiers;
+      let tier = 1;
+      ts.slice(0, CRAFT_MAX_TIER).forEach((v, i) => { if (val >= v * 0.9) tier = i + 1; });
+      return [key, tier, ts[tier - 1]];
+    }).filter(Boolean);
+    if (it.armor && it.trait) { it.base = it.trait; delete it.trait; } // 防具の種類ごとの効果は「基本効果」に改名
+    it.enh = it.enh || 0;
+  }
+  // v3: レアリティが6段（コモン〜神器）から8段（粗悪〜傑作は出来で決まる・伝説・神器）になった
+  if (it.slot === 'title') it.rarity = it.title && TITLES[it.title] ? TITLES[it.title].rarity : ({ 4: 6, 5: 7 })[it.rarity] ?? it.rarity + 1;
+  else if (it.unique && it.rarity >= 4) it.rarity += 2;
+  else {
+    // 基本値の倍率は、今の攻撃力・HPから逆算する
+    const g = growth(it.ilvl || 1);
+    it.bm = it.slot === 'weapon' ? it.atk / (7 * g) : it.slot === 'armor' ? it.hp / (45 * g * (ARMOR_CLASSES[it.armor || 'medium']?.hp || 1)) : it.atk / (2.5 * g);
+    if (!Number.isFinite(it.bm)) it.bm = 1.1;
+    gradeItem(it);
+  }
+  it.v = 3;
   return it;
 }
 
@@ -258,7 +310,7 @@ export const affixCost = (it) => ({ gold: 50 + it.ilvl * 10, gem: 1 });
 export const skillCost = (it) => ({ gold: 40 + it.ilvl * 8 });
 export const loreCost = (it) => ({ gold: 300 + it.ilvl * 20, shard: 10 });
 // 分解で手に入る素材: 強化の欠片（レアリティで数が決まる）と、付いていた特性ごとの宝石
-const SHARDS = [1, 2, 4, 8, 16, 30];
+const SHARDS = [1, 1, 2, 4, 8, 12, 16, 30]; // 粗悪〜神器
 export function salvageMats(it) {
   // 超越の特性を分解しても、特性リストに記録されるのは鍛冶屋の上限（T5）まで
   return { shard: SHARDS[it.rarity] + (it.enh || 0), gems: (it.affixes || []).map(([key, tier]) => [key, Math.min(tier, CRAFT_MAX_TIER)]) };
@@ -277,25 +329,25 @@ export const UNIQUE_FX = {
 
 export const UNIQUES = [
   // 神器
-  { key: 'amenomurakumo', name: '天叢雲剣', rarity: 5, slot: 'weapon', kind: 'sword', fx: ['wave', 'thunder'], lore: '八岐大蛇の尾より出でし神剣。' },
-  { key: 'gungnir', name: 'グングニル', rarity: 5, slot: 'weapon', kind: 'spear', fx: ['thunder', 'skillcrit'], lore: '必中の神槍。放てば必ず主の手に還る。' },
-  { key: 'excalibur', name: 'エクスカリバー', rarity: 5, slot: 'weapon', kind: 'greatsword', fx: ['wave', 'star'], lore: '湖の乙女より授けられし聖剣。' },
-  { key: 'kusanagi_dagger', name: '月詠ノ小太刀', rarity: 5, slot: 'weapon', kind: 'dagger', fx: ['mirror', 'vamp'], lore: '月光を纏う夜の神の刃。' },
-  { key: 'aegis', name: 'アイギスの聖鎧', rarity: 5, slot: 'armor', armor: 'heavy', fx: ['aegis', 'mirror'], lore: '女神の加護を宿す不壊の鎧。' },
-  { key: 'yata', name: '八咫鏡', rarity: 5, slot: 'acc', fx: ['mirror', 'star'], lore: '真実を映す神鏡。' },
+  { key: 'amenomurakumo', name: '天叢雲剣', rarity: 7, slot: 'weapon', kind: 'sword', fx: ['wave', 'thunder'], lore: '八岐大蛇の尾より出でし神剣。' },
+  { key: 'gungnir', name: 'グングニル', rarity: 7, slot: 'weapon', kind: 'spear', fx: ['thunder', 'skillcrit'], lore: '必中の神槍。放てば必ず主の手に還る。' },
+  { key: 'excalibur', name: 'エクスカリバー', rarity: 7, slot: 'weapon', kind: 'greatsword', fx: ['wave', 'star'], lore: '湖の乙女より授けられし聖剣。' },
+  { key: 'kusanagi_dagger', name: '月詠ノ小太刀', rarity: 7, slot: 'weapon', kind: 'dagger', fx: ['mirror', 'vamp'], lore: '月光を纏う夜の神の刃。' },
+  { key: 'aegis', name: 'アイギスの聖鎧', rarity: 7, slot: 'armor', armor: 'heavy', fx: ['aegis', 'mirror'], lore: '女神の加護を宿す不壊の鎧。' },
+  { key: 'yata', name: '八咫鏡', rarity: 7, slot: 'acc', fx: ['mirror', 'star'], lore: '真実を映す神鏡。' },
   // 伝説
-  { key: 'durandal', name: 'デュランダル', rarity: 4, slot: 'weapon', kind: 'sword', fx: ['wave'], lore: '決して折れぬ聖騎士の剣。' },
-  { key: 'gaebolg', name: 'ゲイ・ボルグ', rarity: 4, slot: 'weapon', kind: 'spear', fx: ['thunder'], lore: '三十の棘を持つ魔槍。' },
-  { key: 'muramasa', name: '妖刀 村正', rarity: 4, slot: 'weapon', kind: 'dagger', fx: ['vamp'], lore: '血を求めて止まぬ妖刀。' },
-  { key: 'dainsleif', name: 'ダーインスレイヴ', rarity: 4, slot: 'weapon', kind: 'greatsword', fx: ['vamp', 'flame'], lore: '一度抜けば血を見ずには収まらぬ。' },
-  { key: 'laevateinn', name: 'レーヴァテイン', rarity: 4, slot: 'weapon', kind: 'sword', fx: ['flame'], lore: '世界を焼く炎の枝。' },
-  { key: 'labrys', name: 'ラブリュス', rarity: 4, slot: 'weapon', kind: 'axe', fx: ['flame'], lore: '迷宮の王が掲げた両刃の斧。' },
-  { key: 'yoichi', name: '与一の弓', rarity: 4, slot: 'weapon', kind: 'bow', fx: ['thunder'], lore: '揺れる扇の的をも射抜いたという名弓。' },
-  { key: 'artemis', name: 'アルテミスの銀弓', rarity: 5, slot: 'weapon', kind: 'bow', fx: ['skillcrit', 'star'], lore: '月の女神の銀の弓。' },
-  { key: 'mjolnir', name: '雷斧ミョルニル', rarity: 5, slot: 'weapon', kind: 'axe', fx: ['thunder', 'vamp'], lore: '雷神の怒りを宿す、振るえば戻る斧。' },
-  { key: 'dragonscale', name: '竜鱗の鎧', rarity: 4, slot: 'armor', armor: 'heavy', fx: ['aegis'], lore: '古竜の鱗を編んだ鎧。' },
-  { key: 'starseer', name: '星詠みの指輪', rarity: 4, slot: 'acc', fx: ['star'], lore: '星の巡りを識る指輪。' },
-  { key: 'phantom', name: '幻影の外套', rarity: 4, slot: 'armor', armor: 'light', fx: ['mirror'], lore: '纏う者の影を揺らがせる。' },
+  { key: 'durandal', name: 'デュランダル', rarity: 6, slot: 'weapon', kind: 'sword', fx: ['wave'], lore: '決して折れぬ聖騎士の剣。' },
+  { key: 'gaebolg', name: 'ゲイ・ボルグ', rarity: 6, slot: 'weapon', kind: 'spear', fx: ['thunder'], lore: '三十の棘を持つ魔槍。' },
+  { key: 'muramasa', name: '妖刀 村正', rarity: 6, slot: 'weapon', kind: 'dagger', fx: ['vamp'], lore: '血を求めて止まぬ妖刀。' },
+  { key: 'dainsleif', name: 'ダーインスレイヴ', rarity: 6, slot: 'weapon', kind: 'greatsword', fx: ['vamp', 'flame'], lore: '一度抜けば血を見ずには収まらぬ。' },
+  { key: 'laevateinn', name: 'レーヴァテイン', rarity: 6, slot: 'weapon', kind: 'sword', fx: ['flame'], lore: '世界を焼く炎の枝。' },
+  { key: 'labrys', name: 'ラブリュス', rarity: 6, slot: 'weapon', kind: 'axe', fx: ['flame'], lore: '迷宮の王が掲げた両刃の斧。' },
+  { key: 'yoichi', name: '与一の弓', rarity: 6, slot: 'weapon', kind: 'bow', fx: ['thunder'], lore: '揺れる扇の的をも射抜いたという名弓。' },
+  { key: 'artemis', name: 'アルテミスの銀弓', rarity: 7, slot: 'weapon', kind: 'bow', fx: ['skillcrit', 'star'], lore: '月の女神の銀の弓。' },
+  { key: 'mjolnir', name: '雷斧ミョルニル', rarity: 7, slot: 'weapon', kind: 'axe', fx: ['thunder', 'vamp'], lore: '雷神の怒りを宿す、振るえば戻る斧。' },
+  { key: 'dragonscale', name: '竜鱗の鎧', rarity: 6, slot: 'armor', armor: 'heavy', fx: ['aegis'], lore: '古竜の鱗を編んだ鎧。' },
+  { key: 'starseer', name: '星詠みの指輪', rarity: 6, slot: 'acc', fx: ['star'], lore: '星の巡りを識る指輪。' },
+  { key: 'phantom', name: '幻影の外套', rarity: 6, slot: 'armor', armor: 'light', fx: ['mirror'], lore: '纏う者の影を揺らがせる。' },
 ];
 
 // --- 階層データ ------------------------------------------------------------
@@ -447,9 +499,10 @@ export function rarityRamp(i, ilvl) {
   const k = Math.max(0, Math.min(1, (ilvl - R[0]) / (R[1] - R[0])));
   return R[2] + (1 - R[2]) * k;
 }
+// ドロップの格を抽選する（DROP_GRADES の番号: 0〜3 特性の数 / 4 伝説 / 5 神器）。見た目のレアリティは中身の出来で決まる
 export function rollRarity(boost = 0, minRarity = 0, ilvl = 99) {
-  // boost: 0=通常, 1=ボス / ilvl: 低いほど上のレア度が出にくい
-  const ws = RARITIES.map((r, i) => {
+  // boost: 0=通常, 1=ボス / ilvl: 低いほど特性の多い格・固有装備が出にくい
+  const ws = DROP_GRADES.map((r, i) => {
     if (i < minRarity) return 0;
     let w = r.w * rarityRamp(i, ilvl);
     if (i >= 3) w *= 1 + boost * 5;
@@ -462,16 +515,19 @@ export function rollRarity(boost = 0, minRarity = 0, ilvl = 99) {
 }
 
 
-export function makeItem(ilvl, rarity, opts = {}) {
-  const r = RARITIES[rarity];
+// grade: ドロップの格（rollRarity の結果。0〜3 特性の数 / 4 伝説 / 5 神器）。レアリティは最後に中身の出来で決まる
+export function makeItem(ilvl, grade, opts = {}) {
+  grade = Math.max(0, Math.min(DROP_GRADES.length - 1, grade | 0));
+  const r = DROP_GRADES[grade];
+  let rarity = r.rarity ?? 0;
   let slot = opts.slot || pick(['weapon', 'weapon', 'weapon', 'armor', 'acc']);
   let kind = opts.kind || null;
   let unique = null;
   if (opts.uniqueDef) {
-    // ダンジョン固有のユニーク装備（レアリティは抽選したものを使う）
+    // ダンジョン固有のユニーク装備（格が伝説・神器ならその色、それ以外は出来で決まる・逸品以上）
     unique = { key: 'dun_' + opts.uniqueDef.name, ...opts.uniqueDef };
-  } else if (rarity >= 4) {
-    const pool = UNIQUES.filter((u) => u.rarity === rarity);
+  } else if (r.rarity) {
+    const pool = UNIQUES.filter((u) => u.rarity === r.rarity);
     unique = pick(pool);
   }
   if (unique) {
@@ -481,10 +537,11 @@ export function makeItem(ilvl, rarity, opts = {}) {
   // エリアの出やすい武器種（opts.kinds）は25%でそこから選ぶ（全体では1種あたり約2倍）
   if (slot === 'weapon' && !kind) kind = opts.kinds?.length && Math.random() < 0.25 ? pick(opts.kinds) : pick(WEAPON_KINDS);
   const tier = Math.min(TIER_PREFIX.length - 1, Math.floor((ilvl - 1) / 5));
-  const g = growth(ilvl) * r.mult * rnd(0.92, 1.08);
+  const bm = Math.round(rnd(r.mult[0], r.mult[1]) * 1000) / 1000; // 基本値の倍率（出来の一部）
+  const g = growth(ilvl) * bm;
   const it = {
     id: `${Date.now().toString(36)}${(itemSeq++).toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`,
-    slot, kind, rarity, ilvl, affixes: [], enh: 0, v: 2,
+    slot, kind, rarity, ilvl, bm, affixes: [], enh: 0, v: 3,
   };
   if (slot === 'weapon') {
     it.atk = Math.round(7 * g);
@@ -511,14 +568,14 @@ export function makeItem(ilvl, rarity, opts = {}) {
   // エリアごとの「付きやすい特性」（opts.bias）は2倍くらい出やすい
   const bias = opts.bias || [];
   const keys = Object.keys(AFFIXES).map((k) => [k, Math.random() / (bias.includes(k) ? 2 : 1)]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
-  for (let i = 0; i < r.affixes; i++) { const t = rollTier(ilvl, rarity); it.affixes.push([keys[i], t, affixVal(keys[i], t)]); }
-  // 武器はレア以上でまれに「スキル変化」が付く（特性1つと入れ替わる。超越扱いなので出にくい）
-  if (slot === 'weapon' && it.affixes.length && Math.random() < [0, 0, 0.08, 0.15, 0.3, 0.45][rarity]) {
+  for (let i = 0; i < r.affixes; i++) { const t = rollTier(ilvl, grade); it.affixes.push([keys[i], t, affixVal(keys[i], t)]); }
+  // 武器は特性2つ以上の格でまれに「スキル変化」が付く（特性1つと入れ替わる。超越扱いなので出にくい）
+  if (slot === 'weapon' && it.affixes.length && Math.random() < [0, 0, 0.08, 0.15, 0.3, 0.45][grade]) {
     const local = bias.filter(isVariant);
-    const sv = local.length && Math.random() < 0.35 ? pick(local) : pick(Object.keys(SKILL_VARIANTS)), t = rollTier(ilvl, rarity);
+    const sv = local.length && Math.random() < 0.35 ? pick(local) : pick(Object.keys(SKILL_VARIANTS)), t = rollTier(ilvl, grade);
     it.affixes[it.affixes.length - 1] = [sv, t, t];
   }
-  return it;
+  return gradeItem(it);
 }
 
 // ---------------------------------------------------------------------------
@@ -526,34 +583,34 @@ export function makeItem(ilvl, rarity, opts = {}) {
 // req: 'melee'（近接武器のみ）/ 'bow' / 'spear' など、条件を満たす武器のときだけ効く
 // ---------------------------------------------------------------------------
 export const TITLES = {
-  t_boss1: { name: 'コボルド王を討つ者', rarity: 3, desc: 'ボスへのダメージ +15%', src: '第1層ボスの初討伐' },
-  t_boss2: { name: '霧を越えし者', rarity: 3, desc: '毒沼・流砂の影響を受けない。継続ダメージ -50%', src: '第2層ボスの初討伐' },
-  t_boss3: { name: '砂王を屠りし者', rarity: 4, desc: 'HPが50%以下の間、移動速度 +25%・攻撃速度 +15%', src: '第3層ボスの初討伐' },
-  t_lake: { name: '湖のヌシ殺し', rarity: 3, desc: 'ゴールド獲得 +30%。硬貨を吸い寄せる範囲が2倍', src: 'ヌシ・ギガスライムの討伐' },
-  t_shark: { name: '砂鮫狩り', rarity: 4, desc: '精鋭・ネームド・ボスへの会心率 +15%', src: '砂鮫ギルガの討伐' },
-  t_wind: { name: '疾風', rarity: 2, desc: '回避した後の1.5秒間、移動速度 +40%', src: 'クエスト「猪狩り」' },
-  t_blood: { name: '血の渇き', rarity: 3, req: 'melee', desc: '敵を倒すとHPを6%回復する', src: 'クエスト「霧の狼」' },
-  t_hawk: { name: '鷹の眼', rarity: 3, req: 'bow', desc: '適性エリアに当たった矢は会心率 +30%', src: 'クエスト「砂の巨人」' },
-  t_guard: { name: '不落の盾', rarity: 3, req: 'spear', desc: 'ガードカウンターを出すと4秒間 被ダメージ -40%', src: 'クエスト「スライム退治」' },
-  t_phoenix: { name: '不死鳥', rarity: 4, desc: '倒れたとき、その場でHP30%で一度だけ復活する（5分に1回）', src: 'クエスト「砂塵の王」' },
+  t_boss1: { name: 'コボルド王を討つ者', rarity: 4, desc: 'ボスへのダメージ +15%', src: '第1層ボスの初討伐' },
+  t_boss2: { name: '霧を越えし者', rarity: 4, desc: '毒沼・流砂の影響を受けない。継続ダメージ -50%', src: '第2層ボスの初討伐' },
+  t_boss3: { name: '砂王を屠りし者', rarity: 6, desc: 'HPが50%以下の間、移動速度 +25%・攻撃速度 +15%', src: '第3層ボスの初討伐' },
+  t_lake: { name: '湖のヌシ殺し', rarity: 4, desc: 'ゴールド獲得 +30%。硬貨を吸い寄せる範囲が2倍', src: 'ヌシ・ギガスライムの討伐' },
+  t_shark: { name: '砂鮫狩り', rarity: 6, desc: '精鋭・ネームド・ボスへの会心率 +15%', src: '砂鮫ギルガの討伐' },
+  t_wind: { name: '疾風', rarity: 3, desc: '回避した後の1.5秒間、移動速度 +40%', src: 'クエスト「猪狩り」' },
+  t_blood: { name: '血の渇き', rarity: 4, req: 'melee', desc: '敵を倒すとHPを6%回復する', src: 'クエスト「霧の狼」' },
+  t_hawk: { name: '鷹の眼', rarity: 4, req: 'bow', desc: '適性エリアに当たった矢は会心率 +30%', src: 'クエスト「砂の巨人」' },
+  t_guard: { name: '不落の盾', rarity: 4, req: 'spear', desc: 'ガードカウンターを出すと4秒間 被ダメージ -40%', src: 'クエスト「スライム退治」' },
+  t_phoenix: { name: '不死鳥', rarity: 6, desc: '倒れたとき、その場でHP30%で一度だけ復活する（5分に1回）', src: 'クエスト「砂塵の王」' },
   // ---- クエスト報酬 ----
-  t_delver: { name: '井戸の探索者', rarity: 2, desc: 'ダンジョン・迷宮区の中で移動速度 +15%', src: 'クエスト「古井戸の調査」' },
-  t_mapper: { name: '地図職人', rarity: 2, desc: '迷宮・ダンジョンの自動マッピングの範囲が2倍。宝箱がミニマップに遠くから映る', src: 'クエスト「迷宮区の主」' },
-  t_traveler: { name: '旅人', rarity: 2, desc: 'エリアを移動・ワープした後の10秒間、移動速度 +30%', src: 'クエスト「霧の向こうへ」' },
-  t_treasure: { name: '宝探し', rarity: 3, desc: '宝箱を開けるとゴールドを追加で得て、HPが30%回復する', src: 'クエスト「樹洞の秘宝」' },
-  t_breaker: { name: '崩しの達人', rarity: 3, desc: 'ボスのスタン値の溜まり方 +30%。スタン中のボスへのダメージ +15%', src: 'クエスト「大樹の守り手」' },
-  t_relic: { name: '古代の守護', rarity: 3, desc: '被ダメージ -8%。ひるみにくくなる', src: 'クエスト「埋もれた神殿」' },
-  t_night: { name: '夜目', rarity: 2, desc: 'ダンジョン・迷宮区の中で会心率 +10%', src: 'クエスト「洞窟の羽音」' },
-  t_spore: { name: '薬師', rarity: 2, desc: 'ポーションの回復量 +40%', src: 'クエスト「毒キノコ採り」' },
-  t_spell: { name: '呪い返し', rarity: 3, desc: '弾（遠距離攻撃）から受けるダメージ -35%', src: 'クエスト「まじない師の影」' },
-  t_shell: { name: '甲殻の守り', rarity: 3, req: 'melee', desc: '近接のみ。被ダメージ -12%。正面から受けたときの割り増しがなくなる', src: 'クエスト「大蠍の尾」' },
+  t_delver: { name: '井戸の探索者', rarity: 3, desc: 'ダンジョン・迷宮区の中で移動速度 +15%', src: 'クエスト「古井戸の調査」' },
+  t_mapper: { name: '地図職人', rarity: 3, desc: '迷宮・ダンジョンの自動マッピングの範囲が2倍。宝箱がミニマップに遠くから映る', src: 'クエスト「迷宮区の主」' },
+  t_traveler: { name: '旅人', rarity: 3, desc: 'エリアを移動・ワープした後の10秒間、移動速度 +30%', src: 'クエスト「霧の向こうへ」' },
+  t_treasure: { name: '宝探し', rarity: 4, desc: '宝箱を開けるとゴールドを追加で得て、HPが30%回復する', src: 'クエスト「樹洞の秘宝」' },
+  t_breaker: { name: '崩しの達人', rarity: 4, desc: 'ボスのスタン値の溜まり方 +30%。スタン中のボスへのダメージ +15%', src: 'クエスト「大樹の守り手」' },
+  t_relic: { name: '古代の守護', rarity: 4, desc: '被ダメージ -8%。ひるみにくくなる', src: 'クエスト「埋もれた神殿」' },
+  t_night: { name: '夜目', rarity: 3, desc: 'ダンジョン・迷宮区の中で会心率 +10%', src: 'クエスト「洞窟の羽音」' },
+  t_spore: { name: '薬師', rarity: 3, desc: 'ポーションの回復量 +40%', src: 'クエスト「毒キノコ採り」' },
+  t_spell: { name: '呪い返し', rarity: 4, desc: '弾（遠距離攻撃）から受けるダメージ -35%', src: 'クエスト「まじない師の影」' },
+  t_shell: { name: '甲殻の守り', rarity: 4, req: 'melee', desc: '近接のみ。被ダメージ -12%。正面から受けたときの割り増しがなくなる', src: 'クエスト「大蠍の尾」' },
   // ---- ドロップ限定（倒したときにまれに落ちる）----
-  t_lucky: { name: '幸運の星', rarity: 4, desc: '会心率 +8%・ゴールド獲得 +15%', src: 'どの敵からも、ごくまれに落ちる', drop: true },
-  t_reaper: { name: '死神の影', rarity: 4, desc: 'HPが30%以下の敵へのダメージ +25%', src: '精鋭からまれに落ちる', drop: true },
-  t_berserk: { name: '狂戦士', rarity: 4, req: 'melee', desc: '近接のみ。与ダメージ +20%・被ダメージ +15%', src: 'ネームドからまれに落ちる', drop: true },
-  t_star: { name: '流星', rarity: 5, desc: '武器スキルのクールタイム -20%。武器スキルが当たると流れ星が降る', src: '階層ボスからまれに落ちる', drop: true },
-  t_storm: { name: '嵐を歩む者', rarity: 3, desc: '雨・霧・砂嵐のエリアで移動速度 +15%・攻撃速度 +10%', src: '天候のあるエリアの敵からまれに落ちる', drop: true },
-  t_hunter: { name: '百獣の狩人', rarity: 3, desc: '雑魚（精鋭でない敵）へのダメージ +15%', src: '狩場の敵からまれに落ちる', drop: true },
+  t_lucky: { name: '幸運の星', rarity: 6, desc: '会心率 +8%・ゴールド獲得 +15%', src: 'どの敵からも、ごくまれに落ちる', drop: true },
+  t_reaper: { name: '死神の影', rarity: 6, desc: 'HPが30%以下の敵へのダメージ +25%', src: '精鋭からまれに落ちる', drop: true },
+  t_berserk: { name: '狂戦士', rarity: 6, req: 'melee', desc: '近接のみ。与ダメージ +20%・被ダメージ +15%', src: 'ネームドからまれに落ちる', drop: true },
+  t_star: { name: '流星', rarity: 7, desc: '武器スキルのクールタイム -20%。武器スキルが当たると流れ星が降る', src: '階層ボスからまれに落ちる', drop: true },
+  t_storm: { name: '嵐を歩む者', rarity: 4, desc: '雨・霧・砂嵐のエリアで移動速度 +15%・攻撃速度 +10%', src: '天候のあるエリアの敵からまれに落ちる', drop: true },
+  t_hunter: { name: '百獣の狩人', rarity: 4, desc: '雑魚（精鋭でない敵）へのダメージ +15%', src: '狩場の敵からまれに落ちる', drop: true },
 };
 // ドロップ限定の称号の落ちる確率（倒した敵の種類ごと）
 export const TITLE_DROPS = [
@@ -573,7 +630,7 @@ export function makeTitle(id) {
   const T = TITLES[id];
   return {
     id: `t${Date.now().toString(36)}${(itemSeq++).toString(36)}`, slot: 'title', kind: null, rarity: T.rarity, ilvl: 1,
-    affixes: [], enh: 0, v: 2, weight: 0, name: `「${T.name}」`, title: id, req: T.req || null,
+    affixes: [], enh: 0, v: 3, weight: 0, name: `「${T.name}」`, title: id, req: T.req || null,
   };
 }
 // 伝承化: 伝説・神器の装備を、その固有効果を持つ称号に変える
@@ -581,7 +638,7 @@ export function loreTitle(it) {
   const req = (it.fx || []).map((f) => FX_REQ[f]).find(Boolean) || null;
   return {
     id: `t${Date.now().toString(36)}${(itemSeq++).toString(36)}`, slot: 'title', kind: null, rarity: it.rarity, ilvl: it.ilvl,
-    affixes: [], enh: 0, v: 2, weight: 0, name: `「${it.name}」の伝承`, fx: (it.fx || []).slice(), lore: it.lore, req, from: it.name,
+    affixes: [], enh: 0, v: 3, weight: 0, name: `「${it.name}」の伝承`, fx: (it.fx || []).slice(), lore: it.lore, req, from: it.name,
   };
 }
 
@@ -589,6 +646,7 @@ export function starterWeapon(kind) {
   const it = makeItem(1, 0, { slot: 'weapon', kind });
   it.name = '初心者の' + WEAPONS[kind].name;
   it.atk = 6;
+  it.bm = 1.2; gradeItem(it); // 「並」
   it.skill = kind === 'sword' ? 'retreat' : WEAPON_SKILL_POOL[kind][0];
   if (kind === 'sword') it.starterSkillVersion = 1;
   return it;

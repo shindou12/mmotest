@@ -114,8 +114,11 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .cell .gi { font-size: 22px; font-weight: bold; }
 .cell .lv { position: absolute; top: 2px; right: 4px; font-size: 9px; color: var(--dim); }
 .cell .up { position: absolute; top: 2px; left: 4px; font-size: 11px; color: #5f5; }
-.cell.r4 { box-shadow: 0 0 12px rgba(255,160,50,.7) inset; }
-.cell.r5 { box-shadow: 0 0 16px rgba(255,60,100,.9) inset; animation: divine 1.4s infinite alternate; }
+/* レアリティ: r0 粗悪 r1 並 r2 良品 r3 上質 r4 逸品 r5 傑作 r6 伝説 r7 神器 */
+.cell.r0 { opacity: .7; }
+.cell.r5 { box-shadow: 0 0 12px rgba(255,216,74,.6) inset; }
+.cell.r6 { box-shadow: 0 0 12px rgba(255,154,46,.7) inset; }
+.cell.r7 { box-shadow: 0 0 16px rgba(255,60,100,.9) inset; animation: divine 1.4s infinite alternate; }
 @keyframes divine { from { filter: brightness(1) } to { filter: brightness(1.4) } }
 .eq .cell { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 10px; font-size: 13px; }
 #stats { font-size: 12px; line-height: 1.8; margin-top: 10px; padding: 8px; background: rgba(0,0,0,.3); border-radius: 8px; }
@@ -264,22 +267,26 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .dmg.heal { color: #6f6; }
 .dmg.info { color: #8fd8ff; font-size: 20px; }
 .dmg.just { color: #9ff; font-size: 28px; letter-spacing: .1em; }
-/* 落とし物の名札（PoE風）: 暗い札にレア度の色の文字。上のレア度ほど枠が太く、文字が大きい */
+/* 落とし物の名札（PoE風）: 暗い札にレアリティ（出来）の色の文字。上ほど枠が太く、文字が大きい
+   r0 粗悪 r1 並 r2 良品 r3 上質 r4 逸品 r5 傑作 / r6 伝説 r7 神器（固有装備） */
 .loot { position: absolute; pointer-events: auto; cursor: pointer; white-space: nowrap; user-select: none;
   font: 600 12px/1 "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif; letter-spacing: .02em;
-  padding: 3px 7px 4px; background: rgba(0, 0, 0, .72); border: 1px solid transparent; color: #cfd3da; }
+  padding: 3px 7px 4px; background: rgba(0, 0, 0, .72); border: 1px solid transparent; color: #e6e9ee; }
 .loot:hover { background: rgba(30, 34, 48, .92); outline: 1px solid rgba(255, 255, 255, .7); }
-.loot.r1 { color: #7cf084; border-color: rgba(98, 220, 106, .35); }
-.loot.r2 { color: #6cb8ff; border-color: rgba(74, 168, 255, .7); font-size: 13px; }
-.loot.r3 { color: #c99aff; border-color: #b86cff; font-size: 14px; }
-.loot.r4 { color: #ffb252; border: 2px solid #ffa236; font-size: 15px; background: rgba(20, 10, 0, .85); box-shadow: 0 0 10px rgba(255, 162, 54, .45); }
-.loot.r5 { color: #d0102e; border: 2px solid #d0102e; font-size: 16px; font-weight: 800; background: #fff; box-shadow: 0 0 14px rgba(255, 61, 99, .8); }
-.loot.r5:hover { background: #fff; outline-color: #d0102e; }
+.loot.r0 { color: #8c929c; font-size: 11px; background: rgba(0, 0, 0, .5); opacity: .8; }
+.loot.r2 { color: #7cf084; border-color: rgba(98, 220, 106, .35); }
+.loot.r3 { color: #6cb8ff; border-color: rgba(74, 168, 255, .7); font-size: 13px; }
+.loot.r4 { color: #c99aff; border-color: #b86cff; font-size: 14px; }
+.loot.r5 { color: #ffe27a; border: 2px solid #ffd84a; font-size: 15px; font-weight: 800; background: rgba(28, 22, 0, .88); box-shadow: 0 0 12px rgba(255, 216, 74, .6); }
+.loot.r6 { color: #ffae5a; border: 2px solid #ff9a2e; font-size: 15px; background: rgba(20, 8, 0, .9); box-shadow: 0 0 10px rgba(255, 154, 46, .45); }
+.loot.r7 { color: #d0102e; border: 2px solid #d0102e; font-size: 16px; font-weight: 800; background: #fff; box-shadow: 0 0 14px rgba(255, 61, 99, .8); }
+.loot.r7:hover { background: #fff; outline-color: #d0102e; }
 /* 超越の特性つき: 頭に★（数＝超越の特性の数）、桃色の枠が脈打つ */
 .loot .stars { color: #ff7ab0; margin-right: 3px; letter-spacing: -.05em; text-shadow: 0 0 6px rgba(255, 122, 176, .9); }
-.loot.r5 .stars { color: #ff3d8a; text-shadow: none; }
+.loot.r7 .stars { color: #ff3d8a; text-shadow: none; }
 .loot.tx { border: 2px solid #ff7ab0; animation: lootTx 1.4s ease-in-out infinite; }
-.loot.r5.tx { border-color: #d0102e; }
+.loot.r7.tx { border-color: #d0102e; }
+.loot.r5.tx { border-color: #ffd84a; }
 @keyframes lootTx { 0%, 100% { box-shadow: 0 0 6px rgba(255, 122, 176, .5) } 50% { box-shadow: 0 0 16px rgba(255, 122, 176, 1) } }
 @media (prefers-reduced-motion: reduce) { .loot.tx { animation: none; box-shadow: 0 0 10px rgba(255, 122, 176, .8); } }
 .plate { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 11px; text-shadow: 0 1px 2px #000; white-space: nowrap; }

@@ -9,7 +9,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
-  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE, SKILL_VARIANTS, SV, isVariant, transcendCount, displayName, affixVal, enhMult, titleReqOk,
+  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE, SKILL_VARIANTS, SV, isVariant, transcendCount, displayName, isLegend, gradeItem, affixVal, enhMult, titleReqOk,
   migrateItem, makeTitle, TITLES, TITLE_DROPS, salvageMats, affixName, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost,
   CRAFT_MAX_TIER, weightedTier, loreTitle,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
@@ -420,7 +420,7 @@ function onMsg(m) {
       break;
     case 'gold': spawnGold(m.n, m.x, m.z, !!m.bag); break;
     // 共有ボックス
-    case 'box': ui.boxItems(m.items, m.max); break;
+    case 'box': (m.items || []).forEach(migrateItem); ui.boxItems(m.items, m.max); break;
     case 'boxPut': {
       const i = char.inv.findIndex((it) => it.id === m.ref);
       if (i >= 0) { const [it] = char.inv.splice(i, 1); toast(`「${it.name}」を共有ボックスに入れた`, '#9ae8ff'); }
@@ -1901,11 +1901,17 @@ function landDrop(d) {
     d.beam = fx.beam(d.x, d.z, TRANS_COLOR, 12 + stars * 4, 0.45 + stars * 0.1);
     fx.parts.burst(d.x, 0.5, d.z, 30 + stars * 20, { color: TRANS_COLOR, speed: 5, size: 0.5, life: 1.0, gravity: -3 });
     fx.ringWave(d.x, d.z, TRANS_COLOR, 4 + stars * 2, 0.6);
-  } else if (r >= 3) d.beam = fx.beam(d.x, d.z, col, 6 + r * 4, 0.25 + r * 0.08);
-  if (r >= 4) {
+  } else if (r >= 4) d.beam = fx.beam(d.x, d.z, col, r === 4 ? 14 : 22, r === 4 ? 0.45 : 0.7); // 逸品以上は光の柱（傑作・伝説・神器は太く高い）
+  if (r === 5) {
+    // 傑作: 金の光がはじける
+    fx.flash(d.x, 2, d.z, col, 60, 0.6, 20);
+    fx.parts.burst(d.x, 0.5, d.z, 40, { color: col, speed: 6, size: 0.5, life: 0.9, gravity: -2 });
+    fx.ringWave(d.x, d.z, col, 6, 0.6);
+  }
+  if (isLegend(r)) {
     fx.flash(d.x, 3, d.z, col, 120, 1.2, 40);
     fx.ringWave(d.x, d.z, col, 10, 1.0);
-    addShake(r === 5 ? 1 : 0.5);
+    addShake(r === 7 ? 1 : 0.5);
   }
 }
 
@@ -1921,10 +1927,11 @@ function pickupDrop(d) {
   audio.sfx('pickup');
   const it = d.it, r = it.rarity, col = RARITIES[r].color, stars = transcendCount(it), name = displayName(it);
   const cmp = itemPower(it) > itemPower(char.eq[it.slot]) ? '  ▲' : '';
-  toast(`${RARITIES[r].name}「${name}」を入手${cmp}`, col, r >= 4 || stars > 0);
+  toast(`${RARITIES[r].name}「${name}」を入手${cmp}`, col, r >= 5 || stars > 0);
   // レアな物の画面通知は、拾ったときに出す（落ちたときは札と音と光だけ）
   const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : it.slot === 'title' ? '称号' : '装飾品';
-  if (r >= 4) banner(r === 5 ? '神器を入手' : '伝説の' + what + 'を入手', name, col, r + stars);
+  if (isLegend(r)) banner(r === 7 ? '神器を入手' : '伝説の' + what + 'を入手', name, col, r + stars);
+  else if (r === 5) banner('傑作の' + what + 'を入手', name, col, 5 + stars);
   else if (stars) banner('超越の' + what + 'を入手', name, '#ff7ab0', 4);
   else if (it.slot === 'title') banner('称号を入手', name, col, 3);
   if (it.slot === 'title' && TITLES[it.title]) toast(`${it.name}：${TITLES[it.title].desc}`, col);
@@ -2167,7 +2174,7 @@ function salvage(id) {
   if (!it) return;
   if (it.slot === 'title') { toast('称号は分解できません', '#f99'); return; }
   // 伝説以上は2回右クリックで分解（誤操作防止）
-  if (it.rarity >= 4 && (salvageArm?.id !== it.id || now() - salvageArm.t > 2)) {
+  if (it.rarity >= 5 && (salvageArm?.id !== it.id || now() - salvageArm.t > 2)) {
     salvageArm = { id: it.id, t: now() };
     toast(`もう一度右クリックで「${it.name}」を分解`, RARITIES[it.rarity].color);
     return;
@@ -2180,7 +2187,7 @@ function salvage(id) {
 // 分解の対象: バーで選んだレア度以下。称号・★付き（超越の特性つき）・伝説以上は対象外
 function salvageTarget(it) {
   const lim = char.autoSalvage ?? -1;
-  return lim >= 0 && it.slot !== 'title' && it.rarity <= lim && it.rarity < 4 && transcendCount(it) === 0;
+  return lim >= 0 && it.slot !== 'title' && it.rarity <= lim && !isLegend(it.rarity) && transcendCount(it) === 0;
 }
 function setAutoSalvage(v) {
   char.autoSalvage = clamp(Math.round(v), -1, 3);
@@ -2275,13 +2282,24 @@ function smithEnhance(id) {
   if (err) return fail(err);
   const rate = ENH_RATE[it.enh || 0];
   const ok = Math.random() < rate;
+  let up = '';
   if (ok) {
     it.enh = (it.enh || 0) + 1;
+    up = regrade(it);
     audio.sfx(it.enh >= 6 ? 'perfect' : 'levelup');
     fx.beam(me.x, me.z, it.enh >= 6 ? 0xffa236 : 0xffd84a, 10, 0.6, 0.8);
   } else audio.sfx('block');
   calcStats(); saveChar();
-  return { ok, msg: ok ? `+${it.enh} に強化した！` : `強化に失敗した…（+${it.enh || 0} のまま）`, enh: it.enh };
+  return { ok, msg: ok ? `+${it.enh} に強化した！${up}` : `強化に失敗した…（+${it.enh || 0} のまま）`, enh: it.enh };
+}
+// 鍛冶屋で手を加えたら出来を測り直す。レアリティが変わったら知らせる
+function regrade(it) {
+  const before = it.rarity;
+  gradeItem(it);
+  if (it.rarity === before) return '';
+  const msg = `「${RARITIES[before].name}」から「${RARITIES[it.rarity].name}」に${it.rarity > before ? '上がった' : '下がった'}`;
+  toast(`${it.name}：${msg}`, RARITIES[it.rarity].color, it.rarity > before);
+  return `（${msg}）`;
 }
 function smithAffix(id, idx, key) {
   const it = findItem(id);
@@ -2293,9 +2311,10 @@ function smithAffix(id, idx, key) {
   if (err) return fail(err);
   const tier = weightedTier(Math.min(char.codex[key], CRAFT_MAX_TIER), false);
   it.affixes[idx] = [key, tier, affixVal(key, tier)];
+  const up = regrade(it);
   audio.sfx('buff'); fx.ringWave(me.x, me.z, 0xc8a0ff, 3, 0.4);
   calcStats(); saveChar();
-  return { ok: true, msg: `${affixName(key)} T${tier} を付与した`, tier };
+  return { ok: true, msg: `${affixName(key)} T${tier} を付与した${up}`, tier };
 }
 function smithSkill(id, skillId) {
   const it = findItem(id);
@@ -2310,7 +2329,7 @@ function smithSkill(id, skillId) {
 }
 function smithLore(id) {
   const it = findItem(id);
-  if (!it || it.rarity < 4 || !it.fx?.length || it.slot === 'title') return fail('伝説・神器の装備だけが伝承化できます');
+  if (!it || !isLegend(it.rarity) || !it.fx?.length || it.slot === 'title') return fail('伝説・神器の装備だけが伝承化できます');
   const err = pay(loreCost(it));
   if (err) return fail(err);
   const t = loreTitle(it);
@@ -2611,7 +2630,7 @@ function update(dt) {
   if (me.guarding && Math.random() < 0.3) fx.parts.emit(me.x + Math.sin(me.a) * 0.9 + rnd(-0.4, 0.4), rnd(0.6, 1.8), me.z + Math.cos(me.a) * 0.9 + rnd(-0.4, 0.4), { color: 0xbfe0ff, size: 0.25, life: 0.3, speed: 0.3, gravity: 0 });
   for (const b of me.buffs) if (Math.random() < 0.25) fx.parts.emit(me.x + rnd(-0.5, 0.5), rnd(0.2, 2), me.z + rnd(-0.5, 0.5), { color: b.color, size: 0.3, life: 0.6, speed: 1, gravity: 2 });
   // 伝説・神器のオーラ
-  if (S.wr >= 4 && Math.random() < 0.3) fx.parts.emit(me.x + rnd(-0.6, 0.6), rnd(0.3, 2), me.z + rnd(-0.6, 0.6), { color: RARITIES[S.wr].color, size: 0.25, life: 0.8, speed: 0.4, gravity: 1.5 });
+  if (S.wr >= 5 && Math.random() < 0.3) fx.parts.emit(me.x + rnd(-0.6, 0.6), rnd(0.3, 2), me.z + rnd(-0.6, 0.6), { color: RARITIES[S.wr].color, size: 0.25, life: 0.8, speed: 0.4, gravity: 1.5 });
 
   // NPC（近くに来たらこちらを向く）
   for (const n of npcs) {

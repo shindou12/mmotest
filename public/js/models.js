@@ -210,14 +210,17 @@ function weaponVariant(kind, style, C) {
 // 装備から武器の形を決める: 伝説・神器は専用形（3）、それ以外は名前から 0〜2
 export function weaponStyle(it) {
   if (!it) return 0;
-  if (it.rarity >= 4) return 3;
+  if (it.rarity >= 6) return 3;
   const s = [...String(it.name || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
   return s % 3;
 }
+// 武器の飾りの段階（0〜5）: レアリティ8段（粗悪〜神器）を、金具・光る縁などの見た目の段階にまとめる
+const visTier = (r) => (r >= 6 ? r - 2 : Math.max(0, r - 1));
 
-export function makeWeapon(kind, rarity = 0, style = 0) {
+export function makeWeapon(kind, rarityIn = 0, style = 0) {
   const g = new THREE.Group();
-  const rc = new THREE.Color(RARITIES[rarity].color);
+  const rc = new THREE.Color(RARITIES[rarityIn].color);
+  const rarity = visTier(rarityIn);
   const steel = toon(rarity >= 4 ? new THREE.Color(0xe8eef6).lerp(rc, 0.35) : 0xdfe7f0, rarity >= 3 ? { emissive: rc, emissiveIntensity: 0.15 + (rarity - 3) * 0.15 } : {});
   const gold = toon(rarity >= 3 ? 0xf2c14e : 0x9a7a4a);
   const grip = toon(0x3a2418);
@@ -491,8 +494,9 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
 }
 
 // 盾槍の盾（左腕に持つ）
-function makeShield(rarity, armL) {
-  const rc = new THREE.Color(RARITIES[rarity].color);
+function makeShield(rarityIn, armL) {
+  const rc = new THREE.Color(RARITIES[rarityIn].color);
+  const rarity = visTier(rarityIn);
   const g = new THREE.Group();
   const face = toon(rarity >= 3 ? new THREE.Color(0x5a6a8a).lerp(rc, 0.3) : 0x5a6a8a);
   const rim = toon(rarity >= 3 ? 0xf2c14e : 0xb8c0cc);
@@ -893,7 +897,7 @@ export function makeLootItem(it) {
     item.add(mesh(new THREE.OctahedronGeometry(0.08), glow(c.clone().multiplyScalar(1.5)), [0, 0.1, 0.16]));
   }
   let halo = null;
-  if (r >= 1) {
+  if (r >= 2) {
     halo = new THREE.Mesh(new THREE.CircleGeometry(0.6 + r * 0.08, 24), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.18 + r * 0.04, depthWrite: false }));
     halo.rotation.x = -Math.PI / 2; halo.position.y = 0.03;
     g.add(halo);

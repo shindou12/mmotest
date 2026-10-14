@@ -13,7 +13,7 @@
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
 import {
   FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT, BOW_ZONE,
-  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, transcendCount, displayName, affixText, tierLabel, tierColor,
+  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, transcendCount, displayName, itemQuality, affixText, tierLabel, tierColor,
   enhMult, TITLES, TITLE_REQ, titleReqOk, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost, CRAFT_MAX_TIER, affixName, FX_REQ,
 } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, WEATHERS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
@@ -285,6 +285,8 @@ export function createUI(game) {
     }
     const type = it.slot === 'weapon' ? WEAPONS[it.kind].name : it.slot === 'armor' ? `防具（${ARMOR_CLASSES[it.armor || 'medium'].name}${atype ? '・' + atype.name : ''}）` : '装飾品';
     let h = `<div class="tn" style="color:${r.color}">${esc(displayName(it))}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
+    // 出来（このアイテムレベルで出せる最高の物を100%として）。レアリティ（粗悪〜傑作）はこれで決まる
+    if (it.rarity < 6) h += `<div class="dim">出来 <b style="color:${r.color}">${Math.round(itemQuality(it) * 100)}%</b>（基本値・特性の数とティア・強化から）</div>`;
     const e = enhMult(it), ev = (v) => Math.round(v * e * 10) / 10;
     h += '<div class="base">';
     if (it.atk) h += `<div>攻撃力 <b>+${ev(it.atk)}</b></div>`;
@@ -329,7 +331,7 @@ export function createUI(game) {
     // 分解の対象（このレア度以下）: 自動分解と一括分解で共通
     const lim = char.autoSalvage ?? -1, limName = lim < 0 ? '' : RARITIES[lim].name;
     INV.auto.set({ value: lim });
-    INV.autoLbl.set({ text: lim < 0 ? 'なし' : lim === 0 ? 'コモンだけ' : `${limName}以下`, style: { color: lim < 0 ? '' : RARITIES[lim].color } });
+    INV.autoLbl.set({ text: lim < 0 ? 'なし' : lim === 0 ? '粗悪だけ' : `${limName}以下`, style: { color: lim < 0 ? '' : RARITIES[lim].color } });
     INV.salvage.set({ text: lim < 0 ? '一括分解' : `${limName}以下を一括分解`, disabled: lim < 0 });
     if (char.inv.length) INV.grid.list(char.inv, (it) => ({ html: P.itemCell(it, { showUp: true }), data: it.id, setup: cellSetup }));
     else INV.grid.list([], () => ({})).set({ html: '<div class="dim">アイテムなし。モンスターを倒そう！</div>' });
@@ -514,7 +516,7 @@ export function createUI(game) {
     if (!qs.length) { DLG.list.list([], () => ({})).set({ html: '<div class="dim">今はお願いしたいことはないよ。</div>' }); return; }
     DLG.list.list(qs, (q) => {
       const s = questState(char, q.id);
-      const rw = [`経験値 ${q.reward.xp}`, q.reward.rarity != null ? `${RARITIES[q.reward.rarity].name}以上の${q.reward.slot ? { weapon: '武器', armor: '防具', acc: '装飾品' }[q.reward.slot] : '装備'}` : '', q.reward.potion ? `ポーション所持数 +${q.reward.potion}` : '', q.reward.title ? `称号「${TITLES[q.reward.title].name}」（${TITLES[q.reward.title].desc}）` : ''].filter(Boolean).join('・');
+      const rw = [`経験値 ${q.reward.xp}`, q.reward.rarity != null ? `${q.reward.rarity >= 4 ? '伝説の' : `特性${q.reward.rarity}つ付きの`}${q.reward.slot ? { weapon: '武器', armor: '防具', acc: '装飾品' }[q.reward.slot] : '装備'}` : '', q.reward.potion ? `ポーション所持数 +${q.reward.potion}` : '', q.reward.title ? `称号「${TITLES[q.reward.title].name}」（${TITLES[q.reward.title].desc}）` : ''].filter(Boolean).join('・');
       let btn;
       if (!s) btn = '<button data-act="accept">受ける</button>';
       else if (s.claimed) btn = '<span class="dim">完了</span>';
@@ -556,7 +558,7 @@ export function createUI(game) {
     enh: (it) => it.slot !== 'title',
     affix: (it) => it.slot !== 'title' && it.affixes.length > 0,
     skill: (it) => it.slot === 'weapon',
-    lore: (it) => it.rarity >= 4 && it.fx?.length && it.slot !== 'title',
+    lore: (it) => it.rarity >= 6 && it.fx?.length && it.slot !== 'title',
     codex: () => false,
   };
   const smithItems = () => {

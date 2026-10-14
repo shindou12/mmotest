@@ -475,27 +475,29 @@ export class AudioEngine {
             for (const [k, v] of [[1, 0.05], [2.76, 0.025]]) tone('sine', 1900 * k, 0, 0.22, v);
             this.noiseHit(t, 0.06, 'highpass', 5000, 0.04, B);
           }
-          if (r === 1) tone('sine', mtof(84), 0, 0.25, 0.035, 0.04);
-          else if (r === 2) [0, 7].forEach((s, i) => tone('sine', mtof(81 + s), 0, 0.45, 0.06, 0.04 + i * 0.07).connect(this.revSend));
-          else if (r === 3) [0, 4, 7, 12].forEach((s, i) => tone('triangle', mtof(79 + s), 0, 0.6, 0.06, 0.04 + i * 0.06).connect(this.revSend));
-          // レアなほど「キーン」と高く澄んだ音が長く響く（少しずらした2音のうなりできらめかせる）
+          // レアリティの合図（粗悪・並は物の音だけ。良品→上質→逸品→傑作と華やかに）
+          if (r === 2) tone('sine', mtof(84), 0, 0.25, 0.035, 0.04);
+          else if (r === 3) [0, 7].forEach((s, i) => tone('sine', mtof(81 + s), 0, 0.45, 0.06, 0.04 + i * 0.07).connect(this.revSend));
+          else if (r >= 4) [0, 4, 7, 12].forEach((s, i) => tone('triangle', mtof(79 + s), 0, 0.6, 0.06, 0.04 + i * 0.06).connect(this.revSend));
+          // 上のレアリティほど「キーン」と高く澄んだ音が長く響く（少しずらした2音のうなりできらめかせる）
           const kiin = (f, dur, vol, at = 0.05) => { tone('sine', f, 0, dur, vol, at).connect(this.revSend); tone('sine', f * 1.004, 0, dur, vol * 0.8, at); tone('sine', f * 2.01, 0, dur * 0.6, vol * 0.25, at); };
-          if (r === 3) kiin(2793, 0.7, 0.025, 0.2);
-          if (r === 4) kiin(3136, 1.3, 0.04, 0.15);
-          if (r === 5) { kiin(4186, 2.4, 0.055, 0.1); kiin(3520, 1.8, 0.03, 0.16); }
+          if (r === 4) kiin(2793, 0.7, 0.025, 0.2);
+          if (r === 5) { kiin(3520, 1.6, 0.045, 0.12); kiin(2637, 1.2, 0.02, 0.2); }
+          if (r === 6) kiin(3136, 1.3, 0.04, 0.15);
+          if (r === 7) { kiin(4186, 2.4, 0.055, 0.1); kiin(3520, 1.8, 0.03, 0.16); }
           // 超越の特性つき: 星の数だけ、きらめく高音が駆け上がる
           for (let i = 0; i < (opt.stars || 0); i++) kiin(mtof(96 + [0, 4, 7, 12][i % 4]), 1.2, 0.03, 0.3 + i * 0.12);
-          if (r <= 3) break;
+          if (r <= 5) break;
         }
         if (r <= 1) tone('sine', 880, 1320, 0.12, 0.08);
-        else if (r <= 3) { [0, 7, 12].forEach((s, i) => tone('sine', mtof(76 + s + r), 0, 0.4, 0.08, i * 0.05).connect(this.revSend)); }
+        else if (r <= 5) { [0, 7, 12].forEach((s, i) => tone('sine', mtof(76 + s + Math.min(3, r)), 0, 0.4, 0.08, i * 0.05).connect(this.revSend)); }
         else {
           // 伝説・神器: 重厚な和音 + キラキラ
-          const root = r === 5 ? 57 : 60;
+          const root = r === 7 ? 57 : 60;
           tone('sine', 55, 0, 2.5, 0.35);
-          [0, 7, 12, 16, 19].forEach((s) => this.pad(mtof(root + s), t, 1.2, r === 5 ? 0.06 : 0.04, 2400));
+          [0, 7, 12, 16, 19].forEach((s) => this.pad(mtof(root + s), t, 1.2, r === 7 ? 0.06 : 0.04, 2400));
           for (let i = 0; i < 14; i++) tone('sine', mtof(84 + [0, 4, 7, 11, 12, 16, 19][i % 7] + (i > 6 ? 12 : 0)), 0, 0.6, 0.05, 0.25 + i * 0.07).connect(this.revSend);
-          if (r === 5) { const n = this.noiseHit(t, 0.4, 'highpass', 5000, 2.5, B); n.g.connect(this.revSend); }
+          if (r === 7) { const n = this.noiseHit(t, 0.4, 'highpass', 5000, 2.5, B); n.g.connect(this.revSend); }
         }
         break;
       }

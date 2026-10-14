@@ -277,7 +277,7 @@ export class World {
       }
       this.send(p, { t: 'gold', n: Math.round((C.big ? 80 + ilvl * 12 : 20 + ilvl * 4) * rnd(0.85, 1.15)), x: r2(C.x), z: r2(C.z + 1.2), bag: C.big });
       this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, sx: r2(C.x), sz: r2(C.z), items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
-      for (const it of items) if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
+      for (const it of items) if (it.rarity >= 5) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
     }
   }
 
@@ -299,7 +299,7 @@ export class World {
       this.box.push(item);
       this.send(p, { t: 'boxPut', ok: true, ref: m.ref });
       this.save();
-      if (item.rarity >= 3) this.sys(`${p.name} が共有ボックスに「${item.name}」を入れた`, '#cfe');
+      if (item.rarity >= 4) this.sys(`${p.name} が共有ボックスに「${item.name}」を入れた`, '#cfe');
     } else if (op === 'take') {
       const i = this.box.findIndex((it) => it.uid === m.uid);
       if (i < 0) { this.send(p, { t: 'chat', from: '', text: 'その装備はもう誰かが取り出したようだ。', color: '#aab' }); }
@@ -408,7 +408,7 @@ export class World {
       if (items.length) {
         this.send(p, { t: 'loot', sx: r2(mob.x), sz: r2(mob.z), items: items.map((it) => ({ it, x: r2(mob.x + rnd(-1.6, 1.6)), z: r2(mob.z + rnd(-1.6, 1.6)) })) });
         for (const it of items) {
-          if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
+          if (it.rarity >= 5) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
         }
       }
     }
