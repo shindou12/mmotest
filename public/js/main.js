@@ -1874,7 +1874,7 @@ function chestOpen(C) { return Date.now() - (char.chests?.[C.id] || 0) < chestCd
 // ドロップ
 // ======================================================================
 // 落ちた物は宙を舞って地面に落ち（flip）、着地すると名前の札が出る。札をクリックで拾う（遠ければ歩いて行く）
-const LOOT = { flip: 0.55, height: 2.4, toss: 1.6, pickR: 2.4, life: 150, stagger: 0.16 };
+const LOOT = { flip: 0.55, height: 2.4, toss: 1.6, pickR: 2.4, touch: 1.3, life: 150, stagger: 0.16 };
 const TRANS_COLOR = 0xff7ab0; // 超越の特性の色
 let dropSeq = 0;
 // src: 飛び出す元（倒した敵・宝箱）。なければ近くから放り出す / delay: 何秒後に飛び出すか
@@ -1941,7 +1941,7 @@ function pickupDrop(d) {
   ui.refresh();
   return true;
 }
-// 札をクリック: 近ければ拾い、遠ければそこまで歩いてから拾う（移動キーで取りやめ）
+// 体が触れると拾う。札をクリック: 近ければ拾い、遠ければそこまで歩いてから拾う（移動キーで取りやめ）
 function lootClick(id) {
   const d = drops.find((q) => q.id === id);
   if (!d || !d.landed || me.dead || me.crawl) return;
@@ -1980,9 +1980,16 @@ function updateDrops(dt) {
     }
     if (d.beam) d.beam.material.uniforms.uTime.value = d.t;
     if (d.model.userData.halo) d.model.userData.halo.material.opacity = (0.16 + d.it.rarity * 0.04) * (0.75 + 0.25 * Math.sin(d.t * 3));
-    if (d.t > LOOT.life) { disposeDrop(d); drops.splice(i, 1); }
+    if (d.t > LOOT.life) { disposeDrop(d); drops.splice(i, 1); continue; }
+    // 体が触れたら拾う（いっぱいのときは、たまに知らせるだけ）
+    if (!me.dead && !me.crawl && Math.hypot(d.x - me.x, d.z - me.z) <= LOOT.touch) {
+      if (char.inv.length < 60) pickupDrop(d);
+      else if (fullWarnT <= 0) { pickupDrop(d); fullWarnT = 3; }
+    }
   }
+  fullWarnT -= dt;
 }
+let fullWarnT = 0;
 
 // ======================================================================
 // ゴールド: 硬貨が飛び散って跳ね、近づくと吸い寄せられて拾える。大金は金貨袋
