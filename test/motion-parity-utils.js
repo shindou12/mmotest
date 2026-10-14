@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { makePlayer,setPlayerWeapon,animatePlayer } from '../public/js/models.js';
 import { HEAVY,WEAPON_SKILLS,TREE_SKILLS } from '../public/js/skills.js';
-export function poseHashes(){
+// Snapshot motion anchors, not outfit mesh counts or colors. Character redesigns
+// may change appearance while the authored motion must keep the same transforms.
+// The optional factory is used to record the unchanged pre-redesign reference.
+export function poseHashes(factory=makePlayer){
  const states=[{}, {moving:true,walkT:.4},{guard:true,gg:.2},{charging:true,charge:.5},{dodge:.4},{down:.8},{hurt:.7},{dead:true}];
  for(const swing of [0,.02,.18,.25,.35,.6,1])for(const combo of [0,1,2])states.push({swing,combo});
  for(const spin of [0,.25,.7,1])states.push({spin});
@@ -9,10 +12,15 @@ export function poseHashes(){
  for(const motion of ['lance','helix','piercer','javelin','whirlspear','whirl','heavy','counter'])for(const motionT of [0,.06,.12,.18,.24,.38,.48,.55,.77,.95])states.push({motion,motionT});
  const results={};
  for(const kind of ['sword','greatsword','spear','dagger','axe','bow'])for(let style=0;style<4;style++){
- const hashes=[];const model=makePlayer('#448a9b');setPlayerWeapon(model,kind,4,style); // 4 = 逸品（旧エピック。色と飾りは同じ）
+ const hashes=[];const model=factory('#448a9b');setPlayerWeapon(model,kind,4,style); // 4 = 逸品（旧エピック。色と飾りは同じ）
  for(let i=0;i<states.length;i++){
  animatePlayer(model,{t:1,moving:false,walkT:0,kind,combo:0,swing:-1,spin:-1,sweep:-1,dodge:0,down:0,hurt:0,...states[i]});model.updateMatrixWorld(true);
- const values=[];model.traverse(o=>{values.push(o.visible,...o.matrixWorld.elements.map(n=>Math.round(n*1e10)/1e10));if(o.isLine)values.push(...o.geometry.attributes.position.array);if(o.material)values.push(o.material.opacity,o.material.color?.getHex());});
+ const u=model.userData,values=[model.visible];
+ const anchors=[u.body,u.head,u.armL,u.armR,u.elbowL,u.elbowR,u.hand,u.handL,...u.legs,u.cape,u.weapon,u.weaponModel,u.ring,u.shield];
+ for(const o of anchors){if(!o){values.push(null);continue;}values.push(o.visible,...o.matrixWorld.elements.map(n=>Math.round(n*1e10)/1e10));}
+ const bow=u.weaponModel.userData.bow;
+ if(bow)values.push(...bow.string.geometry.attributes.position.array,bow.arrow.visible,...bow.arrow.matrixWorld.elements.map(n=>Math.round(n*1e10)/1e10));
+ const gauge=u.shield?.userData.gauge;if(gauge)values.push(gauge.opacity,gauge.color.getHex());
  hashes.push(createHash('sha256').update(JSON.stringify(values)).digest('hex'));
  }
  results[kind+'/'+style]=createHash('sha256').update(hashes.join('')).digest('hex');

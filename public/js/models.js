@@ -315,75 +315,121 @@ export function makeWeapon(kind, rarityIn = 0, style = 0) {
 // プレイヤー（デフォルメ頭身）
 // ---------------------------------------------------------------------------
 export function makePlayer(color) {
-  const root = new THREE.Group();
-  const body = new THREE.Group(); root.add(body);
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const c = new THREE.Color(color);
-  const cloth = toon(c), clothD = toon(c.clone().multiplyScalar(0.55)), coat = toon(c.clone().lerp(new THREE.Color(0x15161e), 0.7), { side: THREE.DoubleSide });
-  const skin = toon(0xffd9bf), hairM = toon(c.clone().lerp(new THREE.Color(0x2a1f2c), 0.75));
-  const leather = toon(0x4a3020), metal = toon(0xc8d0dc), gold = toon(0xe0b04a);
+  const cloth = toon(c.clone().lerp(new THREE.Color(0x24394b), .32));
+  const clothD = toon(c.clone().lerp(new THREE.Color(0x18232e), .70));
+  const coat = toon(c.clone().lerp(new THREE.Color(0x101a26), .62), { side: THREE.DoubleSide });
+  const skin = toon(0xf2d2b9), hairM = toon(new THREE.Color(0x17232d).lerp(c,.12));
+  const leather = toon(0x293039), metal = toon(0xc2ced8), metalD=toon(0x7e94a5), gold = toon(0xc7ab6a);
+  const plate=(pts, depth, mat, pos=[0,0,0], rot=[0,0,0]) => mesh(extrude(pts,depth,.008),mat,pos,rot);
 
-  // 胴体
-  body.add(mesh(lathe([[0, 0.92], [0.24, 0.94], [0.27, 1.05], [0.25, 1.25], [0.28, 1.38], [0.2, 1.5], [0, 1.52]]), cloth));
-  body.add(mesh(lathe([[0.2, 1.12], [0.285, 1.2], [0.3, 1.33], [0.22, 1.47]], 16), metal, null, [0, 0, 0], [1, 1, 0.8]));
-  body.add(mesh(new THREE.TorusGeometry(0.26, 0.035, 6, 20), leather, [0, 0.98, 0], [Math.PI / 2, 0, 0]));
-  body.add(mesh(new THREE.BoxGeometry(0.1, 0.08, 0.04), gold, [0, 0.98, 0.27]));
-  const skirt = mesh(cyl(0.27, 0.44, 0.58, 18, true), coat, [0, 0.72, -0.01]);
-  skirt.userData.noOutline = true; body.add(skirt);
-  for (const s of [-1, 1]) body.add(mesh(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), metal, [s * 0.3, 1.43, 0], [0, 0, -s * 0.5], [1, 0.75, 1]));
-  body.add(mesh(cyl(0.08, 0.09, 0.12, 10), skin, [0, 1.55, 0]));
-  const scarf = mesh(new THREE.TorusGeometry(0.14, 0.055, 8, 16), cloth, [0, 1.53, 0], [Math.PI / 2, 0, 0]); body.add(scarf);
-  body.add(mesh(capsule(0.05, 0.25, 6), cloth, [0.1, 1.38, -0.16], [0.5, 0, 0.3]));
+  const baseGear=new THREE.Group();baseGear.name="base-chest-gear";body.add(baseGear);
+  const shoulders=new THREE.Group();shoulders.name="base-shoulder-gear";body.add(shoulders);
 
-  // 頭
-  const head = new THREE.Group(); head.position.y = 1.83; body.add(head);
-  head.add(mesh(sphere(0.33, 20, 16), skin, null, null, [1, 1.02, 0.98]));
-  head.add(mesh(new THREE.SphereGeometry(0.355, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), hairM, [0, 0.03, -0.02], [-0.2, 0, 0]));
-  const spikes = [[0, 0.32, -0.12, -0.6, 0], [0.18, 0.26, -0.18, -0.9, 0.5], [-0.18, 0.26, -0.18, -0.9, -0.5], [0.28, 0.08, -0.12, -0.4, 1.3], [-0.28, 0.08, -0.12, -0.4, -1.3], [0, 0.12, -0.32, -1.6, 0], [0.15, -0.05, -0.28, -2.2, 0.4], [-0.15, -0.05, -0.28, -2.2, -0.4]];
-  for (const [x, y, z, rx, rz] of spikes) head.add(mesh(cone(0.1, 0.32, 7), hairM, [x, y, z], [rx, 0, rz]));
-  for (const [x, rz] of [[-0.16, 0.25], [0, 0], [0.16, -0.25], [0.26, -0.5], [-0.26, 0.5]]) head.add(mesh(cone(0.075, 0.26, 6), hairM, [x, 0.12, 0.25], [2.6, 0, rz]));
-  const eyeW = glow(0xffffff), eyeD = glow(c.clone().lerp(new THREE.Color(0x101018), 0.6));
-  for (const s of [-1, 1]) {
-    head.add(mesh(sphere(0.062, 12, 10), eyeD, [s * 0.12, -0.02, 0.29], null, [0.85, 1.25, 0.4]));
-    head.add(mesh(sphere(0.02, 6, 4), eyeW, [s * 0.12 + 0.02, 0.02, 0.315]));
-    head.add(mesh(new THREE.BoxGeometry(0.1, 0.018, 0.02), hairM, [s * 0.12, 0.09, 0.3], [0, 0, s * 0.15]));
+  // A fitted torso, layered chest plate and a diagonal leather sword belt.
+  body.add(mesh(lathe([[0,.93],[.20,.95],[.205,1.06],[.225,1.29],[.245,1.39],[.19,1.48],[0,1.51]],16),cloth,null,null,[1,1,.82]));
+  baseGear.add(plate([[-.17,.17],[.17,.17],[.165,-.055],[.045,-.16],[-.135,-.12]],.038,metal,[0,1.275,.195]));
+  baseGear.add(plate([[-.075,.14],[.075,.14],[.055,-.04],[0,-.105],[-.055,-.04]],.012,metalD,[0,1.275,.223]));
+  baseGear.add(mesh(new THREE.BoxGeometry(.075,.48,.021),leather,[-.025,1.245,.250],[0,0,-.60]));
+  baseGear.add(mesh(new THREE.BoxGeometry(.086,.058,.028),gold,[-.015,1.226,.272],[0,0,-.60]));
+  body.add(mesh(cyl(.22,.23,.082,12),leather,[0,.98,0],null,[1,1,.86]));
+  body.add(mesh(new THREE.BoxGeometry(.10,.072,.040),gold,[.015,.98,.22]));
+  // Separate coat tails expose the trousers and the stance instead of a solid skirt.
+  for(const side of [-1,1]){
+    const pts=[[.025,.0],[.225,.0],[.275,-.285],[.155,-.35],[.04,-.28]].map(([x,y])=>[x*side,y]);
+    body.add(plate(pts,.025,coat,[0,.91,.13],[.11,-side*.12,0]));
+    body.add(plate([[.17,-.272],[.265,-.277],[.155,-.322],[.17,-.30]].map(([x,y])=>[x*side,y]),.006,gold,[0,.91,.150]));
   }
-  head.add(mesh(sphere(0.03, 6, 4), toon(0xffb0a0), [0, -0.13, 0.31], null, [1.2, 0.5, 0.5]));
-
-  // 脚
-  const legs = [];
-  for (const s of [-1, 1]) {
-    const leg = new THREE.Group(); leg.position.set(s * 0.13, 0.92, 0);
-    leg.add(mesh(capsule(0.1, 0.28, 10), clothD, [0, -0.22, 0]));
-    leg.add(mesh(capsule(0.105, 0.18, 10), leather, [0, -0.6, 0]));
-    leg.add(mesh(sphere(0.11, 10, 8), leather, [0, -0.8, 0.07], null, [1, 0.6, 1.5]));
-    leg.add(mesh(new THREE.TorusGeometry(0.11, 0.02, 5, 12), gold, [0, -0.48, 0], [Math.PI / 2, 0, 0]));
-    body.add(leg); legs.push(leg);
+  body.add(mesh(cyl(.067,.083,.14,10),skin,[0,1.555,0]));
+  // A high asymmetric collar and compact scarf clasp.
+  body.add(mesh(new THREE.TorusGeometry(.12,.030,6,14),clothD,[0,1.515,0],[Math.PI/2,0,0]));
+  body.add(plate([[-.14,.09],[-.07,.12],[-.065,-.08],[-.17,-.03]],.025,clothD,[0,1.47,.12],[.1,0,-.08]));
+  body.add(plate([[.06,.11],[.16,.09],[.17,-.04],[.08,-.065]],.025,clothD,[0,1.47,.12],[.1,0,.08]));
+  body.add(mesh(new THREE.OctahedronGeometry(.027,0),gold,[0,1.47,.23]));
+  // One stronger shoulder plate gives a purposeful, asymmetric silhouette.
+  for(const side of [-1,1]){
+    const pad=mesh(new THREE.SphereGeometry(side<0?.15:.115,12,8,0,Math.PI*2,0,Math.PI/2),side<0?metal:leather,[side*.31,1.43,0],[0,0,-side*.45],[1.1,.62,1.05]);shoulders.add(pad);
+    if(side<0)shoulders.add(plate([[-.13,.015],[.12,.015],[.10,-.055],[-.09,-.075]],.024,metalD,[side*.32,1.435,.10],[0,0,.16]));
   }
-  // 腕
-  const mkArm = (side) => {
-    const arm = new THREE.Group();arm.position.set(side * 0.36, 1.4, 0);
-    arm.add(mesh(capsule(0.072, 0.2, 8), cloth, [0, -0.15, 0]));
-    const elbow = new THREE.Group();elbow.position.y = -.30;arm.add(elbow);
-    elbow.add(mesh(sphere(.073, 8, 6), clothD));
-    elbow.add(mesh(capsule(.068, .18, 8), clothD, [0, -.11, 0]));
-    elbow.add(mesh(cyl(.085, .08, .1, 10), leather, [0, -.20, 0]));
-    const hand = new THREE.Group();hand.position.y = -.30;elbow.add(hand);
-    hand.add(mesh(sphere(.07, 10, 8), leather));
-    arm.userData = { elbow, hand };body.add(arm);return arm;
+
+  // Smaller head with a tapered jaw, narrow eyes, ears and a restrained expression.
+  const head=new THREE.Group();head.position.y=1.83;body.add(head);
+  const face=sphere(.245,18,14),positions=face.attributes.position;
+  for(let i=0;i<positions.count;i++){const y=positions.getY(i),jaw=y<0?1+(y/.245)*.24:1;positions.setXYZ(i,positions.getX(i)*jaw,y*.99,positions.getZ(i)*.94*jaw);}face.computeVertexNormals();
+  head.add(mesh(face,skin));
+  // Hair is a distinct group so covering headwear can hide it without hiding the face.
+  const hair = new THREE.Group(); hair.name = 'player-hair'; head.add(hair);
+  hair.add(mesh(new THREE.SphereGeometry(0.355, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), hairM, [0, 0.03, -0.02], [-0.2, 0, 0]));
+  // Curved, tapered oval locks: roots sit inside the cap, avoiding exposed end faces.
+  const lock = (centers, widths, depths) => {
+    const pos=[],idx=[],radial=10;
+    for(let j=0;j<centers.length-1;j++){
+      const at=new THREE.Vector3(...centers[j]);
+      const tangent=new THREE.Vector3(...centers[j+1]).sub(at).normalize();
+      const width=new THREE.Vector3(1,0,0).addScaledVector(tangent,-tangent.x).normalize();
+      const depth=new THREE.Vector3().crossVectors(tangent,width).normalize();
+      for(let k=0;k<radial;k++){const ang=k/radial*Math.PI*2;const v=at.clone().addScaledVector(width,Math.cos(ang)*widths[j]).addScaledVector(depth,Math.sin(ang)*depths[j]);pos.push(...v.toArray());}
+    }
+    const last=(centers.length-2)*radial,tip=pos.length/3;pos.push(...centers.at(-1));
+    for(let j=0;j<centers.length-2;j++)for(let k=0;k<radial;k++){const n=(k+1)%radial,a=j*radial+k,b=j*radial+n,c=(j+1)*radial+k,d=(j+1)*radial+n;idx.push(a,b,c,b,d,c);}
+    for(let k=0;k<radial;k++)idx.push(last+k,last+(k+1)%radial,tip);
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();hair.add(mesh(geo,hairM));
   };
-  const armL = mkArm(-1), armR = mkArm(1);
-  const elbowL = armL.userData.elbow, elbowR = armR.userData.elbow;
-  const hand = armR.userData.hand, handL = armL.userData.hand;
-  // 背中のマント
-  const cape = mesh(new THREE.CylinderGeometry(0.3, 0.5, 1.0, 14, 4, true, Math.PI * 0.7, Math.PI * 0.6), coat, [0, 0.98, -0.02]);
-  cape.userData.noOutline = true; cape.userData.keep = true; body.add(cape);
+  lock([[0,.26,.215],[-.005,.125,.302],[-.025,.01,.335]], [.13,.105], [.045,.047]);
+  for(const side of [-1,1]){
+    lock([[side*.18,.22,.18],[side*.215,.095,.265],[side*.26,-.08,.243]], [.095,.085], [.045,.045]);
+    lock([[side*.26,.18,-.03],[side*.333,.055,-.10],[side*.32,-.11,-.17]], [.09,.073], [.055,.054]);
+    lock([[side*.12,.20,-.23],[side*.14,.065,-.333],[side*.16,-.13,-.29]], [.13,.10], [.050,.043]);
+  }
 
-  const ring = mesh(new THREE.RingGeometry(0.5, 0.62, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }), [0, 0.06, 0], [-Math.PI / 2, 0, 0]);
-  ring.castShadow = false; root.add(ring);
+  hair.scale.set(.75,.75,.75);
+  const eyeW=glow(0xf3f1e6),eyeD=glow(0x34556b),lineM=glow(0x24313b);
+  for(const side of [-1,1]){
+    head.add(mesh(sphere(.045,10,8),eyeW,[side*.081,.009,.224],[0,0,side*.12],[1.16,.37,.19]));
+    head.add(mesh(sphere(.018,8,6),eyeD,[side*.081,.004,.239],null,[.65,.91,.25]));
+    head.add(mesh(new THREE.BoxGeometry(.106,.012,.013),lineM,[side*.081,.025,.234],[0,0,side*.12]));
+    head.add(mesh(new THREE.BoxGeometry(.105,.014,.016),hairM,[side*.086,.068,.214],[0,0,side*-.10]));
+    head.add(mesh(sphere(.035,8,6),skin,[side*.235,.005,-.008],null,[.55,1.0,.68]));
+  }
+  const nose=plate([[-.013,.020],[.013,.020],[.007,-.017],[-.006,-.012]],.027,skin,[0,-.040,.217]);nose.userData.noOutline=true;nose.userData.keep=true;head.add(nose);
+  head.add(mesh(new THREE.BoxGeometry(.047,.006,.008),lineM,[0,-.120,.195]));
 
-  finish(body, 1);
-  root.userData = { body, legs, armL, armR, elbowL, elbowR, hand, handL, head, cape, ring, weapon: null, wKey: '', color: c, armor: null, armorLook: 0 };
-  return root;
+  // Slim trousers, articulated boots and separate greaves. Rig pivots remain compatible.
+  const legs=[];
+  for(const side of [-1,1]){
+    const leg=new THREE.Group();leg.position.set(side*.13,.92,0);
+    leg.add(mesh(capsule(.086,.30,10),clothD,[0,-.215,0]));
+    leg.add(mesh(capsule(.092,.19,10),leather,[0,-.595,0]));
+    leg.add(mesh(new THREE.BoxGeometry(.17,.29,.043),metalD,[0,-.592,.080],[.04,0,0]));
+    leg.add(plate([[-.072,.115],[.072,.115],[.062,-.104],[0,-.135],[-.062,-.104]],.025,metal,[0,-.593,.110]));
+    leg.add(mesh(cyl(.101,.100,.042,10),leather,[0,-.45,0]));
+    leg.add(mesh(sphere(.103,10,8),leather,[0,-.804,.085],null,[.90,.52,1.58]));
+    leg.add(mesh(new THREE.BoxGeometry(.18,.032,.235),leather,[0,-.846,.059]));
+    leg.add(mesh(sphere(.078,10,6),metalD,[0,-.795,.174],null,[1,.40,.76]));
+    body.add(leg);legs.push(leg);
+  }
+  const mkArm=side=>{
+    const arm=new THREE.Group();arm.position.set(side*.36,1.4,0);
+    arm.add(mesh(capsule(.067,.205,8),cloth,[0,-.15,0]));
+    const elbow=new THREE.Group();elbow.position.y=-.30;arm.add(elbow);
+    elbow.add(mesh(sphere(.065,8,6),clothD));
+    elbow.add(mesh(capsule(.063,.18,8),clothD,[0,-.11,0]));
+    elbow.add(plate([[-.065,.085],[.065,.085],[.054,-.094],[-.044,-.105]],.023,metalD,[0,-.119,.061]));
+    elbow.add(mesh(cyl(.080,.076,.092,8),leather,[0,-.205,0]));
+    const hand=new THREE.Group();hand.position.y=-.30;elbow.add(hand);
+    hand.add(mesh(sphere(.066,10,8),leather));
+    hand.add(mesh(new THREE.BoxGeometry(.065,.033,.015),metal,[0,0,.056]));
+    arm.userData={elbow,hand};body.add(arm);return arm;
+  };
+  const armL=mkArm(-1),armR=mkArm(1),elbowL=armL.userData.elbow,elbowR=armR.userData.elbow,hand=armR.userData.hand,handL=armL.userData.hand;
+  // Short mantle, with the old motion pivot retained.
+  const capeGeo=new THREE.CylinderGeometry(.24,.35,.72,14,4,true,Math.PI*.7,Math.PI*.6);capeGeo.translate(0,.11,0);
+  const cape=mesh(capeGeo,coat,[0,.98,-.02]);cape.userData.noOutline=true;cape.userData.keep=true;body.add(cape);
+  const capeHem=mesh(new THREE.CylinderGeometry(.338,.35,.023,14,1,true,Math.PI*.7,Math.PI*.6),clothD,[0,-.238,0]);capeHem.userData.noOutline=true;cape.add(capeHem);
+  const ring=mesh(new THREE.RingGeometry(.5,.62,32),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}),[0,.06,0],[-Math.PI/2,0,0]);ring.castShadow=false;root.add(ring);
+  finish(body,.85);
+  root.userData={body,legs,armL,armR,elbowL,elbowR,hand,handL,head,hair,cape,ring,baseGear,shoulders,weapon:null,wKey:'',color:c,armor:null,armorLook:0};return root;
 }
 
 // ---------------------------------------------------------------------------
@@ -405,6 +451,9 @@ export function setPlayerArmor(model, look) {
   if (u.armor) { for (const [parent, g] of u.armor) parent.remove(g); }
   u.armor = [];
   u.cape.visible = true;
+  if(u.baseGear)u.baseGear.visible=![4,5,6].includes(look);
+  if(u.shoulders)u.shoulders.visible=![3,5,6].includes(look);
+  if (u.hair) u.hair.visible = ![1, 4, 5, 6].includes(look);
   if (!look) return;
   const c = u.color || new THREE.Color(0x4488ff);
   const cloth = toon(c.clone().lerp(new THREE.Color(0x2a2a3a), 0.35), { side: THREE.DoubleSide });
@@ -438,18 +487,19 @@ export function setPlayerArmor(model, look) {
     case 4: { // 中装: 鎖頭巾と胸当て
       add(onHead, mesh(new THREE.SphereGeometry(0.41, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), chain, [0, 0.02, -0.02], [-0.25, 0, 0]));
       add(onBody, mesh(cyl(0.2, 0.33, 0.22, 16), chain, [0, 1.48, 0]));
-      add(onBody, mesh(lathe([[0.22, 1.08], [0.29, 1.18], [0.3, 1.32], [0.24, 1.42]], 16), steelD, null, null, [1.03, 1, 0.85]));
+      add(onBody, mesh(lathe([[0.22, 1.08], [0.29, 1.18], [0.3, 1.32], [0.24, 1.42]], 16), steelD, null, null, [1.04, 1, 1.20]));
       break;
     }
     case 5: { // 重装: 騎士の兜（バイザーと羽飾り）と大きな肩当て
       add(onHead, mesh(new THREE.SphereGeometry(0.4, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.7), steel, [0, 0.03, 0]));
-      add(onHead, mesh(new THREE.BoxGeometry(0.46, 0.06, 0.08), steelD, [0, -0.02, 0.33]));
+      add(onHead, mesh(extrude([[-.21,.17],[.21,.17],[.235,-.05],[.15,-.19],[0,-.235],[-.15,-.19],[-.235,-.05]],.026,.005),steel,[0,0,.397]));
+      add(onHead, mesh(new THREE.BoxGeometry(.39,.030,.024),toon(0x24313b),[0,.012,.430]));
       add(onHead, mesh(new THREE.BoxGeometry(0.05, 0.3, 0.42), toon(0xc03030), [0, 0.42, -0.05]));
       for (const s of [-1, 1]) {
         add(onBody, mesh(new THREE.SphereGeometry(0.21, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), steel, [s * 0.36, 1.43, 0], [0, 0, -s * 0.5], [1.2, 0.9, 1.15]));
         add(onBody, mesh(new THREE.SphereGeometry(0.17, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), gold, [s * 0.37, 1.39, 0], [0, 0, -s * 0.5], [1.25, 0.6, 1.2]));
       }
-      add(onBody, mesh(lathe([[0.24, 1.0], [0.3, 1.15], [0.31, 1.32], [0.25, 1.46]], 16), steel, null, null, [1.04, 1, 0.9]));
+      add(onBody, mesh(lathe([[0.24, 1.0], [0.3, 1.15], [0.31, 1.32], [0.25, 1.46]], 16), steel, null, null, [1.06, 1, 1.24]));
       break;
     }
     case 6: { // 重装: 角兜と重いマント、腰当て
@@ -465,7 +515,8 @@ export function setPlayerArmor(model, look) {
   }
   for (const [parent, g] of [[u.body, onBody], [u.head, onHead]]) {
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    outline(g, 1);
+    if (parent === u.head) g.scale.set(.76,.80,.76);
+    outline(g, .85);
     parent.add(g);
     u.armor.push([parent, g]);
   }
@@ -916,4 +967,5 @@ export function makeLootOrb(rarity) {
   g.userData.orb = orb;
   return g;
 }
+
 
