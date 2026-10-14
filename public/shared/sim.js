@@ -276,7 +276,7 @@ export class World {
         items = [makeItem(ilvl, Math.max(2, rollRarity(1, 1)), { bias: A.def.bias, kinds: A.def.kinds })];
       }
       this.send(p, { t: 'gold', n: Math.round((C.big ? 80 + ilvl * 12 : 20 + ilvl * 4) * rnd(0.85, 1.15)), x: r2(C.x), z: r2(C.z + 1.2), bag: C.big });
-      this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
+      this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, sx: r2(C.x), sz: r2(C.z), items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
       for (const it of items) if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
     }
   }
@@ -406,7 +406,7 @@ export class World {
         items.push(makeItem(ilvl, rollRarity(mob.elite ? 0.4 : 0, mob.elite ? 1 : 0), B));
       }
       if (items.length) {
-        this.send(p, { t: 'loot', items: items.map((it) => ({ it, x: r2(mob.x + rnd(-1.6, 1.6)), z: r2(mob.z + rnd(-1.6, 1.6)) })) });
+        this.send(p, { t: 'loot', sx: r2(mob.x), sz: r2(mob.z), items: items.map((it) => ({ it, x: r2(mob.x + rnd(-1.6, 1.6)), z: r2(mob.z + rnd(-1.6, 1.6)) })) });
         for (const it of items) {
           if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
         }

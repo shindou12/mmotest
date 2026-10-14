@@ -398,7 +398,8 @@ function onMsg(m) {
       countClear(m.ar, m.boss ? 'boss' : AREAS[m.ar]?.named?.name === m.nm ? 'named' : 'kill');
       break;
     case 'loot':
-      for (const d of m.items) spawnDrop(d.it, d.x, d.z);
+      // 倒した敵・開けた宝箱から、1つずつポコポコ飛び出す
+      m.items.forEach((d, i) => spawnDrop(d.it, d.x, d.z, m.sx != null ? { x: m.sx, z: m.sz, y: m.src === 'chest' ? 0.8 : 1.2 } : null, i * LOOT.stagger));
       if (m.src === 'chest') {
         char.chests = char.chests || {};
         char.chests[m.cid || m.ar] = Date.now();
@@ -1844,15 +1845,17 @@ function chestOpen(C) { return Date.now() - (char.chests?.[C.id] || 0) < chestCd
 // ドロップ
 // ======================================================================
 // 落ちた物は宙を舞って地面に落ち（flip）、着地すると名前の札が出る。札をクリックで拾う（遠ければ歩いて行く）
-const LOOT = { flip: 0.55, height: 2.4, toss: 1.6, pickR: 2.4, life: 150 };
+const LOOT = { flip: 0.55, height: 2.4, toss: 1.6, pickR: 2.4, life: 150, stagger: 0.16 };
 let dropSeq = 0;
-function spawnDrop(it, x, z) {
+// src: 飛び出す元（倒した敵・宝箱）。なければ近くから放り出す / delay: 何秒後に飛び出すか
+function spawnDrop(it, x, z, src = null, delay = 0) {
   const model = makeLootItem(it);
   const a = Math.random() * Math.PI * 2;
-  const ox = x - Math.sin(a) * LOOT.toss, oz = z - Math.cos(a) * LOOT.toss;
-  model.position.set(ox, heightAt(ox, oz) + 1, oz);
+  const ox = src ? src.x : x - Math.sin(a) * LOOT.toss, oz = src ? src.z : z - Math.cos(a) * LOOT.toss, oy = src?.y ?? 1;
+  model.position.set(ox, heightAt(ox, oz) + oy, oz);
+  model.visible = false; // 飛び出す瞬間に見せて音を鳴らす
   scene.add(model);
-  drops.push({ id: ++dropSeq, it, x, z, ox, oz, model, beam: null, t: 0, landed: false, spin: rnd(-1, 1) });
+  drops.push({ id: ++dropSeq, it, x, z, ox, oz, oy, model, beam: null, t: -delay, landed: false, spin: rnd(-1, 1) });
 }
 // 着地: 物の音＋レア度の合図。エピック以上は光の柱
 function landDrop(d) {
@@ -1918,10 +1921,16 @@ function updateDrops(dt) {
     d.t += dt;
     const item = d.model.userData.item;
     if (!d.landed) {
+      if (d.t < 0) continue; // 順番待ち
+      if (!d.model.visible) {
+        d.model.visible = true;
+        if (Math.hypot(d.ox - me.x, d.oz - me.z) < 40) audio.sfx('lootpop');
+        fx.parts.burst(d.ox, d.oy, d.oz, 5, { color: RARITIES[d.it.rarity].color, speed: 3, size: 0.3, life: 0.3 });
+      }
       // 宙を舞う: 放物線で飛びながら回る
       const k = Math.min(1, d.t / LOOT.flip);
       const x = d.ox + (d.x - d.ox) * k, z = d.oz + (d.z - d.oz) * k;
-      d.model.position.set(x, heightAt(x, z) + LOOT.height * 4 * k * (1 - k) + 0.6 * (1 - k), z);
+      d.model.position.set(x, heightAt(x, z) + LOOT.height * 4 * k * (1 - k) + d.oy * (1 - k), z);
       item.rotation.set(d.t * 14, d.t * 9 * d.spin, d.t * 6);
       if (k >= 1) landDrop(d);
       continue;
