@@ -324,11 +324,13 @@ export function makePlayer(color) {
 
   // 胴体
   body.add(mesh(lathe([[0, 0.92], [0.24, 0.94], [0.27, 1.05], [0.25, 1.25], [0.28, 1.38], [0.2, 1.5], [0, 1.52]]), cloth));
-  body.add(mesh(lathe([[0.2, 1.12], [0.285, 1.2], [0.3, 1.33], [0.22, 1.47]], 16), metal, null, [0, 0, 0], [1, 1, 0.8]));
+  body.add(mesh(lathe([[0.25, 1.12], [0.285, 1.2], [0.3, 1.33], [0.22, 1.47]], 16), metal, null, [0, 0, 0], [1.08, 1, 1.12]));
   body.add(mesh(new THREE.TorusGeometry(0.26, 0.035, 6, 20), leather, [0, 0.98, 0], [Math.PI / 2, 0, 0]));
   body.add(mesh(new THREE.BoxGeometry(0.1, 0.08, 0.04), gold, [0, 0.98, 0.27]));
   const skirt = mesh(cyl(0.27, 0.44, 0.58, 18, true), coat, [0, 0.72, -0.01]);
   skirt.userData.noOutline = true; body.add(skirt);
+  const hem = mesh(cyl(0.428, 0.444, 0.032, 18, true), toon(c.clone().lerp(new THREE.Color(0x15161e), 0.58)), [0, 0.441, -0.01]);
+  hem.userData.noOutline = true; body.add(hem);
   for (const s of [-1, 1]) body.add(mesh(new THREE.SphereGeometry(0.13, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), metal, [s * 0.3, 1.43, 0], [0, 0, -s * 0.5], [1, 0.75, 1]));
   body.add(mesh(cyl(0.08, 0.09, 0.12, 10), skin, [0, 1.55, 0]));
   const scarf = mesh(new THREE.TorusGeometry(0.14, 0.055, 8, 16), cloth, [0, 1.53, 0], [Math.PI / 2, 0, 0]); body.add(scarf);
@@ -337,10 +339,30 @@ export function makePlayer(color) {
   // 頭
   const head = new THREE.Group(); head.position.y = 1.83; body.add(head);
   head.add(mesh(sphere(0.33, 20, 16), skin, null, null, [1, 1.02, 0.98]));
-  head.add(mesh(new THREE.SphereGeometry(0.355, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), hairM, [0, 0.03, -0.02], [-0.2, 0, 0]));
-  const spikes = [[0, 0.32, -0.12, -0.6, 0], [0.18, 0.26, -0.18, -0.9, 0.5], [-0.18, 0.26, -0.18, -0.9, -0.5], [0.28, 0.08, -0.12, -0.4, 1.3], [-0.28, 0.08, -0.12, -0.4, -1.3], [0, 0.12, -0.32, -1.6, 0], [0.15, -0.05, -0.28, -2.2, 0.4], [-0.15, -0.05, -0.28, -2.2, -0.4]];
-  for (const [x, y, z, rx, rz] of spikes) head.add(mesh(cone(0.1, 0.32, 7), hairM, [x, y, z], [rx, 0, rz]));
-  for (const [x, rz] of [[-0.16, 0.25], [0, 0], [0.16, -0.25], [0.26, -0.5], [-0.26, 0.5]]) head.add(mesh(cone(0.075, 0.26, 6), hairM, [x, 0.12, 0.25], [2.6, 0, rz]));
+  // Hair is a distinct group so covering headwear can hide it without hiding the face.
+  const hair = new THREE.Group(); hair.name = 'player-hair'; head.add(hair);
+  hair.add(mesh(new THREE.SphereGeometry(0.355, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), hairM, [0, 0.03, -0.02], [-0.2, 0, 0]));
+  // Curved, tapered oval locks: roots sit inside the cap, avoiding exposed end faces.
+  const lock = (centers, widths, depths) => {
+    const pos=[],idx=[],radial=10;
+    for(let j=0;j<centers.length-1;j++){
+      const at=new THREE.Vector3(...centers[j]);
+      const tangent=new THREE.Vector3(...centers[j+1]).sub(at).normalize();
+      const width=new THREE.Vector3(1,0,0).addScaledVector(tangent,-tangent.x).normalize();
+      const depth=new THREE.Vector3().crossVectors(tangent,width).normalize();
+      for(let k=0;k<radial;k++){const ang=k/radial*Math.PI*2;const v=at.clone().addScaledVector(width,Math.cos(ang)*widths[j]).addScaledVector(depth,Math.sin(ang)*depths[j]);pos.push(...v.toArray());}
+    }
+    const last=(centers.length-2)*radial,tip=pos.length/3;pos.push(...centers.at(-1));
+    for(let j=0;j<centers.length-2;j++)for(let k=0;k<radial;k++){const n=(k+1)%radial,a=j*radial+k,b=j*radial+n,c=(j+1)*radial+k,d=(j+1)*radial+n;idx.push(a,b,c,b,d,c);}
+    for(let k=0;k<radial;k++)idx.push(last+k,last+(k+1)%radial,tip);
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();hair.add(mesh(geo,hairM));
+  };
+  lock([[0,.26,.215],[-.005,.125,.302],[-.025,.01,.335]], [.13,.105], [.045,.047]);
+  for(const side of [-1,1]){
+    lock([[side*.18,.22,.18],[side*.215,.095,.265],[side*.26,-.08,.243]], [.095,.085], [.045,.045]);
+    lock([[side*.26,.18,-.03],[side*.333,.055,-.10],[side*.32,-.11,-.17]], [.09,.073], [.055,.054]);
+    lock([[side*.12,.20,-.23],[side*.14,.065,-.333],[side*.16,-.13,-.29]], [.13,.10], [.050,.043]);
+  }
   const eyeW = glow(0xffffff), eyeD = glow(c.clone().lerp(new THREE.Color(0x101018), 0.6));
   for (const s of [-1, 1]) {
     head.add(mesh(sphere(0.062, 12, 10), eyeD, [s * 0.12, -0.02, 0.29], null, [0.85, 1.25, 0.4]));
@@ -377,12 +399,14 @@ export function makePlayer(color) {
   // 背中のマント
   const cape = mesh(new THREE.CylinderGeometry(0.3, 0.5, 1.0, 14, 4, true, Math.PI * 0.7, Math.PI * 0.6), coat, [0, 0.98, -0.02]);
   cape.userData.noOutline = true; cape.userData.keep = true; body.add(cape);
+  const capeHem = mesh(new THREE.CylinderGeometry(0.486, 0.5, 0.032, 14, 1, true, Math.PI*0.7, Math.PI*0.6), toon(c.clone().lerp(new THREE.Color(0x15161e), 0.58)), [0, -0.484, 0]);
+  capeHem.userData.noOutline = true; cape.add(capeHem);
 
   const ring = mesh(new THREE.RingGeometry(0.5, 0.62, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }), [0, 0.06, 0], [-Math.PI / 2, 0, 0]);
   ring.castShadow = false; root.add(ring);
 
   finish(body, 1);
-  root.userData = { body, legs, armL, armR, elbowL, elbowR, hand, handL, head, cape, ring, weapon: null, wKey: '', color: c, armor: null, armorLook: 0 };
+  root.userData = { body, legs, armL, armR, elbowL, elbowR, hand, handL, head, hair, cape, ring, weapon: null, wKey: '', color: c, armor: null, armorLook: 0 };
   return root;
 }
 
@@ -405,6 +429,7 @@ export function setPlayerArmor(model, look) {
   if (u.armor) { for (const [parent, g] of u.armor) parent.remove(g); }
   u.armor = [];
   u.cape.visible = true;
+  if (u.hair) u.hair.visible = ![1, 4, 5, 6].includes(look);
   if (!look) return;
   const c = u.color || new THREE.Color(0x4488ff);
   const cloth = toon(c.clone().lerp(new THREE.Color(0x2a2a3a), 0.35), { side: THREE.DoubleSide });
@@ -438,7 +463,7 @@ export function setPlayerArmor(model, look) {
     case 4: { // 中装: 鎖頭巾と胸当て
       add(onHead, mesh(new THREE.SphereGeometry(0.41, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), chain, [0, 0.02, -0.02], [-0.25, 0, 0]));
       add(onBody, mesh(cyl(0.2, 0.33, 0.22, 16), chain, [0, 1.48, 0]));
-      add(onBody, mesh(lathe([[0.22, 1.08], [0.29, 1.18], [0.3, 1.32], [0.24, 1.42]], 16), steelD, null, null, [1.03, 1, 0.85]));
+      add(onBody, mesh(lathe([[0.22, 1.08], [0.29, 1.18], [0.3, 1.32], [0.24, 1.42]], 16), steelD, null, null, [1.04, 1, 1.20]));
       break;
     }
     case 5: { // 重装: 騎士の兜（バイザーと羽飾り）と大きな肩当て
@@ -449,7 +474,7 @@ export function setPlayerArmor(model, look) {
         add(onBody, mesh(new THREE.SphereGeometry(0.21, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), steel, [s * 0.36, 1.43, 0], [0, 0, -s * 0.5], [1.2, 0.9, 1.15]));
         add(onBody, mesh(new THREE.SphereGeometry(0.17, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), gold, [s * 0.37, 1.39, 0], [0, 0, -s * 0.5], [1.25, 0.6, 1.2]));
       }
-      add(onBody, mesh(lathe([[0.24, 1.0], [0.3, 1.15], [0.31, 1.32], [0.25, 1.46]], 16), steel, null, null, [1.04, 1, 0.9]));
+      add(onBody, mesh(lathe([[0.24, 1.0], [0.3, 1.15], [0.31, 1.32], [0.25, 1.46]], 16), steel, null, null, [1.06, 1, 1.24]));
       break;
     }
     case 6: { // 重装: 角兜と重いマント、腰当て
@@ -916,4 +941,5 @@ export function makeLootOrb(rarity) {
   g.userData.orb = orb;
   return g;
 }
+
 
