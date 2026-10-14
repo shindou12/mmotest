@@ -4,7 +4,8 @@ import { ease } from './pose-rig.js';
 import { techniqueMotion } from './motions/index.js';
 import { BASE as base, STYLES, DEFAULT_STYLE, KEYFRAMES, FULL_TURN } from './motions/styles.js';
 // 技のモーションの計算（形ごとの姿勢のデータは motions/styles.js）
-const profile=(style,i)=>(Object.hasOwn(STYLES,style)?STYLES[style]:DEFAULT_STYLE)(i,i%2?-1:1);
+// 形のデータから i 回目の当たりの [振りかぶり, 当たり] を取る（hits が足りないときは最後のもの）
+const profile=(style,i)=>{const d=Object.hasOwn(STYLES,style)?STYLES[style]:DEFAULT_STYLE;return d.hits?d.hits[Math.min(i,d.hits.length-1)]:d.pose;};
 export const ALL_MOTIONS=Object.freeze({...TECHNIQUES,...TREE_MOTIONS});
 export const TECHNIQUE_FRAMES=Object.freeze(Object.fromEntries(Object.values(ALL_MOTIONS).map(t=>{
  if(KEYFRAMES[t.style])return [t.id,KEYFRAMES[t.style].map(f=>({...base,...f}))];
