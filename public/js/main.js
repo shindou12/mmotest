@@ -1144,7 +1144,11 @@ function dealDamage(mb, mult, o = {}) {
   let dmg = S.atk * (1 + buffMod('atkp') / 100) * mult * typeMult * back * stunned * exec * guardBonus * bossT * titleDmg(mb)
     * (1 + buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? S.critd / 100 : 1) * wtDmgMult(o, mb, crit) * (ambushed && S.wt?.br('dk_smoke') === 'B' ? 1.5 : 1);
   dmg = Math.max(1, Math.round(dmg));
-  if (S.wt?.ks2 === 'dk_exec' && crit && mb.kind !== 2 && mb.hp <= mb.mhp * 0.25 && wtBehind(mb) && o.type !== 'dot') dmg = Math.max(dmg, mb.hp); // 必殺: 背後の会心で弱った雑魚はとどめ
+  if (S.wt?.ks2 === 'dk_exec' && crit && mb.kind !== 2 && mb.hp <= mb.mhp * 0.25 && wtBehind(mb) && o.type !== 'dot' && dmg < mb.hp) { // 必殺: 背後の会心で弱った雑魚はとどめ
+    dmg = mb.hp;
+    floatText(mb.x, 3, mb.z, '必殺', 'just'); fx.flash(mb.x, 1.4, mb.z, 0xcab4ff, 40, 0.3);
+    fx.slash(mb.x, mb.z, me.a, 2.2, 40, 0xffffff, 1.2); fx.parts.burst(mb.x, 1.2, mb.z, 30, { color: 0xcab4ff, speed: 7, size: 0.45, life: 0.5 });
+  }
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
   // スタン値: 強攻撃で大きく溜まる。近接武器ほど溜めやすい
   const st = mb.kind === 2 && !(mb.stunT > 0) ? stunValue(o) : 0;
@@ -1817,7 +1821,10 @@ function doSwing() {
   later(0.06, () => combat.arc(W.range, W.arc, mult, { a, type: 'normal' }));
   if (me.combo === 2 && S.fx.has('wave')) combat.proj({ a, mult: 1.4, type: 'normal' });
   else if (me.combo === 2 && S.wt?.br('sw_norm') === 'A') combat.proj({ a, mult: 1.2, type: 'normal' }); // 剣の心得A「閃光」
-  if (S.wt?.ks2 === 'dk_thousand' && me.combo === 2 && me.dStack >= S.dStackMax) for (const d of [-0.22, 0, 0.22]) combat.arrow({ a: a + d, mult: 0.35, type: 'proc', noZone: true, speed: 40, color: KNIFE_COLOR }); // 千本
+  if (S.wt?.ks2 === 'dk_thousand' && me.combo === 2 && me.dStack >= S.dStackMax) { // 千本: 3段目は手首でナイフを3本投げる
+    me.motion = 'dk_thousand'; me.motionT = 0;
+    later(TREE_MOTIONS.dk_thousand.hits[0], () => { for (const d of [-0.22, 0, 0.22]) combat.arrow({ a: a + d, mult: 0.35, type: 'proc', noZone: true, speed: 40, color: KNIFE_COLOR }); });
+  }
   if (S.wt?.ks1 === 'sw_mage' && now() < me.mageT) combat.proj({ a, mult: 0.8, type: 'normal', speed: 26, life: 0.5, rad: 1.1 }); // 魔剣士
 }
 
@@ -1882,7 +1889,7 @@ function doHeavy(lv) {
   if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; }
   if (S.wk === 'dagger') { me.motion = 'dk_blink'; me.motionT = 0; } // 瞬影: 低く駆け抜けながら斬る
   HEAVY[S.wk].run(combat, lv);
-  if (S.wk === 'dagger' && S.wt?.ks2 === 'dk_step') later(0.24, () => { me.a += Math.PI; me.afterJust = true; floatText(me.x, 3, me.z, '影渡り', 'just'); fx.ringWave(me.x, me.z, 0xcab4ff, 2.2, 0.3); }); // 影渡り: すり抜けたら敵のほうへ向き直る
+  if (S.wk === 'dagger' && S.wt?.ks2 === 'dk_step') later(0.24, () => { me.a += Math.PI; me.afterJust = true; me.motion = 'dk_step_turn'; me.motionT = 0; floatText(me.x, 3, me.z, '影渡り', 'just'); fx.ringWave(me.x, me.z, 0xcab4ff, 2.2, 0.3); }); // 影渡り: すり抜けたら敵のほうへ向き直る
 }
 // 片手剣のガードカウンター（守護騎士）: 踏み込みながら大きく横に斬り払う。威力は盾槍の回転なぎ払いの半分
 function swordCounter() {

@@ -45,6 +45,7 @@ function profile(style,i){
  case 'flanktwin':return [{yaw:sign*1.4,pitch:.2,bodyYaw:sign*.35,y:1.15},{yaw:-sign*.85,pitch:0,z:.47,bodyYaw:-sign*.35,lean:.13}];
  case 'bleedspin':return i===0?[{yaw:-1.0,pitch:.3,bodyYaw:-.4,y:1.16},{yaw:.9,pitch:-.2,bodyYaw:Math.PI,z:.46,lean:.1}]:[{yaw:-.9,pitch:.25,bodyYaw:Math.PI+.4,y:1.16},{yaw:.9,pitch:-.2,bodyYaw:Math.PI*2-.3,z:.46,lean:.1,leg:.3}];
  case 'blink':return [{yaw:-1.25,pitch:.2,bodyYaw:-.3,lean:.35,y:1.05,leg:.4},{yaw:1.3,pitch:.05,bodyYaw:.5,lean:.3,z:.5,leg:.4}];
+ case 'throw3':return [{yaw:-.5,pitch:1.0,y:1.5,z:.12,bodyYaw:-.3},{yaw:.35,pitch:.05,y:1.3,z:.56,bodyYaw:.25,lean:.12}];
  case 'brave':return [{pitch:.4,y:1.3,z:.3,guard:.3},{pitch:1.55,y:1.78,z:.12,lean:-.12,guard:1}];
  case 'fan3':return [{yaw:-1.45,pitch:.15,bodyYaw:-.6,z:.25},{yaw:1.45,pitch:.15,bodyYaw:.65,z:.52,lean:.12,leg:.25}];
  case 'sidelong':return [{yaw:1.3,pitch:.15,lean:-.12,bodyYaw:.3,leg:.35},{yaw:-.95,pitch:.1,bodyYaw:-.55,z:.5,lean:.2,leg:.3}];
@@ -57,6 +58,7 @@ function profile(style,i){
 }
 // 跳んで叩きつける（グランド・スラム）: しゃがむ → 跳び上がって振りかぶる → 着地と同時に叩きつけ → 残心
 const CUSTOM={
+ pivot:[{at:0,bodyYaw:Math.PI,yaw:-.8,pitch:.2,lean:.1},{at:.18,bodyYaw:.3,yaw:.5,pitch:.1,z:.45,lean:.15,leg:.3},{at:.3}],
  smoke:[{at:0},{at:.08,pitch:-.35,y:1.0,z:.32,lean:.22,lift:-.1,leg:.3},{at:.22,pitch:.6,y:1.45,z:.2,lean:-.35,lift:.55,leg:-.3,guard:.6},{at:.4,pitch:.3,y:1.25,lean:-.1,lift:.08,leg:.2},{at:.55}],
  slam:[{at:0},{at:.09,pitch:.9,y:1.32,z:.2,lift:-.16,lean:.18,leg:.35},{at:.22,pitch:1.55,y:1.74,z:.16,lift:1.15,lean:-.18,leg:-.25},{at:.36,pitch:-.5,y:1.1,z:.52,lift:0,lean:.26,leg:.4},{at:.52,pitch:-.45,y:1.1,z:.5,lift:-.06,lean:.22,leg:.35},{at:.8}],
 };

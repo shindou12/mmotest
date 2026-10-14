@@ -29,6 +29,10 @@ export const TREE_MOTIONS = Object.freeze({
   dk_bleed_spin: m('dk_bleed_spin', 'dagger', 0.6, [0.15, 0.33], 'bleedspin'),
   // 短剣・瞬影（強攻撃）: 低く構えて駆け抜けながら斬る
   dk_blink: m('dk_blink', 'dagger', 0.45, [0.16], 'blink'),
+  // 短剣・千本: 3段目でナイフを3本、手首で投げる
+  dk_thousand: m('dk_thousand', 'dagger', 0.32, [0.1], 'throw3'),
+  // 短剣・影渡り: すり抜けたあと、くるりと振り向く
+  dk_step_turn: m('dk_step_turn', 'dagger', 0.3, [0.18], 'pivot'),
   // 大剣・光波: 振りかぶって前へ振り抜き、光波を飛ばす
   gt_wave: m('gt_wave', 'greatsword', 0.55, [0.12], 'lightwave'),
 });
