@@ -2,114 +2,106 @@ import { RARITIES, TITLES, TITLE_DROPS, floorLevel, makeItem, makeTitle } from '
 import { AREAS, CLEAR_KILLS, chestsOf, grid, worldToCell } from '../../shared/areas.js';
 import { QUEST_INDEX, questAvailable, questProgress, questState } from '../quests.js';
 import { esc, now, rnd } from './util.js';
-import { banner, renderQuests, toast, ui } from './ui-bridge.js';
-import { char, saveChar } from './save.js';
-import { audio, fx } from './render.js';
-import { me, npcs, world } from './state.js';
-import { S, calcStats } from './stats.js';
-import { refreshNpcMarks } from './area.js';
-import { tf } from './variants.js';
-import { gainXp } from './actions.js';
-import { spawnDrop } from './loot.js';
+import { field, rules, screen, state, stats, view } from './ports.js';
 
 // ======================================================================
 // クエスト
 // ======================================================================
 export function questEvent(ev) {
-  if (!char) return;
-  const changed = questProgress(char, ev);
+  if (!state.char) return;
+  const changed = questProgress(state.char, ev);
   for (const q of changed) {
-    const st = questState(char, q.id);
-    if (st.done) { toast(`クエスト達成：「${q.name}」 依頼人に報告しよう`, '#ffd84a', true); audio.sfx('clear'); }
-    else toast(`${q.name} ${st.p} / ${q.n}`, '#bfe6ff');
+    const st = questState(state.char, q.id);
+    if (st.done) { screen.toast(`クエスト達成：「${q.name}」 依頼人に報告しよう`, '#ffd84a', true); view.audio.sfx('clear'); }
+    else screen.toast(`${q.name} ${st.p} / ${q.n}`, '#bfe6ff');
   }
-  if (changed.length) { saveChar(); renderQuests(); refreshNpcMarks(); }
+  if (changed.length) { state.saveChar(); screen.renderQuests(); field.refreshNpcMarks(); }
 }
 
 // エリアの踏破（付きやすい特性がマップでわかるようになる）
 export function countClear(ar, how) {
   const def = AREAS[ar];
-  if (!def || !char || (!def.bias?.length && !def.kinds?.length)) return;
-  char.areas = char.areas || {};
-  const st = char.areas[ar] = char.areas[ar] || { k: 0, done: false };
+  if (!def || !state.char || (!def.bias?.length && !def.kinds?.length)) return;
+  state.char.areas = state.char.areas || {};
+  const st = state.char.areas[ar] = state.char.areas[ar] || { k: 0, done: false };
   if (st.done) return;
   st.k++;
   const done = def.type === 'labyrinth' ? how === 'boss' : def.type === 'secret' ? how === 'named' : st.k >= CLEAR_KILLS;
   if (done) {
     st.done = true;
-    toast(`${def.name} を踏破！ 出やすい装備と付きやすい特性がマップでわかるようになった`, '#9affc8', true);
-    audio.sfx('clear');
+    screen.toast(`${def.name} を踏破！ 出やすい装備と付きやすい特性がマップでわかるようになった`, '#9affc8', true);
+    view.audio.sfx('clear');
   }
 }
 
 // 称号を手に入れる（同じ報酬称号は一度だけ）
 export function grantTitle(id) {
-  if (!char || char.titles[id] || !TITLES[id]) return;
-  char.titles[id] = true;
+  if (!state.char || state.char.titles[id] || !TITLES[id]) return;
+  state.char.titles[id] = true;
   const it = makeTitle(id);
-  char.inv.unshift(it);
-  banner('称号を獲得', it.name, RARITIES[it.rarity].color, 3);
-  toast(`称号${it.name}：${TITLES[id].desc}`, RARITIES[it.rarity].color, true);
-  audio.sfx('clear');
-  fx.beam(me.x, me.z, 0xffd84a, 14, 0.9, 1.2);
-  saveChar(); ui.refresh();
+  state.char.inv.unshift(it);
+  screen.banner('称号を獲得', it.name, RARITIES[it.rarity].color, 3);
+  screen.toast(`称号${it.name}：${TITLES[id].desc}`, RARITIES[it.rarity].color, true);
+  view.audio.sfx('clear');
+  view.fx.beam(state.me.x, state.me.z, 0xffd84a, 14, 0.9, 1.2);
+  state.saveChar(); screen.ui.refresh();
 }
 
 // ドロップ限定の称号: 倒した敵に応じてまれに落ちる（持っていない称号だけ。同じものは二度と落ちない）
 export function rollTitleDrop(m) {
-  if (!char) return;
+  if (!state.char) return;
   const A = AREAS[m.ar];
   const k = { el: m.el | 0, boss: m.boss, weather: A?.shape === 'open' ? A.weather : null, type: A?.type };
   for (const d of TITLE_DROPS) {
-    if (char.titles[d.id] || !d.when(k) || Math.random() >= d.chance) continue;
-    char.titles[d.id] = true;
+    if (state.char.titles[d.id] || !d.when(k) || Math.random() >= d.chance) continue;
+    state.char.titles[d.id] = true;
     const it = makeTitle(d.id);
-    spawnDrop(it, me.x + rnd(-1.5, 1.5), me.z + rnd(1, 2.5)); // 通知は拾ったときに出る
-    saveChar();
+    rules.spawnDrop(it, state.me.x + rnd(-1.5, 1.5), state.me.z + rnd(1, 2.5)); // 通知は拾ったときに出る
+    state.saveChar();
     return;
   }
 }
 
 export function acceptQuest(id) {
   const q = QUEST_INDEX[id];
-  if (!q || questState(char, id) || !questAvailable(char, q)) return;
-  char.quests = char.quests || {};
-  char.quests[id] = { p: 0 };
-  audio.sfx('equip'); saveChar(); renderQuests(); refreshNpcMarks();
+  if (!q || questState(state.char, id) || !questAvailable(state.char, q)) return;
+  state.char.quests = state.char.quests || {};
+  state.char.quests[id] = { p: 0 };
+  view.audio.sfx('equip'); state.saveChar(); screen.renderQuests(); field.refreshNpcMarks();
   // すでに条件を満たしているもの（到達など）
-  if (q.type === 'visit' && world.area === q.target) questEvent({ type: 'visit', area: q.target });
+  if (q.type === 'visit' && state.world.area === q.target) questEvent({ type: 'visit', area: q.target });
 }
 
 export function claimQuest(q) {
-  const s = questState(char, q.id);
+  const s = questState(state.char, q.id);
   if (!s?.done || s.claimed) return;
   s.claimed = true;
   const r = q.reward;
   if (r.rarity != null) {
-    const ilvl = Math.max(char.lv, floorLevel(world.floor) + 3);
+    const ilvl = Math.max(state.char.lv, floorLevel(state.world.floor) + 3);
     // 第1層のクエストは1段低め（序盤は白・緑・青が中心。エピック以上は第2層から）
-    const base = world.floor === 1 ? Math.min(r.rarity, 2) : r.rarity;
+    const base = state.world.floor === 1 ? Math.min(r.rarity, 2) : r.rarity;
     const rar = Math.random() < 0.15 ? base + 1 : base;
     const it = makeItem(ilvl, Math.min(5, rar), r.slot ? { slot: r.slot } : {});
-    spawnDrop(it, me.x + rnd(-1, 1), me.z + rnd(1, 2));
+    rules.spawnDrop(it, state.me.x + rnd(-1, 1), state.me.z + rnd(1, 2));
   }
   if (r.title) grantTitle(r.title);
-  if (r.potion) { char.potBonus = (char.potBonus || 0) + r.potion; calcStats(); me.potions = S.maxPot; toast(`ポーションの所持数が ${S.maxPot} になった`, '#6aff8a'); }
-  banner('クエスト完了', q.name, '#ffd84a', 2);
-  audio.sfx('levelup');
-  gainXp(r.xp);
-  saveChar(); renderQuests(); refreshNpcMarks();
+  if (r.potion) { state.char.potBonus = (state.char.potBonus || 0) + r.potion; stats.calcStats(); state.me.potions = stats.S.maxPot; screen.toast(`ポーションの所持数が ${stats.S.maxPot} になった`, '#6aff8a'); }
+  screen.banner('クエスト完了', q.name, '#ffd84a', 2);
+  view.audio.sfx('levelup');
+  rules.gainXp(r.xp);
+  state.saveChar(); screen.renderQuests(); field.refreshNpcMarks();
 }
 
 // ======================================================================
 // 調べる（F）: 転移門 / NPC / レバー / 宝箱
 // ======================================================================
 export function nearestInteract() {
-  if (me.dead) return null;
-  const def = world.def;
-  const d = (p) => Math.hypot(p.x - me.x, p.z - me.z);
+  if (state.me.dead) return null;
+  const def = state.world.def;
+  const d = (p) => Math.hypot(p.x - state.me.x, p.z - state.me.z);
   if (def.gate && d(def.gate) < 6) return { kind: 'gate', label: '<kbd>F</kbd> 転移門を使う（ポーション補充済み）' };
-  for (const n of npcs) {
+  for (const n of state.npcs) {
     if (d(n) >= 3.2) continue;
     if (n.role === 'smith') return { kind: 'smith', npc: n, label: `<kbd>F</kbd> ${esc(n.name)}（鍛冶屋）` };
     return { kind: 'npc', npc: n, label: `<kbd>F</kbd> ${esc(n.name)}と話す` };
@@ -118,7 +110,7 @@ export function nearestInteract() {
   if (def.shape === 'grid') {
     const g = grid(def);
     const L = g.pts.L?.[0];
-    if (L && d(L) < 3.5 && !world.door) return { kind: 'lever', label: '<kbd>F</kbd> レバーを引く' };
+    if (L && d(L) < 3.5 && !state.world.door) return { kind: 'lever', label: '<kbd>F</kbd> レバーを引く' };
   }
   for (const C of chestsOf(def)) {
     if (d(C) < 3.5) return { kind: 'chest', chest: C, label: chestOpen(C) ? '宝箱は空っぽだ（しばらくすると中身が戻る）' : '<kbd>F</kbd> 宝箱を開ける' };
@@ -131,17 +123,17 @@ export const explored = new Map();
 export let exploreDirty = false, exploreSaveT = 0;
 export function exploredOf(id) {
   if (!explored.has(id)) {
-    const g = grid(AREAS[id]), a = new Uint8Array(g.W * g.H), s = char?.explored?.[id] || '';
+    const g = grid(AREAS[id]), a = new Uint8Array(g.W * g.H), s = state.char?.explored?.[id] || '';
     for (let i = 0; i < a.length && i < s.length; i++) a[i] = s.charCodeAt(i) === 49 ? 1 : 0;
     explored.set(id, a);
   }
   return explored.get(id);
 }
 export function exploreTick() {
-  const def = world.def;
-  if (!char || def.shape !== 'grid') return;
-  const g = grid(def), a = exploredOf(def.id), { c, r } = worldToCell(g, me.x, me.z);
-  const R = tf('t_mapper') ? 4 : 2; // 称号「地図職人」は2倍の範囲を記す
+  const def = state.world.def;
+  if (!state.char || def.shape !== 'grid') return;
+  const g = grid(def), a = exploredOf(def.id), { c, r } = worldToCell(g, state.me.x, state.me.z);
+  const R = rules.tf('t_mapper') ? 4 : 2; // 称号「地図職人」は2倍の範囲を記す
   for (let dr = -R; dr <= R; dr++) for (let dc = -R; dc <= R; dc++) {
     const cc = c + dc, rr = r + dr;
     if (cc < 0 || rr < 0 || cc >= g.W || rr >= g.H || a[rr * g.W + cc]) continue;
@@ -149,9 +141,9 @@ export function exploreTick() {
   }
   if (exploreDirty && now() - exploreSaveT > 4) {
     exploreDirty = false; exploreSaveT = now();
-    char.explored = char.explored || {};
-    for (const [id, arr] of explored) char.explored[id] = arr.join('');
-    saveChar();
+    state.char.explored = state.char.explored || {};
+    for (const [id, arr] of explored) state.char.explored[id] = arr.join('');
+    state.saveChar();
   }
 }
-export function chestOpen(C) { return Date.now() - (char.chests?.[C.id] || 0) < chestCd(C); }
+export function chestOpen(C) { return Date.now() - (state.char.chests?.[C.id] || 0) < chestCd(C); }

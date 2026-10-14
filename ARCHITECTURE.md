@@ -99,14 +99,24 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 - `sim/common.js` は何も import しない。
 - `sim/*.js` から新しいモジュールを読むときは、sim.js からも直接読むか、戦闘の golden（`npm run test:golden`）で差が出ないことを確かめる。
 
-### 中心の処理と状態（設計の判断）
+### 層と依存の向き（依存性の逆転）
 
-戦闘・被弾・能力値・毎フレーム（`game/combat.js`・`hurt.js`・`stats.js`・`loop.js` など）は、ゲームの状態（`game/state.js` の me・mobs・world、
-`stats.js` の S）を直接読む「具体的な実装の層」として残している。
+```
+  組み立て役        main.js → game/wiring.js（中心の処理のポートを埋める） / game/weapon-api.js（武器の効果の道具） / actions.js の combat（スキルの道具）
+       │ 差し込む
+  中心の処理        combat・hurt・stats・loop・tree-effects・variants・items・loot・progress
+       │ 読むのは game/ports.js の入れ物だけ（state・stats・view・screen・link・field・rules）
+  拡張する部分      武器の効果（game/weapons/*.js: install(api)）・スキル（c を受け取る）・登録表（models・motions・env・sim）
+       │
+  端（具体的な実装） state・save（状態とセーブ）・render・meshes・labels（three.js）・ui-bridge / ui（DOM）・net-client / net（通信）
+                    input（入力）・area・snapshot（エリアとサーバーの状態の反映）・actions（攻撃とスキルの道具の組み立て）
+```
 
-- 外から足す・差し替える部分（武器の効果・スキル・登録表）は、この層に依存せず、小さな形（`weapon-api.js`・スキルの `c`）を受け取る。
-- 中心の処理どうしを全部引数で受け渡す形にすると、毎フレームの処理に受け渡しが増え、式の順番も変わる。
-  「今とまったく同じ挙動・重くしない」を優先して、ここは分けたモジュール（役目ごとに1ファイル）にとどめた。
+- 中心の処理は、具体的なモジュールを import しない。`game/ports.js` の入れ物から `state.me`・`stats.S`・`view.fx`・`rules.dealDamage` のように読む。
+  中身は `game/wiring.js` が起動のときに差し込む（書き換わる値は getter）。描画や通信を差し替えて、中心の処理だけを動かすこともできる。
+- 中心の処理に新しい道具を渡すときは、`game/wiring.js` に1行足す。
+- 入れ物は読み込みの時点ではまだ空なので、中心の処理のファイルの一番外側（関数の外）では入れ物を使わない。
+- 入力（input.js）と攻撃の道具の組み立て（actions.js）は、読み込みの時点で道具をまとめる端（アダプター）として、具体的なモジュールを直接読む。
 
 ## 武器ごとの効果（フック）の仕組み
 
@@ -213,13 +223,13 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 - 技の時刻（いつ当たるか）: `public/shared/techniques.js`（Q/E 技）と `public/shared/tree-motions.js`（武器ツリー）。
   - `hits`・`duration`・`style` を書く。
   - サーバーと同じ時刻を使う。
-- 技の姿勢: `public/js/motions/styles.js`。
-  - `STYLES[style] = (i, sign) => [振りかぶり, 当たり]` と書くと、hits の各時刻でこの2つの姿勢を通る。
+- 技の姿勢: `public/js/motions/styles.js`（データだけ）。
+  - `STYLES[style] = { pose: [振りかぶり, 当たり] }`（どの当たりも同じ）か `{ hits: [[振りかぶり, 当たり], ...] }`（当たりごと）と書くと、hits の各時刻でその姿勢を通る。
   - 時刻を自分で並べたいときは `KEYFRAMES[style] = [{ at, ...つまみ }]`。
   - 一回転で終わる動きは `FULL_TURN` に足す。
   - つまみ（yaw・pitch・bodyYaw・lean・x・y・z・guard・lift・leg・draw）は `BASE` に並んでいる。
 - 武器ごとの構え・通常攻撃の振り: `motions/<武器>.js` と、その登録表 `motions/index.js`。
-- 盾槍の突きの技は `spear-motion.js` の `THRUSTS`（技ごとの登録表）に足す。盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`。`spin: true` の動きは回転として扱われ、ほかのプレイヤーからも回って見える）。
+- 盾槍の突きの技は `shared/skill-timings.js` に時刻と `thrust`（突きの形: stroke・dash・repeat）を書くだけ。新しい形のときだけ `spear-motion.js` の `THRUST_CURVES` に足す。盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`。`spin: true` の動きは回転として扱われ、ほかのプレイヤーからも回って見える）。
 
 ### 敵・ボスの技・メッセージを足す（サーバー）
 
