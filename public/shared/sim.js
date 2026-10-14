@@ -163,7 +163,7 @@ export class World {
         p.down = true; p.hp = 0;
         p.revStep = reviveStep(m.n);
         p.revMax = p.rev = REVIVE.base * REVIVE.mult[p.revStep];
-        p.revHitAt = -1e9;
+        p.revHitAt = -1e9; p.revTick = 0;
         for (const mob of A.mobs.values()) mob.threat?.delete(p.id);
         this.broadcastArea(A.id, { t: 'pdown', id: p.id, name: p.name });
         this.checkWipe(A, this.areaPlayers(A.id));
@@ -174,7 +174,7 @@ export class World {
         const q = this.players.get(m.id);
         if (!q || q === p || !q.down || q.area !== p.area || p.dead || p.down || dist(p, q) > REVIVE.range) return;
         q.rev -= Math.max(0, Math.min(Number(m.v) || 0, REVIVE.perHit));
-        q.revHitAt = this.time;
+        q.revHitAt = this.time; q.revTick = 0;
         if (q.rev > 0) return;
         q.down = false; q.rev = 0;
         this.send(q, { t: 'revived', by: p.name });
@@ -492,7 +492,11 @@ export class World {
     const alive = players.filter((p) => !p.dead && !p.down);
     this.checkWipe(A, players);
     // 這いずり: しばらく攻撃が当たらないとゲージが戻る
-    for (const p of players) if (p.down && this.time - p.revHitAt > REVIVE.regenDelay) p.rev = Math.min(p.revMax, p.rev + p.revMax / REVIVE.regen * dt);
+    for (const p of players) {
+      if (!p.down || this.time - p.revHitAt < REVIVE.regenDelay || p.rev >= p.revMax) continue;
+      p.revTick -= dt;
+      if (p.revTick <= 0) { p.revTick += REVIVE.regenEvery; p.rev = Math.min(p.revMax, p.rev + p.revMax * REVIVE.regenStep); }
+    }
 
     // タイマー
     if (A.timers.length) {

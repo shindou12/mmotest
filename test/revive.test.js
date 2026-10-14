@@ -47,15 +47,23 @@ test('recent downs scale the gauge x1 / x2.5 / x4, drawn as 1/3, 2/3 and a full 
   assert.equal(ring(w, A, messages, 2), -1);
 });
 
-test('the gauge refills after 2.5 seconds without a hit', () => {
+test('after 2.5 seconds without a hit, the gauge comes back 10% of its total every second', () => {
   const { w, A } = party(2);
-  w.handle(1, { t: 'down', n: 1 });
-  const p = w.players.get(1);
-  w.handle(2, { t: 'rev', id: 1, v: 9 });
-  for (let t = 0; t < 2.4; t += 0.1) { w.time += 0.1; w.tickArea(A, 0.1); }
-  assert.equal(p.rev, REVIVE.base - 9, 'still waiting');
-  for (let t = 0; t < REVIVE.regen + 0.5; t += 0.1) { w.time += 0.1; w.tickArea(A, 0.1); }
-  assert.equal(p.rev, REVIVE.base, 'back to full');
+  w.handle(1, { t: 'down', n: 2 });
+  const p = w.players.get(1), max = REVIVE.base * 2.5;
+  const wait = (s) => { for (let i = 0; i < Math.round(s * 10); i++) { w.time += 0.1; w.tickArea(A, 0.1); } };
+  w.handle(2, { t: 'rev', id: 1, v: max * 0.6 });
+  wait(2.4);
+  assert.ok(Math.abs(p.rev - max * 0.4) < 1e-9, 'still waiting');
+  wait(0.2);
+  assert.ok(Math.abs(p.rev - max * 0.5) < 1e-9, '+10% at 2.5s');
+  wait(1);
+  assert.ok(Math.abs(p.rev - max * 0.6) < 1e-9, '+10% a second later');
+  w.handle(2, { t: 'rev', id: 1, v: 1 }); // 当てると待ち直し
+  wait(2.4);
+  assert.ok(Math.abs(p.rev - (max * 0.6 - 1)) < 1e-9);
+  wait(10);
+  assert.equal(p.rev, max, 'never above full');
 });
 
 test('solo, or everyone down, bleeds out; far or downed allies cannot revive', () => {
