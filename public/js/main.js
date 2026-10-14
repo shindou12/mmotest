@@ -2406,9 +2406,10 @@ function spawnGold(n, x, z, bag = false) {
     model.position.set(x, heightAt(x, z), z);
     scene.add(model);
     const a = Math.random() * Math.PI * 2;
-    coins.push({ bag: true, model, value: n, x, z, y: 1.2, vx: Math.sin(a) * 1.5, vz: Math.cos(a) * 1.5, vy: 7, t: 0, spin: 0 });
+    // 金貨袋の光の柱は袋といっしょに動き、拾ったら消える（以前は消えずに地面に残っていた）
+    const beam = fx.beam(x, z, 0xffd84a, 8, 0.35);
+    coins.push({ bag: true, model, beam, value: n, x, z, y: 1.2, vx: Math.sin(a) * 1.5, vz: Math.cos(a) * 1.5, vy: 7, t: 0, spin: 0 });
     fx.parts.burst(x, 1, z, 40, { color: 0xffd84a, speed: 6, size: 0.45, life: 0.9, gravity: 6 });
-    fx.beam(x, z, 0xffd84a, 8, 0.35);
     return;
   }
   // 硬貨の枚数は金額の平方根くらい（3〜14枚）。端数は最初の1枚に
@@ -2428,6 +2429,7 @@ function addGold(n, bonus = true) {
   char.gold = (char.gold || 0) + n;
   goldGainBuf += n; goldGainT = 0.35;
 }
+function disposeCoin(c) { fx.dispose(c.model); if (c.beam) fx.dispose(c.beam); }
 function collectCoin(c) {
   if (c.mat) {
     // 強化の欠片（自動分解で出たもの）: 分解と同じ素材が手に入る
@@ -2435,7 +2437,7 @@ function collectCoin(c) {
     audio.sfx('shard');
     floatText(me.x, 2.6, me.z, `強化の欠片 +${salvageMats(c.mat).shard}`, 'info');
     fx.parts.burst(me.x, 1.2, me.z, 8, { color: SHARD_COLOR, speed: 3, size: 0.3, life: 0.35, gravity: 0 });
-    fx.dispose(c.model);
+    disposeCoin(c);
     saveChar(); ui.refresh();
     return;
   }
@@ -2449,7 +2451,7 @@ function collectCoin(c) {
     if (coinSfxT <= 0) { audio.sfx('coin', { vol: 1 }); coinSfxT = 0.035; }
     fx.parts.burst(me.x, 1.2, me.z, 4, { color: 0xffe080, speed: 3, size: 0.3, life: 0.3, gravity: 0 });
   }
-  fx.dispose(c.model);
+  disposeCoin(c);
 }
 function updateCoins(dt) {
   coinSfxT -= dt;
@@ -2484,6 +2486,7 @@ function updateCoins(dt) {
       c.model.position.set(c.x, c.y, c.z);
       c.model.userData.body.rotation.y += dt * 1.2;
       c.model.userData.halo.material.opacity = 0.35 + Math.sin(c.t * 4) * 0.2;
+      if (c.beam) { c.beam.position.set(c.x, heightAt(c.x, c.z), c.z); c.beam.material.uniforms.uTime.value = c.t; }
       if (Math.random() < 0.15) fx.parts.emit(c.x + rnd(-0.4, 0.4), c.y + rnd(0.3, 1), c.z + rnd(-0.4, 0.4), { color: 0xfff0a0, size: 0.3, life: 0.5, speed: 0.3, gravity: -1 });
     } else {
       c.model.position.set(c.x, c.y, c.z);
@@ -2492,7 +2495,7 @@ function updateCoins(dt) {
       if (c.vy === 0 && c.y <= ground + 0.01) { c.spin = Math.max(2.5, c.spin * (1 - dt * 2)); }
       if (Math.random() < 0.012) fx.parts.emit(c.x, c.y + 0.2, c.z, { color: 0xffffff, size: 0.35, life: 0.25, speed: 0, gravity: 0 });
     }
-    if (c.t > 90) { fx.dispose(c.model); coins.splice(i, 1); }
+    if (c.t > 90) { disposeCoin(c); coins.splice(i, 1); }
   }
   // 拾った金額はまとめて表示（チャリチャリ拾っている間は合算）
   if (goldGainBuf > 0) {
@@ -2502,7 +2505,7 @@ function updateCoins(dt) {
 }
 // エリア移動などで残った硬貨は、そのまま所持金に入れる
 function flushCoins() {
-  for (const c of coins.splice(0)) { if (c.mat) harvest(c.mat); else addGold(c.value); fx.dispose(c.model); }
+  for (const c of coins.splice(0)) { if (c.mat) harvest(c.mat); else addGold(c.value); disposeCoin(c); }
 }
 
 // ======================================================================
