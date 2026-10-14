@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { AREAS } from '../../shared/areas.js';
 
 // ======================================================================
@@ -32,9 +31,7 @@ export const bprojs = []; // ボスの弾
 export const pending = []; // 遅延処理
 export let started = false;
 export const CAM_ZOOM = [0.55, 1.6];
-export const cam = { zoom: 1, zoomT: 1, focus: new THREE.Vector3() };
-export const tmpV = new THREE.Vector3();
 export const keys = new Set();
-export const mouse = { x: 0, y: 0, l: false, r: false, world: new THREE.Vector3() };
+export const mouse = { x: 0, y: 0, l: false, r: false, world: { x: 0, y: 0, z: 0 } }; // world: 画面のマウス位置の地面上の点（render.js の screenToGround が入れる）
 
 export function setStarted(v) { started = v; }

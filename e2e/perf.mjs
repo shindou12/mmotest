@@ -1,5 +1,5 @@
 // 性能の計測（テストではなく比べる用）: 時計を固定したブラウザで、フィールドで戦いながら 600 フレーム進め、
-// 1フレームあたりの実時間（ゲームの更新だけ / 描画込み）を測る。node e2e/perf.mjs
+// 1フレームあたりの実時間（ゲームの更新だけ / 描画込み）と、そこから求めた FPS を測る。node e2e/perf.mjs
 import { loadPlaywright, startServer, openGame } from './lib/harness.mjs';
 const { chromium } = await loadPlaywright();
 const srv = await startServer();
@@ -21,7 +21,8 @@ try {
         times.push((Date.prototype.getTime.call(new Date()) - t0) / 120);
       }
       times.sort((a, b) => a - b);
-      return { msPerFrameMedian: +times[2].toFixed(2), msPerFrameMin: +times[0].toFixed(2) };
+      // fps: 1フレームの処理時間の中央値から求めた、1秒に回せるフレーム数（ゲームの時計は固定なので、実時間の処理の速さ）
+      return { msPerFrameMedian: +times[2].toFixed(2), msPerFrameMin: +times[0].toFixed(2), fps: +(1000 / times[2]).toFixed(1) };
     });
     await page.close();
   }

@@ -1,4 +1,4 @@
-import { WEAPONS } from '../../shared/data.js';
+import { WEAPONS, DEFAULT_WEAPON } from '../../shared/data.js';
 import { TREE_SKILLS } from '../skills.js';
 import { WT_NODE, WT_RESET_COST, gainProf, hasWTree, profLevel, profOf, wtChoose, wtLearn, wtOf, wtReset, wtSpent, WT_LEGACY } from '../weapon-tree.js';
 import { clamp, now } from './util.js';
@@ -86,7 +86,7 @@ export function wtAura(dt) {
 }
 // 熟練度: 今の武器で経験値を得ると上がる
 export function gainWeaponProf(n) {
-  const wk = S?.wk || char.eq.weapon?.kind || 'sword';
+  const wk = S?.wk || char.eq.weapon?.kind || DEFAULT_WEAPON;
   const before = profLevel(char, wk);
   gainProf(char, wk, n);
   const after = profLevel(char, wk);
@@ -138,7 +138,7 @@ export function migrateWeaponTrees() {
   char.slots = char.slots.map((id) => (id && (gone.includes(id) || !TREE_SKILLS[id]) ? null : id));
   if (back) later(1, () => toast(`すべての武器が新しい武器ツリーになりました。旧ツリーの ${back} ポイントを返しました`, '#ffd84a'));
   if (params.has('prof')) {
-    const wk = char.eq.weapon?.kind || 'sword', p = profOf(char, wk);
+    const wk = char.eq.weapon?.kind || DEFAULT_WEAPON, p = profOf(char, wk);
     p.lv = clamp(Math.round(+params.get('prof')) || 1, 1, 20); p.xp = 0;
     char.profBest = Math.max(char.profBest || 0, p.lv);
   }

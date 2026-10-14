@@ -1,5 +1,4 @@
 import { BALANCE, REVIVE, reviveStep } from '../../shared/balance.js';
-import * as THREE from 'three';
 import { inShape } from '../../shared/data.js';
 import { makeTelegraph } from '../fx.js';
 import { angDiff, clamp, now, rnd, degToRad } from './util.js';
@@ -17,6 +16,7 @@ import { tf } from './variants.js';
 import { strikes, tryDodge } from './actions.js';
 import { moveMe } from './loop.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
+import { toColor } from './meshes.js';
 
 // ======================================================================
 // テレグラフ（予兆）と被弾判定
@@ -47,7 +47,7 @@ export function resolveTele(te) {
   const big = te.dmg > (S ? S.mhp * 0.12 : 20);
   for (const s of te.sh) {
     // 着弾演出
-    const c = new THREE.Color(te.color);
+    const c = toColor(te.color);
     if (s.k === 'circle') { fx.ringWave(s.x, s.z, c, s.r, 0.35); fx.parts.burst(s.x, 0.3, s.z, Math.min(40, 6 + s.r * 4), { color: c, speed: 6, size: 0.5, life: 0.5, up: 2 }); }
     else if (s.k === 'ring') fx.ringWave(s.x, s.z, c, s.r1, 0.5);
     else {

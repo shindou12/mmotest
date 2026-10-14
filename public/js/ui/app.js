@@ -11,7 +11,7 @@
 // 各コンポーネントは Passive View（core.js の View）。描画パラメータは下の Presenter が計算して set() する。
 // クリックやキー入力は UI イベントとして親へバブリングし、途中の link() が文脈（どのパネルのどの項目か）を足す。
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
-import { WEAPONS } from '../../shared/data.js';
+import { WEAPONS, DEFAULT_WEAPON } from '../../shared/data.js';
 import { hasWTree } from '../weapon-tree.js';
 import { View, Root, Mediator } from './core.js';
 import { now, PANELS, CanvasView } from './helpers.js';
@@ -383,7 +383,7 @@ export function createUI(game) {
           L.weaponWrap.set({ style: { display: 'none' } });
           L.fresh.set({ visible: true });
         }
-        this.kind = info?.kind || [...L.weapons.children].find(([, v]) => v.el.classList.contains('on'))?.[0] || 'sword';
+        this.kind = info?.kind || [...L.weapons.children].find(([, v]) => v.el.classList.contains('on'))?.[0] || DEFAULT_WEAPON;
         for (const [k, v] of L.weapons.children) v.set({ cls: { on: k === this.kind } });
         L.start.set({ text: info ? `つづきから（${WEAPONS[info.kind].name}）` : `${WEAPONS[this.kind].name}で新規開始` });
       },

@@ -1,5 +1,4 @@
 // 片手剣の武器ツリーの効果（勢い・剣聖・幻剣・守護騎士・報復者 など）。差し込み口は game/weapon-fx.js
-import * as THREE from 'three';
 import { TREE_MOTIONS } from '../../../shared/tree-motions.js';
 import { BALANCE } from '../../../shared/balance.js';
 import { clamp, now, rnd } from '../util.js';
@@ -12,6 +11,7 @@ import { addShake, later } from '../combat.js';
 import { cutCds, quietBuff, wtEmit } from '../tree-effects.js';
 import { extendCombat, heal, strikes, SWEEP } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
+import { handTracker } from '../meshes.js';
 
 // 剣闘士の「勢い」（バフ欄に数を出す）
 export function setMom(n) {
@@ -36,7 +36,7 @@ export function swordCounter() {
     audio.sfx('heavy'); addShake(0.35);
   });
 }
-const handPos = new THREE.Vector3();
+const handPos = handTracker();
 
 // スキルに渡す文脈に、受け流しの構えを足す（c.parry）
 extendCombat({
@@ -181,8 +181,8 @@ registerWeaponFx('sword', {
     }
     // 剣聖: 全会心の間は、剣から金の光がこぼれ、足元に金の輪
     if (hasBuff('sw_saint')) {
-      me.model.userData.hand?.getWorldPosition(handPos);
-      wtEmit('saint', 45, dt, () => fx.parts.emit(handPos.x + rnd(-0.35, 0.35), handPos.y + rnd(-0.2, 0.7), handPos.z + rnd(-0.35, 0.35), { color: 0xffe070, size: 0.34, life: 0.45, speed: 0.6, gravity: -2 }));
+      const hp = handPos(me.model);
+      wtEmit('saint', 45, dt, () => fx.parts.emit(hp.x + rnd(-0.35, 0.35), hp.y + rnd(-0.2, 0.7), hp.z + rnd(-0.35, 0.35), { color: 0xffe070, size: 0.34, life: 0.45, speed: 0.6, gravity: -2 }));
       if (now() - (me.saintFxT || 0) > 0.5) { me.saintFxT = now(); fx.ringWave(me.x, me.z, 0xffd84a, 2.2, 0.4); }
     }
     // 報復者: 溜めたダメージが多いほど、赤い揺らめきが濃くなり、足元の赤い輪が脈打つ

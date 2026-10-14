@@ -23,7 +23,7 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ state.js        自分・他人・敵などの状態（入れ物）
    │   ├─ util.js         rnd / now / angDiff / deg / lerp など
    │   ├─ ui-bridge.js    画面（ui/app.js）への窓口（DOM にはさわらない）
-   │   ├─ render.js       three.js のシーン・カメラ・fx・audio
+   │   ├─ render.js       three.js のシーン・カメラ（cam）・画面→地面の変換・霧・描画・fx・audio
    │   ├─ save.js         セーブ（キャラクターの保存と読み込み）
    │   ├─ stats.js        能力値の計算（S）・バフ
    │   ├─ input.js        キーボード・マウス・タッチ
@@ -33,7 +33,7 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ hurt.js         被弾・ガード・回避・ダウン
    │   ├─ actions.js      攻撃・強攻撃・スキル・飛び道具。スキルに渡す文脈を役目ごとの小さな形で持つ
    │   │                    （senses 見る・狙う / strikes 当てる / feedback 見せる・鳴らす / selfCare 回復・バフ / party 挑発）
-   │   ├─ meshes.js       戦闘で使う見た目（矢・斧の幻影・ボスの弾・弓の照準・罠・旗など）を作る。three.js はここと render.js に寄せる
+   │   ├─ meshes.js       戦闘で使う見た目（矢・斧の幻影・ボスの弾・弓の照準・罠・旗・手の位置など）を作る
    │   ├─ tree-effects.js 武器ツリーの共通部分（バフ・クールタイム・旧データの移し替え）
    │   ├─ variants.js     スキルの形違い
    │   ├─ progress.js / loot.js / items.js / labels.js
@@ -76,6 +76,11 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
        ├─ panels/*.js     ★ 画面ごとの Presenter（items・inventory・tree・map・npc・smith・hud・touch・minimap・floats・messages・settings）
        └─ core.js / helpers.js  View・Root・Mediator の土台 / 共通の道具
 ```
+
+端（外の仕組み）への依存:
+- three.js は `game/render.js`・`game/meshes.js`・`game/labels.js`（名札）と、models・env・fx・toon・motions・pose-rig（見た目と姿勢の部品）だけが使う。
+  戦闘・被弾・能力値・入力・状態（combat・hurt・stats・input・state・actions・loop・weapons/*）は three.js を import しない。
+- DOM は `ui/`（と名札の canvas）、WebSocket は `net.js` だけ。
 
 依存の向き: `game` → `ui` へは `ui-bridge.js` だけを通す。`game/*` の中心の処理（combat・hurt・stats・
 actions・loop など）は、武器の名前やノードの id を知らず、`weapon-fx.js` のフックを呼ぶだけ。
@@ -125,7 +130,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 
 ### 武器の種類を足す
 
-1. `public/shared/data.js` の `WEAPONS` に1項目足す。
+1. `public/shared/data.js` の `WEAPONS` に1項目足す（初期武器のスキルを変えるときは `STARTER_SKILL` にも）。
    - 項目: 名前・射程・速さ・重さ・`melee` / `ranged` / `twoHanded` など。
    - サーバーとブラウザの両方が使う。
 2. `public/js/weapons/<wk>.js` を作る。`export default { wk, tree, skills, mods, legacy? }` の形にする。
@@ -180,7 +185,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - 一回転で終わる動きは `FULL_TURN` に足す。
   - つまみ（yaw・pitch・bodyYaw・lean・x・y・z・guard・lift・leg・draw）は `BASE` に並んでいる。
 - 武器ごとの構え・通常攻撃の振り: `motions/<武器>.js` と、その登録表 `motions/index.js`。
-- 盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`）。
+- 盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`。`spin: true` の動きは回転として扱われ、ほかのプレイヤーからも回って見える）。
 
 ### 敵・ボスの技・メッセージを足す（サーバー）
 
@@ -234,7 +239,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 - `performance.now`・`Date.now`・タイマー・`requestAnimationFrame` を固定する。
 - `Math.random` はブラウザ側が 0.5、World の中は決まった種の乱数。
 
-性能は `node e2e/perf.mjs` で測る（1フレームの更新・描画の時間）。リファクタリング前の値は `e2e/fixtures/perf-before.json`。
+性能は `node e2e/perf.mjs` で測る（1フレームの更新・描画の時間と FPS）。リファクタリング前の値は `e2e/fixtures/perf-before.json`。
 
 分けるときは、golden テストのほかに、分ける前と後を同じ入力で動かして結果を比べた（一時的なスクリプト。リポジトリには入れていない）。
 

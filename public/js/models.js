@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { animatePlayer } from './player-motion.js';
 export { animatePlayer } from './player-motion.js';
 import { GRIP_Y } from './weapon-pose.js';
-import { RARITIES, WEAPONS } from '../shared/data.js';
+import { RARITIES, WEAPONS, DEFAULT_WEAPON } from '../shared/data.js';
 import { toon, glow, outline, gradientMap } from './toon.js';
 import { mesh, sphere, capsule, cyl, lathe, extrude, finish } from './models/kit.js';
 import { WEAPON_MODELS } from './models/weapon-models.js';
@@ -393,7 +393,7 @@ export function makeLootItem(it) {
   const g = new THREE.Group(), item = new THREE.Group();
   g.add(item);
   if (it.slot === 'weapon') {
-    const w = makeWeapon(it.kind || 'sword', r, weaponStyle(it));
+    const w = makeWeapon(it.kind || DEFAULT_WEAPON, r, weaponStyle(it));
     w.rotation.x = Math.PI / 2; w.scale.setScalar(0.8);
     item.add(w);
   } else if (it.slot === 'armor') {

@@ -1,4 +1,4 @@
-import { INSTINCT, SKILL_VARIANTS, WEAPONS, WEAPON_SKILL_POOL, affixVal, baseAtk, baseHp, enhMult, isVariant, itemWeight, titleReqOk, weightClass } from '../../shared/data.js';
+import { INSTINCT, SKILL_VARIANTS, WEAPONS, WEAPON_SKILL_POOL, affixVal, baseAtk, baseHp, enhMult, isVariant, itemWeight, titleReqOk, weightClass, DEFAULT_WEAPON } from '../../shared/data.js';
 import { armorLook, setPlayerArmor, setPlayerWeapon, weaponStyle } from '../models.js';
 import { WEAPON_SKILLS, treeEffects } from '../skills.js';
 import { wtEffects } from '../weapon-tree.js';
@@ -27,7 +27,7 @@ export const buffMod = (k) => me.buffs.reduce((a, b) => a + (b.mods[k] || 0), 0)
 // ======================================================================
 export function weaponSkillId() {
   const w = char.eq.weapon;
-  const kind = w ? w.kind : 'sword';
+  const kind = w ? w.kind : DEFAULT_WEAPON;
   const id = w?.skill;
   return id && WEAPON_SKILLS[id]?.kind === kind ? id : WEAPON_SKILL_POOL[kind][0];
 }
@@ -46,7 +46,7 @@ export function calcStats() {
   // 防具の基本効果
   if (eq.armor?.base) { const [k, v] = eq.armor.base; aff[k] = (aff[k] || 0) + v; }
   const fxs = new Set(items.flatMap((i) => i.fx || []));
-  const wk = eq.weapon ? eq.weapon.kind : 'sword';
+  const wk = eq.weapon ? eq.weapon.kind : DEFAULT_WEAPON;
   // 称号: 条件（近接のみ など）を満たすときだけ効く。同じ固有効果は重ならない（Set）
   const title = eq.title;
   const titleOn = !!title && titleReqOk(title.req, wk);

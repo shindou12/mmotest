@@ -1,4 +1,4 @@
-import { FLOORS, migrateItem, starterWeapon } from '../shared/data.js';
+import { FLOORS, migrateItem, starterWeapon, DEFAULT_WEAPON } from '../shared/data.js';
 import { AREAS } from '../shared/areas.js';
 import { makePlayer } from './models.js';
 import { OCC } from './toon.js';
@@ -8,8 +8,8 @@ import { createUI } from './ui/app.js';
 import { now } from './game/util.js';
 import { addChat, setUI, toast, ui } from './game/ui-bridge.js';
 import { SAVE_KEY, char, characterStore, loadChar, params, saveChar, setChar, settings } from './game/save.js';
-import { ambient, audio, camera, fx, hemi, scene, sun } from './game/render.js';
-import { CHARGE_MAX, CHARGE_MIN, bprojs, cam, drops, me, mobs, mouse, npcs, others, projs, setStarted, started, teles, tmpV, world } from './game/state.js';
+import { ambient, audio, camera, fx, hemi, scene, sun, cam, tmpV } from './game/render.js';
+import { CHARGE_MAX, CHARGE_MIN, bprojs, drops, me, mobs, mouse, npcs, others, projs, setStarted, started, teles, world } from './game/state.js';
 import { S, calcStats, itemPower } from './game/stats.js';
 import { input } from './game/input.js';
 import { net, roster } from './game/net-client.js';
@@ -82,7 +82,7 @@ const game = {
   explored: exploredOf,
   waypointOk, waypointWarp, setPin, lootClick,
   sfx: (n) => audio.sfx(n),
-  loginInfo() { const c = loadChar(); return c && { name: c.name, color: c.color, lv: c.lv, kind: c.eq?.weapon?.kind || 'sword' }; },
+  loginInfo() { const c = loadChar(); return c && { name: c.name, color: c.color, lv: c.lv, kind: c.eq?.weapon?.kind || DEFAULT_WEAPON }; },
   resetChar() {
     try {
       localStorage.removeItem(SAVE_KEY);

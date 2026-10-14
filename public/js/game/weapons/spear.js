@@ -1,5 +1,4 @@
 // 盾槍の武器ツリーの効果（竜騎士・間合い・騎士・盾の心得 など）と、盾槍のガードカウンター。差し込み口は game/weapon-fx.js
-import * as THREE from 'three';
 import { TREE_MOTIONS } from '../../../shared/tree-motions.js';
 import { RARITIES } from '../../../shared/data.js';
 import { now, rnd } from '../util.js';
@@ -12,7 +11,7 @@ import { addShake, aimAngle, aimPoint, dealDamage, later } from '../combat.js';
 import { ATK_TYPES, quietBuff, wtEmit } from '../tree-effects.js';
 import { strikes, SWEEP } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
-import { bannerMesh } from '../meshes.js';
+import { bannerMesh, handTracker } from '../meshes.js';
 
 // 攻撃が槍の先端で当たったか（間合い）: 1 = 先端 / -1 = 近すぎ / 0 = それ以外・対象外
 export function spTip(o) {
@@ -66,7 +65,7 @@ function spPierce(a) {
   strikes.proj({ a, mult: 1.6, type: 'normal', speed: 30, life: 0.45, rad: 1.3, color: 0xfff0a0, wtNo: true });
   fx.flash(me.x, 1.3, me.z, 0xfff0a0, 30, 0.2);
 }
-const handPos = new THREE.Vector3();
+const handPos = handTracker();
 
 registerWeaponFx('spear', {
   // 竜騎士はガードの代わりに跳ぶ
@@ -156,8 +155,8 @@ registerWeaponFx('spear', {
     }
     // 騎士: 雷をまとう間、槍の穂先から火花
     if (hasBuff('sp_thunder')) {
-      me.model.userData.hand?.getWorldPosition(handPos);
-      wtEmit('thunder', 30, dt, () => fx.parts.emit(handPos.x + rnd(-0.4, 0.4), handPos.y + rnd(0, 1.2), handPos.z + rnd(-0.4, 0.4), { color: Math.random() < 0.5 ? 0xffffff : 0x9ad8ff, size: 0.28, life: 0.2, speed: 3, gravity: 0 }));
+      const hp = handPos(me.model);
+      wtEmit('thunder', 30, dt, () => fx.parts.emit(hp.x + rnd(-0.4, 0.4), hp.y + rnd(0, 1.2), hp.z + rnd(-0.4, 0.4), { color: Math.random() < 0.5 ? 0xffffff : 0x9ad8ff, size: 0.28, life: 0.2, speed: 3, gravity: 0 }));
     }
     if (me.soarReady && now() < me.soarReady) wtEmit('soar', 20, dt, () => fx.parts.emit(me.x + rnd(-0.4, 0.4), 0.2, me.z + rnd(-0.4, 0.4), { color: 0x9affc8, size: 0.3, life: 0.5, speed: 1.5, gravity: -5 }));
   },

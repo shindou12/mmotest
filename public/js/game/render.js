@@ -52,6 +52,23 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
 });
 
+// カメラの状態（ズーム・注視点）と、計算用の一時ベクトル
+export const cam = { zoom: 1, zoomT: 1, focus: new THREE.Vector3() };
+export const tmpV = new THREE.Vector3();
+// 画面の点（px）から、高さ y の地面上の点を求めて out（{x,y,z}）に入れる。地面に届かないときは out をそのままにする
+const raycaster = new THREE.Raycaster();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const hitV = new THREE.Vector3();
+export function screenToGround(px, py, y, out) {
+  const v = new THREE.Vector2((px / innerWidth) * 2 - 1, -(py / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(v, camera);
+  groundPlane.constant = -y;
+  if (raycaster.ray.intersectPlane(groundPlane, hitV)) { out.x = hitV.x; out.y = hitV.y; out.z = hitV.z; }
+}
+// エリアの霧と、天候で日差しの色を寄せる
+export function setFog(color, near, far) { scene.fog = new THREE.Fog(color, near, far); }
+export function tintSun(tint, k) { sun.color.lerp(new THREE.Color(tint), k); }
+
 export const fx = new FX(scene);
 export const ambient = new AmbientParticles(scene);
 export const weatherParts = new AmbientParticles(scene, 1600); // 天候（雨・霧・砂嵐）の粒子

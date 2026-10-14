@@ -115,3 +115,11 @@ export function bannerMesh() {
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
   return { g, flag, ring };
 }
+
+// 色（数値・文字列）を three.js の色に
+export const toColor = (c) => new THREE.Color(c);
+// 手の位置（ワールド座標）を追うもの。手がないときは前の位置のまま
+export function handTracker() {
+  const v = new THREE.Vector3();
+  return (model) => { model.userData.hand?.getWorldPosition(v); return v; };
+}

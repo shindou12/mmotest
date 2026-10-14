@@ -1,7 +1,7 @@
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
 import { REVIVE } from './balance.js';
-import { FLOORS, MAX_FLOOR } from './data.js';
+import { FLOORS, MAX_FLOOR, DEFAULT_WEAPON } from './data.js';
 import { AREAS, FLOOR_HUB, PLATE_WINDOW, grid, lairOf } from './areas.js';
 
 import { rnd, r2, BOX_MAX } from './sim/common.js';
@@ -61,7 +61,7 @@ export class World {
   addPlayer(id, send) {
     this.players.set(id, {
       id, send, joined: false, name: '???', area: FLOOR_HUB[1], x: 0, z: 0, a: Math.PI,
-      hp: 100, mhp: 100, lv: 1, dead: false, color: '#4af', wk: 'sword', wr: 0, sw: 0, sk: 0, dg: 0, gd: 0, wst: 0, arm: 0, rc: 0, cl: 0,
+      hp: 100, mhp: 100, lv: 1, dead: false, color: '#4af', wk: DEFAULT_WEAPON, wr: 0, sw: 0, sk: 0, dg: 0, gd: 0, wst: 0, arm: 0, rc: 0, cl: 0,
     });
   }
 

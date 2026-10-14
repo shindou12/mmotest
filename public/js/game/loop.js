@@ -7,8 +7,8 @@ import { OCC } from '../toon.js';
 import { angDiff, clamp, now, rnd, lerp } from './util.js';
 import { floatText, toast, ui } from './ui-bridge.js';
 import { char, saveChar, settings } from './save.js';
-import { ambient, audio, camera, fx, scene, sun, weatherParts, renderFrame } from './render.js';
-import { CAM_ZOOM, CHARGE_MAX, CHARGE_MIN, cam, keys, me, mobs, npcs, others, pending, setStarted, started, tmpV, world } from './state.js';
+import { ambient, audio, camera, fx, scene, sun, weatherParts, renderFrame, cam, tmpV } from './render.js';
+import { CAM_ZOOM, CHARGE_MAX, CHARGE_MIN, keys, me, mobs, npcs, others, pending, setStarted, started, world } from './state.js';
 import { S, bowRange, buffMod, hasBuff } from './stats.js';
 import { GUARD, guardRegen, updateMouseWorld } from './input.js';
 import { net } from './net-client.js';
@@ -24,6 +24,7 @@ import { lootWalk, updateCoins, updateDrops } from './loot.js';
 import { updateMobLabels } from './labels.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 import { touchGuideMesh } from './meshes.js';
+import { isSpinMotion } from '../../shared/skill-timings.js';
 
 // ======================================================================
 // メインループ
@@ -304,7 +305,7 @@ export function update(dt) {
     if (moving) o.walkT += dt;
     o.model.position.set(o.x, heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
-    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, shieldBack: !!WEAPONS[o.wk]?.shield && (o.cl & 1) > 0, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (WEAPONS[o.wk]?.skillSpin || o.motion === 'whirlspear' || o.motion === 'whirl') ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
+    animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, shieldBack: !!WEAPONS[o.wk]?.shield && (o.cl & 1) > 0, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (WEAPONS[o.wk]?.skillSpin || isSpinMotion(o.motion)) ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
   }
 
   // モンスター

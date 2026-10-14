@@ -1,8 +1,7 @@
-import * as THREE from 'three';
 import { clamp, now } from './util.js';
 import { floatText } from './ui-bridge.js';
-import { audio, camera, fx } from './render.js';
-import { CAM_ZOOM, CHARGE_MIN, cam, keys, me, mouse, started } from './state.js';
+import { audio, fx, screenToGround, cam } from './render.js';
+import { CAM_ZOOM, CHARGE_MIN, keys, me, mouse, started } from './state.js';
 import { S, bowRange } from './stats.js';
 import { setHitStop } from './hurt.js';
 import { addShake, touch } from './combat.js';
@@ -126,11 +125,5 @@ export const input = {
   },
 };
 
-export const raycaster = new THREE.Raycaster();
-export const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-export function updateMouseWorld() {
-  const v = new THREE.Vector2((mouse.x / innerWidth) * 2 - 1, -(mouse.y / innerHeight) * 2 + 1);
-  raycaster.setFromCamera(v, camera);
-  groundPlane.constant = -1;
-  raycaster.ray.intersectPlane(groundPlane, mouse.world);
-}
+// マウスの指す地面（高さ1）の点
+export function updateMouseWorld() { screenToGround(mouse.x, mouse.y, 1, mouse.world); }

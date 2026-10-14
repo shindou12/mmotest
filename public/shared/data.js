@@ -81,6 +81,8 @@ export const WEAPONS = {
   },
 };
 export const WEAPON_KINDS = Object.keys(WEAPONS);
+// 武器を持っていないとき・わからないときの武器の種類
+export const DEFAULT_WEAPON = 'sword';
 // 生存本能（近接武器のパッシブ）: 常に被ダメージを少し軽減する
 export const INSTINCT = { dr: 8 };
 // 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
@@ -262,12 +264,16 @@ export function weightedTier(max, high) {
   for (let i = 0; i < max; i++) { r -= ws[i]; if (r <= 0) return i + 1; }
   return 1;
 }
+// 初期武器のスキルを、いつもの「その武器の最初のスキル」から変えるもの（武器の種類ごと）
+//   skill: 初期武器のスキル / version: 変えた版（セーブの starterSkillVersion）/ old: 古いセーブの初期武器にあったスキル（読み込むと skill に変える）
+export const STARTER_SKILL = { sword: { skill: 'retreat', version: 1, old: 'vorpal' } };
 // 古いセーブの特性 [種類, 値] を [種類, ティア, 値] に直す
 export function migrateItem(it) {
   // Upgrade the starter's original skill once; retain later blacksmith choices.
-  if (it?.kind === 'sword' && it.name === '初心者の片手剣' && !it.starterSkillVersion) {
-    if (it.skill === 'vorpal') it.skill = 'retreat';
-    it.starterSkillVersion = 1;
+  const st = it && Object.hasOwn(STARTER_SKILL, it.kind ?? '') ? STARTER_SKILL[it.kind] : null;
+  if (st && it.name === '初心者の' + WEAPONS[it.kind].name && !it.starterSkillVersion) {
+    if (it.skill === st.old) it.skill = st.skill;
+    it.starterSkillVersion = st.version;
   }
   if (!it || it.v >= 3) return it;
   if (it.v !== 2) {
@@ -648,8 +654,9 @@ export function starterWeapon(kind) {
   it.name = '初心者の' + WEAPONS[kind].name;
   it.atk = 6;
   it.bm = 1.2; gradeItem(it); // 「並」
-  it.skill = kind === 'sword' ? 'retreat' : WEAPON_SKILL_POOL[kind][0];
-  if (kind === 'sword') it.starterSkillVersion = 1;
+  const st = Object.hasOwn(STARTER_SKILL, kind) ? STARTER_SKILL[kind] : null;
+  it.skill = st ? st.skill : WEAPON_SKILL_POOL[kind][0];
+  if (st) it.starterSkillVersion = st.version;
   return it;
 }
 

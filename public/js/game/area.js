@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { FLOORS } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, WEATHERS } from '../../shared/areas.js';
 import { buildArea, textSprite } from '../env.js';
@@ -7,8 +6,8 @@ import { QUESTS, questAvailable, questState } from '../quests.js';
 import { now } from './util.js';
 import { banner, toast, ui } from './ui-bridge.js';
 import { GRASS_BY_Q, char, saveChar, settings } from './save.js';
-import { ambient, audio, fx, hemi, scene, sun, weatherParts } from './render.js';
-import { cam, drops, me, mobs, npcs, others, teles, world } from './state.js';
+import { ambient, audio, fx, hemi, scene, sun, weatherParts, setFog, tintSun, cam } from './render.js';
+import { drops, me, mobs, npcs, others, teles, world } from './state.js';
 import { S } from './stats.js';
 import { net } from './net-client.js';
 import { removeMob, removeOther } from './snapshot.js';
@@ -28,7 +27,7 @@ export function buildEnv(id) {
   env = buildArea(def, FLOORS[def.floor - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1, weather: WEATHERS[def.weather] });
   scene.add(env.group);
   const L = env.light;
-  scene.fog = new THREE.Fog(L.fog, L.fogNear, L.fogFar);
+  setFog(L.fog, L.fogNear, L.fogFar);
   hemi.intensity = L.hemi; sun.intensity = L.sun;
 }
 
@@ -43,7 +42,7 @@ export function enterArea(id, x, z) {
   const indoor = def.shape === 'grid';
   const W = indoor ? null : WEATHERS[def.weather];
   sun.color.set(fdef.sun);
-  if (W) sun.color.lerp(new THREE.Color(W.tint), W.mix * 0.5);
+  if (W) tintSun(W.tint, W.mix * 0.5);
   ambient.setKind(indoor ? 'dust' : fdef.particles);
   weatherParts.setKind(W ? W.particles : null);
   weatherParts.points.geometry.setDrawRange(0, W ? W.count : 0);

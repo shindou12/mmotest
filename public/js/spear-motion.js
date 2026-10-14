@@ -1,5 +1,5 @@
 // Continuous, timed poses shared by the local player and network spectators.
-import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
+import { SPEAR_TIMINGS, isSpinMotion } from '../shared/skill-timings.js';
 export const SPEAR_MOTIONS = Object.freeze(Object.fromEntries(Object.entries(SPEAR_TIMINGS).map(([id, timing]) => [id, timing.duration])));
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const ease = x => { x = clamp(x, 0, 1);return x * x * (3 - 2 * x); };
@@ -20,9 +20,10 @@ export function spearPose(s) {
     p.yaw = s.sweep >= 0 ? s.sweep : counterAngle(t);p.pitch = 0;p.x = .58;p.z = .03;p.y = 1.25;p.lateral = true;
     const rest = ease((t - SPEAR_TIMINGS.counter.slashEnd) / SPEAR_TIMINGS.counter.rest);p.x += (.32-p.x)*rest;p.z += (.24-p.z)*rest;p.side = 1-rest;p.pitch = .18*rest;return p;
   }
-  if (id === 'whirlspear' || id === 'whirl' || s.spin >= 0) {
-    const turns = id === 'whirlspear' ? SPEAR_TIMINGS.whirlspear.count : 1;
-    const timing = id === 'whirlspear' ? SPEAR_TIMINGS.whirlspear : SPEAR_TIMINGS.whirl;
+  if (isSpinMotion(id) || s.spin >= 0) {
+    // 回す動きの時刻（spin の付いた動き。スキルの回転だけのときは whirl）と回数
+    const timing = isSpinMotion(id) ? SPEAR_TIMINGS[id] : SPEAR_TIMINGS.whirl;
+    const turns = timing.count ?? 1;
     const duration = timing.rotationDuration;
     const cycle = clamp(id ? t / duration * turns : s.spin * turns, 0, turns);
     p.yaw = Math.PI * 2 * (Math.floor(cycle) + ease(cycle % 1));
