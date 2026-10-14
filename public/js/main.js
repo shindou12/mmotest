@@ -1907,11 +1907,12 @@ function landDrop(d) {
     fx.flash(d.x, 2, d.z, col, 60, 0.6, 20);
     fx.parts.burst(d.x, 0.5, d.z, 40, { color: col, speed: 6, size: 0.5, life: 0.9, gravity: -2 });
     fx.ringWave(d.x, d.z, col, 6, 0.6);
+    addShake(0.35);
   }
   if (isLegend(r)) {
     fx.flash(d.x, 3, d.z, col, 120, 1.2, 40);
     fx.ringWave(d.x, d.z, col, 10, 1.0);
-    addShake(r === 7 ? 1 : 0.5);
+    addShake(r === 7 ? 1 : 0.6);
   }
 }
 
@@ -2190,7 +2191,7 @@ function salvageTarget(it) {
   return lim >= 0 && it.slot !== 'title' && it.rarity <= lim && !isLegend(it.rarity) && transcendCount(it) === 0;
 }
 function setAutoSalvage(v) {
-  char.autoSalvage = clamp(Math.round(v), -1, 3);
+  char.autoSalvage = clamp(Math.round(v), -1, 4);
   saveChar(); ui.refresh();
 }
 // 自動分解: 落とし物の代わりに、硬貨と強化の欠片が飛び出す
