@@ -137,4 +137,5 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['sword_'], slots: ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance'] };
 
-export default { wk: 'sword', tree: SWORD, skills, mods, legacy };
+// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
+export default { wk: 'sword', tab: 1, glyph: '剣', tree: SWORD, skills, mods, legacy };

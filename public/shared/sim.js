@@ -4,7 +4,7 @@ import { TECHNIQUES } from './techniques.js';
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
 import { BALANCE, REVIVE, reviveStep, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
 import {
-  FLOORS, RARITIES, MAX_FLOOR, floorLevel, bossLevel, mobHp, mobDmg, mobXp, makeItem, rollRarity,
+  FLOORS, RARITIES, WEAPONS, MAX_FLOOR, floorLevel, bossLevel, mobHp, mobDmg, mobXp, makeItem, rollRarity,
 } from './data.js';
 import {
   AREAS, FLOOR_HUB, PLATE_WINDOW, grid, collide, pathStep, exitsOf, arrival, spawnPoint, lairOf,
@@ -147,7 +147,7 @@ export class World {
         mob.hp -= dmg;
         this.applyTechniqueControl(A, p, mob, m.tech);
         // 盾槍はヘイトを稼ぎやすい
-        this.addThreat(mob, p.id, dmg * (p.wk === 'spear' ? 2 : 1));
+        this.addThreat(mob, p.id, dmg * (WEAPONS[p.wk]?.threat ?? 1));
         if (mob.kind !== 'boss') mob.provoked = 6;
         // スタン値（ボスのみ）
         if (mob.kind === 'boss' && mob.stunT <= 0 && mob.hp > 0) {

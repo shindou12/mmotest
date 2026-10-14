@@ -135,4 +135,5 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['greatsword_', 'gs_'], slots: ['gslam', 'fortress', 'gs_guillotine', 'gs_rising', 'gs_broad', 'gs_recoil', 'gs_siege'] };
 
-export default { wk: 'greatsword', tree: GREATSWORD, skills, mods, legacy };
+// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
+export default { wk: 'greatsword', tab: 2, glyph: '大', tree: GREATSWORD, skills, mods, legacy };

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { animatePlayer } from './player-motion.js';
 export { animatePlayer } from './player-motion.js';
 import { GRIP_Y } from './weapon-pose.js';
-import { RARITIES } from '../shared/data.js';
+import { RARITIES, WEAPONS } from '../shared/data.js';
 import { toon, glow, outline, gradientMap } from './toon.js';
 import { mesh, sphere, capsule, cyl, lathe, extrude, finish } from './models/kit.js';
 import { WEAPON_MODELS } from './models/weapon-models.js';
@@ -224,16 +224,17 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
   u.wKey = key;
   if (u.weapon) u.weapon.removeFromParent();
   if (u.shield) { u.shield.removeFromParent(); u.shield = null; }
-  if (kind === 'spear') u.shield = makeShield(rarity, u.armL);
+  if (WEAPONS[kind]?.shield) u.shield = makeShield(rarity, u.armL);
   const w = makeWeapon(kind, rarity, style);
   u.weaponModel = w;
   u.weapon = new THREE.Group();
   u.weapon.name = kind + '-grip';
   u.weapon.add(w);
   w.position.y = -GRIP_Y[kind];
-  w.rotation.y = kind === 'bow' ? -Math.PI / 2 : 0;
+  const offHand = !!WEAPONS[kind]?.offHand; // 弓は左手で持ち、弦が体のほうを向く
+  w.rotation.y = offHand ? -Math.PI / 2 : 0;
   u.wKind = kind;
-  (kind === 'bow' ? u.handL : u.hand).add(u.weapon);
+  (offHand ? u.handL : u.hand).add(u.weapon);
   u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);
   animatePlayer(model, { t: 0, moving: false, walkT: 0, kind, combo: 0, swing: -1, spin: -1, sweep: -1, dodge: 0, down: 0, hurt: 0 });
 

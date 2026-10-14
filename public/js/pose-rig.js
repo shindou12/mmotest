@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WEAPONS } from '../shared/data.js';
 
 export const GRIP_Y = Object.freeze({ sword: -0.15, greatsword: -0.20, dagger: -0.08, spear: 0.45, axe: 0.15, bow: 0 });
 const down = new THREE.Vector3(0, -1, 0);
@@ -28,8 +29,9 @@ export function orientWeapon(u, yaw, pitch) {
   shaft.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
   normal.crossVectors(width, shaft).normalize();
   desired.setFromRotationMatrix(basis.makeBasis(width, shaft, normal));
-  const arm = u.wKind === 'bow' ? u.armL : u.armR;
-  const elbow = u.wKind === 'bow' ? u.elbowL : u.elbowR;
+  const offHand = !!WEAPONS[u.wKind]?.offHand;
+  const arm = offHand ? u.armL : u.armR;
+  const elbow = offHand ? u.elbowL : u.elbowR;
   u.weapon.quaternion.copy(arm.quaternion).multiply(elbow.quaternion).invert().multiply(desired);
 }
 

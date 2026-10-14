@@ -45,6 +45,8 @@ export const DROP_GRADES = [
 // weight: 装備重量（回避のクールタイムに影響）
 // stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ
 // melee: 近接武器（生存本能を持つ） / twoHanded: 両手で振る重い武器（構え・振りの動きと音が変わる）
+// shield: 左腕に盾を持つ（クラスによっては背負う） / threat: 与えたダメージに対する敵の注意の集めやすさ（なければ1倍）
+// offHand: 左手で持つ（弓） / skillSpin: ほかのプレイヤーから見て、スキルを使うと回転斬りに見える
 export const WEAPONS = {
   sword: {
     name: '片手剣', range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4, stun: 1.0, melee: true,
@@ -52,13 +54,13 @@ export const WEAPONS = {
     skill: { name: 'ヴォーパル・ストライク', cd: 5, desc: '前方へ突進しながら貫く', mult: 3.2 },
   },
   greatsword: {
-    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true, twoHanded: true,
+    name: '大剣', range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true, twoHanded: true, skillSpin: true,
     passive: [], // 大剣は武器ツリー（熟練度）で決める
     skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
   },
   spear: {
     // 盾槍: 強攻撃を溜めている間はガード。ヘイトを集めやすい
-    name: '盾槍', range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true, stun: 1.3, melee: true,
+    name: '盾槍', range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true, stun: 1.3, melee: true, shield: true, threat: 2,
     passive: ['強攻撃を溜めている間はガード。ガードで攻撃を受けてから離すと「ガードカウンター」（一回転して周りを大きくなぎ払う）'],
     skill: { name: 'ライトニング・ランス', cd: 5.5, desc: '直線上を雷光で貫く', mult: 3.0 },
   },
@@ -74,7 +76,7 @@ export const WEAPONS = {
   // 弓: 矢を飛ばす。弓を引くと足元から射程の円が広がり、矢はその円の端まで届く
   //   baseRange: 引かずに撃つ矢の射程 / range: 最大射程 / draw: 弓を引く速さ（円が広がる速さ m/秒）。最大射程まで引くと最大の溜め撃ち
   bow: {
-    name: '弓', range: 22, arc: 0, speed: 0.4, mult: 0.6, weight: 3, stun: 0.3, ranged: true, baseRange: 9, draw: 14,
+    name: '弓', range: 22, arc: 0, speed: 0.4, mult: 0.6, weight: 3, stun: 0.3, ranged: true, baseRange: 9, draw: 14, offHand: true,
     passive: ['弓を引くと足元から射程の円が広がる（引かずに撃つ矢は9m・最大射程22m）', '最大射程まで引くと最大の溜め撃ち（弓を引く速さ 毎秒14m）'],
   },
 };

@@ -28,6 +28,9 @@ export const WT_TAGS = {
 // 武器ごとのツリー・スキル・追加の能力値は weapons/ の各ファイル（登録は weapons/index.js）
 const DEFS = Object.fromEntries(WEAPON_DEFS.map((d) => [d.wk, d]));
 export const WTREES = Object.fromEntries(WEAPON_DEFS.map((d) => [d.wk, d.tree]));
+// 画面の表示: 武器ツリーのタブの並び（tab の順）と装備アイコンの文字
+export const WEAPON_TABS = [...WEAPON_DEFS].sort((a, b) => a.tab - b.tab).map((d) => d.wk);
+export const WEAPON_GLYPH = Object.fromEntries(WEAPON_DEFS.map((d) => [d.wk, d.glyph]));
 export const WT_NODE = {};
 for (const [wk, T] of Object.entries(WTREES)) T.rows.forEach((r, ri) => r.nodes.forEach((n) => { WT_NODE[n.id] = { ...n, wk, row: ri, kind: r.kind, req: ROW_REQ[ri] }; }));
 export const hasWTree = (wk) => !!WTREES[wk];

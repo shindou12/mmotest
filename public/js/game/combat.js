@@ -1,5 +1,5 @@
 import { BALANCE } from '../../shared/balance.js';
-import { RARITIES, SV, WEAPONS } from '../../shared/data.js';
+import { RARITIES, SV } from '../../shared/data.js';
 import { angDiff, now, rnd } from './util.js';
 import { floatText } from './ui-bridge.js';
 import { characterStore, settings } from './save.js';
@@ -20,7 +20,7 @@ export let shake = 0;
 export const touch = { on: false, stick: { x: 0, y: 0 }, aim: null, aimLen: 0, target: null };
 export function autoTarget() {
   if (!S) return null;
-  const range = S.W.ranged ? WEAPONS.bow.range : S.W.range + 4;
+  const range = S.W.ranged ? S.W.range : S.W.range + 4;
   // 近さと、スティック（または向き）の方向との近さで選ぶ
   const sl = Math.hypot(touch.stick.x, touch.stick.y);
   const want = sl > 0.3 ? Math.atan2(touch.stick.x, touch.stick.y) : me.a;

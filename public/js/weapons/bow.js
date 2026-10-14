@@ -124,4 +124,5 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['bow_'], slots: ['backshot', 'focus', 'bow_double', 'bow_tether', 'bow_side', 'bow_trap', 'bow_chime'] };
 
-export default { wk: 'bow', tree: BOW, skills, mods, legacy };
+// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
+export default { wk: 'bow', tab: 6, glyph: '弓', tree: BOW, skills, mods, legacy };

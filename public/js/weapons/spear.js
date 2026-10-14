@@ -137,4 +137,5 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['spear_'], slots: ['shieldbash', 'taunt', 'spear_fan', 'spear_sweep', 'spear_press', 'spear_stake', 'spear_intercept'] };
 
-export default { wk: 'spear', tree: SPEAR, skills, mods, legacy };
+// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
+export default { wk: 'spear', tab: 4, glyph: '盾', tree: SPEAR, skills, mods, legacy };

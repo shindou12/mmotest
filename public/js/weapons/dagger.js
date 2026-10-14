@@ -135,4 +135,5 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['dagger_'], slots: ['poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken'] };
 
-export default { wk: 'dagger', tree: DAGGER, skills, mods, legacy };
+// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
+export default { wk: 'dagger', tab: 5, glyph: '短', tree: DAGGER, skills, mods, legacy };

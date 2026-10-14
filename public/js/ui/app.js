@@ -18,7 +18,7 @@ import {
 } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, WEATHERS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
 import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, TREES, STYLE_COLS, spTotal, spSpent, treeSpent, canLearn } from '../skills.js';
-import { WTREES, WT_TAGS, ROW_REQ, PROF_MAX, hasWTree, profLevel, profOf, profNeed, wtOf, wtSpent, wtLeft, wtCanLearn, WT_RESET_COST } from '../weapon-tree.js';
+import { WTREES, WT_TAGS, ROW_REQ, PROF_MAX, hasWTree, profLevel, profOf, profNeed, wtOf, wtSpent, wtLeft, wtCanLearn, WT_RESET_COST, WEAPON_TABS, WEAPON_GLYPH } from '../weapon-tree.js';
 import { QUESTS, questState, questAvailable } from '../quests.js';
 import { View, Root, Mediator } from './core.js';
 
@@ -27,7 +27,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const hex = (n) => '#' + n.toString(16).padStart(6, '0');
 const now = () => performance.now() / 1000;
 const PANELS = ['inv', 'tree', 'settings', 'map', 'dialog', 'gate', 'box', 'smith'];
-const GLYPH = { sword: '剣', greatsword: '大', spear: '盾', dagger: '短', axe: '斧', bow: '弓', light: '衣', medium: '鎧', heavy: '甲', acc: '飾', title: '銘' };
+const GLYPH = { ...WEAPON_GLYPH, light: '衣', medium: '鎧', heavy: '甲', acc: '飾', title: '銘' };
 
 // ミニマップ: 図形の一覧を受け取って描くだけの View
 // 図形の一覧を描くだけの Passive View（round: 円形に切り抜く＝ミニマップ）
@@ -359,9 +359,9 @@ export function createUI(game) {
     const S = game.S, char = game.char, tree = char.tree;
     if (!treeTab) treeTab = S.wk;
     TREE.sp.set({ html: `残りスキルポイント <b>${spTotal(char.lv) - spSpent(tree)}</b>` });
-    const tabs = [['sword', '片手剣'], ['greatsword', '大剣'], ['axe', '大斧'], ['spear', '盾槍'], ['dagger', '短剣'], ['bow', '弓'], ['stat', 'ステータス'], ['style', 'プレイスタイル']];
+    const tabs = [...WEAPON_TABS.map((k) => [k, WEAPONS[k].name]), ['stat', 'ステータス'], ['style', 'プレイスタイル']];
     TREE.tabs.list(tabs, ([id, nm], i) => ({
-      html: `<button class="${treeTab === id ? 'on' : ''} ${i === 6 ? 'gap' : ''}">${nm}<small>${id === S.wk ? '装備中・' : ''}${hasWTree(id) ? `熟練${profLevel(char, id)}` : `${treeSpent(tree, id)}pt`}</small></button>`,
+      html: `<button class="${treeTab === id ? 'on' : ''} ${i === WEAPON_TABS.length ? 'gap' : ''}">${nm}<small>${id === S.wk ? '装備中・' : ''}${hasWTree(id) ? `熟練${profLevel(char, id)}` : `${treeSpent(tree, id)}pt`}</small></button>`,
       data: id, setup: (v) => v.on('click', 'tree:tab', () => ({ tab: id })),
     }));
     TREE.reset.set({ text: '振り直し' });

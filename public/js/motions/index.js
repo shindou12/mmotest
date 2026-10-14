@@ -7,9 +7,11 @@
 import { applyBowPose, applyBowSwing, applyBowTechnique } from './bow.js';
 import { applySpearPose, applySpearSwing } from './spear.js';
 import { applyMeleePose, applyMeleeSwing, applyMeleeTechnique } from './melee.js';
+import { applySwordPose } from './sword.js';
 
 export const MELEE = { pose: applyMeleePose, swing: applyMeleeSwing, technique: applyMeleeTechnique };
 export const WEAPON_MOTIONS = {
+  sword: { ...MELEE, pose: applySwordPose },
   spear: { ...MELEE, pose: applySpearPose, swing: applySpearSwing },
   bow: {
     pose: applyBowPose, swing: applyBowSwing, technique: applyBowTechnique,
