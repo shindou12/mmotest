@@ -13,11 +13,12 @@
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
 import {
   FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT, BOW_ZONE,
-  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, affixText, tierLabel, tierColor,
+  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, transcendCount, displayName, affixText, tierLabel, tierColor,
   enhMult, TITLES, TITLE_REQ, titleReqOk, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost, CRAFT_MAX_TIER, affixName, FX_REQ,
 } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, WEATHERS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
 import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, TREES, STYLE_COLS, spTotal, spSpent, treeSpent, canLearn } from '../skills.js';
+import { WTREES, WT_TAGS, ROW_REQ, PROF_MAX, hasWTree, profLevel, profOf, profNeed, wtOf, wtSpent, wtLeft, wtCanLearn, WT_RESET_COST } from '../weapon-tree.js';
 import { QUESTS, questState, questAvailable } from '../quests.js';
 import { View, Root, Mediator } from './core.js';
 
@@ -133,9 +134,11 @@ export function createUI(game) {
   }
   const INV = {
     grid: panels.inv.add('grid', '#inv-grid'), stats: panels.inv.add('stats', '#stats'), salvage: panels.inv.add('salvage', '#inv-salvage'),
+    auto: panels.inv.add('auto', '#inv-auto'), autoLbl: panels.inv.add('autoLbl', '#inv-auto-lbl'),
     eq: {},
   };
   INV.salvage.on('click', 'inv:salvageCommon');
+  INV.auto.on('input', 'inv:autoSalvage', (e) => ({ v: +e.target.value }));
   for (const el of panels.inv.el.querySelectorAll('.eq')) INV.eq[el.dataset.slot] = panels.inv.add('eq_' + el.dataset.slot, el.querySelector('.cell'));
   INV.grid.link((ev) => { ev.ctx.source = 'inv'; });
   for (const [slot, v] of Object.entries(INV.eq)) {
@@ -247,8 +250,8 @@ export function createUI(game) {
     const up = showUp && it.slot !== 'title' && game.itemPower(it) > game.itemPower(game.char.eq[it.slot]) ? '<span class="up">▲</span>' : '';
     const sv = it.affixes.some(([k]) => isVariant(k)) ? '<span class="svb" title="スキル変化">✧</span>' : '';
     const tr = it.affixes.some(([, t]) => t >= 6) ? ' trans' : '';
-    if (eq) return `<div class="cell r${it.rarity}${tr}" style="border-color:${c};color:${c}"><span class="gi">${glyphOf(it)}</span><span>${esc(it.name)}${enhTag(it)}<br><small class="dim">${it.slot === 'title' ? '称号' : `iLv${it.ilvl}・重さ${itemWeight(it)}`}</small></span></div>`;
-    return `<div class="cell r${it.rarity}${tr}${sel ? ' sel' : ''}" style="border-color:${c};color:${c}">${up}${sv}<span class="lv">${it.slot === 'title' ? '' : it.ilvl}</span><span class="gi">${glyphOf(it)}</span><span style="font-size:9px;max-width:58px;overflow:hidden;white-space:nowrap">${esc(it.name)}</span>${enhTag(it)}${it.by ? `<span class="by">${esc(it.by)}</span>` : ''}</div>`;
+    if (eq) return `<div class="cell r${it.rarity}${tr}" style="border-color:${c};color:${c}"><span class="gi">${glyphOf(it)}</span><span>${esc(displayName(it))}${enhTag(it)}<br><small class="dim">${it.slot === 'title' ? '称号' : `iLv${it.ilvl}・重さ${itemWeight(it)}`}</small></span></div>`;
+    return `<div class="cell r${it.rarity}${tr}${sel ? ' sel' : ''}" style="border-color:${c};color:${c}">${up}${sv}<span class="lv">${it.slot === 'title' ? '' : it.ilvl}</span><span class="gi">${glyphOf(it)}</span><span style="font-size:9px;max-width:58px;overflow:hidden;white-space:nowrap">${esc(displayName(it))}</span>${enhTag(it)}${it.by ? `<span class="by">${esc(it.by)}</span>` : ''}</div>`;
   };
   // 特性の1行（ティアのバッジ付き）
   const affixRow = (a) => {
@@ -282,8 +285,7 @@ export function createUI(game) {
         + (it.lore ? `<div class="lore">${esc(it.lore)}</div>` : '');
     }
     const type = it.slot === 'weapon' ? WEAPONS[it.kind].name : it.slot === 'armor' ? `防具（${ARMOR_CLASSES[it.armor || 'medium'].name}${atype ? '・' + atype.name : ''}）` : '装飾品';
-    let h = `<div class="tn" style="color:${r.color}">${esc(it.name)}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
-    const e = enhMult(it), ev = (v) => Math.round(v * e * 10) / 10;
+    let h = `<div class="tn" style="color:${r.color}">${esc(displayName(it))}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;    const e = enhMult(it), ev = (v) => Math.round(v * e * 10) / 10;
     h += '<div class="base">';
     if (it.atk) h += `<div>攻撃力 <b>+${ev(it.atk)}</b></div>`;
     if (it.hp) h += `<div>HP <b>+${ev(it.hp)}</b></div>`;
@@ -324,6 +326,11 @@ export function createUI(game) {
       v.data = it?.id;
       v.set({ html: it ? P.itemCell(it, { eq: true }).replace(/^<div[^>]*>|<\/div>$/g, '') : 'なし', style: { 'border-color': it ? RARITIES[it.rarity].color : '', color: it ? RARITIES[it.rarity].color : '#666' } });
     }
+    // 分解の対象（このレア度以下）: 自動分解と一括分解で共通
+    const lim = char.autoSalvage ?? -1, limName = lim < 0 ? '' : RARITIES[lim].name;
+    INV.auto.set({ value: lim });
+    INV.autoLbl.set({ text: lim < 0 ? 'なし' : lim === 0 ? '粗悪だけ' : `${limName}以下`, style: { color: lim < 0 ? '' : RARITIES[lim].color } });
+    INV.salvage.set({ text: lim < 0 ? '一括分解' : `${limName}以下を一括分解`, disabled: lim < 0 });
     if (char.inv.length) INV.grid.list(char.inv, (it) => ({ html: P.itemCell(it, { showUp: true }), data: it.id, setup: cellSetup }));
     else INV.grid.list([], () => ({})).set({ html: '<div class="dim">アイテムなし。モンスターを倒そう！</div>' });
     const st = [
@@ -354,9 +361,11 @@ export function createUI(game) {
     TREE.sp.set({ html: `残りスキルポイント <b>${spTotal(char.lv) - spSpent(tree)}</b>` });
     const tabs = [['sword', '片手剣'], ['greatsword', '大剣'], ['axe', '大斧'], ['spear', '盾槍'], ['dagger', '短剣'], ['bow', '弓'], ['stat', 'ステータス'], ['style', 'プレイスタイル']];
     TREE.tabs.list(tabs, ([id, nm], i) => ({
-      html: `<button class="${treeTab === id ? 'on' : ''} ${i === 6 ? 'gap' : ''}">${nm}<small>${id === S.wk ? '装備中・' : ''}${treeSpent(tree, id)}pt</small></button>`,
+      html: `<button class="${treeTab === id ? 'on' : ''} ${i === 6 ? 'gap' : ''}">${nm}<small>${id === S.wk ? '装備中・' : ''}${hasWTree(id) ? `熟練${profLevel(char, id)}` : `${treeSpent(tree, id)}pt`}</small></button>`,
       data: id, setup: (v) => v.on('click', 'tree:tab', () => ({ tab: id })),
     }));
+    TREE.reset.set({ text: '振り直し' });
+    if (hasWTree(treeTab)) { weaponTree(treeTab); return; }
     const T = TREES[treeTab], spent = treeSpent(tree, treeTab);
     const isWeapon = !['stat', 'style'].includes(treeTab);
     const rows = [];
@@ -394,6 +403,77 @@ export function createUI(game) {
                   nv.add('slot' + b.dataset.slot, b).on('click', 'tree:slot', (e) => { e.stopPropagation(); return { slot: Number(b.dataset.slot) }; });
                 }
                 nv.on('click', 'tree:learn');
+              },
+            };
+          });
+        },
+      };
+    });
+  };
+
+  // 新しい武器ツリー（熟練度でポイント。スキル・パッシブは3lvで A/B に分岐、クラス・マスターは1つずつ）
+  const WT_KIND_NAME = { skill: 'スキル', passive: 'パッシブ', ks1: 'クラス', ks2: 'マスター' };
+  const weaponTree = (wk) => {
+    const S = game.S, char = game.char, T = WTREES[wk], st = wtOf(char, wk);
+    const pl = profLevel(char, wk), own = profOf(char, wk), left = wtLeft(char, wk), spent = wtSpent(st);
+    TREE.sp.set({ html: `${esc(T.name)}の残りポイント <b>${left}</b>` });
+    TREE.reset.set({ text: spent ? `振り直し（${WT_RESET_COST(spent)}G）` : '振り直し' });
+    const tag = (t) => `<span class="wt-tag t-${t}">${WT_TAGS[t].icon} ${WT_TAGS[t].name}</span>`;
+    const xpK = own.lv >= PROF_MAX || own.lv < pl ? 1 : own.xp / profNeed(own.lv);
+    const rows = [{ head: true }];
+    if (wk !== S.wk) rows.push({ note: `このツリーの効果は「${T.name}」を装備しているときだけ有効です` });
+    T.rows.forEach((r, ri) => rows.push({ r, ri }));
+    TREE.body.list(rows, (row) => {
+      if (row.head) {
+        return { html: `<div class="wt-head"><div class="wt-prof">熟練度 <b>${pl}</b><small>/ ${PROF_MAX}</small></div>
+          <div class="wt-bar"><i style="width:${(xpK * 100).toFixed(1)}%"></i></div>
+          <div class="dim">${own.lv < pl ? `ほかの武器の最大熟練度（${char.profBest}）の半分から始まっています。` : ''}この武器を装備して敵を倒すと上がる。熟練度1つで1ポイント</div></div>` };
+      }
+      if (row.note) return { html: `<div class="tree-note">${esc(row.note)}</div>` };
+      const { r, ri } = row, req = ROW_REQ[ri], open = pl >= req;
+      const isKs = r.kind === 'ks1' || r.kind === 'ks2';
+      const nodes = r.kind === 'ks2' && st.ks1 ? r.nodes.filter((n) => n.from === st.ks1) : r.nodes;
+      const kindName = WT_KIND_NAME[r.kind];
+      const ksName = st.ks1 ? T.rows[2].nodes.find((q) => q.id === st.ks1).name : '';
+      const excl = r.kind === 'ks1' ? '<div class="wt-excl">― クラスをひとつ選ぶ ―</div>' : r.kind === 'ks2' ? `<div class="wt-excl k2">― ${st.ks1 ? `${esc(ksName)}を極める：どちらかひとつ` : '選んだクラスごとに、ふたつの道'} ―</div>` : '';
+      return {
+        name: 'wtrow' + ri,
+        html: `<div class="wt-row ${open ? '' : 'locked'}"><div class="wt-req"><b>${req}</b><small>${kindName}${open ? '' : ' 🔒'}</small></div><div class="wt-body">${excl}<div class="wt-nodes n${nodes.length}"></div></div></div>`,
+        setup: (rv) => {
+          rv.add('nodes', '.wt-nodes').list(nodes, (n) => {
+            const can = wtCanLearn(char, n.id);
+            if (isKs) {
+              const sel = st[r.kind] === n.id, other = st[r.kind] && !sel;
+              return {
+                name: n.id, data: n.id,
+                html: `<div class="wt-node ks ${r.kind === 'ks2' ? 'k2' : ''} ${sel ? 'have' : ''} ${other ? 'other' : ''} ${can ? 'can' : ''}">
+                  <div class="wt-top"><span class="wt-ic"><span>${n.icon}</span></span><b class="wt-nm">${esc(n.name)}</b><small class="wt-kind k-${r.kind}">${kindName}</small></div>
+                  <div class="wt-desc">${esc(n.desc)}</div><div class="wt-tags">${n.tags.map(tag).join('')}</div></div>`,
+                setup: (nv) => { nv.link((ev) => { ev.payload.node = n.id; }); nv.on('click', 'wt:learn'); },
+              };
+            }
+            const lv = st.lv[n.id] || 0, b = lv === 3 ? st.br[n.id] : null;
+            const pips = [0, 1, 2].map((k) => `<i class="${k < lv ? 'on' : ''}"></i>`).join('');
+            const tags = [...new Set([...(n.tags || []), ...(b ? n[b].tags || [] : [])])];
+            const brCls = (k) => (b === k ? 'chosen' : b ? 'lost' : lv === 3 ? 'pick' : '');
+            const slotBtns = n.id in TREE_SKILLS && lv > 0 ? `<div class="slotbtns">${[0, 1].map((k) => `<button data-slot="${k}" class="${char.slots?.[k] === n.id ? 'on' : ''}">${'QE'[k]}</button>`).join('')}</div>` : '';
+            const val = lv ? n.lv[Math.min(1, lv - 1)] : n.lv[0];
+            return {
+              name: n.id, data: n.id,
+              html: `<div class="wt-node ${r.kind} ${lv ? 'have' : ''} ${can ? 'can' : ''}">
+                <div class="wt-top"><span class="wt-ic"><span>${n.icon}</span></span><b class="wt-nm">${esc(n.name)}</b><span class="pips">${pips}</span></div>
+                <div class="wt-val"><small class="wt-kind k-${r.kind}">${r.kind === 'skill' ? 'スキル・Q/Eで使う' : 'パッシブ・常に効く'}</small> ${esc(n.base)}　<b>${esc(val)}</b>${r.kind === 'skill' ? `<span class="dim">　CT ${TREE_SKILLS[n.id].cd}秒</span>` : ''}</div>
+                <div class="wt-tags">${tags.map(tag).join('')}</div>
+                <div class="wt-br">${['A', 'B'].map((k) => `<div class="${brCls(k)}" data-br="${k}"><b>${k}：${esc(n[k].name)}</b>${esc(n[k].desc)}</div>`).join('')}</div>${slotBtns}</div>`,
+              setup: (nv) => {
+                nv.link((ev) => { ev.payload.node = n.id; ev.payload.skill = n.id; });
+                for (const el of nv.el.querySelectorAll('[data-br]')) {
+                  if (lv === 3 && !b) nv.add('br' + el.dataset.br, el).on('click', 'wt:choose', (e) => { e.stopPropagation(); return { b: el.dataset.br }; });
+                }
+                for (const el of nv.el.querySelectorAll('.slotbtns button')) {
+                  nv.add('slot' + el.dataset.slot, el).on('click', 'tree:slot', (e) => { e.stopPropagation(); return { slot: Number(el.dataset.slot) }; });
+                }
+                nv.on('click', 'wt:learn');
               },
             };
           });
@@ -507,7 +587,7 @@ export function createUI(game) {
     if (!qs.length) { DLG.list.list([], () => ({})).set({ html: '<div class="dim">今はお願いしたいことはないよ。</div>' }); return; }
     DLG.list.list(qs, (q) => {
       const s = questState(char, q.id);
-      const rw = [`経験値 ${q.reward.xp}`, q.reward.rarity != null ? `${RARITIES[q.reward.rarity].name}以上の${q.reward.slot ? { weapon: '武器', armor: '防具', acc: '装飾品' }[q.reward.slot] : '装備'}` : '', q.reward.potion ? `ポーション所持数 +${q.reward.potion}` : '', q.reward.title ? `称号「${TITLES[q.reward.title].name}」（${TITLES[q.reward.title].desc}）` : ''].filter(Boolean).join('・');
+      const rw = [`経験値 ${q.reward.xp}`, q.reward.rarity != null ? `${q.reward.rarity >= 4 ? '伝説の' : `特性${q.reward.rarity}つ付きの`}${q.reward.slot ? { weapon: '武器', armor: '防具', acc: '装飾品' }[q.reward.slot] : '装備'}` : '', q.reward.potion ? `ポーション所持数 +${q.reward.potion}` : '', q.reward.title ? `称号「${TITLES[q.reward.title].name}」（${TITLES[q.reward.title].desc}）` : ''].filter(Boolean).join('・');
       let btn;
       if (!s) btn = '<button data-act="accept">受ける</button>';
       else if (s.claimed) btn = '<span class="dim">完了</span>';
@@ -549,7 +629,7 @@ export function createUI(game) {
     enh: (it) => it.slot !== 'title',
     affix: (it) => it.slot !== 'title' && it.affixes.length > 0,
     skill: (it) => it.slot === 'weapon',
-    lore: (it) => it.rarity >= 4 && it.fx?.length && it.slot !== 'title',
+    lore: (it) => it.rarity >= 6 && it.fx?.length && it.slot !== 'title',
     codex: () => false,
   };
   const smithItems = () => {
@@ -569,7 +649,7 @@ export function createUI(game) {
     const c = game.char;
     return (c.gold || 0) >= (cost.gold || 0) && (c.mats.shard || 0) >= (cost.shard || 0) && (!cost.gemKey || (c.mats.gems[cost.gemKey] || 0) >= (cost.gem || 0));
   };
-  const head = (it) => `<div class="sd-head" style="--rc:${RARITIES[it.rarity].color}"><span class="gi">${glyphOf(it)}</span><div><b>${esc(it.name)}${enhTag(it)}</b><small>${RARITIES[it.rarity].name}・iLv${it.ilvl}${game.char.inv.includes(it) ? '' : '・装備中'}</small></div></div>`;
+  const head = (it) => `<div class="sd-head" style="--rc:${RARITIES[it.rarity].color}"><span class="gi">${glyphOf(it)}</span><div><b>${esc(displayName(it))}${enhTag(it)}</b><small>${RARITIES[it.rarity].name}・iLv${it.ilvl}${game.char.inv.includes(it) ? '' : '・装備中'}</small></div></div>`;
   const doBtn = (label, enabled) => ({ html: `<button class="sd-do" ${enabled ? '' : 'disabled'}>${label}</button>`, setup: (v) => v.on('click', 'smith:do') });
   const msgBlock = () => (sm.msg ? [{ html: `<div class="sd-msg ${sm.ok ? 'ok' : 'ng'}">${esc(sm.msg)}</div>` }] : []);
 
@@ -716,21 +796,21 @@ export function createUI(game) {
     H.atkName.set({ text: HEAVY[S.wk].name });
     H.skillName.set({ text: S.ws.name });
     H.wsKey.set({ text: '右クリック' });
-    H.slots.guard.set({ visible: !!S.W.guard, cls: { active: me.guarding } });
+    H.slots.guard.set({ visible: !!S.guard, cls: { active: me.guarding } });
     setCd(H.slots.skill, me.wsCd, S.ws.cd * (1 - S.cdr / 100));
     for (let i = 0; i < 2; i++) {
       const id = char.slots?.[i], v = H.slots['t' + (i + 1)];
       const usable = id && S.actives.has(id);
       v.nm.set({ text: id ? TREE_SKILLS[id].name : '未設定' });
       v.set({ cls: { off: !usable } });
-      setCd(v, usable ? (me.tcd[id] || 0) : 1, usable ? TREE_SKILLS[id].cd * (1 - S.cdr / 100) : 1);
+      setCd(v, usable ? (me.tcd[id] || 0) : 1, usable ? game.skillCd(id) : 1);
     }
     setCd(H.slots.dodge, me.dodgeCd, S.dodgeCd);
     H.dodgeW.set({ text: S.wc.name, style: { color: S.wc.color } });
     // 自キャラの横の輪: 回避の回復（原神のスタミナのように、減ったときだけ出る）
     const q = game.project(me.x, 1.4, me.z);
     // 盾槍でガード中・ガードゲージが減っている間は、同じ輪でガードゲージを見せる（青 → 黄 → 赤）
-    const ggShow = S.W.guard && (me.guarding || me.gg < 100);
+    const ggShow = S.guard && (me.guarding || me.gg < 100);
     const stam = ggShow ? clamp(me.gg / 100, 0, 1) : S.dodgeCd > 0 ? 1 - clamp(me.dodgeCd / S.dodgeCd, 0, 1) : 1;
     if (stam < 1 || ggShow) stamSeen = t;
     const ggCol = stam > 0.6 ? '#9ad8ff' : stam > 0.3 ? '#ffd84a' : '#ff4a3a';
@@ -738,15 +818,16 @@ export function createUI(game) {
     H.staminaFg.set({ attr: { 'stroke-dasharray': `${(stam * 100).toFixed(1)} 100` }, style: { stroke: ggShow ? ggCol : '' } });
     H.charge.set({ style: { left: q.x + 'px', top: q.y + 34 + 'px' } });
     setCd(H.slots.pot, me.potions > 0 ? me.potCd : 1, 1);
-    const left = spTotal(char.lv) - spSpent(char.tree);
+    const left = spTotal(char.lv) - spSpent(char.tree) + (hasWTree(S.wk) ? Math.max(0, wtLeft(char, S.wk)) : 0);
     H.spBadge.set({ text: left > 0 ? String(left) : '', visible: left > 0 });
     // 溜めゲージ
     const charging = me.charging && me.chargeT >= game.CHARGE_MIN;
     H.charge.set({ visible: charging, cls: { max: me.chargeLv === 2 } });
     if (charging) H.chargeFill.set({ style: { width: clamp((me.chargeT - game.CHARGE_MIN) / (game.CHARGE_MAX - game.CHARGE_MIN) * 100, 0, 100) + '%' } });
     // バフ
-    const status = me.buffs.map((b) => `<span style="color:${hex(b.color)}">✦ ${esc(b.label)} ${b.t.toFixed(1)}s</span>`);
+    const status = me.buffs.map((b) => `<span style="color:${hex(b.color)}">✦ ${esc(b.label)}${b.t > 1e6 ? '' : ` ${b.t.toFixed(1)}s`}</span>`);
     if (me.dStack > 0) status.push(`<span style="color:#9fe">⚡ 連撃 攻速+${me.dStack * 4}%</span>`);
+    if (me.crawl) status.push('<span style="color:#ff9a8a">✚ 這いずり中（足元の円が仲間の攻撃で減り、なくなると起き上がる）</span>');
     if (me.guarding && me.counter) status.push('<span style="color:#bfe0ff">⛨ カウンター準備（離すとガードカウンター）</span>');
     const hz = game.hazard();
     if (hz) status.push(`<span style="color:${hz.kind === 'poison' ? '#c08aff' : '#e0c890'}">⚠ ${HAZARDS[hz.kind].name}</span>`);
@@ -803,16 +884,16 @@ export function createUI(game) {
       const usable = id && S.actives.has(id);
       v.nm.set({ text: id ? TREE_SKILLS[id].name : '未設定' });
       v.set({ cls: { off: !usable } });
-      setCd(v, usable ? (me.tcd[id] || 0) : 1, usable ? TREE_SKILLS[id].cd * (1 - S.cdr / 100) : 1);
+      setCd(v, usable ? (me.tcd[id] || 0) : 1, usable ? game.skillCd(id) : 1);
     }
     setCd(B.dodge, me.dodgeCd, S.dodgeCd);
-    B.guard.set({ visible: !!S.W.guard, cls: { pressed: me.guarding } });
+    B.guard.set({ visible: !!S.guard, cls: { pressed: me.guarding } });
     B.pot.num.set({ text: String(me.potions) });
     setCd(B.pot, me.potions > 0 ? me.potCd : 1, 1);
     const it = game.nearestInteract();
     B.use.set({ visible: !!it });
     if (it) B.use.nm.set({ text: USE_LABEL[it.kind] || '調べる' });
-    const left = spTotal(char.lv) - spSpent(char.tree);
+    const left = spTotal(char.lv) - spSpent(char.tree) + (hasWTree(S.wk) ? Math.max(0, wtLeft(char, S.wk)) : 0);
     T.sp.set({ text: left > 0 ? String(left) : '' });
   };
 
@@ -967,6 +1048,49 @@ export function createUI(game) {
       v.get('name').set({ text: `Lv${o.lv} ${o.name}` });
       v.get('hp').set({ style: { width: clamp(o.hp / o.mhp * 100, 0, 100) + '%' } });
     }
+    lootLabels();
+  };
+
+  // ---- 落とし物の名札（レア度で色分け。重なったら上へ積む。クリックで拾う） ----
+  const loot = new Map();
+  const lootLabels = () => {
+    const live = new Set();
+    const list = [];
+    for (const d of game.drops) {
+      if (!d.landed) continue;
+      live.add(d.id);
+      let v = loot.get(d.id);
+      if (!v) {
+        const el = document.createElement('div');
+        floatLayer.el.appendChild(el);
+        v = new View(el, 'loot' + d.id, floatLayer);
+        const stars = transcendCount(d.it);
+        v.set({ cls: { loot: true, ['r' + d.it.rarity]: true, tx: stars > 0 }, attr: { title: `${RARITIES[d.it.rarity].name}${stars ? `・超越の特性 ${stars}つ` : ''}（クリックで拾う）` } });
+        v.set({ html: (stars ? `<span class="stars">${'★'.repeat(stars)}</span>` : '') + esc(d.it.name) });
+        v.on('click', 'loot:pick', () => ({ id: d.id }));
+        v.size = { w: el.offsetWidth, h: el.offsetHeight };
+        loot.set(d.id, v);
+      }
+      const q = game.project(d.x, 0.3, d.z);
+      if (q.vis) list.push({ v, q });
+      else v.set({ style: { display: 'none' } });
+    }
+    for (const [id, v] of loot) if (!live.has(id)) { v.remove(); loot.delete(id); }
+    // 手前（画面の下）の札から置き、重なる札はその上へずらす
+    list.sort((a, b) => b.q.y - a.q.y);
+    const placed = [];
+    for (const { v, q } of list) {
+      const { w, h } = v.size;
+      const x = q.x - w / 2;
+      let y = q.y - h - 4;
+      for (let n = 0; n < 30; n++) {
+        const hit = placed.find((p) => x < p.x + p.w && x + w > p.x && y < p.y + p.h + 2 && y + h + 2 > p.y);
+        if (!hit) break;
+        y = hit.y - h - 2;
+      }
+      placed.push({ x, y, w, h });
+      v.set({ style: { display: '', left: x + 'px', top: y + 'px' } });
+    }
   };
 
   // ---- 通知 ----
@@ -975,13 +1099,13 @@ export function createUI(game) {
     H.toasts.el.appendChild(el);
     const v = new View(el, 'toast', H.toasts);
     v.set({ cls: { toast: true, big }, style: { 'border-color': color, color }, text });
-    setTimeout(() => v.remove(), 3600);
+    setTimeout(() => v.remove(), 6000);
     while (H.toasts.el.children.length > 5) H.toasts.el.firstChild.remove();
   };
   let bannerUntil = 0, bannerPrio = 0;
   P.banner = (top, main, color, prio = 0) => {
     if (now() < bannerUntil && prio < bannerPrio) return;
-    bannerUntil = now() + 2.5; bannerPrio = prio;
+    bannerUntil = now() + 4.5; bannerPrio = prio;
     H.banner.set({ html: `<div class="b1">${esc(top)}</div><div class="b2" style="color:${color}">${esc(main)}</div>`, cls: { show: false } });
     void H.banner.el.offsetWidth;
     H.banner.set({ cls: { show: true } });
@@ -1074,6 +1198,7 @@ export function createUI(game) {
         // スマホ操作中は、タッチから作られるマウスの代替イベントを無視する
         'pointer:down'(ev) { if (!this.is('login') && !tc.on) game.input.pointerDown(ev.payload.button); },
         'pointer:up'(ev) { if (!this.is('login') && !tc.on) game.input.pointerUp(ev.payload.button); },
+        'loot:pick'(ev) { if (this.is('play')) game.lootClick(ev.payload.id); },
         // ---- スマホ ----
         'device:touch'() { enableTouch(); },
         'stick:start'(ev) {
@@ -1230,6 +1355,7 @@ export function createUI(game) {
       },
       'item:context'(ev) { if (ev.ctx.source === 'inv') { game.salvage(ev.payload.id); P.hideTip(); } },
       'inv:salvageCommon'() { game.salvageCommon(); },
+      'inv:autoSalvage'(ev) { game.setAutoSalvage(ev.payload.v); },
       invAction(ev) {
         if (!this.sel) return;
         if (ev.payload.what === 'use') game.equip(this.sel); else game.salvage(this.sel);
@@ -1267,7 +1393,9 @@ export function createUI(game) {
       'tree:tab'(ev) { treeTab = ev.payload.tab; game.sfx('ui'); P.tree(); },
       'tree:learn'(ev) { game.learn(ev.payload.node); },
       'tree:slot'(ev) { game.setSlot(ev.payload.slot, ev.payload.skill); },
-      'tree:reset'() { game.resetTree(); },
+      'tree:reset'() { if (hasWTree(treeTab)) game.wtResetTree(treeTab); else game.resetTree(); },
+      'wt:learn'(ev) { game.wtLearnNode(ev.payload.node); },
+      'wt:choose'(ev) { game.wtChooseBranch(ev.payload.node, ev.payload.b); },
     }),
     settings: panelState('settings', {
       'set:change'(ev) { game.setSetting(ev.payload.key, ev.payload.value); P.settings(); },

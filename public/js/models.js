@@ -210,14 +210,17 @@ function weaponVariant(kind, style, C) {
 // 装備から武器の形を決める: 伝説・神器は専用形（3）、それ以外は名前から 0〜2
 export function weaponStyle(it) {
   if (!it) return 0;
-  if (it.rarity >= 4) return 3;
+  if (it.rarity >= 6) return 3;
   const s = [...String(it.name || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
   return s % 3;
 }
+// 武器の飾りの段階（0〜5）: レアリティ8段（粗悪〜神器）を、金具・光る縁などの見た目の段階にまとめる
+const visTier = (r) => (r >= 6 ? r - 2 : Math.max(0, r - 1));
 
-export function makeWeapon(kind, rarity = 0, style = 0) {
+export function makeWeapon(kind, rarityIn = 0, style = 0) {
   const g = new THREE.Group();
-  const rc = new THREE.Color(RARITIES[rarity].color);
+  const rc = new THREE.Color(RARITIES[rarityIn].color);
+  const rarity = visTier(rarityIn);
   const steel = toon(rarity >= 4 ? new THREE.Color(0xe8eef6).lerp(rc, 0.35) : 0xdfe7f0, rarity >= 3 ? { emissive: rc, emissiveIntensity: 0.15 + (rarity - 3) * 0.15 } : {});
   const gold = toon(rarity >= 3 ? 0xf2c14e : 0x9a7a4a);
   const grip = toon(0x3a2418);
@@ -491,8 +494,9 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
 }
 
 // 盾槍の盾（左腕に持つ）
-function makeShield(rarity, armL) {
-  const rc = new THREE.Color(RARITIES[rarity].color);
+function makeShield(rarityIn, armL) {
+  const rc = new THREE.Color(RARITIES[rarityIn].color);
+  const rarity = visTier(rarityIn);
   const g = new THREE.Group();
   const face = toon(rarity >= 3 ? new THREE.Color(0x5a6a8a).lerp(rc, 0.3) : 0x5a6a8a);
   const rim = toon(rarity >= 3 ? 0xf2c14e : 0xb8c0cc);
@@ -833,6 +837,25 @@ export function makeCoin() {
   g.userData.body = body;
   return g;
 }
+// 強化の欠片: 水色に光る結晶のかけら（大きい1本と小さい2本）。body を回す
+export function makeShard() {
+  const g = new THREE.Group(), body = new THREE.Group();
+  g.add(body);
+  const core = glow(new THREE.Color(0x8ae8ff).multiplyScalar(1.4));
+  const pale = toon(0xd8f6ff, { emissive: 0x4ab8ff, emissiveIntensity: 0.5 });
+  const shard = (h, r, x, z, tilt, m) => {
+    const s = new THREE.Mesh(new THREE.OctahedronGeometry(r, 0), m);
+    s.scale.set(1, h / r, 1); s.position.set(x, h * 0.5, z); s.rotation.z = tilt; s.castShadow = true;
+    body.add(s);
+  };
+  shard(0.26, 0.09, 0, 0, 0.1, core);
+  shard(0.16, 0.06, 0.09, 0.04, -0.5, pale);
+  shard(0.13, 0.05, -0.08, -0.03, 0.6, pale);
+  g.userData.body = body;
+  g.scale.setScalar(1.9);
+  return g;
+}
+
 export function makeGoldBag() {
   const g = new THREE.Group();
   const body = new THREE.Group(); g.add(body);
@@ -849,6 +872,37 @@ export function makeGoldBag() {
   halo.rotation.x = -Math.PI / 2; halo.position.y = 0.04; g.add(halo);
   g.userData.body = body; g.userData.halo = halo;
   g.scale.setScalar(1.4);
+  return g;
+}
+
+// 地面に落ちている装備（寝かせた実物）。item: 落ちた物を回して飛ばす中身 / glow: 足元の淡い光（アンコモン以上）
+export function makeLootItem(it) {
+  const r = it.rarity, c = new THREE.Color(RARITIES[r].color);
+  const g = new THREE.Group(), item = new THREE.Group();
+  g.add(item);
+  if (it.slot === 'weapon') {
+    const w = makeWeapon(it.kind || 'sword', r, weaponStyle(it));
+    w.rotation.x = Math.PI / 2; w.scale.setScalar(0.8);
+    item.add(w);
+  } else if (it.slot === 'armor') {
+    const m = toon(it.armor === 'heavy' ? 0x9aa6b4 : it.armor === 'light' ? 0x6b4a32 : 0x4a5a7a);
+    item.add(mesh(new THREE.BoxGeometry(0.62, 0.16, 0.5), m, [0, 0.08, 0]));
+    item.add(mesh(new THREE.BoxGeometry(0.2, 0.12, 0.26), m, [0.38, 0.06, -0.1]));
+    item.add(mesh(new THREE.BoxGeometry(0.2, 0.12, 0.26), m, [-0.38, 0.06, -0.1]));
+  } else if (it.slot === 'title') {
+    item.add(mesh(cyl(0.07, 0.07, 0.6, 10), toon(0xf2e6c4), [0, 0.07, 0], [0, 0, Math.PI / 2]));
+    item.add(mesh(cyl(0.025, 0.025, 0.7, 6), toon(0x7a4a2a), [0, 0.07, 0], [0, 0, Math.PI / 2]));
+  } else {
+    item.add(mesh(new THREE.TorusGeometry(0.16, 0.04, 8, 18), toon(0xf2c14e), [0, 0.05, 0], [Math.PI / 2, 0, 0]));
+    item.add(mesh(new THREE.OctahedronGeometry(0.08), glow(c.clone().multiplyScalar(1.5)), [0, 0.1, 0.16]));
+  }
+  let halo = null;
+  if (r >= 2) {
+    halo = new THREE.Mesh(new THREE.CircleGeometry(0.6 + r * 0.08, 24), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.18 + r * 0.04, depthWrite: false }));
+    halo.rotation.x = -Math.PI / 2; halo.position.y = 0.03;
+    g.add(halo);
+  }
+  g.userData.item = item; g.userData.halo = halo;
   return g;
 }
 

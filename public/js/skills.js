@@ -1,4 +1,5 @@
 import { ADVANCED_TREE_SKILLS } from './advanced-skills.js';
+import { WT_SKILLS } from './weapon-tree.js';
 import { TECHNIQUES } from '../shared/techniques.js';
 import { SPEAR_TIMINGS, repeatHitAt } from '../shared/skill-timings.js';
 // スキル定義: 強攻撃 / 武器に付くスキル / ツリーで覚えるスキル / スキルツリー
@@ -540,6 +541,12 @@ export const TREE_SKILLS = {
 
 Object.assign(TREE_SKILLS, ADVANCED_TREE_SKILLS);
 
+// スキル全体のクールタイム倍率（武器スキル・ツリーのスキル・Q/Eの技すべて。表示も同じ値になる）
+export const SKILL_CD_MULT = 1.2;
+for (const s of [...Object.values(WEAPON_SKILLS), ...Object.values(TREE_SKILLS)]) s.cd = Math.round(s.cd * SKILL_CD_MULT * 10) / 10;
+// 新しい武器ツリーのスキル（クールタイムは×1.2済みの値で持っている）
+Object.assign(TREE_SKILLS, WT_SKILLS);
+
 // ---------------------------------------------------------------------------
 // スキルツリー
 // tier の段に進むには、そのツリーに tier×2 ポイント必要
@@ -554,8 +561,7 @@ const weaponTree = (k, names, a1, a2, cap) => [
 ];
 
 export const TREES = {
-  sword: { name: '片手剣', nodes: weaponTree('sword', ['剣の心得'], 'slant', 'brave', { name: '閃光の剣', flag: 'wave', desc: '通常攻撃3段目が斬撃波となって飛ぶ' }) },
-  greatsword: { name: '大剣', nodes: weaponTree('greatsword', ['大剣の心得'], 'gslam', 'fortress', { name: '大地割り', flag: 'quake', desc: '兜割りの後、さらに大きな衝撃波が広がる' }) },
+  // 片手剣・大剣は新しい武器ツリー（weapon-tree.js）に移った
   spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ガードカウンターの威力 +30%' }) },
   dagger: { name: '短剣', nodes: weaponTree('dagger', ['短剣の心得'], 'poison', 'smoke', { name: '暗殺術', mods: { crit: 8, critd: 40 }, desc: '会心率 +8%、会心ダメージ +40%' }) },
   axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },
@@ -591,7 +597,7 @@ export const TREES = {
 };
 export const STYLE_COLS = ['回避（ダンサー）', '守護（ガーディアン）', '攻撃（バーサーカー）'];
 
-for (const t of Object.values(TECHNIQUES)) TREES[t.kind].nodes.push({
+for (const t of Object.values(TECHNIQUES)) if (TREES[t.kind]) TREES[t.kind].nodes.push({
   id: t.id + '_node', name: t.name, tier: t.tier, max: 1, active: t.id, role: t.role, desc: t.desc,
 });
 

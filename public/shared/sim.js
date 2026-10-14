@@ -2,7 +2,7 @@ import { MOTION_DURATIONS } from './motion-catalog.js';
 import { TECHNIQUES } from './techniques.js';
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
-import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
+import { BALANCE, REVIVE, reviveStep, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
 import {
   FLOORS, RARITIES, MAX_FLOOR, floorLevel, bossLevel, mobHp, mobDmg, mobXp, makeItem, rollRarity,
 } from './data.js';
@@ -157,6 +157,30 @@ export class World {
         if (mob.hp <= 0) this.killMob(A, mob);
         break;
       }
+      case 'down': {
+        // HPが0になって這いずり状態へ。n: 最近倒れた回数（キャラごとなのでクライアントが数える）
+        if (p.dead || p.down) return;
+        p.down = true; p.hp = 0;
+        p.revStep = reviveStep(m.n);
+        p.revMax = p.rev = REVIVE.base * REVIVE.mult[p.revStep];
+        p.revHitAt = -1e9;
+        for (const mob of A.mobs.values()) mob.threat?.delete(p.id);
+        this.broadcastArea(A.id, { t: 'pdown', id: p.id, name: p.name });
+        this.checkWipe(A, this.areaPlayers(A.id));
+        break;
+      }
+      case 'rev': {
+        // 倒れている仲間に攻撃を当てた（v: その攻撃のスタン値）
+        const q = this.players.get(m.id);
+        if (!q || q === p || !q.down || q.area !== p.area || p.dead || p.down || dist(p, q) > REVIVE.range) return;
+        q.rev -= Math.max(0, Math.min(Number(m.v) || 0, REVIVE.perHit));
+        q.revHitAt = this.time;
+        if (q.rev > 0) return;
+        q.down = false; q.rev = 0;
+        this.send(q, { t: 'revived', by: p.name });
+        this.broadcastArea(A.id, { t: 'prev', id: q.id, by: p.id });
+        break;
+      }
       case 'absorb': {
         // 狙われている本人がその敵の攻撃を受けた/防いだ → ヘイトのリセットまでの時間が少し延びる
         const mob = A.mobs.get(m.id);
@@ -246,14 +270,14 @@ export class World {
         const t = Math.random();
         const rar = t < 0.05 ? 5 : t < 0.3 ? 4 : 3;
         const B = { bias: A.def.bias, kinds: A.def.kinds };
-        items = [makeItem(ilvl, rar, { uniqueDef: A.def.unique, ...B }), makeItem(ilvl, rollRarity(1, 2), B)];
+        items = [makeItem(ilvl, rar, { uniqueDef: A.def.unique, ...B }), makeItem(ilvl, rollRarity(1, 2, ilvl), B)];
       } else {
-        // 小さな宝箱: レア以上を1つ
-        items = [makeItem(ilvl, Math.max(2, rollRarity(1, 1)), { bias: A.def.bias, kinds: A.def.kinds })];
+        // 小さな宝箱: アンコモン以上を1つ（上のレア度はアイテムレベルで出やすくなる）
+        items = [makeItem(ilvl, rollRarity(0.6, 1, ilvl), { bias: A.def.bias, kinds: A.def.kinds })];
       }
       this.send(p, { t: 'gold', n: Math.round((C.big ? 80 + ilvl * 12 : 20 + ilvl * 4) * rnd(0.85, 1.15)), x: r2(C.x), z: r2(C.z + 1.2), bag: C.big });
-      this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
-      for (const it of items) if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
+      this.send(p, { t: 'loot', src: 'chest', ar: A.id, cid: C.id, sx: r2(C.x), sz: r2(C.z), items: items.map((it) => ({ it, x: r2(C.x + rnd(-1, 1)), z: r2(C.z + rnd(0.5, 1.5)) })) });
+      for (const it of items) if (it.rarity >= 5) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
     }
   }
 
@@ -275,7 +299,7 @@ export class World {
       this.box.push(item);
       this.send(p, { t: 'boxPut', ok: true, ref: m.ref });
       this.save();
-      if (item.rarity >= 3) this.sys(`${p.name} が共有ボックスに「${item.name}」を入れた`, '#cfe');
+      if (item.rarity >= 4) this.sys(`${p.name} が共有ボックスに「${item.name}」を入れた`, '#cfe');
     } else if (op === 'take') {
       const i = this.box.findIndex((it) => it.uid === m.uid);
       if (i < 0) { this.send(p, { t: 'chat', from: '', text: 'その装備はもう誰かが取り出したようだ。', color: '#aab' }); }
@@ -371,20 +395,20 @@ export class World {
       const ilvl = mob.lv;
       const B = { bias: A.def.bias, kinds: A.def.kinds }; // エリアの出やすい武器種・付きやすい特性
       if (isBoss) {
-        items.push(makeItem(ilvl + 1, rollRarity(1, 2), B));
-        items.push(makeItem(ilvl + 1, rollRarity(1, 1), B));
-        if (Math.random() < 0.5) items.push(makeItem(ilvl, rollRarity(1, 0), B));
+        items.push(makeItem(ilvl + 1, rollRarity(1, 2, ilvl), B));
+        items.push(makeItem(ilvl + 1, rollRarity(1, 1, ilvl), B));
+        if (Math.random() < 0.5) items.push(makeItem(ilvl, rollRarity(1, 0, ilvl), B));
       } else if (mob.named) {
-        // ネームド: 良いものが必ず出る
-        items.push(makeItem(ilvl + 2, Math.max(3, rollRarity(1, 2)), B));
-        items.push(makeItem(ilvl, Math.max(2, rollRarity(1, 1)), B));
+        // ネームド: レア以上が必ず出る（エピック以上はアイテムレベルで出やすくなる）
+        items.push(makeItem(ilvl + 2, rollRarity(1, 2, ilvl), B));
+        items.push(makeItem(ilvl, rollRarity(0.6, 1, ilvl), B));
       } else if (Math.random() < (mob.elite ? 0.6 : mob.kind === 'add' ? 0.08 : 0.34)) {
-        items.push(makeItem(ilvl, rollRarity(mob.elite ? 0.4 : 0, mob.elite ? 1 : 0), B));
+        items.push(makeItem(ilvl, rollRarity(mob.elite ? 0.25 : 0, mob.elite ? 1 : 0, ilvl), B));
       }
       if (items.length) {
-        this.send(p, { t: 'loot', items: items.map((it) => ({ it, x: r2(mob.x + rnd(-1.6, 1.6)), z: r2(mob.z + rnd(-1.6, 1.6)) })) });
+        this.send(p, { t: 'loot', sx: r2(mob.x), sz: r2(mob.z), items: items.map((it) => ({ it, x: r2(mob.x + rnd(-1.6, 1.6)), z: r2(mob.z + rnd(-1.6, 1.6)) })) });
         for (const it of items) {
-          if (it.rarity >= 4) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
+          if (it.rarity >= 5) this.sys(`★ ${p.name} が${RARITIES[it.rarity].name}「${it.name}」を手に入れた！`, RARITIES[it.rarity].color);
         }
       }
     }
@@ -465,7 +489,12 @@ export class World {
   tickArea(A, dt) {
     const def = A.def;
     const players = this.areaPlayers(A.id);
-    const alive = players.filter((p) => !p.dead);
+    const alive = players.filter((p) => !p.dead && !p.down);
+    this.checkWipe(A, players);
+    // 這いずり: しばらく攻撃が当たらないとゲージが戻る
+    for (const p of players) {
+      if (p.down && this.time - p.revHitAt >= REVIVE.regenDelay) p.rev = Math.min(p.revMax, p.rev + p.revMax * REVIVE.regen * dt);
+    }
 
     // タイマー
     if (A.timers.length) {
@@ -848,7 +877,12 @@ export class World {
   }
 
   livePlayer(A, id) {
-    return this.areaPlayers(A.id).find((p) => p.id === id && !p.dead);
+    return this.areaPlayers(A.id).find((p) => p.id === id && !p.dead && !p.down);
+  }
+
+  // 這いずり: 同じエリアの全員が倒れたら（ひとりでも）、這いずっている人は全員力尽きる
+  checkWipe(A, players) {
+    if (!players.some((p) => p.down) || !players.every((p) => p.dead || p.down)) return;    for (const p of players) if (p.down) { p.down = false; p.rev = 0; this.send(p, { t: 'bleed' }); }
   }
 
   bossPattern(A, b, pat, target, inArena) {
@@ -940,7 +974,7 @@ export class World {
         this.later(A, 2.0, () => this.tele(A, b, mk(Math.PI / 4), 0.9, base * 1.2, '#ff1a8a'));
         this.later(A, 2.6, () => this.tele(A, b, mk(0), 0.9, base * 1.2, '#ff1a8a'));
         this.later(A, 3.2, () => {
-          for (const p of this.areaPlayers(A.id)) if (!p.dead) for (let k = 0; k < 3; k++) this.later(A, k * 0.3, () => this.tele(A, b, [{ k: 'circle', x: r2(p.x), z: r2(p.z), r: 2.8 }], 0.7, base * 0.8, '#ff1a8a'));
+          for (const p of this.areaPlayers(A.id)) if (!p.dead && !p.down) for (let k = 0; k < 3; k++) this.later(A, k * 0.3, () => this.tele(A, b, [{ k: 'circle', x: r2(p.x), z: r2(p.z), r: 2.8 }], 0.7, base * 0.8, '#ff1a8a'));
         });
         return 4.6;
       }
@@ -1079,7 +1113,7 @@ export class World {
   }
 
   snapshot(A) {
-    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0, p.rc | 0, p.pm || '', p.pt || 0]);
+    const ps = this.areaPlayers(A.id).map((p) => [p.id, p.name, r2(p.x), r2(p.z), r2(p.a), Math.round(p.hp), Math.round(p.mhp), p.lv, p.color, p.wk, p.wr, p.sw, p.sk, p.dead ? 1 : 0, p.dg, p.gd, p.wst | 0, p.arm | 0, p.rc | 0, p.pm || '', p.pt || 0, p.down ? Math.round(p.rev / p.revMax * REVIVE.disp[p.revStep] * 1000) / 1000 : -1]);
     const ms = [...A.mobs.values()].map((m) => [
       m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st,
       m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.named ? 3 : m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,

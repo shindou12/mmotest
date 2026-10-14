@@ -458,19 +458,57 @@ export class AudioEngine {
         break;
       }
       case 'drop': {
+        // 地面に落ちた音（物の種類で変わる）＋ レア度の合図（上がるほど目立つ）
         const r = opt.rarity || 0;
+        if (opt.slot) {
+          if (opt.slot === 'weapon') { // 金属: 非整数倍の倍音でガシャン
+            this.noiseHit(t, 0.22, 'bandpass', 2600, 0.06, B, 1.2);
+            for (const [k, v] of [[1, 0.06], [2.76, 0.035], [5.4, 0.02], [8.9, 0.01]]) tone('sine', 520 * k, 0, 0.18 + 0.1 / k, v);
+            tone('sine', 140, 70, 0.1, 0.12);
+          } else if (opt.slot === 'armor') { // 革・布: 低いドサッ
+            this.noiseHit(t, 0.3, 'lowpass', 700, 0.14, B, 0.8);
+            tone('sine', 110, 55, 0.14, 0.18);
+          } else if (opt.slot === 'title') { // 紙: パサッ
+            this.noiseHit(t, 0.12, 'highpass', 3000, 0.09, B);
+            this.noiseHit(t + 0.05, 0.08, 'bandpass', 1800, 0.06, B);
+          } else { // 装飾品: 小さくチリン
+            for (const [k, v] of [[1, 0.05], [2.76, 0.025]]) tone('sine', 1900 * k, 0, 0.22, v);
+            this.noiseHit(t, 0.06, 'highpass', 5000, 0.04, B);
+          }
+          // レアリティの合図（粗悪・並は物の音だけ。良品→上質→逸品→傑作と華やかに）
+          if (r === 2) tone('sine', mtof(84), 0, 0.25, 0.035, 0.04);
+          else if (r === 3) [0, 7].forEach((s, i) => tone('sine', mtof(81 + s), 0, 0.45, 0.06, 0.04 + i * 0.07).connect(this.revSend));
+          else if (r >= 4) [0, 4, 7, 12].forEach((s, i) => tone('triangle', mtof(79 + s), 0, 0.6, 0.06, 0.04 + i * 0.06).connect(this.revSend));
+          // 上のレアリティほど「キーン」と高く澄んだ音が長く響く（少しずらした2音のうなりできらめかせる）
+          const kiin = (f, dur, vol, at = 0.05) => { tone('sine', f, 0, dur, vol, at).connect(this.revSend); tone('sine', f * 1.004, 0, dur, vol * 0.8, at); tone('sine', f * 2.01, 0, dur * 0.6, vol * 0.25, at); };
+          if (r === 4) kiin(2793, 0.7, 0.025, 0.2);
+          if (r === 5) { kiin(3520, 1.6, 0.045, 0.12); kiin(2637, 1.2, 0.02, 0.2); }
+          if (r === 6) kiin(3136, 1.3, 0.04, 0.15);
+          if (r === 7) { kiin(4186, 2.4, 0.055, 0.1); kiin(3520, 1.8, 0.03, 0.16); }
+          // 超越の特性つき: 星の数だけ、きらめく高音が駆け上がる
+          for (let i = 0; i < (opt.stars || 0); i++) kiin(mtof(96 + [0, 4, 7, 12][i % 4]), 1.2, 0.03, 0.3 + i * 0.12);
+          if (r <= 5) break;
+        }
         if (r <= 1) tone('sine', 880, 1320, 0.12, 0.08);
-        else if (r <= 3) { [0, 7, 12].forEach((s, i) => tone('sine', mtof(76 + s + r), 0, 0.4, 0.08, i * 0.05).connect(this.revSend)); }
+        else if (r <= 5) { [0, 7, 12].forEach((s, i) => tone('sine', mtof(76 + s + Math.min(3, r)), 0, 0.4, 0.08, i * 0.05).connect(this.revSend)); }
         else {
           // 伝説・神器: 重厚な和音 + キラキラ
-          const root = r === 5 ? 57 : 60;
+          const root = r === 7 ? 57 : 60;
           tone('sine', 55, 0, 2.5, 0.35);
-          [0, 7, 12, 16, 19].forEach((s) => this.pad(mtof(root + s), t, 1.2, r === 5 ? 0.06 : 0.04, 2400));
+          [0, 7, 12, 16, 19].forEach((s) => this.pad(mtof(root + s), t, 1.2, r === 7 ? 0.06 : 0.04, 2400));
           for (let i = 0; i < 14; i++) tone('sine', mtof(84 + [0, 4, 7, 11, 12, 16, 19][i % 7] + (i > 6 ? 12 : 0)), 0, 0.6, 0.05, 0.25 + i * 0.07).connect(this.revSend);
-          if (r === 5) { const n = this.noiseHit(t, 0.4, 'highpass', 5000, 2.5, B); n.g.connect(this.revSend); }
+          if (r === 7) { const n = this.noiseHit(t, 0.4, 'highpass', 5000, 2.5, B); n.g.connect(this.revSend); }
         }
         break;
       }
+      // 強化の欠片: 結晶のチリリン（飛び出すときは控えめ、拾うときははっきり）
+      case 'shard': {
+        const v = opt.drop ? 0.5 : 1;
+        [[2637, 0], [3951, 0.05], [3136, 0.1]].forEach(([f, at]) => { tone('sine', f, 0, 0.35, 0.04 * v, at).connect(this.revSend); tone('sine', f * 2.76, 0, 0.12, 0.012 * v, at); });
+        break;
+      }
+      // 落とし物が飛び出す（ポコッ）
+      case 'lootpop': tone('sine', 260 + Math.random() * 60, 620, 0.09, 0.12); this.noiseHit(t, 0.05, 'bandpass', 900, 0.05, B, 2); break;
       case 'pickup': tone('sine', 1320, 1760, 0.08, 0.08); tone('sine', 1760, 2200, 0.1, 0.06, 0.06); break;
       // 硬貨: 金属らしい非整数倍の倍音を短く重ねる（チャリン）
       case 'coin': {

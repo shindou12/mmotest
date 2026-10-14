@@ -81,11 +81,11 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 
 #prompt { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--acc); padding: 8px 16px; border-radius: 8px; }
 #toasts { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
-.toast { padding: 6px 16px; background: rgba(0,0,0,.6); border-radius: 6px; border-left: 3px solid; font-size: 14px; animation: toast 3.5s forwards; white-space: nowrap; }
+.toast { padding: 6px 16px; background: rgba(0,0,0,.6); border-radius: 6px; border-left: 3px solid; font-size: 14px; animation: toast 6s forwards; white-space: nowrap; }
 .toast.big { font-size: 20px; padding: 10px 24px; border-left-width: 5px; box-shadow: 0 0 30px currentColor; }
 @keyframes toast { 0% { opacity: 0; transform: translateY(-8px) } 8% { opacity: 1; transform: none } 85% { opacity: 1 } 100% { opacity: 0 } }
 #banner { position: absolute; top: 30%; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; }
-#banner.show { animation: banner 3.4s forwards; }
+#banner.show { animation: banner 5s forwards; }
 #banner .b1 { font-size: 16px; letter-spacing: .5em; color: #bfe6ff; }
 #banner .b2 { font-size: clamp(32px, 5vw, 56px); font-weight: bold; letter-spacing: .15em; text-shadow: 0 0 24px currentColor, 0 3px 4px #000; }
 @keyframes banner { 0% { opacity: 0; transform: scale(1.15); letter-spacing: .5em } 12% { opacity: 1; transform: none } 80% { opacity: 1 } 100% { opacity: 0 } }
@@ -97,6 +97,12 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .inv-head { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
 .inv-head b { font-size: 16px; }
 .inv-head button:last-child { margin-left: auto; }
+#inv .inv-head { flex-wrap: wrap; row-gap: 6px; }
+#inv .inv-head > b, #inv .inv-head > .dim, #inv .inv-head > button { white-space: nowrap; }
+.inv-auto { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); white-space: nowrap; }
+.inv-auto input { width: 110px; accent-color: #ffd84a; }
+.inv-auto b { min-width: 7.5em; font-size: 12px; }
+#inv-salvage:disabled { opacity: .45; cursor: default; }
 .inv-body { display: flex; gap: 14px; overflow: hidden; }
 .inv-left { width: 260px; flex-shrink: 0; overflow-y: auto; }
 .inv-right { flex: 1; overflow-y: auto; }
@@ -108,8 +114,11 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .cell .gi { font-size: 22px; font-weight: bold; }
 .cell .lv { position: absolute; top: 2px; right: 4px; font-size: 9px; color: var(--dim); }
 .cell .up { position: absolute; top: 2px; left: 4px; font-size: 11px; color: #5f5; }
-.cell.r4 { box-shadow: 0 0 12px rgba(255,160,50,.7) inset; }
-.cell.r5 { box-shadow: 0 0 16px rgba(255,60,100,.9) inset; animation: divine 1.4s infinite alternate; }
+/* レアリティ: r0 粗悪 r1 並 r2 良品 r3 上質 r4 逸品 r5 傑作 r6 伝説 r7 神器 */
+.cell.r0 { opacity: .7; }
+.cell.r5 { box-shadow: 0 0 12px rgba(255,216,74,.6) inset; }
+.cell.r6 { box-shadow: 0 0 12px rgba(255,154,46,.7) inset; }
+.cell.r7 { box-shadow: 0 0 16px rgba(255,60,100,.9) inset; animation: divine 1.4s infinite alternate; }
 @keyframes divine { from { filter: brightness(1) } to { filter: brightness(1.4) } }
 .eq .cell { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 10px; font-size: 13px; }
 #stats { font-size: 12px; line-height: 1.8; margin-top: 10px; padding: 8px; background: rgba(0,0,0,.3); border-radius: 8px; }
@@ -170,6 +179,61 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .slotbtns { position: absolute; top: 6px; right: 6px; display: flex; gap: 3px; }
 .slotbtns button { padding: 1px 7px; font-size: 11px; }
 .slotbtns button.on { background: #8a6aff; border-color: #c9b4ff; }
+/* 新しい武器ツリー（熟練度） */
+.wt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.3); }
+.wt-prof { font-size: 13px; color: var(--dim); } .wt-prof b { font-size: 20px; color: var(--acc); margin: 0 3px; }
+.wt-bar { flex: 1; min-width: 120px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+.wt-bar i { display: block; height: 100%; background: var(--acc); }
+.wt-head .dim { flex-basis: 100%; }
+.wt-row { display: grid; grid-template-columns: 62px 1fr; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.wt-req { text-align: center; padding-top: 4px; } .wt-req b { display: block; font-size: 17px; color: var(--acc); } .wt-req small { font-size: 10px; color: var(--dim); }
+.wt-row.locked .wt-nodes { filter: grayscale(.8); opacity: .4; pointer-events: none; } .wt-row.locked .wt-req b { color: var(--dim); }
+.wt-excl { text-align: center; font-size: 11px; color: #ff9a2e; margin-bottom: 5px; } .wt-excl.k2 { color: #ff3d63; }
+.wt-nodes { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wt-nodes.n2 { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 68%; margin: 0 auto; }
+@media (max-width: 700px) { .wt-nodes, .wt-nodes.n2 { grid-template-columns: 1fr; width: auto; } }
+.wt-node { position: relative; padding: 7px 9px 8px; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.35); cursor: pointer; min-width: 0; }
+.wt-node.can { border-color: #ffd84a; box-shadow: 0 0 10px rgba(255,216,74,.2) inset; }
+.wt-node.can:hover { background: rgba(255,216,74,.1); }
+.wt-node.have { border-color: rgba(98,220,106,.6); background: rgba(98,220,106,.07); }
+.wt-top { display: flex; align-items: center; gap: 6px; padding-right: 48px; }
+.wt-ic { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; background: rgba(255,255,255,.08); flex: none; }
+.wt-node.skill .wt-ic { border-radius: 50%; }
+.wt-nm { font-size: 13px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-top .pips { margin: 0; } .wt-top .pips i { width: 9px; height: 9px; } .wt-top .pips i.on { background: #62dc6a; }
+.wt-node.ks .wt-top { padding-right: 0; }
+.wt-val, .wt-desc { font-size: 11px; color: #c8d4e4; margin: 4px 0; line-height: 1.5; }
+.wt-val b { color: #fff; font-weight: normal; }
+.wt-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.wt-tag { font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid currentColor; line-height: 1.5; }
+.wt-tag.t-wave { color: #6ad0ff; } .wt-tag.t-cd { color: #b86cff; } .wt-tag.t-crit { color: #ffd84a; } .wt-tag.t-dodge { color: #62dc6a; } .wt-tag.t-hurt { color: #ff7a6a; } .wt-tag.t-charge { color: #ffb84a; } .wt-tag.t-light { color: #a8e4ff; } .wt-tag.t-recv { color: #c9b4ff; }
+.wt-br { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
+.wt-br div { border: 1px dashed var(--line); border-radius: 6px; padding: 3px 6px; font-size: 10.5px; line-height: 1.45; color: var(--dim); }
+.wt-br div b { display: block; font-size: 11px; color: var(--txt); }
+.wt-br div.pick { cursor: pointer; border-style: solid; border-color: #ffd84a; color: var(--txt); animation: wtGlow 1.4s ease-in-out infinite; }
+.wt-br div.pick:hover { background: rgba(255,216,74,.14); }
+.wt-br div.chosen { border-style: solid; border-color: #ffd84a; background: rgba(255,216,74,.14); color: var(--txt); }
+.wt-br div.lost { opacity: .3; }
+@keyframes wtGlow { 50% { box-shadow: 0 0 10px rgba(255,216,74,.5); } }
+/* 種類の見分け: スキル=青の丸・左に青の帯 / パッシブ=緑の四角・点線の帯 / クラス・マスター=菱形・色付きの背景 */
+.wt-kind { display: inline-block; margin-right: 3px; font-size: 9.5px; padding: 0 5px; border-radius: 4px; line-height: 1.6; white-space: nowrap; flex: none; }
+.wt-kind.k-skill { color: #0a1424; background: #6ad0ff; }
+.wt-kind.k-passive { color: #9ee6a0; border: 1px solid rgba(98,220,106,.6); }
+.wt-kind.k-ks1 { color: #1a0e00; background: #ff9a2e; } .wt-kind.k-ks2 { color: #fff; background: #ff3d63; }
+.wt-node.skill { border-left: 3px solid #6ad0ff; }
+.wt-node.skill .wt-ic { background: rgba(106,208,255,.2); box-shadow: 0 0 8px rgba(106,208,255,.35); }
+.wt-node.passive { border-left: 3px dotted #62dc6a; background: rgba(20,30,20,.35); }
+.wt-node.passive .wt-ic { background: rgba(98,220,106,.16); border-radius: 4px; }
+.wt-node.ks { border-width: 2px; border-color: rgba(255,154,46,.45); background: linear-gradient(160deg, rgba(255,154,46,.14), rgba(0,0,0,.4) 60%); }
+.wt-node.ks.k2 { border-color: rgba(255,61,99,.45); background: linear-gradient(160deg, rgba(255,61,99,.16), rgba(0,0,0,.4) 60%); }
+.wt-node.ks .wt-ic { transform: rotate(45deg); border-radius: 3px; background: rgba(255,154,46,.3); border: 1px solid #ff9a2e; }
+.wt-node.ks.k2 .wt-ic { background: rgba(255,61,99,.3); border-color: #ff3d63; }
+.wt-ic > span { display: inline-block; }
+.wt-node.ks .wt-ic > span { transform: rotate(-45deg); }
+.wt-node.ks .wt-nm { color: #ff9a2e; } .wt-node.ks.k2 .wt-nm { color: #ff3d63; }
+.wt-node.ks.have { border-color: #ff9a2e; background: linear-gradient(160deg, rgba(255,154,46,.32), rgba(0,0,0,.35) 70%); box-shadow: 0 0 14px rgba(255,154,46,.3); }
+.wt-node.ks.k2.have { border-color: #ff3d63; background: linear-gradient(160deg, rgba(255,61,99,.32), rgba(0,0,0,.35) 70%); box-shadow: 0 0 14px rgba(255,61,99,.35); }
+.wt-node.ks.other { opacity: .35; }
 
 /* 設定 */
 #settings { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, 94vw); padding: 14px; z-index: 20; display: flex; flex-direction: column; gap: 12px; }
@@ -258,6 +322,28 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .dmg.heal { color: #6f6; }
 .dmg.info { color: #8fd8ff; font-size: 20px; }
 .dmg.just { color: #9ff; font-size: 28px; letter-spacing: .1em; }
+/* 落とし物の名札（PoE風）: 暗い札にレアリティ（出来）の色の文字。上ほど枠が太く、文字が大きい
+   r0 粗悪 r1 並 r2 良品 r3 上質 r4 逸品 r5 傑作 / r6 伝説 r7 神器（固有装備） */
+.loot { position: absolute; pointer-events: auto; cursor: pointer; white-space: nowrap; user-select: none;
+  font: 600 12px/1 "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif; letter-spacing: .02em;
+  padding: 3px 7px 4px; background: rgba(0, 0, 0, .72); border: 1px solid transparent; color: #e6e9ee; }
+.loot:hover { background: rgba(30, 34, 48, .92); outline: 1px solid rgba(255, 255, 255, .7); }
+.loot.r0 { color: #8c929c; font-size: 11px; background: rgba(0, 0, 0, .5); opacity: .8; }
+.loot.r2 { color: #7cf084; border-color: rgba(98, 220, 106, .35); }
+.loot.r3 { color: #6cb8ff; border-color: rgba(74, 168, 255, .7); font-size: 13px; }
+.loot.r4 { color: #c99aff; border-color: #b86cff; font-size: 14px; }
+.loot.r5 { color: #ffe27a; border: 2px solid #ffd84a; font-size: 15px; font-weight: 800; background: rgba(28, 22, 0, .88); box-shadow: 0 0 12px rgba(255, 216, 74, .6); }
+.loot.r6 { color: #ffae5a; border: 2px solid #ff9a2e; font-size: 15px; background: rgba(20, 8, 0, .9); box-shadow: 0 0 10px rgba(255, 154, 46, .45); }
+.loot.r7 { color: #d0102e; border: 2px solid #d0102e; font-size: 16px; font-weight: 800; background: #fff; box-shadow: 0 0 14px rgba(255, 61, 99, .8); }
+.loot.r7:hover { background: #fff; outline-color: #d0102e; }
+/* 超越の特性つき: 頭に★（数＝超越の特性の数）、桃色の枠が脈打つ */
+.loot .stars { color: #ff7ab0; margin-right: 3px; letter-spacing: -.05em; text-shadow: 0 0 6px rgba(255, 122, 176, .9); }
+.loot.r7 .stars { color: #ff3d8a; text-shadow: none; }
+.loot.tx { border: 2px solid #ff7ab0; animation: lootTx 1.4s ease-in-out infinite; }
+.loot.r7.tx { border-color: #d0102e; }
+.loot.r5.tx { border-color: #ffd84a; }
+@keyframes lootTx { 0%, 100% { box-shadow: 0 0 6px rgba(255, 122, 176, .5) } 50% { box-shadow: 0 0 16px rgba(255, 122, 176, 1) } }
+@media (prefers-reduced-motion: reduce) { .loot.tx { animation: none; box-shadow: 0 0 10px rgba(255, 122, 176, .8); } }
 .plate { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 11px; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 .plate .pb { width: 60px; height: 5px; background: rgba(0,0,0,.6); border-radius: 3px; margin: 2px auto 0; overflow: hidden; }
 .plate .pb > div { height: 100%; background: #e44; }

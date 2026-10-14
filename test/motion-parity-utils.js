@@ -9,7 +9,7 @@ export function poseHashes(){
  for(const motion of ['lance','helix','piercer','javelin','whirlspear','whirl','heavy','counter'])for(const motionT of [0,.06,.12,.18,.24,.38,.48,.55,.77,.95])states.push({motion,motionT});
  const results={};
  for(const kind of ['sword','greatsword','spear','dagger','axe','bow'])for(let style=0;style<4;style++){
- const hashes=[];const model=makePlayer('#448a9b');setPlayerWeapon(model,kind,3,style);
+ const hashes=[];const model=makePlayer('#448a9b');setPlayerWeapon(model,kind,4,style); // 4 = 逸品（旧エピック。色と飾りは同じ）
  for(let i=0;i<states.length;i++){
  animatePlayer(model,{t:1,moving:false,walkT:0,kind,combo:0,swing:-1,spin:-1,sweep:-1,dodge:0,down:0,hurt:0,...states[i]});model.updateMatrixWorld(true);
  const values=[];model.traverse(o=>{values.push(o.visible,...o.matrixWorld.elements.map(n=>Math.round(n*1e10)/1e10));if(o.isLine)values.push(...o.geometry.attributes.position.array);if(o.material)values.push(o.material.opacity,o.material.color?.getHex());});
