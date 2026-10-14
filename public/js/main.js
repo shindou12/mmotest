@@ -1,3 +1,5 @@
+// 組み立て役: 中心の処理のポートに具体的なモジュールを差し込む（ほかの処理より先に）
+import './game/wiring.js';
 import { FLOORS, migrateItem, starterWeapon, DEFAULT_WEAPON } from '../shared/data.js';
 import { AREAS } from '../shared/areas.js';
 import { makePlayer } from './models.js';
