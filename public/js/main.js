@@ -1796,7 +1796,9 @@ function claimQuest(q) {
   const r = q.reward;
   if (r.rarity != null) {
     const ilvl = Math.max(char.lv, floorLevel(world.floor) + 3);
-    const rar = Math.max(r.rarity, Math.random() < 0.15 ? r.rarity + 1 : r.rarity);
+    // 第1層のクエストは1段低め（序盤は白・緑・青が中心。エピック以上は第2層から）
+    const base = world.floor === 1 ? Math.min(r.rarity, 2) : r.rarity;
+    const rar = Math.random() < 0.15 ? base + 1 : base;
     const it = makeItem(ilvl, Math.min(5, rar), r.slot ? { slot: r.slot } : {});
     spawnDrop(it, me.x + rnd(-1, 1), me.z + rnd(1, 2));
   }

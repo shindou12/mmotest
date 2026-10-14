@@ -438,11 +438,20 @@ let itemSeq = 0;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-export function rollRarity(boost = 0, minRarity = 0) {
-  // boost: 0=通常, 1=ボス
+// レア度の出やすさはアイテムレベルで伸びる（序盤は白と緑ばかり、層を上がるほど青・紫が増える）
+//   [伸び始めるiLv, 本来の出やすさになるiLv, 序盤の倍率]
+const RARITY_RAMP = { 2: [1, 12, 0.45], 3: [5, 22, 0.1], 4: [10, 28, 0.04], 5: [16, 32, 0.02] };
+export function rarityRamp(i, ilvl) {
+  const R = RARITY_RAMP[i];
+  if (!R) return 1;
+  const k = Math.max(0, Math.min(1, (ilvl - R[0]) / (R[1] - R[0])));
+  return R[2] + (1 - R[2]) * k;
+}
+export function rollRarity(boost = 0, minRarity = 0, ilvl = 99) {
+  // boost: 0=通常, 1=ボス / ilvl: 低いほど上のレア度が出にくい
   const ws = RARITIES.map((r, i) => {
     if (i < minRarity) return 0;
-    let w = r.w;
+    let w = r.w * rarityRamp(i, ilvl);
     if (i >= 3) w *= 1 + boost * 5;
     if (i === 2) w *= 1 + boost * 1.5;
     return w;
