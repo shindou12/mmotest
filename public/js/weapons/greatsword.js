@@ -1,6 +1,11 @@
-// 大剣の武器ツリー: ツリーのデータ（段・ノード）・スキル（Q/E）・ツリーが足す能力値。登録は weapons/index.js
-import { L3, T, at, slashAt } from './common.js';
+// 大剣のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・武器ツリーの効果。
+// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
+import * as THREE from 'three';
+import { L3, T, at, slashAt, fwd } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
+import { cone, cyl, extrude, mesh, sphere } from '../models/kit.js';
+import { now } from '../game/util.js';
+import { toon } from '../toon.js';
 
 export const LIGHT_COLOR = 0xa8e4ff;
 // 大剣: 「重い一撃」と「光波」と「受け」。クラスは 光波 / 一撃 / カウンター
@@ -135,5 +140,235 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['greatsword_', 'gs_'], slots: ['gslam', 'fortress', 'gs_guillotine', 'gs_rising', 'gs_broad', 'gs_recoil', 'gs_siege'] };
 
-// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
-export default { wk: 'greatsword', tab: 2, glyph: '大', tree: GREATSWORD, skills, mods, legacy };
+// ---------------------------------------------------------------------------
+// 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
+// ---------------------------------------------------------------------------
+const heavy = {
+    name: '兜割り', desc: '前方へ叩きつけ、衝撃で周囲を巻き込む',
+    run(c, lv) {
+      const a = c.aim(), [dx, dz] = fwd(a, 2.6), x = c.me.x + dx, z = c.me.z + dz;
+      const r = lv === 2 ? 3.8 : 3.0;
+      c.fx.slash(c.me.x, c.me.z, a, 3.4, 90, c.col(), 2.2);
+      c.later(0.12, () => {
+        c.circle(x, z, r, lv === 2 ? 4.6 : 3.0, { type: 'heavy' });
+        c.fx.ringWave(x, z, c.col(), r + 1, 0.4);
+        c.fx.parts.burst(x, 0.3, z, 40, { color: 0xc8b090, speed: 7, size: 0.5, life: 0.6, up: 2 });
+        c.shake(lv === 2 ? 0.5 : 0.3);
+        if (c.S().flags.has('quake')) c.later(0.15, () => { c.circle(x, z, 6.5, 1.5, { type: 'heavy' }); c.fx.ringWave(x, z, 0xffd27a, 7, 0.5); });
+      });
+    },
+  };
+
+// ---------------------------------------------------------------------------
+// 武器スキル（武器に付くスキル。鍛冶屋で付け替えられる）
+// ---------------------------------------------------------------------------
+const weaponSkills = {
+  cyclone: {
+    name: 'サイクロン', kind: 'greatsword', cd: 6, desc: '周囲を薙ぎ払う3回転斬り', spin: true,
+    run(c) {
+      for (let i = 0; i < 3; i++) {
+        c.later(0.1 + i * 0.15, () => {
+          c.arc(4.6, 360, 0.9, { type: 'wskill' });
+          c.fx.slash(c.me.x, c.me.z, c.me.a + i * 2.1, 4.6, 200, c.col(), 1.0, i % 2 === 1);
+          c.fx.ringWave(c.me.x, c.me.z, c.col(), 4.6, 0.3);
+          c.sfx('swing', { heavy: true });
+        });
+      }
+    },
+  },
+  breaker: {
+    name: 'アース・ブレイカー', kind: 'greatsword', cd: 7, desc: '地面を割り、前方へ岩を噴き上げる',
+    run(c) {
+      const a = c.aim(), sx = c.me.x, sz = c.me.z;
+      c.shake(0.3);
+      for (let i = 0; i < 6; i++) {
+        c.later(0.08 + i * 0.07, () => {
+          const [dx, dz] = fwd(a, 1.8 + i * 1.7);
+          const x = sx + dx, z = sz + dz;
+          c.circle(x, z, 1.9, 1.25, { type: 'wskill' });
+          c.fx.parts.burst(x, 0.2, z, 18, { color: 0xb8a080, speed: 7, size: 0.6, life: 0.6, up: 3 });
+          c.fx.ringWave(x, z, 0xd8c0a0, 2, 0.25);
+        });
+      }
+    },
+  },
+  avalanche: {
+    name: 'アバランシュ', kind: 'greatsword', cd: 8, desc: '大きく跳び込み、着地の衝撃で周りを叩き潰す（無敵あり）',
+    run(c) {
+      const a = c.aim();
+      c.dash(a, 7, 0.3, 0.35);
+      c.later(0.32, () => {
+        c.circle(c.me.x, c.me.z, 3.8, 3.2, { type: 'wskill', stun: 12 });
+        c.fx.ringWave(c.me.x, c.me.z, c.col(), 4.5, 0.4);
+        c.fx.parts.burst(c.me.x, 0.3, c.me.z, 60, { color: 0xc8b090, speed: 9, size: 0.7, life: 0.7, up: 3 });
+        c.shake(0.6); c.sfx('impact');
+      });
+    },
+  },
+  meteor: {
+    name: 'メテオブレイク', kind: 'greatsword', cd: 9, desc: '前方へ3回、遠くへ進むように衝撃を叩き込む',
+    run(c) {
+      const a = c.aim(), sx = c.me.x, sz = c.me.z;
+      [3, 5.5, 8].forEach((d, i) => c.later(0.1 + i * 0.16, () => {
+        const [dx, dz] = fwd(a, d), x = sx + dx, z = sz + dz;
+        c.circle(x, z, 2.6, 1.8, { type: 'wskill', stun: 4 });
+        c.fx.ringWave(x, z, c.col(), 3, 0.35);
+        c.fx.parts.burst(x, 0.3, z, 30, { color: c.col(), speed: 7, size: 0.6, life: 0.5, up: 2 });
+        c.shake(0.3); c.sfx('impact');
+      }));
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
+// ---------------------------------------------------------------------------
+const model = {
+  base(k) {
+    const { g, steel, gold, gem, edge, handle } = k;
+    const w = 0.17, L = 2.2;
+    const pts = [[-w, 0], [w, 0], [w * 1.1, L * 0.55], [w * 0.8, L - 0.35], [0, L], [-w * 0.8, L - 0.35], [-w * 1.1, L * 0.55]];
+    edge(pts, 0.06);
+    g.add(mesh(extrude(pts, 0.06), steel, [0, 0.12, 0]));
+    g.add(mesh(new THREE.BoxGeometry(0.05, L * 0.7, 0.075), toon(0x9aa4b4), [0, 0.12 + L * 0.38, 0]));
+    g.add(mesh(new THREE.BoxGeometry(0.78, 0.1, 0.14), gold, [0, 0.1, 0]));
+    for (const s of [-1, 1]) g.add(mesh(cone(0.06, 0.22, 6), gold, [s * 0.45, 0.13, 0], [0, 0, -s * 1.3]));
+    g.add(mesh(sphere(0.07, 10, 8), gem, [0, 0.1, 0.07]));
+    handle(0.55, 0.045);
+  },
+  styles: {
+    1: (k) => { // 大包丁: 四角い幅広の刃
+      const { g, gold, handle, blade } = k;
+      blade([[-0.18, 0], [0.18, 0], [0.24, 1.8], [-0.05, 2.0], [-0.24, 1.75]], 0.07);
+      g.add(mesh(cyl(0.05, 0.05, 0.08, 12), gold, [0.1, 1.6, 0], [Math.PI / 2, 0, 0]));
+      g.add(mesh(new THREE.BoxGeometry(0.5, 0.12, 0.16), gold, [0, 0.08, 0]));
+      handle(0.6, 0.05);
+    },
+    2: (k) => { // ツヴァイハンダー: 細長い刃と返し
+      const { g, steel, gold, handle, blade } = k;
+      blade([[-0.1, 0], [0.1, 0], [0.11, 2.1], [0, 2.45], [-0.11, 2.1]], 0.05);
+      for (const s of [-1, 1]) g.add(mesh(cone(0.04, 0.2, 6), steel, [s * 0.16, 0.5, 0], [0, 0, -s * 1.57]));
+      g.add(mesh(new THREE.BoxGeometry(0.95, 0.07, 0.1), gold, [0, 0.08, 0]));
+      handle(0.75, 0.042);
+    },
+    3: (k) => { // 専用: 波打つ炎の刃（フランベルジュ）
+      const { g, gold, gem, handle, glowM, blade } = k;
+      const L = 2.3, pts = [];
+      for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push([0.17 + Math.sin(t * 18) * 0.04 - t * 0.08, t * L]); }
+      pts.push([0, L + 0.25]);
+      for (let i = 12; i >= 0; i--) { const t = i / 12; pts.push([-(0.17 + Math.sin(t * 18 + 1) * 0.04 - t * 0.08), t * L]); }
+      blade(pts, 0.06);
+      g.add(mesh(new THREE.BoxGeometry(0.05, L * 0.8, 0.08), glowM(1.4), [0, 0.12 + L * 0.42, 0]));
+      g.add(mesh(new THREE.TorusGeometry(0.32, 0.05, 6, 16, Math.PI), gold, [0, 0.0, 0], [0, 0, Math.PI]));
+      g.add(mesh(sphere(0.08, 10, 8), gem, [0, 0.1, 0.07]));
+      handle(0.6, 0.048);
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 武器ツリーの効果。api: 武器の効果に渡す道具（game/weapon-api.js が役目ごとの小さな形で作る）。game/weapons/index.js が呼ぶ
+function effects({ player, attack, tree, show, register }) {
+  const { me, addBuff, hasBuff } = player;
+  const { strikes, extendCombat, later } = attack;
+  const { quietBuff, cutCds } = tree;
+  const { fx, audio, floatText, addShake } = show;
+
+  // 見切り眼: JUST回避・受け流しのあと3秒間ダメージアップ（6秒に1回まで）
+  function eye() {
+    const W = player.S.wt;
+    if (!W?.lv('gt_eye') || now() - me.eyeT < 6) return;
+    me.eyeT = now();
+    quietBuff('gt_eye', '見切り眼', 3, { dmgp: W.lv('gt_eye') >= 2 ? 25 : 15 }, 0x9affff);
+    if (W.br('gt_eye') === 'A') me.eyeCharge = true;
+    if (W.br('gt_eye') === 'B') cutCds(2);
+  }
+
+  // スキルに渡す文脈に、溜めた状態から始める道具を足す（c.primeCharge: グランド・スラムB「踏み込み溜め」）
+  extendCombat({ primeCharge(frac) { me.primeCharge = frac; } });
+
+  // 第3引数: 呼ぶ順（小さいほど先。書いていない場面は登録した順で、順の付いたものより後）。倍率を掛ける順などを元と同じに保つ
+  register('greatsword', {
+    // 一撃: 溜めは +25% 長い / 溜めの心得A: 溜めが速い
+    stats(S, WT) { S.chargeMax = S.chargeMax * (WT?.ks1 === 'gt_blow' ? 1.25 : 1) * (WT?.br('gt_charge') === 'A' ? 0.8 : 1); },
+    dmgMult(k, W, o, mb) {
+      const maxHeavy = o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8;
+      if (W.ks1 === 'gt_wave' && o.type === 'heavy' && !o.wave) k *= 0.85;
+      if (W.ks1 === 'gt_blow' && maxHeavy) k *= 1.4;
+      if (W.br('gt_break') === 'A' && mb?.stunT > 0) k *= 1.2;
+      if (o.exec && mb && mb.hp < mb.mhp * 0.3) k *= o.exec; // 断頭落としA「処断」
+      return k;
+    },
+    // 断罪: 最大溜めの強攻撃の会心率 +35%
+    critAdd: (v, o) => v + (player.S.wt?.ks2 === 'gt_judge' && o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8 ? 35 : 0),
+    // 月蝕: 光波が最初に当たった敵のところで爆ぜる
+    onHit(mb, dmg, crit, o) {
+      if (o.proj?.eclipse && !o.proj.boomed) {
+        o.proj.boomed = true;
+        const x = mb.x, z = mb.z;
+        later(0.05, () => { strikes.circle(x, z, 3, 1.5, { type: 'proc', wtNo: true }); fx.ringWave(x, z, LIGHT_COLOR, 3.4, 0.35); fx.flash(x, 1.2, z, LIGHT_COLOR, 30, 0.25); audio.sfx('wave'); });
+      }
+    },
+    // 溜め中に攻撃を受けた: 不屈（溜めが最大に）/ 剛体A（溜めが進む）
+    onHurtCharging() {
+      const W = player.S.wt;
+      if (W.ks2 === 'gt_unyield') me.chargeT = Math.max(me.chargeT, player.S.chargeMax);
+      else if (W.br('gt_armor') === 'A') me.chargeT += 0.3;
+    },
+    // 溜め中の被ダメージ軽減（剛体lv2・剛体B・一撃）と破城の構えA
+    dr(v) {
+      const W = player.S.wt;
+      if (!W) return v;
+      let dr = 0;
+      if (me.charging) {
+        if (W.lv('gt_armor') >= 2) dr += 15;
+        if (W.br('gt_armor') === 'B') dr += 10;
+        if (W.ks1 === 'gt_blow') dr += 30;
+      }
+      if (W.br('gt_siege') === 'A' && hasBuff('gt_siege')) dr += 20;
+      return v + dr;
+    },
+    // 剛体: 溜め中はスーパーアーマー（破城の構えAの効果中も）。剛体Bは溜め中に吹き飛ばされない
+    superArmor: () => (me.charging && (player.S.wt?.lv('gt_armor') ?? 0) >= 1) || (player.S.wt?.br('gt_siege') === 'A' && hasBuff('gt_siege')),
+    noKnockdown: () => me.charging && player.S.wt?.br('gt_armor') === 'B',
+    // 強攻撃を振ったとき: 光波・月の残滓・破城の構えB
+    heavy(lv, a) {
+      const W = player.S.wt;
+      if (W.ks1 === 'gt_wave') {
+        me.motion = 'gt_wave'; me.motionT = 0; // 振り抜いて光波を飛ばす
+        const big = lv === 2, moon = big && W.ks2 === 'gt_fullmoon';
+        strikes.proj({ a, mult: (big ? 2.0 : 1.0) * (moon ? 1.75 : 1), type: 'heavy', speed: big ? 22 : 24, life: big ? 0.75 : 0.55, rad: moon ? 3.4 : big ? 2.0 : 1.2, color: LIGHT_COLOR, stun: W.br('gt_break') === 'B' ? 6 : 1.5, eclipse: W.ks2 === 'gt_eclipse' });
+        if (big) fx.flash(me.x, 1.5, me.z, LIGHT_COLOR, moon ? 60 : 35, 0.3);
+      }
+      if (W.lv('gt_moon')) {
+        const n = W.br('gt_moon') === 'A' ? 2 : 1, m = W.lv('gt_moon') >= 2 ? 0.8 : 0.5;
+        const stun = W.br('gt_moon') === 'B' || W.br('gt_break') === 'B' ? 4 : 0.5;
+        for (let i = 0; i < n; i++) later(0.12 + i * 0.12, () => strikes.proj({ a: a + (n > 1 ? (i ? 0.12 : -0.12) : 0), mult: m, type: 'proc', speed: 24, life: 0.5, rad: 0.9, color: LIGHT_COLOR, wtNo: true, stun }));
+      }
+      if (W.br('gt_siege') === 'B' && hasBuff('gt_siege')) strikes.proj({ a, mult: 1.2, type: 'heavy', speed: 22, life: 0.6, rad: 1.6, color: LIGHT_COLOR, stun: 1.5 });
+    },
+    // カウンター: 強攻撃を押した直後に攻撃を受けたら、無傷で受け流して反撃する
+    counter(src) {
+      if (player.S.wt?.ks1 !== 'gt_counter' || !me.charging || now() - me.chargeStart > 0.35) return false;
+      me.charging = false; me.chargeT = 0; me.chargeLv = 0;
+      me.iframe = Math.max(me.iframe, 0.4);
+      const a = src ? Math.atan2(src.x - me.x, src.z - me.z) : me.a;
+      const M = TREE_MOTIONS.gt_riposte;
+      me.a = a; me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration; me.act++;
+      floatText(me.x, 3.1, me.z, '見切り!', 'just');
+      audio.sfx('perfect'); audio.sfx('block');
+      fx.ringWave(me.x, me.z, 0xffffff, 3, 0.3); fx.flash(me.x, 1.5, me.z, 0xffffff, 40, 0.25);
+      later(M.hits[0], () => { strikes.arc(4, 200, 3.5, { type: 'heavy', a, stun: 8 }); fx.slash(me.x, me.z, a, 4, 200, 0xffffff, 1.6, true); audio.sfx('swing', { heavy: true }); addShake(0.25); });
+      if (player.S.wt.ks2 === 'gt_iai') me.iaiReady = true;
+      if (player.S.wt.ks2 === 'gt_mirror') addBuff('gt_mirror', '明鏡', 5, { dmgp: 30 }, 0xe0f0ff);
+      eye();
+      return true;
+    },
+    justDodge() { eye(); },
+  }, { dmgMult: 4, critAdd: 0, onHit: 3, heavy: 0, justDodge: 2 });
+}
+
+// 武器の登録（weapons/index.js が集める）
+//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
+export default { wk: 'greatsword', tab: 2, glyph: '大', tree: GREATSWORD, skills, mods, legacy, heavy, weaponSkills, model, effects };

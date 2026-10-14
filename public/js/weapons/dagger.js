@@ -1,6 +1,10 @@
-// 短剣の武器ツリー: ツリーのデータ（段・ノード）・スキル（Q/E）・ツリーが足す能力値。登録は weapons/index.js
+// 短剣のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・武器ツリーの効果。
+// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
+import * as THREE from 'three';
 import { L3, T, at } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
+import { angDiff, degToRad, now } from '../game/util.js';
+import { cyl, extrude, mesh, sphere } from '../models/kit.js';
 
 export const KNIFE_COLOR = 0xcab4ff;
 // 短剣: 「速さ」「急所」「毒」。クラスは 毒刃 / 暗殺 / 連刃
@@ -135,5 +139,223 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['dagger_'], slots: ['poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken'] };
 
-// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
-export default { wk: 'dagger', tab: 5, glyph: '短', tree: DAGGER, skills, mods, legacy };
+// ---------------------------------------------------------------------------
+// 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
+// ---------------------------------------------------------------------------
+const heavy = {
+    name: '瞬影', desc: '敵の間をすり抜けながら切り裂く（無敵あり）',
+    run(c, lv) {
+      // 武器ツリー「影歩き」: A は距離と無敵が伸び、B は通り抜けた敵に毒
+      const a = c.aim(), sx = c.me.x, sz = c.me.z, W = c.S().wt, far = W?.br('dk_shadow') === 'A' ? 1.3 : 1;
+      const len = (lv === 2 ? 7.5 : 6) * far;
+      c.dash(a, len, 0.18, far > 1 ? 0.5 : 0.3);
+      c.later(0.16, () => {
+        c.line(len, 2.4, lv === 2 ? 2.8 : 1.8, { type: 'heavy', a, sx, sz, poison: W?.br('dk_shadow') === 'B' ? 2 : 0 });
+        c.fx.slash(c.me.x, c.me.z, a + Math.PI, 2.5, 160, c.col(), 1.0);
+      });
+    },
+  };
+
+// ---------------------------------------------------------------------------
+// 武器スキル（武器に付くスキル。鍛冶屋で付け替えられる）
+// ---------------------------------------------------------------------------
+const weaponSkills = {
+  shadow: {
+    name: 'シャドウ・ダンス', kind: 'dagger', cd: 4.5, desc: '目にも止まらぬ五連撃',
+    run(c) {
+      for (let i = 0; i < 5; i++) {
+        c.later(0.05 + i * 0.09, () => {
+          c.arc(3.0, 150, 1.0, { type: 'wskill' });
+          c.fx.slash(c.me.x, c.me.z, c.me.a + (Math.random() - 0.5) * 0.8, 3.0, 120, c.col(), 0.8 + i * 0.12, i % 2 === 1);
+          c.sfx('swing');
+        });
+      }
+    },
+  },
+  phantom: {
+    name: 'ファントム・レイド', kind: 'dagger', cd: 6, desc: '近くの敵の背後へ瞬間移動し、必ず会心の一撃',
+    run(c) {
+      const t = c.nearest(11);
+      if (!t) { c.dash(c.aim(), 5, 0.15, 0.3); return; }
+      const back = t.a + Math.PI;
+      c.fx.parts.burst(c.me.x, 1, c.me.z, 25, { color: 0x6a4aff, speed: 4, size: 0.5, life: 0.5 });
+      c.me.x = t.x + Math.sin(back) * (t.rad + 1); c.me.z = t.z + Math.cos(back) * (t.rad + 1);
+      c.me.a = Math.atan2(t.x - c.me.x, t.z - c.me.z); c.me.iframe = Math.max(c.me.iframe, 0.3);
+      c.fx.parts.burst(c.me.x, 1, c.me.z, 25, { color: 0x6a4aff, speed: 4, size: 0.5, life: 0.5 });
+      c.later(0.08, () => { c.hit(t, 3.5, { type: 'wskill', crit: true }); c.fx.slash(c.me.x, c.me.z, c.me.a, 2.5, 140, c.col(), 1.1); });
+    },
+  },
+  fan: {
+    name: '扇投げ', kind: 'dagger', cd: 5, desc: '扇状に7本のナイフを投げる（距離でダメージが落ちない）',
+    run(c) {
+      const a = c.aim();
+      for (let i = -3; i <= 3; i++) c.arrow({ a: a + i * 0.12, mult: 0.62, type: 'wskill', noZone: true, speed: 36, rad: 0.55, color: 0xd8e0f0 });
+    },
+  },
+  venom: {
+    name: 'ヴェノム・ファング', kind: 'dagger', cd: 8, desc: '素早く三度斬りつけ、6秒間 攻撃に毒が乗るようになる',
+    run(c) {
+      c.buff('poison', '毒刃', 6, {}, 0x8aff5a);
+      for (let i = 0; i < 3; i++) {
+        c.later(i * 0.1, () => {
+          c.arc(2.9, 140, 0.9, { type: 'wskill' });
+          c.fx.slash(c.me.x, c.me.z, c.me.a + (i - 1) * 0.3, 2.9, 120, 0x8aff5a, 0.9, i % 2 === 1);
+          c.sfx('swing');
+        });
+      }
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
+// ---------------------------------------------------------------------------
+const model = {
+  base(k) {
+    const { g, steel, gold, gem, edge, handle } = k;
+    const pts = [[-0.06, 0], [0.065, 0], [0.07, 0.4], [0.02, 0.72], [-0.04, 0.5]];
+    edge(pts, 0.03);
+    g.add(mesh(extrude(pts, 0.03), steel, [0, 0.12, 0]));
+    g.add(mesh(new THREE.TorusGeometry(0.1, 0.022, 6, 12, Math.PI), gold, [0, 0.1, 0]));
+    g.add(mesh(sphere(0.035, 8, 6), gem, [0, 0.11, 0.03]));
+    handle(0.3, 0.03);
+  },
+  styles: {
+    1: (k) => { // クナイ: 菱形の刃と輪の柄頭
+      const { g, gold, grip, blade } = k;
+      blade([[0, 0], [0.07, 0.25], [0, 0.65], [-0.07, 0.25]], 0.035);
+      g.add(mesh(cyl(0.028, 0.028, 0.3, 8), grip, [0, -0.08, 0]));
+      g.add(mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 12), gold, [0, -0.28, 0]));
+    },
+    2: (k) => { // クリス: 波打つ刃
+      const { g, gold, handle, blade } = k;
+      const pts = [];
+      for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push([0.05 + Math.sin(t * 14) * 0.025 - t * 0.04, t * 0.7]); }
+      pts.push([0, 0.78]);
+      for (let i = 8; i >= 0; i--) { const t = i / 8; pts.push([-(0.05 + Math.sin(t * 14 + 1.2) * 0.025 - t * 0.04), t * 0.7]); }
+      blade(pts, 0.03);
+      g.add(mesh(new THREE.BoxGeometry(0.2, 0.05, 0.06), gold, [0, 0.1, 0]));
+      handle(0.28, 0.028);
+    },
+    3: (k) => { // 専用: 月の形の双刃
+      const { g, steel, gem, handle, glowM, blade } = k;
+      blade([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]], 0.03, 0.12, glowM(1.2));
+      g.add(mesh(extrude([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]].map(([x, y]) => [-x * 0.7, y * 0.8]), 0.025), steel, [0, 0.12, 0]));
+      g.add(mesh(new THREE.OctahedronGeometry(0.05), gem, [0, 0.1, 0.03]));
+      handle(0.3, 0.03);
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 武器ツリーの効果。api: 武器の効果に渡す道具（game/weapon-api.js が役目ごとの小さな形で作る）。game/weapons/index.js が呼ぶ
+function effects({ player, attack, tree, show, register }) {
+  const { me, hasBuff } = player;
+  const { strikes, dealDamage, extendCombat, later } = attack;
+  const { quietBuff } = tree;
+  const { fx, audio, floatText } = show;
+
+  // 敵の背後にいるか（敵の向きから120度以上うしろ）
+  function wtBehind(mb) {
+    if (!mb || mb.a == null) return false;
+    return Math.abs(angDiff(Math.atan2(me.x - mb.x, me.z - mb.z), mb.a)) > degToRad(120);
+  }
+  // 毒・出血の強さ（毒の心得）と時間（長毒）
+  const wtToxMul = () => 1 + (player.S.wt?.lv('dk_toxin') ? (player.S.wt.lv('dk_toxin') >= 2 ? 50 : 30) : 0) / 100;
+  const wtToxDur = () => 4 * (player.S.wt?.br('dk_toxin') === 'A' ? 1.5 : 1);
+  // 毒を重ねる（最大5。1つにつき毎秒15%）。猛毒は5つで破裂
+  function addPoison(mb, n) {
+    if (!mb || mb.hp <= 0 || !(n > 0)) return;
+    mb.vStack = Math.min(5, (mb.vStack || 0) + n);
+    mb.poisonUntil = now() + wtToxDur();
+    if (player.S.wt?.ks2 === 'dk_burst' && mb.vStack >= 5) {
+      mb.vStack = 0; mb.poisonUntil = 0;
+      later(0.05, () => {
+        if (mb.hp <= 0) return;
+        dealDamage(mb, 3.0, { type: 'proc', noProc: true, wtNo: true });
+        fx.parts.burst(mb.x, 1.2, mb.z, 40, { color: 0x8aff5a, speed: 7, size: 0.6, life: 0.6, gravity: 1 });
+        fx.ringWave(mb.x, mb.z, 0x8aff5a, 2.6, 0.35); audio.sfx('hit', { crit: true });
+      });
+    }
+  }
+  // 毒の1回（0.5秒ごと）のダメージ。ポイズン・エッジA「致死毒」の効果中は2倍
+  const wtPoisonTick = (mb) => 0.075 * mb.vStack * wtToxMul() * (player.S.wt?.br('dk_poison') === 'A' && hasBuff('dk_poison') ? 2 : 1);
+  // 出血（毎秒 perSec。stack なら最大3まで重なる）
+  function addBleed(mb, perSec, stack = false, sec = 4) {
+    if (!mb || mb.hp <= 0) return;
+    mb.bleedN = stack ? Math.min(3, (mb.bleedN || 0) + 1) : 1;
+    mb.bleedPow = Math.max(stack ? perSec * mb.bleedN : perSec, mb.bleedUntil > now() && !stack ? mb.bleedPow || 0 : 0);
+    mb.bleedUntil = now() + sec * (player.S.wt?.br('dk_toxin') === 'A' ? 1.5 : 1);
+  }
+
+  // スキルに渡す文脈に、毒と出血を足す（c.poison / c.bleed）
+  extendCombat({
+    poison: (mb, n) => addPoison(mb, n),
+    bleed: (mb, perSec, stack) => addBleed(mb, perSec, stack),
+    ambush(n) { me.ambush = Math.max(me.ambush, n); }, // スモーク・ステップ: 次の n 撃は必ず会心
+  });
+
+  // 第3引数: 呼ぶ順（小さいほど先。書いていない場面は登録した順で、順の付いたものより後）。倍率を掛ける順などを元と同じに保つ
+  register('dagger', {
+    // 連撃（当てるたびに攻撃の速さ）: 連撃の心得・連刃・疾風 / 身軽B
+    stats(S, WT) {
+      if (WT?.br('dk_agile') === 'B') S.dodgeDist = 1.3;
+      if (S.wk === 'dagger') S.dStackPer = !WT ? 4 : WT.lv('dk_combo') ? WT.v('dk_combo', 'per') : WT.ks1 === 'dk_blades' ? 4 : 0;
+      if (WT?.ks1 === 'dk_blades') S.dStackMax = 15;
+      S.dStackT = (WT?.br('dk_combo') === 'A' ? 5 : 3) * (WT?.ks2 === 'dk_gale' ? 2 : 1);
+    },
+    dmgMult(k, W, o, mb, crit) {
+      if (W.ks2 === 'dk_spread' && mb?.vStack) k *= 1 + 0.04 * mb.vStack;
+      if (W.br('dk_combo') === 'B' && me.dStack >= player.S.dStackMax) k *= 1.06;
+      if (W.ks1 === 'dk_assassin' && o.type !== 'proc' && wtBehind(mb)) k *= 1.2 * (W.ks2 === 'dk_exec' && crit && mb.kind === 2 ? 1.4 : 1);
+      return k;
+    },
+    // 暗殺: 背後は必ず会心
+    critAfter: (mb, o) => !!player.S.wt && wtBehind(mb) && player.S.wt.ks1 === 'dk_assassin' && o.type !== 'dot' && o.type !== 'proc',
+    // スモーク・ステップB「奇襲」: 奇襲の会心 +50%
+    ambushMult: (k, ambushed) => (ambushed && player.S.wt?.br('dk_smoke') === 'B' ? 1.5 : k),
+    // 必殺: 背後の会心で弱った雑魚はとどめ
+    finisher(dmg, mb, crit, o) {
+      if (player.S.wt?.ks2 === 'dk_exec' && crit && mb.kind !== 2 && mb.hp <= mb.mhp * 0.25 && wtBehind(mb) && o.type !== 'dot' && dmg < mb.hp) {
+        dmg = mb.hp;
+        floatText(mb.x, 3, mb.z, '必殺', 'just'); fx.flash(mb.x, 1.4, mb.z, 0xcab4ff, 40, 0.3);
+        fx.slash(mb.x, mb.z, me.a, 2.2, 40, 0xffffff, 1.2); fx.parts.burst(mb.x, 1.2, mb.z, 30, { color: 0xcab4ff, speed: 7, size: 0.45, life: 0.5 });
+      }
+      return dmg;
+    },
+    // 毒・出血を重ねる / 連刃の二重斬り
+    onHit(mb, dmg, crit, o, mult) {
+      const W = player.S.wt;
+      if (o.poison) addPoison(mb, o.poison);
+      if (W.ks1 === 'dk_venom') addPoison(mb, 1);
+      if (hasBuff('dk_poison')) addPoison(mb, 1);
+      if (W.br('dk_toxin') === 'B' && o.type === 'normal' && me.combo === 2) addPoison(mb, 1);
+      if (crit && W.br('dk_vitalp') === 'B') addBleed(mb, 0.2, false, 3);
+      if (W.ks1 === 'dk_blades' && me.dStack >= player.S.dStackMax && o.type === 'normal') later(0.07, () => { if (mb.hp > 0) { dealDamage(mb, mult * 0.4, { type: 'proc', noProc: true, wtNo: true }); fx.slash(mb.x, mb.z, me.a + Math.PI, 1.6, 120, 0xcab4ff, 0.6, true); } });
+    },
+    // 毒・出血の1回（0.5秒ごと）
+    poisonTick: (v, mb) => wtPoisonTick(mb),
+    bleedMul: (k) => k * wtToxMul(),
+    // 疾風: 連撃が最大の間は移動が速い
+    aura(dt, W) { if (W.ks2 === 'dk_gale' && me.dStack >= player.S.dStackMax) quietBuff('dk_gale', '疾風', 0.3, { move: 25 }, 0x9affc8); },
+    // 千本: 3段目は手首でナイフを3本投げる
+    swingLate(a) {
+      if (player.S.wt?.ks2 === 'dk_thousand' && me.combo === 2 && me.dStack >= player.S.dStackMax) {
+        me.motion = 'dk_thousand'; me.motionT = 0;
+        later(TREE_MOTIONS.dk_thousand.hits[0], () => { for (const d of [-0.22, 0, 0.22]) strikes.arrow({ a: a + d, mult: 0.35, type: 'proc', noZone: true, speed: 40, color: KNIFE_COLOR }); });
+      }
+    },
+    // 瞬影は溜めきったときだけ（途中で離したら通常攻撃）
+    heavyNeedsFull: () => player.S?.wk === 'dagger',
+    heavyStart() { if (player.S.wk === 'dagger') { me.motion = 'dk_blink'; me.motionT = 0; } }, // 瞬影: 低く駆け抜けながら斬る
+    // 影渡り: すり抜けたら敵のほうへ向き直る
+    heavyAfter() { if (player.S.wk === 'dagger' && player.S.wt?.ks2 === 'dk_step') later(0.24, () => { me.a += Math.PI; me.afterJust = true; me.motion = 'dk_step_turn'; me.motionT = 0; floatText(me.x, 3, me.z, '影渡り', 'just'); fx.ringWave(me.x, me.z, 0xcab4ff, 2.2, 0.3); }); },
+    // 残影: JUST回避の次の1撃は会心
+    justDodge() { if (player.S.wt?.br('dk_agile') === 'A') me.ambush = Math.max(me.ambush, 1); },
+  }, { dmgMult: 0, onHit: 2, heavyStart: 1, aura: 3, justDodge: 1, swingLate: 1 });
+}
+
+// 武器の登録（weapons/index.js が集める）
+//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
+export default { wk: 'dagger', tab: 5, glyph: '短', tree: DAGGER, skills, mods, legacy, heavy, weaponSkills, model, effects };

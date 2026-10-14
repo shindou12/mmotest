@@ -1,11 +1,6 @@
-// 武器ごとの効果（武器ツリーのクラス・マスター・パッシブ）の登録。武器を足すときは、ここにファイルを1つ足して1行足す
-// 各ファイルは install(api) を export し、受け取った道具（game/weapon-api.js）で自分の効果を登録する。並び順が呼ぶ順の基本
+// 武器ごとの効果（武器ツリーのクラス・マスター・パッシブ）を登録する。中身は js/weapons/<武器>.js の effects（install(api)）
+// 受け取る道具は game/weapon-api.js。並び順（weapons/index.js の WEAPON_DEFS）が呼ぶ順の基本
 import { weaponApi } from '../weapon-api.js';
-import installSword from './sword.js';
-import installGreatsword from './greatsword.js';
-import installDagger from './dagger.js';
-import installSpear from './spear.js';
-import installAxe from './axe.js';
-import installBow from './bow.js';
+import { WEAPON_DEFS } from '../../weapons/index.js';
 
-for (const install of [installSword, installGreatsword, installDagger, installSpear, installAxe, installBow]) install(weaponApi);
+for (const d of WEAPON_DEFS) d.effects?.(weaponApi);

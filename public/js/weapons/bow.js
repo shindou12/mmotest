@@ -1,6 +1,12 @@
-// 弓の武器ツリー: ツリーのデータ（段・ノード）・スキル（Q/E）・ツリーが足す能力値。登録は weapons/index.js
+// 弓のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・構え・武器ツリーの効果。
+// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
+import * as THREE from 'three';
 import { L3, T, at, spOff } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
+import { aimHand, ease } from '../pose-rig.js';
+import { bowString, cyl, extrude, mesh, sphere } from '../models/kit.js';
+import { clamp, now, rnd } from '../game/util.js';
+import { toon } from '../toon.js';
 
 // 弓: 「射程」「手数」「罠」。クラスは 狙撃手（最大まで引く）/ 連射（通常攻撃）/ 罠師（回避で罠）
 // 弓を引くと射程の円が広がる仕組み（最大射程・弓を引く速さ）は弓そのものの特性
@@ -124,5 +130,290 @@ function mods(st, br, mods) {
 // 旧ツリー（スキルツリーの武器の枝）からの移行: ポイントを返すノードの頭の文字と、スロットから外す旧スキル
 const legacy = { prefixes: ['bow_'], slots: ['backshot', 'focus', 'bow_double', 'bow_tether', 'bow_side', 'bow_trap', 'bow_chime'] };
 
-// tab: 武器ツリー画面のタブの並び / glyph: 装備アイコンの文字
-export default { wk: 'bow', tab: 6, glyph: '弓', tree: BOW, skills, mods, legacy };
+// ---------------------------------------------------------------------------
+// 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
+// ---------------------------------------------------------------------------
+const heavy = {
+    name: '溜め撃ち', desc: '弓を引いて、貫通する矢を放つ（引くほど遠くまで届く）',
+    run(c, lv) {
+      // 射程は離したときの円の大きさ（main の c.range()）。最大射程まで引くと最大の溜め
+      // 武器ツリー: 狙撃手は最大溜めが必ず会心 / 重矢は矢が太い
+      const W = c.S?.().wt, snipe = lv === 2 && W?.ks1 === 'bw_sniper', fat = W?.br('bw_draw') === 'B' ? 1.5 : 1;
+      c.arrow({ a: c.aim(), mult: lv === 2 ? 2.6 : 1.6, type: 'heavy', pierce: true, speed: 55, rad: (lv === 2 ? 1.2 : 0.8) * fat, big: true, range: c.range?.(), crit: snipe || undefined, snipe, full: lv === 2 });
+    },
+  };
+
+// ---------------------------------------------------------------------------
+// 武器スキル（武器に付くスキル。鍛冶屋で付け替えられる）
+// ---------------------------------------------------------------------------
+const weaponSkills = {
+  multishot: {
+    name: 'マルチショット', kind: 'bow', cd: 5, desc: '扇状に5本の矢を同時に放つ',
+    run(c) { const a = c.aim(); for (let i = -2; i <= 2; i++) c.arrow({ a: a + i * 0.14, mult: 0.75, type: 'wskill' }); },
+  },
+  arrowrain: {
+    name: 'アローレイン', kind: 'bow', cd: 7, desc: '狙った場所に矢の雨を降らせる',
+    run(c) {
+      const p = c.point();
+      for (let i = 0; i < 8; i++) {
+        c.later(0.15 + i * 0.07, () => {
+          const x = p.x + (Math.random() - 0.5) * 4, z = p.z + (Math.random() - 0.5) * 4;
+          c.circle(x, z, 1.6, 0.42, { type: 'wskill', stun: 0.5 });
+          c.fx.parts.burst(x, 0.3, z, 8, { color: 0xd8e8ff, speed: 3, size: 0.35, life: 0.3 });
+        });
+      }
+      c.fx.ringWave(p.x, p.z, 0xd8e8ff, 3.5, 0.6);
+    },
+  },
+  snipe: {
+    name: 'スナイプ', kind: 'bow', cd: 8, desc: '一瞬狙いを定め、最大射程まで貫く強力な一矢を放つ',
+    run(c) {
+      const a = c.aim();
+      c.fx.parts.burst(c.me.x, 1.3, c.me.z, 16, { color: c.col(), speed: 2, size: 0.4, life: 0.35, gravity: 0 });
+      c.later(0.3, () => c.arrow({ a, mult: 3.0, type: 'wskill', pierce: true, noZone: true, speed: 75, big: true, rad: 0.9 }));
+    },
+  },
+  blast: {
+    name: 'ボムアロー', kind: 'bow', cd: 7, desc: '狙った場所で爆発する矢を放つ',
+    run(c) {
+      const a = c.aim(), p = c.point();
+      const d = Math.min(16, Math.hypot(p.x - c.me.x, p.z - c.me.z));
+      const x = c.me.x + Math.sin(a) * d, z = c.me.z + Math.cos(a) * d;
+      c.arrow({ a, mult: 0.5, type: 'wskill', noZone: true, speed: 40 });
+      c.later(d / 40 + 0.05, () => {
+        c.circle(x, z, 3.4, 2.2, { type: 'wskill', stun: 3 });
+        c.fx.ringWave(x, z, 0xffa040, 3.8, 0.4);
+        c.fx.parts.burst(x, 0.8, z, 60, { color: 0xffa040, speed: 9, size: 0.7, life: 0.6, gravity: -2 });
+        c.shake(0.35); c.sfx('impact');
+      });
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
+// ---------------------------------------------------------------------------
+const model = {
+  base(k) {
+    const { g, gold, grip, gem, rc, rarity } = k;
+    const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
+    const R = 0.8, arc = Math.PI * 0.72;
+    const limb = new THREE.TorusGeometry(R, 0.045, 6, 28, arc);
+    limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+    g.add(mesh(limb, wood));
+    const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+    bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
+    g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip, [0, 0, 0]));
+    for (const s of [-1, 1]) g.add(mesh(sphere(0.06, 8, 6), gold, [sx, s * tip, 0]));
+    g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
+  },
+  prep(k) { // 形違いの前に作る道具・材質（形違いのときだけ）
+    const { g, rc, rarity } = k;
+    const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
+    const string = (tip, sx) => bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
+    return { wood, string };
+  },
+  styles: {
+    1: (k) => { // 1: リカーブ（先端が反る） 2: ロングボウ（長い）
+      const { g, grip, gem, wood, string, style } = k;
+      const R = style === 2 ? 1.25 : 0.75, arc = style === 2 ? Math.PI * 0.62 : Math.PI * 0.66;
+      const limb = new THREE.TorusGeometry(R, style === 2 ? 0.04 : 0.05, 6, 28, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+      g.add(mesh(limb, wood));
+      const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+      if (style === 1) for (const s of [-1, 1]) g.add(mesh(new THREE.TorusGeometry(0.12, 0.035, 5, 10, Math.PI * 0.8), wood, [sx + 0.1, s * tip, 0], [0, 0, s > 0 ? 0.3 : Math.PI - 0.3]));
+      string(tip, sx);
+      g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip));
+      g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
+    },
+    2: (k) => model.styles[1](k), // 1 と同じ作り（style で長さが変わる）
+    3: (k) => { // 専用: 三日月と刃の翼
+      const { g, gold, gem, glowM, string } = k;
+      const R = 0.85, arc = Math.PI * 0.8;
+      const limb = new THREE.TorusGeometry(R, 0.05, 6, 32, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+      g.add(mesh(limb, toon(0xe8e0d0)));
+      const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+      for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.18, 0.1 * s], [0.35, 0.45 * s], [0.12, 0.25 * s]], 0.025), glowM(1.3), [0.02, s * 0.2, 0]));
+      string(tip, sx);
+      g.add(mesh(cyl(0.06, 0.06, 0.3, 8), gold));
+      g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0.06, 0, 0]));
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// 構え・振り（motions/index.js が近接の動きに上書きする）
+// ---------------------------------------------------------------------------
+function applyBowPose(u, s) {
+    const active = s.charging || s.swing >= 0;
+    const draw = s.charging ? clamp(s.charge ?? 1, 0, 1) : s.swing >= 0 ? 1 - clamp(s.swing / .25, 0, 1) : 0;
+    // Turn the torso side-on while the bow and head keep facing the aim direction.
+    // Moving the bow forward alone lets its deep curve/string cut through the chest.
+    const stance = s.bowStance ?? 1.0;
+    u.body.rotation.y = stance;u.head.rotation.y = -stance;
+    const aim = new THREE.Vector3(-Math.sin(stance), 0, Math.cos(stance));
+    const grip = aimHand(u.armL, u.elbowL, new THREE.Vector3(-.10, s.bowHeight ?? (active ? 1.36 : 1.25), .53), new THREE.Vector3(-1, -.7, 0));
+    const details = u.weaponModel.userData.bow;
+    if (active && details) {
+      const pull = .22 * draw;
+      aimHand(u.armR, u.elbowR, grip.clone().addScaledVector(aim, details.sx - pull), new THREE.Vector3(1, 0, -.7));
+      const pos = details.string.geometry.attributes.position;pos.setX(1, details.sx - pull);pos.needsUpdate = true;
+      details.arrow.visible = s.charging || s.swing < .15;
+      details.arrow.position.x = details.sx - pull;
+    } else if (details) {
+      details.string.geometry.attributes.position.setX(1, details.sx);details.string.geometry.attributes.position.needsUpdate = true;
+      details.arrow.visible = false;
+    }
+    // Bow limbs remain vertical; its model's -90 degree yaw puts the string toward the torso.
+    const handOrientation = u.armL.quaternion.clone().multiply(u.elbowL.quaternion);
+    u.weapon.quaternion.copy(handOrientation).invert().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -stance));
+}
+
+function applyBowSwing(u, s, e) {
+  u.armR.rotation.set(-Math.PI / 2, 0, 0.1);u.armR.position.z = 0;
+  u.armL.rotation.set(-Math.PI / 2 + 0.2, 0, -0.6 + e * 0.3);
+  u.body.rotation.y = 0;
+}
+
+// 技（矢の技）の姿勢: 引き具合 p.draw で弓を引き、始めと終わりは構えから溶け込む
+function applyBowTechnique(u, s, t, p) {
+  const time=s.motionT||0,blend=ease(Math.min(1,time/.08))*ease(Math.max(0,Math.min(1,(t.duration-time)/.12)));
+  applyBowPose(u,{...s,charging:true,charge:p.draw,swing:-1,bowStance:1+p.bodyYaw,bowHeight:1.25+.11*blend});
+  const idle=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.25,0,.12));u.armR.quaternion.copy(idle.slerp(u.armR.quaternion.clone(),blend));
+  u.elbowR.quaternion.slerp(new THREE.Quaternion(),1-blend);
+  u.weaponModel.userData.bow.arrow.visible=p.draw>.03;
+  u.body.rotation.x=p.lean;u.body.position.y+=p.lift;
+}
+const motion = {
+    pose: applyBowPose, swing: applyBowSwing, technique: applyBowTechnique,
+    afterSwing(u) { if (u.weapon) u.weapon.rotation.x = Math.PI / 2; },
+    rest(u) { if (u.weapon) u.weapon.rotation.x = 0; },
+  };
+
+// ---------------------------------------------------------------------------
+// 武器ツリーの効果。api: 武器の効果に渡す道具（game/weapon-api.js が役目ごとの小さな形で作る）。game/weapons/index.js が呼ぶ
+function effects({ player, field, attack, tree, show, register }) {
+  const { me } = player;
+  const { mobs, world, heightAt, aimPoint } = field;
+  const { strikes, extendCombat, later } = attack;
+  const { quietBuff } = tree;
+  const { fx, audio, floatText, addShake, trapMesh } = show;
+
+  // 最大まで引いた矢（狙撃手）が当たった / 外れた: 鷹の目・狙い澄まし
+  function bwSnipe(hit) {
+    const W = player.S.wt;
+    if (W?.ks2 === 'bw_hawk' && hit && now() - me.hawkT > 8) { me.hawkT = now(); me.iaiReady = true; fx.ringWave(me.x, me.z, 0xffd84a, 2, 0.3); }
+    if (W?.ks2 === 'bw_aim') {
+      me.aimN = hit ? Math.min(3, me.aimN + 1) : 0;
+      me.buffs = me.buffs.filter((b) => b.id !== 'bw_aim');
+      if (me.aimN > 0) me.buffs.push({ id: 'bw_aim', label: `狙い澄まし +${me.aimN * 10}%`, t: 1e9, max: 1e9, mods: {}, color: 0xffd84a });
+    }
+  }
+  // 矢嵐: 狙った場所に矢の雨
+  function bwRain(p) {
+    for (let i = 0; i < 5; i++) later(0.12 + i * 0.07, () => {
+      const x = p.x + rnd(-1.6, 1.6), z = p.z + rnd(-1.6, 1.6);
+      fx.parts.burst(x, 6, z, 6, { color: 0xbfe8ff, speed: 2, size: 0.35, life: 0.3, gravity: 40 });
+      later(0.15, () => { strikes.circle(x, z, 1.5, 0.5, { type: 'proc', noProc: true }); fx.ringWave(x, z, 0xbfe8ff, 1.6, 0.2); });
+    });
+  }
+  // 罠（罠師の回避・置き矢）: 踏まれると発動。dodge: 罠師の罠（数に上限がある）
+  function bwTrap(x, z, o) {
+    const { g, ring, col } = trapMesh(o);
+    g.position.set(x, heightAt(x, z), z);
+    const t = { x, z, ...o, armAt: now() + (o.arm ?? 0.5), until: now() + o.life, area: world.area, mesh: g };
+    fx.add(g, o.life + 0.2, (obj) => { ring.material.opacity = now() < t.armAt ? 0.2 : 0.4 + Math.sin(now() * 8) * 0.15; });
+    if (o.dodge) {
+      const mine = me.traps.filter((q) => q.dodge);
+      if (mine.length >= (player.S.wt?.ks2 === 'bw_lure' ? 4 : 2)) bwTrapGone(mine[0]);
+    }
+    me.traps.push(t);
+    fx.parts.burst(x, 0.3, z, 10, { color: col, speed: 2, size: 0.3, life: 0.3 });
+    return t;
+  }
+  function bwTrapGone(t) {
+    me.traps = me.traps.filter((q) => q !== t);
+    const it = fx.items.find((q) => q.obj === t.mesh);
+    if (it) it.life = 0;
+  }
+  function bwTrapTick() {
+    for (const t of [...me.traps]) {
+      if (t.area !== world.area || now() > t.until) { bwTrapGone(t); continue; }
+      if (now() < t.armAt) continue;
+      if (![...mobs.values()].some((mb) => mb.hp > 0 && Math.hypot(mb.x - t.x, mb.z - t.z) < t.r + mb.rad * 0.5)) continue;
+      bwTrapGone(t);
+      strikes.circle(t.x, t.z, t.r, t.mult, { type: t.dodge ? 'proc' : 'tskill', tech: 'bow_trap', stun: t.stun, noProc: t.dodge });
+      fx.parts.burst(t.x, 0.4, t.z, 30, { color: t.color ?? 0xffc860, speed: 6, size: 0.4, life: 0.4, up: 3 }); fx.ringWave(t.x, t.z, t.color ?? 0xffc860, t.r + 0.4, 0.3);
+      audio.sfx('hit');
+    }
+  }
+  // 射抜き: 罠を矢で撃ち抜いて大爆発
+  function bwBlast(t) {
+    bwTrapGone(t);
+    strikes.circle(t.x, t.z, 3.5, 3.5, { type: 'proc', noProc: true, stun: 6 });
+    fx.ringWave(t.x, t.z, 0xff9a4a, 4, 0.4); fx.flash(t.x, 1.2, t.z, 0xff9a4a, 50, 0.3);
+    fx.parts.burst(t.x, 0.6, t.z, 50, { color: 0xffb060, speed: 9, size: 0.55, life: 0.5, up: 3 });
+    floatText(t.x, 2.6, t.z, '射抜き!', 'just'); audio.sfx('impact'); addShake(0.35);
+  }
+
+  // スキルに渡す文脈に、罠を置く道具を足す（c.trap）
+  extendCombat({ trap: (x, z, o) => bwTrap(x, z, o) });
+
+  // 第3引数: 呼ぶ順（小さいほど先。書いていない場面は登録した順で、順の付いたものより後）。倍率を掛ける順などを元と同じに保つ
+  register('bow', {
+    // 弓: 引かずに撃つ射程（張り弦 +4m）・最大射程（遠見の心得）・弓を引く速さ（速引き +30%）。最大射程まで引いたら最大の溜め
+    stats(S, WT, W) {
+      S.chargeMax = S.chargeMax * (WT?.br('bw_draw') === 'A' ? 0.8 : 1);
+      S.iframeBonus = S.iframeBonus + (WT?.br('bw_roll') === 'B' ? 0.1 : 0);
+      S.bowBase = S.bowBase + (WT?.br('bw_zone') === 'A' ? 4 : 0);
+      S.bowMax = S.bowMax + (WT ? WT.v('bw_zone', 'rng') : 0);
+      S.bowDraw = S.bowDraw * (WT?.br('bw_draw') === 'A' ? 1.3 : 1);
+      if (W.ranged) S.chargeMax = Math.max(0.3, (S.bowMax - S.bowBase) / S.bowDraw); // 弓: 最大射程まで引いたら最大の溜め
+    },
+    treeReset() { me.aimN = 0; },
+    // 急所射ち・鋭矢
+    critAdd: (v, o) => v + (player.S.wt?.br('bw_crit') === 'A' && o.full ? 15 : 0) + (player.S.wt?.br('bw_quiver') === 'A' && o.type === 'tskill' && player.S.wk === 'bow' ? 15 : 0),
+    // 狙い澄まし
+    dmgMult: (k, W, o) => (W.ks2 === 'bw_aim' && o.snipe ? k * (1 + 0.1 * me.aimN) : k),
+    stun: (st, o) => (player.S.wt?.br('bw_draw') === 'B' && o.type === 'heavy' ? st * 1.5 : st), // 重矢
+    afterCast() { if (player.S.wt.br('bw_quiver') === 'B') quietBuff('bw_quiverB', '余勢', 2, { aspd: 25 }, 0x9affc8); },
+    // 回避した（受け身引き・速射・罠師）
+    onDodge() {
+      const W = player.S.wt;
+      if (!W) return;
+      if (W.br('bw_roll') === 'A') quietBuff('bw_rollA', '受け身引き', 1.4, { chargeRate: 100 }, 0x9ae8ff);
+      if (W.ks2 === 'bw_quick') quietBuff('bw_quick', '速射', 1.5 + 0.38, { aspd: 40 }, 0x9affc8);
+      if (W.ks1 === 'bw_trapper' && now() - me.trapT >= 2) {
+        me.trapT = now();
+        const lure = W.ks2 === 'bw_lure';
+        bwTrap(me.x, me.z, { mult: 2.0 * (lure ? 1.3 : 1), r: 1.8, stun: lure ? 15 : 3, life: 15, arm: 0.5, dodge: true });
+      }
+    },
+    // 連射: 通常攻撃で2本ずつ（矢嵐: 5回ごとに矢の雨）
+    shoot(a, mult) {
+      if (player.S.wt?.ks1 !== 'bw_rapid') return false;
+      for (const d of [-0.04, 0.04]) strikes.arrow({ a: a + d, mult: mult * 0.75, type: 'normal' });
+      if (player.S.wt.ks2 === 'bw_storm' && ++me.stormN % 5 === 0) bwRain(aimPoint());
+      return true;
+    },
+    // 最大まで引いた矢: 反動と、射程いっぱいの輪
+    heavyStart(lv) { if (player.S.wk === 'bow' && lv === 2) { me.motion = 'bw_full'; me.motionT = 0; fx.ringWave(me.x, me.z, 0xffd84a, player.S.bowMax, 0.35); } },
+    iaiLabel: (label) => (player.S.wk === 'bow' ? '鷹の目' : label),
+    // 射抜き: 自分の罠を矢で射抜くと大爆発
+    arrowTick(w) {
+      if (player.S.wt?.ks2 === 'bw_shot' && !w.trapShot) {
+        const tr = me.traps.find((q) => q.dodge && Math.hypot(q.x - w.x, q.z - w.z) < 1.3);
+        if (tr) { w.trapShot = true; bwBlast(tr); }
+      }
+    },
+    // 遠矢: 射程の端（8割より先）で当たると +20%
+    arrowEdge: (w, d) => player.S.wt?.br('bw_zone') === 'B' && d >= w.range * 0.8,
+    arrowHit(w) { if (w.snipe && !w.snipeDone) { w.snipeDone = true; bwSnipe(true); } },
+    arrowGone(w) { if (w.snipe && !w.snipeDone) bwSnipe(false); },
+    aura() { bwTrapTick(); },
+  }, { dmgMult: 1, critAdd: 1, heavyStart: 2, aura: 0, afterCast: 1 });
+}
+
+// 武器の登録（weapons/index.js が集める）
+//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
+export default { wk: 'bow', tab: 6, glyph: '弓', tree: BOW, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };

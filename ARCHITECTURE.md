@@ -40,11 +40,11 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ loop.js         毎フレームの更新
    │   ├─ weapon-fx.js    ★ 武器ごとの効果の差し込み口（フック）
    │   ├─ weapon-api.js   ★ 武器の効果に渡す道具（player・field・attack・tree・show・party・register の小さな形）
-   │   └─ weapons/<武器>.js ★ 武器ツリーの効果。install(api) で道具を受け取り、フックを登録する。index.js が呼ぶ
+   │   └─ weapons/index.js  各武器のファイルの effects に道具（weapon-api）を渡して、効果を登録させる
    │
    ├─ weapon-tree.js   武器ツリーの仕組み（熟練度・振り分け・効果のまとめ）
-   ├─ weapons/<武器>.js ★ 武器ツリーのデータ（段・ノード）・スキル・能力値。index.js が登録表
-   ├─ skills.js / advanced-skills.js   Q/E スキルの動き
+   ├─ weapons/<武器>.js ★ 1つの武器のすべて（ツリー・Q/E・強攻撃・武器スキル・形・構え・効果）。weapons/index.js が登録表
+   ├─ skills.js / advanced-skills.js   スキルの集まり（強攻撃・武器スキルは各武器のファイルから集める）
    │
    ├─ models.js        モデルの組み立て（プレイヤー・武器・防具・敵・落とし物）
    ├─ models/
@@ -64,7 +64,7 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    ├─ motions/
    │   ├─ index.js        ★ 武器ごとの体の動きの登録表（pose / swing / technique）
    │   ├─ styles.js       ★ 技の姿勢のデータ（STYLES / KEYFRAMES）
-   │   └─ bow.js / spear.js / melee.js   武器ごとの動きの関数
+   │   └─ melee.js        近接の動き（武器ごとの上書きは js/weapons/<武器>.js の motion）
    │
    ├─ env.js           エリアの見た目の組み立て（buildArea）
    ├─ env/
@@ -87,7 +87,7 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
 
 依存の向き: `game` → `ui` へは `ui-bridge.js` だけを通す。`game/*` の中心の処理（combat・hurt・stats・
 actions・loop など）は、武器の名前やノードの id を知らず、`weapon-fx.js` のフックを呼ぶだけ。
-武器ごとの中身は `game/weapons/<武器>.js` に閉じている。武器の効果のファイルは具体的なモジュール（state・stats・combat…）を import せず、
+武器ごとの中身は `js/weapons/<武器>.js`（の effects）に閉じている。武器の効果のファイルは具体的なモジュール（state・stats・combat…）を import せず、
 `game/weapon-api.js` が作る小さな形（ポート）を引数で受け取る（依存性の逆転）。
 
 ### sim の import の深さ
@@ -106,7 +106,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
        │ 差し込む
   中心の処理        combat・hurt・stats・loop・tree-effects・variants・items・loot・progress
        │ 読むのは game/ports.js の入れ物だけ（state・stats・view・screen・link・field・rules）
-  拡張する部分      武器の効果（game/weapons/*.js: install(api)）・スキル（c を受け取る）・登録表（models・motions・env・sim）
+  拡張する部分      武器のファイル（js/weapons/*.js: 効果は effects(api)）・スキル（c を受け取る）・登録表（models・motions・env・sim）
        │
   端（具体的な実装） state・save（状態とセーブ）・render・meshes・labels（three.js）・ui-bridge / ui（DOM）・net-client / net（通信）
                     input（入力）・area・snapshot（エリアとサーバーの状態の反映）・actions（攻撃とスキルの道具の組み立て）
@@ -148,53 +148,42 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 | `aura(dt, W)` / `tick` | call | 毎フレーム |
 | `shoot` / `arrowTick` / `arrowEdge` / `arrowHit` / `arrowGone` | call / reduce | 矢 |
 
-正確な一覧と引数は `game/weapons/*.js` の実装と、呼んでいる側（`grep -n "fx\(Call\|Some\|Reduce\)" public/js/game`）を見る。
+正確な一覧と引数は `js/weapons/*.js` の effects の実装と、呼んでいる側（`grep -n "fx\(Call\|Some\|Reduce\)" public/js/game`）を見る。
 
 ## 足し方
 
 ### 武器の種類を足す
 
-1. `public/shared/data.js` の `WEAPONS` に1項目足す（初期武器のスキルを変えるときは `STARTER_SKILL` にも）。
-   - 項目: 名前・射程・速さ・重さ・`melee` / `ranged` / `twoHanded` など。
-   - サーバーとブラウザの両方が使う。
-2. `public/js/weapons/<wk>.js` を作る。`export default { wk, tree, skills, mods, legacy? }` の形にする。
-   - `tree`: 段とノード。
-   - `skills`: ツリーの Q/E スキル。
-   - `mods(st, br, mods)`: ツリーが足す能力値。
-   - `public/js/weapons/index.js` の `WEAPON_DEFS` に1行足す。並び順がツリー画面の順になる。
-3. `public/js/game/weapons/<wk>.js` を作る。`export default function install({ player, field, attack, tree, show, party, register })` の中で、
-   `register('<wk>', { ... })` で効果を登録する（使える道具は `game/weapon-api.js` の一覧）。
-   - スキルに渡す道具（`combat` 文脈）を足すときは `attack.extendCombat({ ... })`。
-   - 能力値 S は計算し直されるので、分割代入せず `player.S` で読む。
-   - `public/js/game/weapons/index.js` に import と1行（install の並び）を足す。
-4. 形: `public/js/models/weapon-models.js` の `WEAPON_MODELS` に `<wk>: { base(k) {...}, styles: {...} }` を足す。
-   - 握る位置は手順1の `WEAPONS` の `grip`、盾を持つなら `shield` に盾の形の名前（`models/shield-models.js`）。
-5. 動き: 近接武器なら何もしなくてよい（`motions/melee.js` の動きになる）。
-   - 独自の構えにするときは `motions/<wk>.js` に `pose` / `swing` / `technique` を書いて、`motions/index.js` の `WEAPON_MOTIONS` に登録する。
-6. 初期スキル（Q/E）は `public/js/skills.js` と `shared/data.js` の `WEAPON_SKILL_POOL` に足す。
+新しい武器は、**サーバーと共通の表に1項目 ＋ 武器のファイル1つ ＋ 登録1行** で足せる。ほかのファイルは直さない。
 
-### まとめ: 新しい武器で触る場所
+| 何を | どこに |
+|---|---|
+| サーバーと共通の数値（名前・射程・速さ・重さ・握る位置 grip・盾 shield・両手持ち・スキルの候補 skillPool など） | `public/shared/data.js` の `WEAPONS` に1項目 |
+| その武器のすべて（下の一覧） | `public/js/weapons/<wk>.js` を1つ |
+| 登録 | `public/js/weapons/index.js` の `WEAPON_DEFS` に1行（並び順がツリー画面の順・効果を呼ぶ順の基本） |
 
-どれも「表に1項目足す」か「ファイルを1つ足して登録の1行を足す」で、既存の処理は直さない。
+`public/js/weapons/<wk>.js` は `export default { wk, tab, glyph, tree, skills, mods, legacy, heavy, weaponSkills, model, motion?, effects }` を書く。
+登録表（HEAVY・WEAPON_SKILLS・WEAPON_MODELS・WEAPON_MOTIONS・武器の効果）は、どれも `WEAPON_DEFS` から集めて作られる。
 
-| 何を | どこに | 種類 |
-|---|---|---|
-| 武器の種類（能力・射程・握る位置・盾・両手持ちなど） | `shared/data.js` の `WEAPONS` | 表に1項目（サーバーと共通） |
-| 武器ツリー（段・ノード・スキル・能力値） | `js/weapons/<wk>.js` ＋ `js/weapons/index.js` に1行 | ファイル＋登録 |
-| 武器ツリーの効果（クラス・マスター・パッシブ） | `js/game/weapons/<wk>.js` ＋ `js/game/weapons/index.js` に1行 | ファイル＋登録 |
-| 形 | `js/models/weapon-models.js` の `WEAPON_MODELS` | 表に1項目 |
-| 構え・振り（近接と違うときだけ） | `js/motions/<wk>.js` ＋ `js/motions/index.js` に1行 | ファイル＋登録 |
-| 最初のスキル | `shared/data.js` の `WEAPON_SKILL_POOL` と `js/skills.js` | 表に1項目 |
+- `tab`・`glyph`: 武器ツリー画面のタブの並びと、装備アイコンの文字。
+- `tree`・`skills`・`mods`・`legacy`: 武器ツリー（段とノード、Q/E スキル、ツリーが足す能力値、旧ツリーからの移行）。
+- `heavy`: 強攻撃（`run(c, lv)`）。`weaponSkills`: 武器に付くスキル（id → `{ name, kind, cd, run(c) }`。id は `skillPool` に書く）。
+- `model`: 形（`base(k)` が基本の形、`styles[1|2|3](k)` が形違い。`k` は材質と道具）。
+- `motion`（近接と違うときだけ）: `{ pose, swing, technique, afterSwing, rest }`。書いたものだけ近接の動きを上書きする。
+- `effects`: 武器ツリーの効果。`function effects({ player, field, attack, tree, show, party, register })` の中で
+  `register('<wk>', { フック: 関数 }, { フック: 順 })` で登録する（使える道具は `game/weapon-api.js` の一覧）。
+  - スキルに渡す道具（`combat` 文脈）を足すときは `attack.extendCombat({ ... })`。
+  - 能力値 S は計算し直されるので、分割代入せず `player.S` で読む。
+- 初期武器のスキルを `skillPool` の1つ目から変えるときだけ、`shared/data.js` の `STARTER_SKILL` にも足す。
 
-ツリーのデータ（`js/weapons/`）と効果（`js/game/weapons/`）を分けているのは、データ側を node のテストや画面からも読めるようにするため
-（効果側はブラウザのゲーム本体にしか要らない）。
+サーバーと共通の数値だけを `shared/data.js` に置くのは、サーバー（Node）が three.js を使う武器のファイルを読めないため。
 
 ### クラス・マスター・パッシブ（武器ツリーのノード）を足す
 
 1. `public/js/weapons/<wk>.js` の `tree.rows` にノードを足す（id は `<略号>_<名前>`）。
    - 能力値だけのパッシブは、ノードに `mods: [lv1, lv2]` を書けば済む。
    - lv3 の分岐（A/B）で能力値が変わるときは、そのファイルの `mods()` に書く。
-2. 動きのある効果は `public/js/game/weapons/<wk>.js` のフックに書く。
+2. 動きのある効果は `public/js/weapons/<wk>.js` の effects のフックに書く。
    - クラスは `W.ks1 === 'id'`、マスターは `W.ks2 === 'id'`、パッシブは `W.lv('id')` / `W.br('id') === 'A'` で判定する。
    - 新しい場面が必要なら、呼ぶ側に `fxCall('名前', ...)` を1か所足す（`weapon-fx.js` の説明を参照）。
 3. 技のモーションが要るなら `public/shared/tree-motions.js` に時刻（hits・duration・style）を足し、姿勢を `motions/styles.js` に足す。
@@ -205,7 +194,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 
 ### モデルを足す・差し替える
 
-- 武器の形: `models/weapon-models.js` の `WEAPON_MODELS[kind]`。
+- 武器の形: `js/weapons/<武器>.js` の `model`（`models/weapon-models.js` の `WEAPON_MODELS[kind]` に集まる）。
   - `base(k)` が基本の形（style 0）。
   - `styles[1|2|3](k)` が形違い（3 は伝説・神器の専用形）。
   - 形違いの前に共通の道具を作るときは `prep(k)` を書く。
@@ -228,7 +217,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - 時刻を自分で並べたいときは `KEYFRAMES[style] = [{ at, ...つまみ }]`。
   - 一回転で終わる動きは `FULL_TURN` に足す。
   - つまみ（yaw・pitch・bodyYaw・lean・x・y・z・guard・lift・leg・draw）は `BASE` に並んでいる。
-- 武器ごとの構え・通常攻撃の振り: `motions/<武器>.js` と、その登録表 `motions/index.js`。
+- 武器ごとの構え・通常攻撃の振り: `js/weapons/<武器>.js` の `motion`（`motions/index.js` が近接の動きに上書きして集める）。
 - 盾槍の突きの技は `shared/skill-timings.js` に時刻と `thrust`（突きの形: stroke・dash・repeat）を書くだけ。新しい形のときだけ `spear-motion.js` の `THRUST_CURVES` に足す。盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`。`spin: true` の動きは回転として扱われ、ほかのプレイヤーからも回って見える）。
 
 ### 敵・ボスの技・メッセージを足す（サーバー）
