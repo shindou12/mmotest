@@ -7,13 +7,13 @@ export function animatePlayer(model, s) {
   u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);u.head.rotation.y = 0;
   const walk = s.moving ? Math.sin(s.walkT * 10) : 0;
   u.legs[0].rotation.x = walk * 0.75; u.legs[1].rotation.x = -walk * 0.75;
-  if (s.guard) {
+  if (s.guard && !u.shieldBack) {
     // ガード: 盾を前に突き出して構える
     u.armL.rotation.set(-1.35, 0, 0.45);
     if (u.shield) u.shield.rotation.set(Math.PI / 2, 0, 0);
   } else {
     u.armL.rotation.set(-walk * 0.6, 0, -0.15);
-    if (u.shield) u.shield.rotation.set(0, -Math.PI / 2 + 0.25, 0);
+    if (u.shield && !u.shieldBack) u.shield.rotation.set(0, -Math.PI / 2 + 0.25, 0);
   }
   u.body.position.y = s.moving ? Math.abs(Math.cos(s.walkT * 10)) * 0.07 : Math.sin(s.t * 2) * 0.015;
   u.head.rotation.x = s.moving ? 0.05 : Math.sin(s.t * 1.3) * 0.03;
@@ -38,7 +38,13 @@ export function animatePlayer(model, s) {
     gm.color.setHex(gg > 0.6 ? 0x9ad8ff : gg > 0.3 ? 0xffd84a : 0xff4a3a);
   }
   updateWeaponPose(u, s);
-  if (u.shield && !(s.down > 0)) {
+  // 竜騎士: 盾を背負う（腕から背中へ付け替える）
+  if (u.shield && !!s.shieldBack !== !!u.shieldBack) {
+    u.shieldBack = !!s.shieldBack;
+    if (u.shieldBack) { u.body.add(u.shield); u.shield.position.set(0, 1.05, -0.28); u.shield.rotation.set(0.15, Math.PI, 0); }
+    else { u.armL.userData.elbow.add(u.shield); u.shield.position.set(-0.08, -0.14, 0.12); }
+  }
+  if (u.shield && !u.shieldBack && !(s.down > 0)) {
     // Shield faces forward in body space, regardless of forearm bending.
     u.shield.quaternion.copy(u.armL.quaternion).multiply(u.elbowL.quaternion).invert();
   }

@@ -10,8 +10,8 @@ import { World } from '../public/shared/sim.js';
 const base={t:1,moving:false,walkT:0,combo:0,swing:-1,spin:-1,sweep:-1,dodge:0,down:0,hurt:0};
 test('29 techniques are actual one-rank tree nodes and only activate with their weapon',()=>{
  assert.equal(TECHNIQUE_IDS.length,29);
- // 片手剣・大剣・短剣は新しい武器ツリー（weapon-tree.test.js）に移った
- for(const kind of ['spear','axe','bow']){
+ // 片手剣・大剣・短剣・盾槍は新しい武器ツリー（weapon-tree.test.js）に移った
+ for(const kind of ['axe','bow']){
   const additions=Object.values(TECHNIQUES).filter(t=>t.kind===kind);assert.equal(additions.length,5);
   const char={lv:30,tree:{[kind+'_norm']:3,[kind+'_heavy']:3}};
   for(const t of additions){const n=TREES[kind].nodes.find(n=>n.active===t.id);assert.ok(n);assert.equal(n.max,1);assert.equal(canLearn({lv:1,tree:{}},n.id),false);assert.equal(canLearn(char,n.id),true);char.tree[n.id]=1;assert.equal(canLearn(char,n.id),false);assert.equal(TREE_SKILLS[t.id].motion,t.id);assert.equal(MOTION_DURATIONS[t.id],t.duration);}

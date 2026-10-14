@@ -132,7 +132,7 @@ const me = {
   staggerT: 0, hurtT: 0, downT: 0, downStart: -99, noDownT: 0, kbT: 0, kbX: 0, kbZ: 0, dStack: 0, dStackT: 0, nextAtkBonus: 1, atkBonus: 1, atkBonusT: 0,
   // 武器ツリー（片手剣）の状態: 攻撃の通し番号 / 勢い / 魔剣士の時間 / 幻剣 / 受け流し / 報復 など
   act: 0, mom: 0, mageT: 0, cycleAct: -1, danceAct: -1, danceExt: 0, normHealAct: -1, normHeals: 0, edgeT: 0, edgeHealT: 0,
-  afterJust: false, revenge: 0, chargeStart: 0, eyeCharge: false, eyeT: -99, iaiReady: false, primeCharge: 0, lastHeavyLv: 0, lastHeavyT: -99, phantom: null, phantomUntil: 0, parryUntil: 0, parryDone: true, saintOn: false, paladinT: 0,
+  afterJust: false, revenge: 0, chargeStart: 0, eyeCharge: false, eyeT: -99, iaiReady: false, primeCharge: 0, lastHeavyLv: 0, lastHeavyT: -99, phantom: null, phantomUntil: 0, soarReady: 0, tipRun: 0, tipAct: -1, pierceReady: false, banner: null, boltT: 0, parryUntil: 0, parryDone: true, saintOn: false, paladinT: 0,
   model: null,
 };
 const world = { area: 'f1_town', def: AREAS.f1_town, floor: 1, unlocked: 1, bossState: 'idle', door: false, plates: [] };
@@ -214,13 +214,13 @@ function calcStats() {
   const P = {
     heavy: wk === 'axe' ? 25 : 0, // 大剣の強攻撃+20%は武器ツリー「溜めの心得」に移った
     vamp: wk === 'axe' ? 3 : 0,
-    def: wk === 'spear' ? 10 : 0,
+    def: 0, // 盾槍の被ダメージ-10%は武器ツリー「鉄壁の心得」に移った
     dodge: 1, // 短剣の回避クールタイム-25%は武器ツリー「身軽」に移った
     iframe: 0, // 片手剣の回避無敵は武器ツリーの「軽身」に移った
   };
   S = {
     wk, W, atk, mhp: Math.round(mhp), fx: fxs, flags: T.flags, actives: WT ? new Set([...T.actives, ...WT.actives]) : T.actives,
-    wt: WT, guard: !!W.guard || WT?.ks1 === 'sw_guard',
+    wt: WT, guard: (!!W.guard && WT?.ks1 !== 'sp_dragoon') || WT?.ks1 === 'sw_guard',
     chargeMax: CHARGE_MAX * (WT?.ks1 === 'gt_blow' ? 1.25 : 1) * (WT?.br('gt_charge') === 'A' ? 0.8 : 1), dodgeDist: WT?.br('sw_light') === 'B' || WT?.br('dk_agile') === 'B' ? 1.3 : 1,
     // 短剣の連撃: 当てるたびに攻撃の速さ（連撃の心得・連刃）
     dStackPer: wk !== 'dagger' ? 0 : !WT ? 4 : WT.lv('dk_combo') ? WT.v('dk_combo', 'per') : WT.ks1 === 'dk_blades' ? 4 : 0,
@@ -268,7 +268,7 @@ function itemPower(it) {
 // 盾槍のガード（強攻撃の溜め中に自動で構える。スマホはガードボタンでも。ダウン中はできない）
 // ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃の代わりに回転なぎ払い（sweepTick）
 function startGuard() {
-  if (me.dead || me.crawl || me.downT > 0 || me.guarding || me.gg <= 0 || me.staggerT > 0) return;
+  if (!S?.guard || me.dead || me.crawl || me.downT > 0 || me.guarding || me.gg <= 0 || me.staggerT > 0) return;
   me.guarding = true; me.guardStart = now(); me.charging = false; me.counter = false; audio.sfx('equip');
 }
 // ガードゲージ: ガードで受けるたびに減り（受ける前のダメージに比例）、尽きるとガードブレイクで大きな隙。
@@ -276,7 +276,9 @@ function startGuard() {
 const GUARD = { max: 100, perHp: 120, kdExtra: 20, regenDelay: 1.0, regen: 34, breakT: 1.5, breakDmg: 1.5 };
 me.gg = GUARD.max;
 function guardDamage(rawBefore, kd) {
-  me.gg -= rawBefore / S.mhp * GUARD.perHp + (kd ? GUARD.kdExtra : 0);
+  // 盾の心得: 減りが少ない / 挑発A「威圧」: 効果中は減らない
+  const keep = S.wt?.br('sp_taunt') === 'A' && hasBuff('sp_taunt') ? 0 : 1 - (S.wt?.v('sp_shield', 'gauge') || 0) / 100;
+  me.gg -= (rawBefore / S.mhp * GUARD.perHp + (kd ? GUARD.kdExtra : 0)) * keep;
   me.ggHitT = now();
   if (me.gg <= 0) { guardBreak(); return true; }
   if (me.gg < GUARD.max * 0.3) { audio.sfx('impact'); floatText(me.x, 2.4, me.z, '盾がきしむ…', 'info'); }
@@ -294,7 +296,7 @@ function guardBreak() {
 }
 function guardRegen(dt) {
   if (me.guarding || me.gg >= GUARD.max || now() - (me.ggHitT || 0) < GUARD.regenDelay || me.staggerT > 0) return;
-  me.gg = Math.min(GUARD.max, me.gg + GUARD.regen * dt);
+  me.gg = Math.min(GUARD.max, me.gg + GUARD.regen * dt * (S.wt?.br('sp_shield') === 'A' ? 2 : 1));
 }
 // ガードで攻撃を受けた → カウンター準備
 function armCounter() {
@@ -892,9 +894,10 @@ function resolveTele(te) {
       raw *= S.flags.has('bulwark') ? 0 : 0.25;
       audio.sfx('block');
       fx.parts.burst(me.x + Math.sin(me.a) * 0.8, 1.2, me.z + Math.cos(me.a) * 0.8, 14, { color: 0xbfe0ff, speed: 5, size: 0.4, life: 0.35 });
-      armCounter(); wtOnGuard(te.dmg);
-      // ガードで受けた: ひるみ・ダウンはせず、少し押し戻されるだけ（ガードとカウンター準備は続く）
-      knockFrom(src, 0.8, 0.12); hitStop = 0.05;
+      armCounter(); wtOnGuard(te.dmg, srcMob);
+      // ガードで受けた: ひるみ・ダウンはせず、少し押し戻されるだけ（ガードとカウンター準備は続く）。鉄壁A「不動」は押し戻されない
+      if (S.wt?.br('sp_iron') !== 'A') knockFrom(src, 0.8, 0.12);
+      hitStop = 0.05;
       if (raw <= 0) { floatText(me.x, 2.4, me.z, '防御', 'info'); return; }
       takeDamage(raw, src, false, true);
       return;
@@ -1134,6 +1137,7 @@ function dealDamage(mb, mult, o = {}) {
   let crit = o.crit || (S.wt && hasBuff('sw_saint') && o.type !== 'dot') || o.sv?.key === 'sv_heavy' || Math.random() * 100 < S.crit + buffMod('crit') + wtCritAdd(o) + (tough && tf('t_shark') ? 15 : 0) + (tf('t_night') && indoorNow() ? 10 : 0) + (tf('t_lucky') ? 8 : 0) || (skill && S.fx.has('skillcrit'));
   let ambushed = false;
   if (!crit && me.ambush > 0 && !o.noProc) { crit = true; me.ambush--; ambushed = true; }
+  if (!crit && spTip(o) === 1) crit = true; // 間合い: 槍の先端は必ず会心
   if (S.wt && !crit && wtBehind(mb) && S.wt.ks1 === 'dk_assassin' && o.type !== 'dot' && o.type !== 'proc') crit = true; // 暗殺: 背後は必ず会心
   const typeMult = 1 + ((S[TYPE_MOD[o.type]] || 0) + buffMod(TYPE_MOD[o.type])) / 100;
   const back = me.hp < S.mhp * 0.5 ? 1 + S.backwater / 100 : 1;
@@ -1152,7 +1156,7 @@ function dealDamage(mb, mult, o = {}) {
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
   // スタン値: 強攻撃で大きく溜まる。近接武器ほど溜めやすい
   const st = mb.kind === 2 && !(mb.stunT > 0) ? stunValue(o) : 0;
-  net.send({ t: 'hit', id: mb.id, dmg, crit, st, tech: o.tech });
+  net.send({ t: 'hit', id: mb.id, dmg, crit, st, tech: o.tech || (S.wt?.ks2 === 'sp_hold' && spTip(o) === 1 && mb.kind !== 2 ? 'spear_press' : undefined) }); // 間合い支配: 先端で当てた雑魚を押し戻す
   if (o.healOnHit) heal(dmg * o.healOnHit, true);
   if (o.threat > 1) net.send({ t: 'threat', id: mb.id, n: Math.round(dmg * (o.threat - 1)) });
   // 武器パッシブ（攻撃が当たったとき）
@@ -1223,6 +1227,11 @@ function wtDmgMult(o, mb, crit) {
   if (W.ks2 === 'dk_spread' && mb?.vStack) k *= 1 + 0.04 * mb.vStack;
   if (W.br('dk_combo') === 'B' && me.dStack >= S.dStackMax) k *= 1.06;
   if (W.ks1 === 'dk_assassin' && o.type !== 'proc' && wtBehind(mb)) k *= 1.2 * (W.ks2 === 'dk_exec' && crit && mb.kind === 2 ? 1.4 : 1);
+  // 盾槍
+  const tip = spTip(o);
+  if (tip === 1) k *= 1.25; else if (tip === -1) k *= 0.8;
+  if (hasBuff('sp_thunder') && (o.type === 'normal' || o.type === 'heavy')) k *= 1.2;
+  if (W.br('sp_brk') === 'A' && mb?.stunT > 0) k *= 1.2;
   // 大剣
   const maxHeavy = o.type === 'heavy' && !o.wave && me.lastHeavyLv === 2 && now() - me.lastHeavyT < 0.8;
   if (W.ks1 === 'gt_wave' && o.type === 'heavy' && !o.wave) k *= 0.85;
@@ -1248,6 +1257,18 @@ function wtOnHit(mb, dmg, crit, o, mult) {
       addBuff('sw_saint', '剣聖・全会心', 3, {}, 0xffd84a);
       floatText(me.x, 3.2, me.z, '剣聖!', 'just');
     }
+  }
+  // 盾槍: 先端の連続（一点突破）と雷槍
+  if (W.ks1 === 'sp_reach' && me.tipAct !== me.act && ATK_TYPES.includes(o.type)) {
+    me.tipAct = me.act;
+    me.tipRun = spTip(o) === 1 ? me.tipRun + 1 : 0;
+    if (W.ks2 === 'sp_pierce' && me.tipRun >= 3 && !me.pierceReady) { me.pierceReady = true; me.tipRun = 0; floatText(me.x, 3.1, me.z, '一点突破', 'just'); fx.ringWave(me.x, me.z, 0xfff0a0, 1.8, 0.3); }
+  }
+  if (spTip(o) === 1) fx.flash(mb.x, 1.3, mb.z, 0xfff0a0, 14, 0.12);
+  if (W.ks2 === 'sp_bolt' && hasBuff('sp_thunder') && (o.type === 'normal' || o.type === 'heavy') && now() - me.boltT > 0.3) {
+    me.boltT = now();
+    const x = mb.x, z = mb.z;
+    later(0.06, () => { fx.lightning(x, z, 0x9ad8ff); combat.circle(x, z, 2.5, 0.6, { type: 'proc', noProc: true }); audio.sfx('thunder'); });
   }
   // 短剣: 毒・出血を重ねる / 連刃の二重斬り
   if (o.poison) addPoison(mb, o.poison);
@@ -1306,6 +1327,7 @@ function skillCd(id) {
 // 攻撃を受けた（受け流し・不撓A・勢いのリセット）
 function wtOnHurt(guarded) {
   const W = S.wt;
+  if (W.br('sp_intercept') === 'A' && hasBuff('sp_intercept')) spThunder();
   if (now() < me.parryUntil && !me.parryDone) {
     me.parryDone = true;
     floatText(me.x, 3, me.z, '受け流し!', 'just');
@@ -1324,9 +1346,11 @@ function wtOnHurt(guarded) {
   if (W.ks1 === 'sw_glad' && W.ks2 !== 'sw_berserk') setMom(0);
 }
 // ガードで受けた（守護騎士）
-function wtOnGuard(raw) {
+function wtOnGuard(raw, src) {
   const W = S.wt;
   if (!W) return;
+  if (W.br('sp_intercept') === 'A' && hasBuff('sp_intercept')) spThunder();
+  if (W.br('sp_shield') === 'B' && src?.hp > 0) dealDamage(src, 0.3, { type: 'proc', stun: 6, noProc: true }); // 盾の重み
   if (W.ks2 === 'sw_paladin' && now() - me.paladinT > 1.5) {
     me.paladinT = now();
     heal(S.mhp * 0.05, true);
@@ -1364,6 +1388,12 @@ const wtCritAdd = (o) => (S.wt?.ks2 === 'gt_judge' && o.type === 'heavy' && !o.w
 // 強攻撃の押し始め: 居合・踏み込み溜めで、溜めた状態から始める
 function wtChargeStart() {
   if (!S?.wt) return;
+  if (me.soarReady && now() < me.soarReady && !me.dead && me.downT <= 0 && me.staggerT <= 0) { // 竜翔: 溜めなしでもう一度跳ぶ
+    me.soarReady = 0; me.charging = false; me.skillT = -1;
+    floatText(me.x, 3, me.z, '竜翔', 'just');
+    spJump(2, true);
+    return;
+  }
   if (me.iaiReady) { me.iaiReady = false; me.chargeT = S.chargeMax; floatText(me.x, 3, me.z, '居合', 'just'); }
   else if (me.primeCharge > 0) { me.chargeT = S.chargeMax * me.primeCharge; me.primeCharge = 0; }
 }
@@ -1414,12 +1444,23 @@ function wtEye() {
 }
 // 武器ツリーの状態を、体と剣のまわりの光で見せる（勢い・剣聖の全会心・報復者の蓄え）
 const wtHandPos = new THREE.Vector3();
-const wtAuraAcc = { mom: 0, saint: 0, rev: 0 };
+const wtAuraAcc = { mom: 0, saint: 0, rev: 0, thunder: 0, soar: 0 };
 // 1秒あたり rate 個の割合で粒を出す（フレームの速さに左右されない）
 function wtEmit(key, rate, dt, fn) { wtAuraAcc[key] += rate * dt; while (wtAuraAcc[key] >= 1) { wtAuraAcc[key]--; fn(); } }
 function wtAura(dt) {
   const W = S?.wt;
   if (!W || me.dead || me.crawl || !me.model) return;
+  // 旗手: 旗のそばにいる間は守りと攻めが上がる
+  if (me.banner) {
+    if (now() > me.banner.until) me.banner = null;
+    else if (Math.hypot(me.x - me.banner.x, me.z - me.banner.z) < 5) quietBuff('sp_banner', '旗手', 0.3, { dr: 20, atkp: 15 }, 0x6ab0ff);
+  }
+  // 騎士: 雷をまとう間、槍の穂先から火花
+  if (hasBuff('sp_thunder')) {
+    me.model.userData.hand?.getWorldPosition(wtHandPos);
+    wtEmit('thunder', 30, dt, () => fx.parts.emit(wtHandPos.x + rnd(-0.4, 0.4), wtHandPos.y + rnd(0, 1.2), wtHandPos.z + rnd(-0.4, 0.4), { color: Math.random() < 0.5 ? 0xffffff : 0x9ad8ff, size: 0.28, life: 0.2, speed: 3, gravity: 0 }));
+  }
+  if (me.soarReady && now() < me.soarReady) wtEmit('soar', 20, dt, () => fx.parts.emit(me.x + rnd(-0.4, 0.4), 0.2, me.z + rnd(-0.4, 0.4), { color: 0x9affc8, size: 0.3, life: 0.5, speed: 1.5, gravity: -5 }));
   // 疾風: 連撃が最大の間は移動が速い
   if (W.ks2 === 'dk_gale' && me.dStack >= S.dStackMax) quietBuff('dk_gale', '疾風', 0.3, { move: 25 }, 0x9affc8);
   // 剣闘士: 勢いが溜まるほど、橙の火の粉が体から立ちのぼる（最大で足元に炎の輪）
@@ -1472,6 +1513,58 @@ function addBleed(mb, perSec, stack = false, sec = 4) {
   mb.bleedPow = Math.max(stack ? perSec * mb.bleedN : perSec, mb.bleedUntil > now() && !stack ? mb.bleedPow || 0 : 0);
   mb.bleedUntil = now() + sec * (S.wt?.br('dk_toxin') === 'A' ? 1.5 : 1);
 }
+// ---- 盾槍 ----
+// 攻撃が槍の先端で当たったか（間合い）: 1 = 先端 / -1 = 近すぎ / 0 = それ以外・対象外
+function spTip(o) {
+  if (S.wt?.ks1 !== 'sp_reach' || o.tip == null || !ATK_TYPES.includes(o.type)) return 0;
+  return o.tip >= 0.7 ? 1 : o.tip < 0.4 ? -1 : 0;
+}
+// 突きの届く距離の倍率（槍の心得A「長柄」は通常攻撃だけ・騎士の雷は突き全部）
+const spReach = (normal) => (S.wk !== 'spear' ? 1 : (normal && S.wt?.br('sp_spear') === 'A' ? 1.2 : 1) * (hasBuff('sp_thunder') ? 1.5 : 1));
+// 騎士: 突きが雷をまとう
+function spThunder() {
+  if (!hasBuff('sp_thunder')) { fx.lightning(me.x, me.z, 0x9ad8ff); audio.sfx('thunder'); }
+  quietBuff('sp_thunder', '雷槍', 3, {}, 0x9ad8ff);
+}
+// 竜騎士の強攻撃: 高く跳んで狙った場所へ突き降りる（空中は無敵）
+const JUMP = { air: 0.55, mult: [0, 5.0, 7.5], range: [0, 5, 8], r: 2.5 };
+function spJump(lv, soared = false) {
+  const p = aimPoint(), a = Math.atan2(p.x - me.x, p.z - me.z);
+  const d = Math.min(JUMP.range[lv], Math.hypot(p.x - me.x, p.z - me.z));
+  const M = TREE_MOTIONS.sp_jump;
+  me.a = a; me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration; me.act++;
+  combat.dash(a, Math.max(0.01, d), JUMP.air, JUMP.air + 0.15);
+  fx.parts.burst(me.x, 0.3, me.z, 18, { color: 0xd8c8a8, speed: 4, size: 0.45, life: 0.4, up: 3 });
+  audio.sfx('dodge');
+  later(JUMP.air, () => {
+    if (me.dead) return;
+    combat.circle(me.x, me.z, JUMP.r, JUMP.mult[lv], { type: 'heavy', stun: 10 });
+    fx.ringWave(me.x, me.z, RARITIES[S.wr].color, JUMP.r + 0.6, 0.35); fx.flash(me.x, 1, me.z, 0xffffff, 40, 0.25);
+    fx.parts.burst(me.x, 0.3, me.z, 40, { color: 0xc8b090, speed: 7, size: 0.5, life: 0.6, up: 2 });
+    audio.sfx('heavy'); addShake(lv === 2 ? 0.5 : 0.3); hitStop = 0.06;
+    if (S.wt?.ks2 === 'sp_fang') later(0.08, () => { // 竜の牙: 着地点から衝撃が広がる
+      combat.circle(me.x, me.z, 4.5, 3.0, { type: 'heavy', stun: 20 });
+      fx.ringWave(me.x, me.z, 0xff8a4a, 5, 0.45); fx.parts.burst(me.x, 0.4, me.z, 50, { color: 0xff8a4a, speed: 9, size: 0.55, life: 0.6, up: 2 }); addShake(0.4);
+    });
+    if (S.wt?.ks2 === 'sp_soar' && !soared) { me.soarReady = now() + 1.5; fx.ringWave(me.x, me.z, 0x9affc8, 1.6, 0.3); }
+  });
+}
+// 旗手: ガードカウンターした場所に旗を立てる
+function spBanner(x, z) {
+  const old = me.banner && fx.items.find((it) => it.obj === me.banner.mesh);
+  if (old) old.life = 0; // 前の旗は消す
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), new THREE.MeshLambertMaterial({ color: 0x8a6a40 }));
+  pole.position.y = 1.6; g.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.7), new THREE.MeshBasicMaterial({ color: 0x6ab0ff, side: THREE.DoubleSide }));
+  flag.position.set(0.55, 2.8, 0); g.add(flag);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(4.8, 5, 48), new THREE.MeshBasicMaterial({ color: 0x6ab0ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
+  g.position.set(x, 0, z);
+  fx.add(g, 8, (o, k) => { flag.rotation.y = Math.sin(k * 40) * 0.3; ring.material.opacity = 0.35 * (1 - k * 0.5); });
+  me.banner = { x, z, until: now() + 8, mesh: g };
+  fx.beam(x, z, 0x6ab0ff, 4, 0.5, 0.5);
+}
 // 熟練度: 今の武器で経験値を得ると上がる
 function gainWeaponProf(n) {
   const wk = S?.wk || char.eq.weapon?.kind || 'sword';
@@ -1521,10 +1614,10 @@ function wtResetTree(wk) {
 function migrateWeaponTrees() {
   char.prof = char.prof || {}; char.wt = char.wt || {};
   let back = 0;
-  for (const id of Object.keys(char.tree)) if (id.startsWith('sword_') || id.startsWith('greatsword_') || id.startsWith('gs_') || id.startsWith('dagger_')) { back += char.tree[id]; delete char.tree[id]; }
-  const gone = ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance', 'gslam', 'fortress', 'gs_guillotine', 'gs_rising', 'gs_broad', 'gs_recoil', 'gs_siege', 'poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken'];
+  for (const id of Object.keys(char.tree)) if (id.startsWith('sword_') || id.startsWith('greatsword_') || id.startsWith('gs_') || id.startsWith('dagger_') || id.startsWith('spear_')) { back += char.tree[id]; delete char.tree[id]; }
+  const gone = ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance', 'gslam', 'fortress', 'gs_guillotine', 'gs_rising', 'gs_broad', 'gs_recoil', 'gs_siege', 'poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken', 'shieldbash', 'taunt', 'spear_fan', 'spear_sweep', 'spear_press', 'spear_stake', 'spear_intercept'];
   char.slots = char.slots.map((id) => (id && (gone.includes(id) || !TREE_SKILLS[id]) ? null : id));
-  if (back) later(1, () => toast(`片手剣・大剣・短剣は新しい武器ツリーになりました。旧ツリーの ${back} ポイントを返しました`, '#ffd84a'));
+  if (back) later(1, () => toast(`片手剣・大剣・短剣・盾槍は新しい武器ツリーになりました。旧ツリーの ${back} ポイントを返しました`, '#ffd84a'));
   if (params.has('prof')) {
     const wk = char.eq.weapon?.kind || 'sword', p = profOf(char, wk);
     p.lv = clamp(Math.round(+params.get('prof')) || 1, 1, 20); p.xp = 0;
@@ -1746,7 +1839,7 @@ const combat = {
     for (const mb of [...mobs.values()]) {
       const dx = mb.x - me.x, dz = mb.z - me.z, d = Math.hypot(dx, dz);
       if (d > range + mb.rad) continue;
-      if (Math.abs(angDiff(Math.atan2(dx, dz), a)) <= arc + mb.rad / Math.max(d, 0.5) || d < mb.rad + 0.6) dealDamage(mb, mult, o);
+      if (Math.abs(angDiff(Math.atan2(dx, dz), a)) <= arc + mb.rad / Math.max(d, 0.5) || d < mb.rad + 0.6) dealDamage(mb, mult, S.wt?.ks1 === 'sp_reach' ? { ...o, tip: d / (range + mb.rad) } : o);
     }
     for (const p of downedAllies()) {
       const dx = p.x - me.x, dz = p.z - me.z, d = Math.hypot(dx, dz);
@@ -1759,7 +1852,7 @@ const combat = {
     for (const mb of [...mobs.values()]) {
       const dx = mb.x - sx, dz = mb.z - sz;
       const along = dx * fx_ + dz * fz, side = Math.abs(dx * fz - dz * fx_);
-      if (along > -mb.rad && along < len + mb.rad && side < w / 2 + mb.rad) dealDamage(mb, mult, o);
+      if (along > -mb.rad && along < len + mb.rad && side < w / 2 + mb.rad) dealDamage(mb, mult, S.wt?.ks1 === 'sp_reach' ? { ...o, tip: along / (len + mb.rad) } : o);
     }
     for (const p of downedAllies()) {
       const dx = p.x - sx, dz = p.z - sz, along = dx * fx_ + dz * fz, side = Math.abs(dx * fz - dz * fx_);
@@ -1781,6 +1874,7 @@ const combat = {
     me.dashA = a; me.dashT = dur; me.dashSpeed = dist / dur; me.a = a;
     if (iframe) me.iframe = Math.max(me.iframe, iframe);
   },
+  reach: (normal) => spReach(normal),
   nearest(range) {
     let best = null, bd = range;
     for (const mb of mobs.values()) { const d = Math.hypot(mb.x - me.x, mb.z - me.z); if (d < bd) { bd = d; best = mb; } }
@@ -1816,9 +1910,12 @@ function doSwing() {
     if (me.dodgeT > 0) floatText(me.x, 2.4, me.z, '転がり撃ち', 'info');
     return;
   }
-  fx.slash(me.x, me.z, me.a, W.range, W.arc, col, 1.0, me.combo % 2 === 1);
+  const range = W.range * spReach(true);
+  fx.slash(me.x, me.z, me.a, range, W.arc, hasBuff('sp_thunder') ? 0x9ad8ff : col, 1.0, me.combo % 2 === 1);
   audio.sfx('swing', { heavy: S.wk === 'greatsword' || S.wk === 'axe' || me.combo === 2 });
-  later(0.06, () => combat.arc(W.range, W.arc, mult, { a, type: 'normal' }));
+  later(0.06, () => combat.arc(range, W.arc, mult, { a, type: 'normal' }));
+  if (S.wt?.br('sp_spear') === 'B' && me.combo === 2) later(0.2, () => { combat.arc(range, W.arc, 0.6, { a, type: 'normal' }); fx.slash(me.x, me.z, a, range, W.arc, col, 0.8); }); // 連突き
+  spPierce(a);
   if (me.combo === 2 && S.fx.has('wave')) combat.proj({ a, mult: 1.4, type: 'normal' });
   else if (me.combo === 2 && S.wt?.br('sw_norm') === 'A') combat.proj({ a, mult: 1.2, type: 'normal' }); // 剣の心得A「閃光」
   if (S.wt?.ks2 === 'dk_thousand' && me.combo === 2 && me.dStack >= S.dStackMax) { // 千本: 3段目は手首でナイフを3本投げる
@@ -1862,6 +1959,13 @@ function fxArrow(x, z, a, color) {
   fx.add(m, 0.6, (o, k) => { o.position.x = x + Math.sin(a) * 40 * k * 0.6; o.position.z = z + Math.cos(a) * 40 * k * 0.6; });
 }
 
+// 一点突破: 溜めた次の突きが前方を貫く衝撃になる
+function spPierce(a) {
+  if (!me.pierceReady) return;
+  me.pierceReady = false;
+  combat.proj({ a, mult: 1.6, type: 'normal', speed: 30, life: 0.45, rad: 1.3, color: 0xfff0a0, wtNo: true });
+  fx.flash(me.x, 1.3, me.z, 0xfff0a0, 30, 0.2);
+}
 function doHeavy(lv) {
   if (!canAct() || lv < 1) return;
   startAttack(); me.act++;
@@ -1881,12 +1985,18 @@ function doHeavy(lv) {
     addShake(0.4);
     if (tf('t_guard')) addBuff('fort', '不落の盾', 4, { dr: 40 }, 0xbfe0ff);
     if (S.wk !== 'spear') { swordCounter(); return; } // 片手剣（守護騎士）は踏み込みの横斬り
+    const W = S.wt;
+    if (W?.ks1 === 'sp_knight') spThunder();
+    if (W?.ks2 === 'sp_banner') spBanner(me.x, me.z);
+    if (W?.br('sp_ctr') === 'A') me.iframe = Math.max(me.iframe, SWEEP.dur);
+    if (W?.br('sp_ctr') === 'B') later(SWEEP.dur, () => { if (!me.dead) { const a = aimAngle(); me.a = a; me.swingT = 0; me.swingDur = 0.4; me.combo = 2; me.sw++; combat.line(6 * spReach(false), 2, 1.5, { type: 'heavy', a }); fx.slash(me.x, me.z, a, 6, 30, 0xbfe0ff, 1.2); audio.sfx('swing', { heavy: true }); } }); // 二段反撃
     me.swingT = 9; // 振りのモーションの代わりに回転なぎ払い
     me.sweepT = 1e-4; me.sweepHit = false;me.motion = 'counter';me.motionT = 0;
     audio.sfx('swing', { heavy: true });
     return;
   }
-  if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; }
+  if (S.wt?.ks1 === 'sp_dragoon') { spJump(lv); return; }
+  if (S.wk === 'spear') { me.motion = 'heavy';me.motionT = 0; spPierce(me.a); }
   if (S.wk === 'dagger') { me.motion = 'dk_blink'; me.motionT = 0; } // 瞬影: 低く駆け抜けながら斬る
   HEAVY[S.wk].run(combat, lv);
   if (S.wk === 'dagger' && S.wt?.ks2 === 'dk_step') later(0.24, () => { me.a += Math.PI; me.afterJust = true; me.motion = 'dk_step_turn'; me.motionT = 0; floatText(me.x, 3, me.z, '影渡り', 'just'); fx.ringWave(me.x, me.z, 0xcab4ff, 2.2, 0.3); }); // 影渡り: すり抜けたら敵のほうへ向き直る
@@ -1932,8 +2042,8 @@ function sweepTick(dt) {
   }
   if (!me.sweepHit && prev < SWEEP.hitAt && me.sweepT >= SWEEP.hitAt) {
     me.sweepHit = true;
-    const kk = (S.flags.has('bulwark') ? 1.3 : 1) * (S.wk === 'spear' ? 1 : 0.5); // ツリー「不動の盾」で +30%。盾槍以外（守護騎士）は半分
-    combat.circle(me.x, me.z, SWEEP.r, SWEEP.mult * kk, { type: 'heavy', stun: SWEEP.stun });
+    const kk = (S.flags.has('bulwark') ? 1.3 : 1) * (S.wk === 'spear' ? 1 + (S.wt?.v('sp_ctr', 'ctr') || 0) / 100 : 0.5); // 反撃の心得で強くなる。盾槍以外（守護騎士）は半分
+    combat.circle(me.x, me.z, SWEEP.r, SWEEP.mult * kk, { type: 'heavy', stun: SWEEP.stun * (S.wt?.br('sp_brk') === 'B' ? 2 : 1) });
     fx.ringWave(me.x, me.z, 0xbfe0ff, SWEEP.r + 0.5, 0.4, 1.0, 1.0);
     fx.flash(me.x, 1.2, me.z, 0xbfe0ff, 50, 0.3);
     audio.sfx('heavy'); addShake(0.45);
@@ -2057,7 +2167,7 @@ function updateBossProjs(dt) {
       if (me.guarding && S.guard && facing) {
         // ガードで弾を消す
         net.send({ t: 'pblock', id: p.id });
-        if (!guardDamage(p.dmg, false)) { floatText(me.x, 2.6, me.z, '防御', 'info'); armCounter(); wtOnGuard(p.dmg); }
+        if (!guardDamage(p.dmg, false)) { floatText(me.x, 2.6, me.z, '防御', 'info'); armCounter(); wtOnGuard(p.dmg, mobs.get(p.src)); }
         audio.sfx('block');
         fx.parts.burst(p.x, 1.3, p.z, 20, { color: 0xbfe0ff, speed: 6, size: 0.4, life: 0.35 });
         gone = true;
@@ -3041,7 +3151,7 @@ function update(dt) {
   me.model.position.set(me.x, heightAt(me.x, me.z), me.z);
   me.model.rotation.y = me.a;
   animatePlayer(me.model, {
-    t, moving: me.moving, walkT: me.walkT, kind: S.wk, combo: me.combo, dead: me.dead, guard: me.guarding,
+    t, moving: me.moving, walkT: me.walkT, kind: S.wk, combo: me.combo, dead: me.dead, guard: me.guarding, shieldBack: S.wt?.ks1 === 'sp_dragoon',
     swing: me.swingT < me.swingDur ? me.swingT / me.swingDur : me.charging && me.chargeT > CHARGE_MIN ? 0.02 : -1,
     spin: me.skillT >= 0 && me.spin ? me.skillT / 0.55 : -1,
     dodge: me.dodgeT > 0 ? me.dodgeT / 0.38 : 0,

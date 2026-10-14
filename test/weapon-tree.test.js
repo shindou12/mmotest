@@ -195,3 +195,34 @@ test('dagger: poison / assassin / blades classes, base passives moved into the t
   wtLearn(c, 'dk_vital');
   T0.hp = 40; assert.equal(run('dk_vital').find((e) => e.m === 'hit').a[1], 5.4, 'low-HP targets take the big hit');
 });
+
+test('spear: dragoon / reach / knight classes, the old -10% moved into 鉄壁の心得, skills scale and branch', () => {
+  const c = fresh();
+  profOf(c, 'spear').lv = 20;
+  assert.equal(TREES.spear, undefined, 'old spear tree is gone');
+  wtLearn(c, 'sp_iron'); wtLearn(c, 'sp_iron'); wtLearn(c, 'sp_iron'); wtChoose(c, 'sp_iron', 'B');
+  let E = wtEffects(c, 'spear');
+  assert.equal(E.mods.def, 10, 'the old -10% damage taken now lives in 鉄壁の心得');
+  assert.equal(E.mods.hpp, 10);
+  assert.ok(wtLearn(c, 'sp_dragoon')); assert.ok(!wtCanLearn(c, 'sp_knight'));
+  assert.equal(wtEffects(c, 'spear').mods.aspd, 30, 'dragoon attacks faster');
+  assert.ok(!wtCanLearn(c, 'sp_banner'), 'masters follow their class'); assert.ok(wtLearn(c, 'sp_fang'));
+  const T0 = { id: 1, x: 0, z: 4, hp: 100, mhp: 100 };
+  const run = (id) => {
+    const k = ctx(wtEffects(c, 'spear'));
+    Object.assign(k.c, { point: () => ({ x: 0, z: 4 }), taunt: (...a) => k.events.push({ m: 'taunt', a }), text: () => {}, shake: () => {} });
+    k.c.fx.lightning = () => {};
+    TREE_SKILLS[id].run(k.c); k.run(); return k.events;
+  };
+  wtLearn(c, 'sp_fan');
+  assert.deepEqual(run('sp_fan').filter((e) => e.m === 'line').map((e) => e.a[2]), [1.3, 1.3, 1.3]);
+  wtLearn(c, 'sp_fan'); wtLearn(c, 'sp_fan'); wtChoose(c, 'sp_fan', 'B');
+  assert.ok(run('sp_fan').filter((e) => e.m === 'line').every((e) => e.a[0] === 7.5 && e.a[2] === 1.65), 'long fan reaches further');
+  wtLearn(c, 'sp_stake'); wtLearn(c, 'sp_stake'); wtLearn(c, 'sp_stake'); wtChoose(c, 'sp_stake', 'A');
+  const st = run('sp_stake').filter((e) => e.m === 'circle');
+  assert.equal(st[0].a[3], 4.8); assert.equal(st.length, 7, 'thunder stake keeps striking');
+  wtLearn(c, 'sp_taunt'); wtChoose(c, 'sp_taunt', 'B');
+  assert.equal(wtEffects(c, 'spear').br('sp_taunt'), null, 'branch needs lv3');
+  assert.equal(run('sp_taunt').find((e) => e.m === 'buff').a[3].dr, 30);
+  for (const id of ['sp_fan', 'sp_sweep', 'sp_bash', 'sp_stake', 'sp_intercept', 'sp_taunt']) assert.ok(TREE_SKILLS[id], id);
+});

@@ -45,11 +45,11 @@ export const HEAVY = {
   spear: {
     name: '溜め突き', desc: '踏み込みながら遠くまで貫く',
     run(c, lv) {
-      const a = c.aim(), sx = c.me.x, sz = c.me.z;
+      const a = c.aim(), sx = c.me.x, sz = c.me.z, k = c.reach ? c.reach(false) : 1; // 騎士の雷で届く距離が伸びる
       c.dash(a, 3, SPEAR_TIMINGS.heavy.dashDuration, 0);
       c.later(SPEAR_TIMINGS.heavy.hitAt, () => {
-        c.line(lv === 2 ? 8 : 6.5, 2.0, lv === 2 ? 3.8 : 2.4, { type: 'heavy', a, sx, sz });
-        for (let d = 0; d < 8; d += 0.5) c.fx.parts.emit(sx + Math.sin(a) * d, 1.1, sz + Math.cos(a) * d, { color: c.col(), size: 0.5, life: 0.35, speed: 1, gravity: 0 });
+        c.line((lv === 2 ? 8 : 6.5) * k, 2.0, lv === 2 ? 3.8 : 2.4, { type: 'heavy', a, sx, sz });
+        for (let d = 0; d < 8 * k; d += 0.5) c.fx.parts.emit(sx + Math.sin(a) * d, 1.1, sz + Math.cos(a) * d, { color: c.col(), size: 0.5, life: 0.35, speed: 1, gravity: 0 });
       });
     },
   },
@@ -563,8 +563,7 @@ const weaponTree = (k, names, a1, a2, cap) => [
 ];
 
 export const TREES = {
-  // 片手剣・大剣・短剣は新しい武器ツリー（weapon-tree.js）に移った
-  spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ガードカウンターの威力 +30%' }) },
+  // 片手剣・大剣・短剣・盾槍は新しい武器ツリー（weapon-tree.js）に移った
   axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },
   bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { zone: 3 }, desc: '引き絞ったときの適性エリアの幅 +3m' }) },
   stat: {

@@ -52,6 +52,10 @@ function profile(style,i){
  case 'lightwave':return [{pitch:1.5,y:1.72,z:.16,lean:-.15},{pitch:-.05,y:1.3,z:.6,lean:.28,leg:.4}];
  case 'riposte':return [{yaw:-1.35,pitch:.05,bodyYaw:-.55,y:1.12,z:.2,guard:.6,lean:-.04},{yaw:1.45,pitch:.12,bodyYaw:.75,z:.52,lean:.18,leg:.38}];
  case 'gtriposte':return [{yaw:-.95,pitch:-.55,y:1.0,z:.34,bodyYaw:-.45,lean:.12},{yaw:.75,pitch:1.15,y:1.62,z:.3,bodyYaw:.5,lean:-.1,leg:.35}];
+ case 'bash':return [{pitch:.2,z:.2,guard:1,lean:-.05,bodyYaw:-.35},{pitch:.1,z:.3,guard:1,lean:.28,bodyYaw:.25,leg:.4}];
+ case 'bashrush':return [{pitch:.15,z:.15,guard:1,lean:.3,leg:.45,y:1.1},{pitch:.1,z:.32,guard:1,lean:.38,bodyYaw:.15,leg:.5}];
+ case 'clang':return [{pitch:1.2,y:1.6,z:.2,guard:1,lean:-.12},{pitch:.3,y:1.35,z:.35,guard:1,lean:.05,leg:.2}];
+ case 'lowspin':return [{yaw:-1.2,pitch:-.35,y:1.08,bodyYaw:-.4},{yaw:1.1,pitch:-.35,y:.98,x:.5,z:.18,bodyYaw:Math.PI*2-.3,lean:.2,leg:.3}];
  case 'chime':return [{draw:.3,guard:1},{draw:0,bodyYaw:-.2,lean:-.1,guard:1}];
  default:return [{},{z:.5}];
  }
@@ -60,6 +64,8 @@ function profile(style,i){
 const CUSTOM={
  pivot:[{at:0,bodyYaw:Math.PI,yaw:-.8,pitch:.2,lean:.1},{at:.18,bodyYaw:.3,yaw:.5,pitch:.1,z:.45,lean:.15,leg:.3},{at:.3}],
  smoke:[{at:0},{at:.08,pitch:-.35,y:1.0,z:.32,lean:.22,lift:-.1,leg:.3},{at:.22,pitch:.6,y:1.45,z:.2,lean:-.35,lift:.55,leg:-.3,guard:.6},{at:.4,pitch:.3,y:1.25,lean:-.1,lift:.08,leg:.2},{at:.55}],
+ dive:[{at:0},{at:.1,pitch:.4,y:1.3,z:.22,lift:-.18,lean:.2,leg:.4},{at:.28,pitch:1.3,y:1.72,z:.16,lift:1.7,lean:-.22,leg:-.3},{at:.44,pitch:-1.2,y:1.5,z:.42,lift:1.3,lean:.35,leg:-.1},{at:.55,pitch:-1.3,y:1.1,z:.5,lift:0,lean:.32,leg:.45},{at:.7,pitch:-1.2,y:1.12,z:.48,lift:-.08,lean:.25,leg:.35},{at:.85}],
+ fanleap:[{at:0},{at:.08,pitch:.3,z:.2,lift:-.12,leg:.35},{at:.2,pitch:.6,y:1.5,z:.2,lift:.9,lean:-.1,leg:-.2},{at:.24,yaw:-.5,pitch:-.6,z:.55,lift:.5,lean:.3},{at:.32,yaw:0,pitch:-.6,z:.58,lift:.2,lean:.3},{at:.4,yaw:.5,pitch:-.6,z:.55,lift:0,lean:.3,leg:.35},{at:.75}],
  slam:[{at:0},{at:.09,pitch:.9,y:1.32,z:.2,lift:-.16,lean:.18,leg:.35},{at:.22,pitch:1.55,y:1.74,z:.16,lift:1.15,lean:-.18,leg:-.25},{at:.36,pitch:-.5,y:1.1,z:.52,lift:0,lean:.26,leg:.4},{at:.52,pitch:-.45,y:1.1,z:.5,lift:-.06,lean:.22,leg:.35},{at:.8}],
 };
 export const ALL_MOTIONS=Object.freeze({...TECHNIQUES,...TREE_MOTIONS});
@@ -69,7 +75,7 @@ export const TECHNIQUE_FRAMES=Object.freeze(Object.fromEntries(Object.values(ALL
  t.hits.forEach((hit,i)=>{const [wind,impact]=profile(t.style,i),previous=t.hits[i-1]||0,next=t.hits[i+1]||t.duration;
  frames.push({at:Math.max(previous+.02,hit-.12),...base,...wind},{at:hit,...base,...impact},{at:Math.min(hit+.10,next-.02),...base,...impact});});
  // 一回転で終わる動き（旋）は、最後の向きを一周ぶんにして巻き戻らないようにする
- frames.push({at:t.duration,...base,bodyYaw:t.style==='slantspin'||t.style==='bleedspin'?Math.PI*2:0});return [t.id,frames.sort((a,b)=>a.at-b.at)];
+ frames.push({at:t.duration,...base,bodyYaw:t.style==='slantspin'||t.style==='bleedspin'||t.style==='lowspin'?Math.PI*2:0});return [t.id,frames.sort((a,b)=>a.at-b.at)];
 })));
 export function sampleTechnique(id,time){
  const frames=TECHNIQUE_FRAMES[id];if(!frames)return null;

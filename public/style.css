@@ -207,6 +207,7 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 .wt-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .wt-tag { font-size: 10px; padding: 0 6px; border-radius: 8px; border: 1px solid currentColor; line-height: 1.5; }
 .wt-tag.t-wave { color: #6ad0ff; } .wt-tag.t-cd { color: #b86cff; } .wt-tag.t-crit { color: #ffd84a; } .wt-tag.t-dodge { color: #62dc6a; } .wt-tag.t-hurt { color: #ff7a6a; } .wt-tag.t-charge { color: #ffb84a; } .wt-tag.t-light { color: #a8e4ff; } .wt-tag.t-recv { color: #c9b4ff; }
+.wt-tag.t-poison { color: #8aff5a; } .wt-tag.t-move { color: #9affc8; } .wt-tag.t-shield { color: #9ad8ff; } .wt-tag.t-thrust { color: #fff0a0; } .wt-tag.t-break { color: #ff9a5a; }
 .wt-br { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
 .wt-br div { border: 1px dashed var(--line); border-radius: 6px; padding: 3px 6px; font-size: 10.5px; line-height: 1.45; color: var(--dim); }
 .wt-br div b { display: block; font-size: 11px; color: var(--txt); }

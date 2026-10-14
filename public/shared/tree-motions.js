@@ -35,4 +35,16 @@ export const TREE_MOTIONS = Object.freeze({
   dk_step_turn: m('dk_step_turn', 'dagger', 0.3, [0.18], 'pivot'),
   // 大剣・光波: 振りかぶって前へ振り抜き、光波を飛ばす
   gt_wave: m('gt_wave', 'greatsword', 0.55, [0.12], 'lightwave'),
+  // 盾槍・竜騎士（強攻撃）: 沈み込んで高く跳び、槍を真下へ向けて突き降りる
+  sp_jump: m('sp_jump', 'spear', 0.85, [0.55], 'dive'),
+  // 盾槍・シールドバッシュ: 盾を前へ叩きつける（A「連打」は2回・B「盾突進」は踏み込んでから）
+  sp_bash: m('sp_bash', 'spear', 0.45, [0.08], 'bash'),
+  sp_bash_twin: m('sp_bash_twin', 'spear', 0.65, [0.08, 0.36], 'bash'),
+  sp_bash_rush: m('sp_bash_rush', 'spear', 0.5, [0.16], 'bashrush'),
+  // 盾槍・挑発: 盾を槍で打ち鳴らして叫ぶ
+  sp_taunt: m('sp_taunt', 'spear', 0.6, [0.2], 'clang'),
+  // 盾槍・足払いA「大回し」: 低く一回転して薙ぐ
+  sp_sweep_spin: m('sp_sweep_spin', 'spear', 0.75, [0.3], 'lowspin'),
+  // 盾槍・扇突きA「竜爪」: 跳び上がってから三方へ突き降ろす
+  sp_fan_leap: m('sp_fan_leap', 'spear', 0.75, [0.22, 0.31, 0.4], 'fanleap'),
 });
