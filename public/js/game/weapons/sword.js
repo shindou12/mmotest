@@ -10,7 +10,7 @@ import { S, addBuff, hasBuff } from '../stats.js';
 import { net } from '../net-client.js';
 import { addShake, later } from '../combat.js';
 import { cutCds, quietBuff, wtEmit } from '../tree-effects.js';
-import { SWEEP, combat, heal } from '../actions.js';
+import { extendCombat, heal, strikes, SWEEP } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
 
 // 剣闘士の「勢い」（バフ欄に数を出す）
@@ -27,10 +27,10 @@ export function setMom(n) {
 export function swordCounter() {
   const M = TREE_MOTIONS.sw_counter, a = me.a;
   me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration;
-  combat.dash(a, 1.4, 0.16, 0.3);
+  strikes.dash(a, 1.4, 0.16, 0.3);
   audio.sfx('swing', { heavy: true });
   later(M.hits[0], () => {
-    combat.arc(4.2, 300, SWEEP.mult * 0.5, { type: 'heavy', stun: SWEEP.stun, a });
+    strikes.arc(4.2, 300, SWEEP.mult * 0.5, { type: 'heavy', stun: SWEEP.stun, a });
     fx.slash(me.x, me.z, a, 4.2, 300, 0xbfe0ff, 1.4);
     fx.ringWave(me.x, me.z, 0xbfe0ff, 4.6, 0.35);
     audio.sfx('heavy'); addShake(0.35);
@@ -39,7 +39,7 @@ export function swordCounter() {
 const handPos = new THREE.Vector3();
 
 // スキルに渡す文脈に、受け流しの構えを足す（c.parry）
-Object.assign(combat, {
+extendCombat({
   parry(sec, dr) { addBuff('sw_parry', '受け流し', sec, { dr }, 0xbfe0ff); me.parryUntil = now() + sec; me.parryDone = false; },
 });
 
@@ -77,7 +77,7 @@ registerWeaponFx('sword', {
     if (W.ks2 === 'sw_berserk' && me.mom > 0) heal(dmg * me.mom / 100 * BALANCE.lifestealEfficiency, false);
     if (crit && W.br('sw_edge') === 'A' && now() - me.edgeT > 0.5) {
       me.edgeT = now();
-      combat.proj({ a: Math.atan2(mb.x - me.x, mb.z - me.z), mult: 0.5, type: 'proc', speed: 26, life: 0.45, rad: 0.9, wtNo: true });
+      strikes.proj({ a: Math.atan2(mb.x - me.x, mb.z - me.z), mult: 0.5, type: 'proc', speed: 26, life: 0.45, rad: 0.9, wtNo: true });
     }
     if (crit && W.br('sw_edge') === 'B' && now() - me.edgeHealT > 0.15) { me.edgeHealT = now(); heal(S.mhp * 0.01, false); }
     if (o.type === 'normal' && W.br('sw_norm') === 'B') {
@@ -148,7 +148,7 @@ registerWeaponFx('sword', {
     const mult = me.revenge / S.atk;
     me.revenge = 0;
     later(0.15, () => {
-      combat.circle(me.x, me.z, 3.6, mult, { type: 'heavy' });
+      strikes.circle(me.x, me.z, 3.6, mult, { type: 'heavy' });
       fx.ringWave(me.x, me.z, 0xff6a5a, 4, 0.4); fx.flash(me.x, 1.5, me.z, 0xff6a5a, 40, 0.3);
       floatText(me.x, 3.2, me.z, '報復!', 'just'); addShake(0.3);
     });
@@ -162,10 +162,10 @@ registerWeaponFx('sword', {
   swingAspd: (v) => v + (S.wt?.ks1 === 'sw_glad' ? me.mom * 2 : 0),
   // 3段目: 剣の心得A「閃光」（斬撃波の特性がないとき）/ 魔剣士の光波
   swingLate(a, waved) {
-    if (!waved && me.combo === 2 && S.wt?.br('sw_norm') === 'A') combat.proj({ a, mult: 1.2, type: 'normal' }); // 剣の心得A「閃光」
+    if (!waved && me.combo === 2 && S.wt?.br('sw_norm') === 'A') strikes.proj({ a, mult: 1.2, type: 'normal' }); // 剣の心得A「閃光」
   },
   swingLast(a) {
-    if (S.wt?.ks1 === 'sw_mage' && now() < me.mageT) combat.proj({ a, mult: 0.8, type: 'normal', speed: 26, life: 0.5, rad: 1.1 }); // 魔剣士
+    if (S.wt?.ks1 === 'sw_mage' && now() < me.mageT) strikes.proj({ a, mult: 0.8, type: 'normal', speed: 26, life: 0.5, rad: 1.1 }); // 魔剣士
   },
   justDodge() { if (S.wt?.br('sw_light') === 'A') { me.afterJust = true; floatText(me.x, 3.0, me.z, '後の先', 'just'); } },
   // ブレイブハートB「速攻」: 効果中はクールタイムが早く戻る

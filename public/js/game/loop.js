@@ -1,14 +1,13 @@
 import { MOTION_DURATIONS } from '../../shared/motion-catalog.js';
 import { REVIVE } from '../../shared/balance.js';
-import * as THREE from 'three';
 import { FLOORS, RARITIES, WEAPONS } from '../../shared/data.js';
 import { AREAS, HAZARDS, collide, hazardsOf, insideOpen } from '../../shared/areas.js';
 import { animateMob, animatePlayer } from '../models.js';
 import { OCC } from '../toon.js';
-import { angDiff, clamp, now, rnd } from './util.js';
+import { angDiff, clamp, now, rnd, lerp } from './util.js';
 import { floatText, toast, ui } from './ui-bridge.js';
 import { char, saveChar, settings } from './save.js';
-import { ambient, audio, camera, composer, fx, scene, sun, weatherParts } from './render.js';
+import { ambient, audio, camera, fx, scene, sun, weatherParts, renderFrame } from './render.js';
 import { CAM_ZOOM, CHARGE_MAX, CHARGE_MIN, cam, keys, me, mobs, npcs, others, pending, setStarted, started, tmpV, world } from './state.js';
 import { S, bowRange, buffMod, hasBuff } from './stats.js';
 import { GUARD, guardRegen, updateMouseWorld } from './input.js';
@@ -24,6 +23,7 @@ import { chestOpen, exploreTick } from './progress.js';
 import { lootWalk, updateCoins, updateDrops } from './loot.js';
 import { updateMobLabels } from './labels.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
+import { touchGuideMesh } from './meshes.js';
 
 // ======================================================================
 // メインループ
@@ -33,19 +33,6 @@ export let sendT = 0;
 export let saveT = 0;
 // ---- 弓の照準ガイド: 足元の射程の円（引くほど広がり、最大射程で止まる）と狙いの線 ----
 export let bowGuide = null;
-export function makeBowGuide() {
-  const group = new THREE.Group();
-  const flat = (geo, c, op) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, depthTest: false })); m.rotation.x = -Math.PI / 2; return m; };
-  const disc = flat(new THREE.CircleGeometry(1, 96), 0x9affd8, 0.05); // 射程の内側（うっすら）
-  const ring = flat(new THREE.RingGeometry(0.975, 1, 128), 0x9affd8, 0.6); // いまの射程
-  const max = flat(new THREE.RingGeometry(0.99, 1, 128), 0xffffff, 0.2); // 最大射程（引いている間だけ）
-  // 狙いの線（引いている間）
-  const aim = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 1), new THREE.MeshBasicMaterial({ color: 0xfff0a0, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false }));
-  aim.geometry.translate(0, 0.5, 0);
-  aim.geometry.rotateX(Math.PI / 2); // +z 方向へ伸びる
-  for (const m of [disc, ring, max, aim]) { m.renderOrder = 4; group.add(m); }
-  return { group, disc, ring, max, aim };
-}
 export function updateBowGuide(t) {
   if (!bowGuide) return;
   const G = bowGuide;
@@ -73,14 +60,7 @@ export let touchGuide = null;
 export function updateTouchAim(t) {
   if (!touch.on) { if (touchGuide) touchGuide.group.visible = false; return; }
   if (!touchGuide) {
-    const group = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48), new THREE.MeshBasicMaterial({ color: 0xff5a4a, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
-    ring.rotation.x = -Math.PI / 2;
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1), new THREE.MeshBasicMaterial({ color: 0x9ae8ff, transparent: true, opacity: 0.45, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
-    line.geometry.translate(0, 0.5, 0); line.geometry.rotateX(Math.PI / 2);
-    const spot = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.5, 40), new THREE.MeshBasicMaterial({ color: 0x9ae8ff, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
-    spot.rotation.x = -Math.PI / 2;
-    for (const m of [ring, line, spot]) { m.renderOrder = 5; group.add(m); }
+    const { group, ring, line, spot } = touchGuideMesh();
     scene.add(group);
     touchGuide = { group, ring, line, spot };
   }
@@ -391,7 +371,7 @@ export function update(dt) {
   cam.zoom += (cam.zoomT - cam.zoom) * (1 - Math.exp(-10 * dt));
   cam.focus.lerp(tmpV.set(me.x, heightAt(me.x, me.z) + 1.2, me.z), 1 - Math.exp(-12 * dt));
   const zoom = cam.zoom * (world.def.shape === 'grid' ? 0.9 : 1);
-  const pitch = THREE.MathUtils.lerp(0.62, 0.92, clamp((cam.zoom - CAM_ZOOM[0]) / (CAM_ZOOM[1] - CAM_ZOOM[0]), 0, 1));
+  const pitch = lerp(0.62, 0.92, clamp((cam.zoom - CAM_ZOOM[0]) / (CAM_ZOOM[1] - CAM_ZOOM[0]), 0, 1));
   const dist = 19.5 * zoom;
   // 屋外の端では、カメラが外周の崖の中に入らないよう、真上寄りから見下ろす
   let back = Math.cos(pitch) * dist;
@@ -435,7 +415,7 @@ export function loop() {
   // ヒットストップ: 被弾の瞬間だけ動きをほぼ止めて、手応えを出す
   if (hitStop > 0) { setHitStop(hitStop - dt); dt *= 0.1; }
   if (started) update(dt);
-  if (!window.__noRender) composer.render(); // 自動テスト（挙動の記録）は描画を省いて速く回す
+  renderFrame();
 }
 
 export function setBowGuide(v) { bowGuide = v; }

@@ -6,8 +6,13 @@
 ## 全体の図
 
 ```
-server.js ──────────────► public/shared/sim.js（World: サーバーのシミュレーション）
-                               │
+server.js ──────────────► public/shared/sim.js（World: プレイヤー・エリア・毎フレーム・状態の配信）
+                               └─ sim/  役目ごとのメソッドと登録表（World に足す）
+                                   ├─ messages.js     ★ プレイヤーからのメッセージ（t ごとの登録表 MESSAGES）
+                                   ├─ boss-patterns.js ★ ボスの技（技ごとの登録表 BOSS_PATTERNS）
+                                   ├─ mob-attacks.js  ★ 敵の攻撃の形（敵の形 t ごとの登録表 MOB_ATTACKS）
+                                   ├─ mobs.js / boss.js / area-tick.js / interact.js   敵・ボス・エリアの毎フレーム・レバーや宝箱
+                                   └─ common.js       共通の道具と定数
 public/shared/ ─ data.js（武器種・装備・敵・称号の表）/ balance.js / areas.js
    （サーバーとブラウザの共通） techniques.js / tree-motions.js（技の時刻とモーション）
                                skill-timings.js / motion-catalog.js
@@ -16,7 +21,7 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │
    ├─ game/            ゲーム本体（1ファイル1つの役目）
    │   ├─ state.js        自分・他人・敵などの状態（入れ物）
-   │   ├─ util.js         rnd / now / angDiff など
+   │   ├─ util.js         rnd / now / angDiff / deg / lerp など
    │   ├─ ui-bridge.js    画面（ui/app.js）への窓口（DOM にはさわらない）
    │   ├─ render.js       three.js のシーン・カメラ・fx・audio
    │   ├─ save.js         セーブ（キャラクターの保存と読み込み）
@@ -26,7 +31,9 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ area.js / snapshot.js   エリアの入れ替え・サーバーの状態の反映
    │   ├─ combat.js       ダメージ計算・命中
    │   ├─ hurt.js         被弾・ガード・回避・ダウン
-   │   ├─ actions.js      攻撃・強攻撃・スキル・飛び道具（combat 文脈 = スキルに渡す道具）
+   │   ├─ actions.js      攻撃・強攻撃・スキル・飛び道具。スキルに渡す文脈を役目ごとの小さな形で持つ
+   │   │                    （senses 見る・狙う / strikes 当てる / feedback 見せる・鳴らす / selfCare 回復・バフ / party 挑発）
+   │   ├─ meshes.js       戦闘で使う見た目（矢・斧の幻影・ボスの弾・弓の照準・罠・旗など）を作る。three.js はここと render.js に寄せる
    │   ├─ tree-effects.js 武器ツリーの共通部分（バフ・クールタイム・旧データの移し替え）
    │   ├─ variants.js     スキルの形違い
    │   ├─ progress.js / loot.js / items.js / labels.js
@@ -56,13 +63,32 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ styles.js       ★ 技の姿勢のデータ（STYLES / KEYFRAMES）
    │   └─ bow.js / spear.js / melee.js   武器ごとの動きの関数
    │
-   ├─ toon.js / fx.js / env.js / audio.js   見た目・効果・地形・音
-   └─ ui/app.js, ui/core.js                 画面
+   ├─ env.js           エリアの見た目の組み立て（buildArea）
+   ├─ env/
+   │   ├─ props.js        ★ 飾りのプロップの登録表（PROPS: 木・岩・花…）
+   │   ├─ obstacles.js    ★ 障害物の登録表（OBSTACLES）・危険地帯・宝箱・ボックス
+   │   ├─ open.js / grid.js  屋外（フィールド・町・野営地）/ 迷路（ダンジョン・迷宮区）
+   │   ├─ landmarks.js    空・転移門・ワープポイント・ボスの部屋・草・遠景
+   │   ├─ ambient.js      漂う粒子 / kit.js  地形の道具（決まった乱数・高さ・文字の札）
+   ├─ toon.js / fx.js / audio.js   トゥーンの材質・効果・音
+   └─ ui/
+       ├─ app.js          画面の部品（View）を作り、Mediator（状態と操作の裁定）を動かす
+       ├─ panels/*.js     ★ 画面ごとの Presenter（items・inventory・tree・map・npc・smith・hud・touch・minimap・floats・messages・settings）
+       └─ core.js / helpers.js  View・Root・Mediator の土台 / 共通の道具
 ```
 
-依存の向き: `ui` → `game` へは `ui-bridge.js` だけを通す。`game/*` の中心の処理（combat・hurt・stats・
+依存の向き: `game` → `ui` へは `ui-bridge.js` だけを通す。`game/*` の中心の処理（combat・hurt・stats・
 actions・loop など）は、武器の名前やノードの id を知らず、`weapon-fx.js` のフックを呼ぶだけ。
 武器ごとの中身は `game/weapons/<武器>.js` に閉じている。
+
+### sim の import の深さ
+
+ブラウザのソロモードは `shared/sim.js` を `import()` で読み込む。モジュールが見つかる段（sim.js から何段目か）が深くなると、
+読み込みが終わるまでのフレーム数がわずかに変わり、時計を固定した記録テスト（戦闘の golden）の結果が変わる。
+
+- sim.js は、分ける前と同じモジュール（motion-catalog・techniques・balance・data・areas）を直接読む。
+- `sim/common.js` は何も import しない。
+- `sim/*.js` から新しいモジュールを読むときは、sim.js からも直接読むか、戦闘の golden（`npm run test:golden`）で差が出ないことを確かめる。
 
 ## 武器ごとの効果（フック）の仕組み
 
@@ -156,6 +182,31 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 - 武器ごとの構え・通常攻撃の振り: `motions/<武器>.js` と、その登録表 `motions/index.js`。
 - 盾槍の連続した姿勢は `spear-motion.js`（時刻は `shared/skill-timings.js`）。
 
+### 敵・ボスの技・メッセージを足す（サーバー）
+
+- 敵の攻撃の形: `public/shared/sim/mob-attacks.js` の `MOB_ATTACKS[t]` に関数を足す。
+  - 予兆の形の配列を返す。自分で予兆を出したときは `null` を返す。
+  - 登録のない t は `default`（前へ一直線）になる。
+  - 見た目は `public/js/models/mob-models.js` の `MOB_MODELS[t]` に足す。
+- ボスの技: `public/shared/sim/boss-patterns.js` の `BOSS_PATTERNS[名前]` に関数を足す。
+  - 戻り値は次の行動までの秒数。
+  - `public/shared/data.js` のボスの `patterns` / `p3` に名前を書くと使われる。
+- プレイヤーからのメッセージ: `public/shared/sim/messages.js` の `MESSAGES[t]` に関数を足す。
+  - 送る側は `net.send({ t, ... })`。
+
+### エリアの飾り・障害物を足す
+
+- 飾り: `public/js/env/props.js` の `PROPS[種類]` に関数を足す。
+  - エリア定義（`shared/areas.js`）の props に名前を書く。
+- 障害物: `public/js/env/obstacles.js` の `OBSTACLES[種類]` に関数を足す。
+  - 当たり判定の形は `shared/areas.js` の obstaclesOf が決める。
+
+### 画面（パネル）を足す
+
+1. `public/js/ui/panels/<名前>.js` に `export function install<名前>(ui)` を書く。
+   - `ui` から部品（View）を受け取り、`P.<名前> = () => {...}` で描画を足す。
+2. `ui/app.js` で部品を作り、install を呼び、Mediator の状態（`mediator.states`）に足す。
+
 ## テスト
 
 | コマンド | 中身 |
@@ -184,3 +235,9 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 - `Math.random` はブラウザ側が 0.5、World の中は決まった種の乱数。
 
 性能は `node e2e/perf.mjs` で測る（1フレームの更新・描画の時間）。リファクタリング前の値は `e2e/fixtures/perf-before.json`。
+
+分けるときは、golden テストのほかに、分ける前と後を同じ入力で動かして結果を比べた（一時的なスクリプト。リポジトリには入れていない）。
+
+- サーバー: ボスの全技 × 3層 × 3段階、敵の全種類 × 精鋭、全メッセージ。
+- 画面: 全パネル・全タブ（鍛冶屋・ボックス・会話・転移門を含む）の DOM。
+- エリア: 全エリア × 天候 × 草の量の形・色・位置・高さ。

@@ -1,5 +1,4 @@
 // 弓の武器ツリーの効果（狙撃手・連射・罠師・遠見・弓引き など）と、弓の射程の特性。差し込み口は game/weapon-fx.js
-import * as THREE from 'three';
 import { now, rnd } from '../util.js';
 import { floatText } from '../ui-bridge.js';
 import { audio, fx } from '../render.js';
@@ -8,8 +7,9 @@ import { S } from '../stats.js';
 import { heightAt } from '../area.js';
 import { addShake, aimPoint, later } from '../combat.js';
 import { quietBuff } from '../tree-effects.js';
-import { combat } from '../actions.js';
+import { extendCombat, strikes } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
+import { trapMesh } from '../meshes.js';
 
 // 最大まで引いた矢（狙撃手）が当たった / 外れた: 鷹の目・狙い澄まし
 function bwSnipe(hit) {
@@ -26,18 +26,12 @@ function bwRain(p) {
   for (let i = 0; i < 5; i++) later(0.12 + i * 0.07, () => {
     const x = p.x + rnd(-1.6, 1.6), z = p.z + rnd(-1.6, 1.6);
     fx.parts.burst(x, 6, z, 6, { color: 0xbfe8ff, speed: 2, size: 0.35, life: 0.3, gravity: 40 });
-    later(0.15, () => { combat.circle(x, z, 1.5, 0.5, { type: 'proc', noProc: true }); fx.ringWave(x, z, 0xbfe8ff, 1.6, 0.2); });
+    later(0.15, () => { strikes.circle(x, z, 1.5, 0.5, { type: 'proc', noProc: true }); fx.ringWave(x, z, 0xbfe8ff, 1.6, 0.2); });
   });
 }
 // 罠（罠師の回避・置き矢）: 踏まれると発動。dodge: 罠師の罠（数に上限がある）
 function bwTrap(x, z, o) {
-  const g = new THREE.Group(), col = o.color ?? 0xffc860;
-  const ring = new THREE.Mesh(new THREE.RingGeometry(o.r - 0.12, o.r, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
-  for (let i = 0; i < 6; i++) {
-    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.35, 5), new THREE.MeshLambertMaterial({ color: 0xd8c8a8 }));
-    const a = i / 6 * Math.PI * 2; sp.position.set(Math.sin(a) * o.r * 0.45, 0.15, Math.cos(a) * o.r * 0.45); g.add(sp);
-  }
+  const { g, ring, col } = trapMesh(o);
   g.position.set(x, heightAt(x, z), z);
   const t = { x, z, ...o, armAt: now() + (o.arm ?? 0.5), until: now() + o.life, area: world.area, mesh: g };
   fx.add(g, o.life + 0.2, (obj) => { ring.material.opacity = now() < t.armAt ? 0.2 : 0.4 + Math.sin(now() * 8) * 0.15; });
@@ -60,7 +54,7 @@ function bwTrapTick() {
     if (now() < t.armAt) continue;
     if (![...mobs.values()].some((mb) => mb.hp > 0 && Math.hypot(mb.x - t.x, mb.z - t.z) < t.r + mb.rad * 0.5)) continue;
     bwTrapGone(t);
-    combat.circle(t.x, t.z, t.r, t.mult, { type: t.dodge ? 'proc' : 'tskill', tech: 'bow_trap', stun: t.stun, noProc: t.dodge });
+    strikes.circle(t.x, t.z, t.r, t.mult, { type: t.dodge ? 'proc' : 'tskill', tech: 'bow_trap', stun: t.stun, noProc: t.dodge });
     fx.parts.burst(t.x, 0.4, t.z, 30, { color: t.color ?? 0xffc860, speed: 6, size: 0.4, life: 0.4, up: 3 }); fx.ringWave(t.x, t.z, t.color ?? 0xffc860, t.r + 0.4, 0.3);
     audio.sfx('hit');
   }
@@ -68,14 +62,14 @@ function bwTrapTick() {
 // 射抜き: 罠を矢で撃ち抜いて大爆発
 function bwBlast(t) {
   bwTrapGone(t);
-  combat.circle(t.x, t.z, 3.5, 3.5, { type: 'proc', noProc: true, stun: 6 });
+  strikes.circle(t.x, t.z, 3.5, 3.5, { type: 'proc', noProc: true, stun: 6 });
   fx.ringWave(t.x, t.z, 0xff9a4a, 4, 0.4); fx.flash(t.x, 1.2, t.z, 0xff9a4a, 50, 0.3);
   fx.parts.burst(t.x, 0.6, t.z, 50, { color: 0xffb060, speed: 9, size: 0.55, life: 0.5, up: 3 });
   floatText(t.x, 2.6, t.z, '射抜き!', 'just'); audio.sfx('impact'); addShake(0.35);
 }
 
 // スキルに渡す文脈に、罠を置く道具を足す（c.trap）
-Object.assign(combat, { trap: (x, z, o) => bwTrap(x, z, o) });
+extendCombat({ trap: (x, z, o) => bwTrap(x, z, o) });
 
 registerWeaponFx('bow', {
   // 弓: 引かずに撃つ射程（張り弦 +4m）・最大射程（遠見の心得）・弓を引く速さ（速引き +30%）。最大射程まで引いたら最大の溜め
@@ -109,7 +103,7 @@ registerWeaponFx('bow', {
   // 連射: 通常攻撃で2本ずつ（矢嵐: 5回ごとに矢の雨）
   shoot(a, mult) {
     if (S.wt?.ks1 !== 'bw_rapid') return false;
-    for (const d of [-0.04, 0.04]) combat.arrow({ a: a + d, mult: mult * 0.75, type: 'normal' });
+    for (const d of [-0.04, 0.04]) strikes.arrow({ a: a + d, mult: mult * 0.75, type: 'normal' });
     if (S.wt.ks2 === 'bw_storm' && ++me.stormN % 5 === 0) bwRain(aimPoint());
     return true;
   },

@@ -44,6 +44,8 @@ export function applyQuality() {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
 }
 applyQuality();
+// 1フレームを描く。自動テスト（挙動の記録）は描画を省いて速く回す
+export function renderFrame() { if (!window.__noRender) composer.render(); }
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();

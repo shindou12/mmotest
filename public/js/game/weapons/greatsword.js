@@ -8,7 +8,7 @@ import { me } from '../state.js';
 import { S, addBuff, hasBuff } from '../stats.js';
 import { addShake, later } from '../combat.js';
 import { cutCds, quietBuff } from '../tree-effects.js';
-import { combat } from '../actions.js';
+import { extendCombat, strikes } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
 
 // 見切り眼: JUST回避・受け流しのあと3秒間ダメージアップ（6秒に1回まで）
@@ -22,7 +22,7 @@ function eye() {
 }
 
 // スキルに渡す文脈に、溜めた状態から始める道具を足す（c.primeCharge: グランド・スラムB「踏み込み溜め」）
-Object.assign(combat, { primeCharge(frac) { me.primeCharge = frac; } });
+extendCombat({ primeCharge(frac) { me.primeCharge = frac; } });
 
 registerWeaponFx('greatsword', {
   // 一撃: 溜めは +25% 長い / 溜めの心得A: 溜めが速い
@@ -42,7 +42,7 @@ registerWeaponFx('greatsword', {
     if (o.proj?.eclipse && !o.proj.boomed) {
       o.proj.boomed = true;
       const x = mb.x, z = mb.z;
-      later(0.05, () => { combat.circle(x, z, 3, 1.5, { type: 'proc', wtNo: true }); fx.ringWave(x, z, LIGHT_COLOR, 3.4, 0.35); fx.flash(x, 1.2, z, LIGHT_COLOR, 30, 0.25); audio.sfx('wave'); });
+      later(0.05, () => { strikes.circle(x, z, 3, 1.5, { type: 'proc', wtNo: true }); fx.ringWave(x, z, LIGHT_COLOR, 3.4, 0.35); fx.flash(x, 1.2, z, LIGHT_COLOR, 30, 0.25); audio.sfx('wave'); });
     }
   },
   // 溜め中に攻撃を受けた: 不屈（溜めが最大に）/ 剛体A（溜めが進む）
@@ -73,15 +73,15 @@ registerWeaponFx('greatsword', {
     if (W.ks1 === 'gt_wave') {
       me.motion = 'gt_wave'; me.motionT = 0; // 振り抜いて光波を飛ばす
       const big = lv === 2, moon = big && W.ks2 === 'gt_fullmoon';
-      combat.proj({ a, mult: (big ? 2.0 : 1.0) * (moon ? 1.75 : 1), type: 'heavy', speed: big ? 22 : 24, life: big ? 0.75 : 0.55, rad: moon ? 3.4 : big ? 2.0 : 1.2, color: LIGHT_COLOR, stun: W.br('gt_break') === 'B' ? 6 : 1.5, eclipse: W.ks2 === 'gt_eclipse' });
+      strikes.proj({ a, mult: (big ? 2.0 : 1.0) * (moon ? 1.75 : 1), type: 'heavy', speed: big ? 22 : 24, life: big ? 0.75 : 0.55, rad: moon ? 3.4 : big ? 2.0 : 1.2, color: LIGHT_COLOR, stun: W.br('gt_break') === 'B' ? 6 : 1.5, eclipse: W.ks2 === 'gt_eclipse' });
       if (big) fx.flash(me.x, 1.5, me.z, LIGHT_COLOR, moon ? 60 : 35, 0.3);
     }
     if (W.lv('gt_moon')) {
       const n = W.br('gt_moon') === 'A' ? 2 : 1, m = W.lv('gt_moon') >= 2 ? 0.8 : 0.5;
       const stun = W.br('gt_moon') === 'B' || W.br('gt_break') === 'B' ? 4 : 0.5;
-      for (let i = 0; i < n; i++) later(0.12 + i * 0.12, () => combat.proj({ a: a + (n > 1 ? (i ? 0.12 : -0.12) : 0), mult: m, type: 'proc', speed: 24, life: 0.5, rad: 0.9, color: LIGHT_COLOR, wtNo: true, stun }));
+      for (let i = 0; i < n; i++) later(0.12 + i * 0.12, () => strikes.proj({ a: a + (n > 1 ? (i ? 0.12 : -0.12) : 0), mult: m, type: 'proc', speed: 24, life: 0.5, rad: 0.9, color: LIGHT_COLOR, wtNo: true, stun }));
     }
-    if (W.br('gt_siege') === 'B' && hasBuff('gt_siege')) combat.proj({ a, mult: 1.2, type: 'heavy', speed: 22, life: 0.6, rad: 1.6, color: LIGHT_COLOR, stun: 1.5 });
+    if (W.br('gt_siege') === 'B' && hasBuff('gt_siege')) strikes.proj({ a, mult: 1.2, type: 'heavy', speed: 22, life: 0.6, rad: 1.6, color: LIGHT_COLOR, stun: 1.5 });
   },
   // カウンター: 強攻撃を押した直後に攻撃を受けたら、無傷で受け流して反撃する
   counter(src) {
@@ -94,7 +94,7 @@ registerWeaponFx('greatsword', {
     floatText(me.x, 3.1, me.z, '見切り!', 'just');
     audio.sfx('perfect'); audio.sfx('block');
     fx.ringWave(me.x, me.z, 0xffffff, 3, 0.3); fx.flash(me.x, 1.5, me.z, 0xffffff, 40, 0.25);
-    later(M.hits[0], () => { combat.arc(4, 200, 3.5, { type: 'heavy', a, stun: 8 }); fx.slash(me.x, me.z, a, 4, 200, 0xffffff, 1.6, true); audio.sfx('swing', { heavy: true }); addShake(0.25); });
+    later(M.hits[0], () => { strikes.arc(4, 200, 3.5, { type: 'heavy', a, stun: 8 }); fx.slash(me.x, me.z, a, 4, 200, 0xffffff, 1.6, true); audio.sfx('swing', { heavy: true }); addShake(0.25); });
     if (S.wt.ks2 === 'gt_iai') me.iaiReady = true;
     if (S.wt.ks2 === 'gt_mirror') addBuff('gt_mirror', '明鏡', 5, { dmgp: 30 }, 0xe0f0ff);
     eye();

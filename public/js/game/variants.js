@@ -5,7 +5,7 @@ import { audio, fx } from './render.js';
 import { me, mobs, world } from './state.js';
 import { S, addBuff } from './stats.js';
 import { addShake, aimAngle, aimPoint, dealDamage, later } from './combat.js';
-import { combat, heal } from './actions.js';
+import { combat, heal, strikes } from './actions.js';
 
 // ======================================================================
 // スキル変化（武器の特性）: 武器スキルの性質を大きく変える
@@ -45,12 +45,12 @@ export function variantCtx(v, second = false) {
   const c = Object.create(combat);
   const color = () => v.color ?? combat.col();
   c.col = color;
-  c.hit = (mb, mult, o) => combat.hit(mb, mult * P.mult, tag(o));
-  c.arc = (range, deg, mult, o) => combat.arc(range * P.range, deg, mult * P.mult, tag(o));
-  c.line = (len, w, mult, o) => combat.line(len * P.range, w * P.range, mult * P.mult, tag(o));
-  c.circle = (x, z, r, mult, o) => combat.circle(x, z, r * P.range, mult * P.mult, tag(o));
-  c.proj = (o) => combat.proj({ ...tag(o), mult: (o.mult ?? 1.4) * P.mult, rad: (o.rad ?? 1.8) * P.range, life: (o.life ?? 0.7) * P.range, color: v.color ?? o.color });
-  c.arrow = (o) => combat.arrow({ ...tag(o), mult: (o.mult ?? 1) * P.mult, rad: (o.rad ?? 0.7) * P.range, color: v.color ?? o.color });
+  c.hit = (mb, mult, o) => strikes.hit(mb, mult * P.mult, tag(o));
+  c.arc = (range, deg, mult, o) => strikes.arc(range * P.range, deg, mult * P.mult, tag(o));
+  c.line = (len, w, mult, o) => strikes.line(len * P.range, w * P.range, mult * P.mult, tag(o));
+  c.circle = (x, z, r, mult, o) => strikes.circle(x, z, r * P.range, mult * P.mult, tag(o));
+  c.proj = (o) => strikes.proj({ ...tag(o), mult: (o.mult ?? 1.4) * P.mult, rad: (o.rad ?? 1.8) * P.range, life: (o.life ?? 0.7) * P.range, color: v.color ?? o.color });
+  c.arrow = (o) => strikes.arrow({ ...tag(o), mult: (o.mult ?? 1) * P.mult, rad: (o.rad ?? 0.7) * P.range, color: v.color ?? o.color });
   // 見た目も大きさと色を合わせる
   const f = Object.create(fx);
   f.slash = (x, z, a, r, arc, col, ...rest) => fx.slash(x, z, a, r * P.range, arc, v.color ?? col, ...rest);
@@ -69,7 +69,7 @@ export function castWeaponSkill(sk) {
     // 瞬身: 狙った方向へ一瞬で移動してから発動
     const a = aimAngle(), d = SV.blinkDist(v.t);
     fx.parts.burst(me.x, 1, me.z, 25, { color: 0x9affff, speed: 4, size: 0.5, life: 0.4 });
-    combat.dash(a, d, 0.1, 0.45);
+    strikes.dash(a, d, 0.1, 0.45);
     later(0.12, () => { fx.parts.burst(me.x, 1, me.z, 25, { color: 0x9affff, speed: 4, size: 0.5, life: 0.4 }); go(); });
   } else go();
   if (v.key === 'sv_gale') galeAt(aimPoint(), v);
@@ -89,7 +89,7 @@ export function onVariantHit(mb, dmg, o) {
       fx.parts.burst(mb.x, 1, mb.z, 50, { color: 0xff7a20, speed: 8, size: 0.7, life: 0.6, gravity: -2 });
       fx.ringWave(mb.x, mb.z, 0xff6a20, 3, 0.35); fx.flash(mb.x, 1.5, mb.z, 0xff6a20, 40, 0.3);
       audio.sfx('flame'); addShake(0.2);
-      later(0.05, () => combat.circle(mb.x, mb.z, 2.6, SV.blazeBoom, { type: 'dot', noProc: true }));
+      later(0.05, () => strikes.circle(mb.x, mb.z, 2.6, SV.blazeBoom, { type: 'dot', noProc: true }));
     }
   }
   if (v.key === 'sv_storm' && c.left > 0) {
@@ -132,7 +132,7 @@ export function onVariantHit(mb, dmg, o) {
       fx.parts.burst(x, 1, z, 40, { color: 0xd8f6ff, speed: 8, size: 0.55, life: 0.5, gravity: 6 });
       fx.ringWave(x, z, 0x80d8ff, 3.2, 0.3); fx.flash(x, 1.5, z, 0x80d8ff, 30, 0.25);
       audio.sfx('hit', { crit: true });
-      combat.circle(x, z, 3, SV.frost(v.t), { type: 'wskill', noProc: true });
+      strikes.circle(x, z, 3, SV.frost(v.t), { type: 'wskill', noProc: true });
     });
   }
 }
@@ -147,7 +147,7 @@ export function galeAt(p, v) {
         const a = k * 0.9 + j * Math.PI / 2, h = (j + (k % 3)) * 0.8, r = 0.6 + h * 0.35;
         fx.parts.emit(p.x + Math.sin(a) * r, h, p.z + Math.cos(a) * r, { color: j % 2 ? 0x8affb0 : 0xe0fff0, size: 0.45, life: 0.35, speed: 1, gravity: -2 });
       }
-      if (k % 4 === 0) combat.circle(p.x, p.z, 2.6, pow, { type: 'wskill', noProc: true });
+      if (k % 4 === 0) strikes.circle(p.x, p.z, 2.6, pow, { type: 'wskill', noProc: true });
     });
   }
 }
@@ -159,7 +159,7 @@ export function holyAt(p, v) {
     fx.flash(p.x, 3, p.z, 0xfff0a0, 60, 0.4, 16);
     fx.parts.burst(p.x, 0.5, p.z, 50, { color: 0xfff6c0, speed: 6, size: 0.6, life: 0.6, gravity: -4 });
     audio.sfx('thunder'); addShake(0.2);
-    combat.circle(p.x, p.z, 3, SV.holyMult(v.t), { type: 'wskill', noProc: true });
+    strikes.circle(p.x, p.z, 3, SV.holyMult(v.t), { type: 'wskill', noProc: true });
     heal(S.mhp * SV.holyHeal(v.t) / 100, true);
   });
 }
@@ -174,7 +174,7 @@ export function meteorsAt(p, v) {
       fx.beam(x, z, 0xffa060, 10, 0.5, 0.25);
       fx.parts.burst(x, 0.4, z, 30, { color: i % 2 ? 0xffd080 : 0xff7a30, speed: 7, size: 0.55, life: 0.5, up: 2 });
       audio.sfx('impact'); addShake(0.12);
-      combat.circle(x, z, 2.2, pow, { type: 'wskill', noProc: true });
+      strikes.circle(x, z, 2.2, pow, { type: 'wskill', noProc: true });
     });
   }
 }

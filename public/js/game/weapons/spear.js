@@ -10,8 +10,9 @@ import { S, hasBuff } from '../stats.js';
 import { setHitStop } from '../hurt.js';
 import { addShake, aimAngle, aimPoint, dealDamage, later } from '../combat.js';
 import { ATK_TYPES, quietBuff, wtEmit } from '../tree-effects.js';
-import { SWEEP, combat } from '../actions.js';
+import { strikes, SWEEP } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
+import { bannerMesh } from '../meshes.js';
 
 // 攻撃が槍の先端で当たったか（間合い）: 1 = 先端 / -1 = 近すぎ / 0 = それ以外・対象外
 export function spTip(o) {
@@ -32,17 +33,17 @@ function spJump(lv, soared = false) {
   const d = Math.min(JUMP.range[lv], Math.hypot(p.x - me.x, p.z - me.z));
   const M = TREE_MOTIONS.sp_jump;
   me.a = a; me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration; me.act++;
-  combat.dash(a, Math.max(0.01, d), JUMP.air, JUMP.air + 0.15);
+  strikes.dash(a, Math.max(0.01, d), JUMP.air, JUMP.air + 0.15);
   fx.parts.burst(me.x, 0.3, me.z, 18, { color: 0xd8c8a8, speed: 4, size: 0.45, life: 0.4, up: 3 });
   audio.sfx('dodge');
   later(JUMP.air, () => {
     if (me.dead) return;
-    combat.circle(me.x, me.z, JUMP.r, JUMP.mult[lv], { type: 'heavy', stun: 10 });
+    strikes.circle(me.x, me.z, JUMP.r, JUMP.mult[lv], { type: 'heavy', stun: 10 });
     fx.ringWave(me.x, me.z, RARITIES[S.wr].color, JUMP.r + 0.6, 0.35); fx.flash(me.x, 1, me.z, 0xffffff, 40, 0.25);
     fx.parts.burst(me.x, 0.3, me.z, 40, { color: 0xc8b090, speed: 7, size: 0.5, life: 0.6, up: 2 });
     audio.sfx('heavy'); addShake(lv === 2 ? 0.5 : 0.3); setHitStop(0.06);
     if (S.wt?.ks2 === 'sp_fang') later(0.08, () => { // 竜の牙: 着地点から衝撃が広がる
-      combat.circle(me.x, me.z, 4.5, 3.0, { type: 'heavy', stun: 20 });
+      strikes.circle(me.x, me.z, 4.5, 3.0, { type: 'heavy', stun: 20 });
       fx.ringWave(me.x, me.z, 0xff8a4a, 5, 0.45); fx.parts.burst(me.x, 0.4, me.z, 50, { color: 0xff8a4a, speed: 9, size: 0.55, life: 0.6, up: 2 }); addShake(0.4);
     });
     if (S.wt?.ks2 === 'sp_soar' && !soared) { me.soarReady = now() + 1.5; fx.ringWave(me.x, me.z, 0x9affc8, 1.6, 0.3); }
@@ -52,13 +53,7 @@ function spJump(lv, soared = false) {
 function spBanner(x, z) {
   const old = me.banner && fx.items.find((it) => it.obj === me.banner.mesh);
   if (old) old.life = 0; // 前の旗は消す
-  const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6), new THREE.MeshLambertMaterial({ color: 0x8a6a40 }));
-  pole.position.y = 1.6; g.add(pole);
-  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.7), new THREE.MeshBasicMaterial({ color: 0x6ab0ff, side: THREE.DoubleSide }));
-  flag.position.set(0.55, 2.8, 0); g.add(flag);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(4.8, 5, 48), new THREE.MeshBasicMaterial({ color: 0x6ab0ff, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
+  const { g, flag, ring } = bannerMesh();
   g.position.set(x, 0, z);
   fx.add(g, 8, (o, k) => { flag.rotation.y = Math.sin(k * 40) * 0.3; ring.material.opacity = 0.35 * (1 - k * 0.5); });
   me.banner = { x, z, until: now() + 8, mesh: g };
@@ -68,7 +63,7 @@ function spBanner(x, z) {
 function spPierce(a) {
   if (!me.pierceReady) return;
   me.pierceReady = false;
-  combat.proj({ a, mult: 1.6, type: 'normal', speed: 30, life: 0.45, rad: 1.3, color: 0xfff0a0, wtNo: true });
+  strikes.proj({ a, mult: 1.6, type: 'normal', speed: 30, life: 0.45, rad: 1.3, color: 0xfff0a0, wtNo: true });
   fx.flash(me.x, 1.3, me.z, 0xfff0a0, 30, 0.2);
 }
 const handPos = new THREE.Vector3();
@@ -94,7 +89,7 @@ registerWeaponFx('spear', {
   // 槍の心得B「連突き」と一点突破（通常攻撃）
   swingExtra(a, range, col) {
     const W = S.W;
-    if (S.wt?.br('sp_spear') === 'B' && me.combo === 2) later(0.2, () => { combat.arc(range, W.arc, 0.6, { a, type: 'normal' }); fx.slash(me.x, me.z, a, range, W.arc, col, 0.8); }); // 連突き
+    if (S.wt?.br('sp_spear') === 'B' && me.combo === 2) later(0.2, () => { strikes.arc(range, W.arc, 0.6, { a, type: 'normal' }); fx.slash(me.x, me.z, a, range, W.arc, col, 0.8); }); // 連突き
     spPierce(a);
   },
   // 先端の連続（一点突破）と雷槍
@@ -109,7 +104,7 @@ registerWeaponFx('spear', {
     if (W.ks2 === 'sp_bolt' && hasBuff('sp_thunder') && (o.type === 'normal' || o.type === 'heavy') && now() - me.boltT > 0.3) {
       me.boltT = now();
       const x = mb.x, z = mb.z;
-      later(0.06, () => { fx.lightning(x, z, 0x9ad8ff); combat.circle(x, z, 2.5, 0.6, { type: 'proc', noProc: true }); audio.sfx('thunder'); });
+      later(0.06, () => { fx.lightning(x, z, 0x9ad8ff); strikes.circle(x, z, 2.5, 0.6, { type: 'proc', noProc: true }); audio.sfx('thunder'); });
     }
   },
   // 迎撃の構えA「雷の構え」: 構えている間に受けると雷をまとう
@@ -142,7 +137,7 @@ registerWeaponFx('spear', {
     if (W?.ks1 === 'sp_knight') spThunder();
     if (W?.ks2 === 'sp_banner') spBanner(me.x, me.z);
     if (W?.br('sp_ctr') === 'A') me.iframe = Math.max(me.iframe, SWEEP.dur);
-    if (W?.br('sp_ctr') === 'B') later(SWEEP.dur, () => { if (!me.dead) { const a = aimAngle(); me.a = a; me.swingT = 0; me.swingDur = 0.4; me.combo = 2; me.sw++; combat.line(6 * spReach(false), 2, 1.5, { type: 'heavy', a }); fx.slash(me.x, me.z, a, 6, 30, 0xbfe0ff, 1.2); audio.sfx('swing', { heavy: true }); } }); // 二段反撃
+    if (W?.br('sp_ctr') === 'B') later(SWEEP.dur, () => { if (!me.dead) { const a = aimAngle(); me.a = a; me.swingT = 0; me.swingDur = 0.4; me.combo = 2; me.sw++; strikes.line(6 * spReach(false), 2, 1.5, { type: 'heavy', a }); fx.slash(me.x, me.z, a, 6, 30, 0xbfe0ff, 1.2); audio.sfx('swing', { heavy: true }); } }); // 二段反撃
     me.swingT = 9; // 振りのモーションの代わりに回転なぎ払い
     me.sweepT = 1e-4; me.sweepHit = false;me.motion = 'counter';me.motionT = 0;
     audio.sfx('swing', { heavy: true });

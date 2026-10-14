@@ -8,7 +8,7 @@ import { me, mobs } from '../state.js';
 import { S } from '../stats.js';
 import { addShake, aimAngle, later } from '../combat.js';
 import { quietBuff, wtEmit } from '../tree-effects.js';
-import { combat } from '../actions.js';
+import { extendCombat, strikes } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
 
 // 狂戦士: 減ったHP10%ごとに +3%（捨て身は1.5倍）
@@ -20,7 +20,7 @@ function axBers() {
 // 地割れ: 前へ一直線に地面が裂ける
 function axCrack(a, len, mult, stun) {
   const sx = me.x, sz = me.z;
-  combat.line(len, 2.2, mult, { type: 'heavy', a, sx, sz, stun, wtNo: true });
+  strikes.line(len, 2.2, mult, { type: 'heavy', a, sx, sz, stun, wtNo: true });
   for (let d = 1; d < len; d += 0.6) later(d * 0.02, () => fx.parts.burst(sx + Math.sin(a) * d, 0.2, sz + Math.cos(a) * d, 6, { color: 0xb89870, speed: 5, size: 0.5, life: 0.5, up: 3 }));
   fx.slash(sx, sz, a, len, 12, 0xd8b080, 1.2);
 }
@@ -29,12 +29,12 @@ function axThrow(lv) {
   const a = aimAngle(), M = TREE_MOTIONS.ax_throw, m = lv === 2 ? 2.6 : 1.6, W = S.wt, col = RARITIES[S.wr].color;
   me.a = a; me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration;
   const far = { x: me.x + Math.sin(a) * 8, z: me.z + Math.cos(a) * 8 }, rad = lv === 2 ? 1.6 : 1.2;
-  later(M.hits[0], () => combat.proj({ a, mult: m, type: 'heavy', speed: 20, life: 0.4, rad, shape: 'axe', stun: 6 }));
+  later(M.hits[0], () => strikes.proj({ a, mult: m, type: 'heavy', speed: 20, life: 0.4, rad, shape: 'axe', stun: 6 }));
   const spin = W.ks2 === 'ax_storm' ? 2 : 0;
-  for (let k = 0; k < spin * 4; k++) later(M.hits[0] + 0.4 + k * 0.25, () => { combat.circle(far.x, far.z, 2.4, 0.5, { type: 'proc', stun: 1, wtNo: true }); fx.slash(far.x, far.z, k * 1.4, 2.4, 220, col, 0.8); });
+  for (let k = 0; k < spin * 4; k++) later(M.hits[0] + 0.4 + k * 0.25, () => { strikes.circle(far.x, far.z, 2.4, 0.5, { type: 'proc', stun: 1, wtNo: true }); fx.slash(far.x, far.z, k * 1.4, 2.4, 220, col, 0.8); });
   later(M.hits[0] + 0.4 + spin, () => {
     const ra = Math.atan2(me.x - far.x, me.z - far.z), t = Math.max(0.1, Math.hypot(me.x - far.x, me.z - far.z) / 20);
-    combat.proj({ a: ra, mult: m, type: 'heavy', speed: 20, life: t, rad, shape: 'axe', sx: far.x, sz: far.z, stun: 6 });
+    strikes.proj({ a: ra, mult: m, type: 'heavy', speed: 20, life: t, rad, shape: 'axe', sx: far.x, sz: far.z, stun: 6 });
     if (W.ks2 === 'ax_catch') later(t, () => {
       if (me.dead) return;
       quietBuff('ax_catch', '受け止め', 3, { aspd: 25 }, 0xffb040);
@@ -44,7 +44,7 @@ function axThrow(lv) {
 }
 
 // スキルに渡す文脈に、HPを払う道具を足す（c.pay: ブラッドラストA「血の代償」。0にはならない）
-Object.assign(combat, {
+extendCombat({
   pay(frac) { const d = Math.min(me.hp - 1, Math.round(S.mhp * frac)); if (d > 0) { me.hp -= d; floatText(me.x, 2.2, me.z, d, 'me'); } },
 });
 
@@ -101,7 +101,7 @@ registerWeaponFx('axe', {
       if (mb.axBoom || now() - (mb.localT || 0) > 3) continue;
       mb.axBoom = true;
       const x = mb.x, z = mb.z;
-      combat.circle(x, z, 4 + mb.rad, 5.0, { type: 'proc', noProc: true });
+      strikes.circle(x, z, 4 + mb.rad, 5.0, { type: 'proc', noProc: true });
       fx.ringWave(x, z, 0xffb040, 5 + mb.rad, 0.45); fx.flash(x, 1.5, z, 0xffb040, 60, 0.35);
       fx.parts.burst(x, 0.4, z, 60, { color: 0xc8a070, speed: 9, size: 0.6, life: 0.7, up: 3 });
       floatText(x, 4, z, '破砕!', 'just'); audio.sfx('impact'); addShake(0.5);

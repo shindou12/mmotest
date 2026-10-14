@@ -1,21 +1,20 @@
 // 短剣の武器ツリーの効果（連撃・毒・出血・暗殺・必殺・連刃 など）と、短剣の強攻撃「瞬影」の決まり。差し込み口は game/weapon-fx.js
-import * as THREE from 'three';
 import { TREE_MOTIONS } from '../../../shared/tree-motions.js';
 import { KNIFE_COLOR } from '../../weapon-tree.js';
-import { angDiff, now } from '../util.js';
+import { angDiff, now, degToRad } from '../util.js';
 import { floatText } from '../ui-bridge.js';
 import { audio, fx } from '../render.js';
 import { me } from '../state.js';
 import { S, hasBuff } from '../stats.js';
 import { dealDamage, later } from '../combat.js';
 import { quietBuff } from '../tree-effects.js';
-import { combat } from '../actions.js';
+import { extendCombat, strikes } from '../actions.js';
 import { registerWeaponFx } from '../weapon-fx.js';
 
 // 敵の背後にいるか（敵の向きから120度以上うしろ）
 export function wtBehind(mb) {
   if (!mb || mb.a == null) return false;
-  return Math.abs(angDiff(Math.atan2(me.x - mb.x, me.z - mb.z), mb.a)) > THREE.MathUtils.degToRad(120);
+  return Math.abs(angDiff(Math.atan2(me.x - mb.x, me.z - mb.z), mb.a)) > degToRad(120);
 }
 // 毒・出血の強さ（毒の心得）と時間（長毒）
 const wtToxMul = () => 1 + (S.wt?.lv('dk_toxin') ? (S.wt.lv('dk_toxin') >= 2 ? 50 : 30) : 0) / 100;
@@ -46,7 +45,7 @@ export function addBleed(mb, perSec, stack = false, sec = 4) {
 }
 
 // スキルに渡す文脈に、毒と出血を足す（c.poison / c.bleed）
-Object.assign(combat, {
+extendCombat({
   poison: (mb, n) => addPoison(mb, n),
   bleed: (mb, perSec, stack) => addBleed(mb, perSec, stack),
   ambush(n) { me.ambush = Math.max(me.ambush, n); }, // スモーク・ステップ: 次の n 撃は必ず会心
@@ -98,7 +97,7 @@ registerWeaponFx('dagger', {
   swingLate(a) {
     if (S.wt?.ks2 === 'dk_thousand' && me.combo === 2 && me.dStack >= S.dStackMax) {
       me.motion = 'dk_thousand'; me.motionT = 0;
-      later(TREE_MOTIONS.dk_thousand.hits[0], () => { for (const d of [-0.22, 0, 0.22]) combat.arrow({ a: a + d, mult: 0.35, type: 'proc', noZone: true, speed: 40, color: KNIFE_COLOR }); });
+      later(TREE_MOTIONS.dk_thousand.hits[0], () => { for (const d of [-0.22, 0, 0.22]) strikes.arrow({ a: a + d, mult: 0.35, type: 'proc', noZone: true, speed: 40, color: KNIFE_COLOR }); });
     }
   },
   // 瞬影は溜めきったときだけ（途中で離したら通常攻撃）

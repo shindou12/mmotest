@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { FLOORS, RARITIES, WEAPONS } from '../../shared/data.js';
 import { makeMob, makePlayer, setPlayerArmor, setPlayerWeapon } from '../models.js';
 import { now } from './util.js';
@@ -11,6 +10,7 @@ import { tf } from './variants.js';
 import { fxArrow, heal } from './actions.js';
 import { makeMobLabel } from './labels.js';
 import { fxCall } from './weapon-fx.js';
+import { reviveRingGeo, reviveRingMesh } from './meshes.js';
 
 // ======================================================================
 // スナップショット適用
@@ -98,7 +98,7 @@ export function removeOther(id) {
 }
 
 // 這いずりのゲージ: 倒れている人の足元の円。円1周が最大（最近倒れた回数が多いほど長い）
-export const RING = [1.35, 1.75];
+export { RING } from './meshes.js';
 export function reviveRing(h, x, z, rv) {
   if (!(rv >= 0)) {
     if (h.revRing) { fx.dispose(h.revRing.g); h.revRing = null; }
@@ -106,13 +106,7 @@ export function reviveRing(h, x, z, rv) {
   }
   let R = h.revRing;
   if (!R) {
-    const mat = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
-    const g = new THREE.Group();
-    const bg = new THREE.Mesh(new THREE.RingGeometry(RING[0] - 0.08, RING[1] + 0.08, 64), mat(0x101820, 0.6));
-    const fg = new THREE.Mesh(new THREE.RingGeometry(RING[0], RING[1], 4), mat(0xffd84a, 0.95));
-    bg.renderOrder = 20; fg.renderOrder = 21;
-    g.add(bg, fg);
-    g.rotation.x = -Math.PI / 2;
+    const { g, fg } = reviveRingMesh();
     scene.add(g);
     R = h.revRing = { g, fg, v: -1, shown: rv, t: now() };
   }
@@ -123,7 +117,7 @@ export function reviveRing(h, x, z, rv) {
   if (Math.abs(R.v - R.shown) > 0.002) {
     R.v = R.shown;
     R.fg.geometry.dispose();
-    R.fg.geometry = new THREE.RingGeometry(RING[0], RING[1], Math.max(4, Math.ceil(R.v * 64)), 1, Math.PI / 2, Math.max(0.01, R.v) * Math.PI * 2);
+    R.fg.geometry = reviveRingGeo(Math.max(4, Math.ceil(R.v * 64)), Math.max(0.01, R.v) * Math.PI * 2);
   }
   R.g.position.set(x, heightAt(x, z) + 0.08, z);
   R.fg.material.opacity = 0.75 + 0.25 * Math.sin(t * 6);

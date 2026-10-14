@@ -9,7 +9,7 @@ import { S, buffMod, hasBuff } from './stats.js';
 import { net } from './net-client.js';
 import { wtCritAdd, wtDmgMult, wtOnHit } from './tree-effects.js';
 import { indoorNow, onVariantHit, tf, titleDmg } from './variants.js';
-import { combat, heal } from './actions.js';
+import { heal, strikes } from './actions.js';
 import { fxReduce, fxSome } from './weapon-fx.js';
 
 // ======================================================================
@@ -106,7 +106,7 @@ export function dealDamage(mb, mult, o = {}) {
     fx.parts.burst(x, 7, z, 20, { color: 0xfff0a0, speed: 3, size: 0.5, life: 0.4, gravity: 30 });
     later(0.25, () => {
       fx.flash(x, 1, z, 0xfff0a0, 30, 0.25); fx.ringWave(x, z, 0xfff0a0, 2.6, 0.3);
-      combat.circle(x, z, 2.4, 0.35, { type: 'proc', noProc: true });
+      strikes.circle(x, z, 2.4, 0.35, { type: 'proc', noProc: true });
     });
   }
   if (o.noProc) return;
@@ -114,7 +114,7 @@ export function dealDamage(mb, mult, o = {}) {
   if (crit && S.fx.has('thunder')) {
     later(0.08, () => {
       fx.lightning(mb.x, mb.z); audio.sfx('thunder'); addShake(0.2);
-      combat.circle(mb.x, mb.z, 3.5, 1.5, { noProc: true });
+      strikes.circle(mb.x, mb.z, 3.5, 1.5, { noProc: true });
     });
   }
   if (S.fx.has('flame') && Math.random() < 0.35) {

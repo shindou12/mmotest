@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { RARITIES, TITLES, floorLevel, migrateItem } from '../../shared/data.js';
 import { AREAS } from '../../shared/areas.js';
 import { Net } from '../net.js';
@@ -17,6 +16,7 @@ import { clearBossProjs, gainXp, heal, spawnBossProj } from './actions.js';
 import { countClear, grantTitle, questEvent, rollTitleDrop } from './progress.js';
 import { LOOT, spawnDrop, spawnGold } from './loot.js';
 import { salvageTarget, spawnSalvaged } from './items.js';
+import { aimLineMesh } from './meshes.js';
 
 // ======================================================================
 // ネットワーク
@@ -167,9 +167,7 @@ export function onMsg(m) {
       const b = mobs.get(m.id);
       const tgt = () => (m.tid === me.id ? me : others.get(m.tid));
       if (!b || !tgt()) break;
-      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xff4a3a, transparent: true, depthTest: false }));
-      line.renderOrder = 7;
+      const line = aimLineMesh();
       fx.add(line, m.d / 1000, (o, k) => {
         const t = tgt();
         if (!t) return;

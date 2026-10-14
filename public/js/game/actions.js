@@ -2,12 +2,10 @@ import { MOTION_DURATIONS } from '../../shared/motion-catalog.js';
 import { SPEAR_TIMINGS } from '../../shared/skill-timings.js';
 import { counterAngle } from '../spear-motion.js';
 import { BALANCE } from '../../shared/balance.js';
-import * as THREE from 'three';
 import { MAX_LEVEL, RARITIES, WEAPONS, xpToNext } from '../../shared/data.js';
 import { collide } from '../../shared/areas.js';
-import { makeWeapon } from '../models.js';
 import { HEAVY, TREE_SKILLS } from '../skills.js';
-import { angDiff, now } from './util.js';
+import { angDiff, now, degToRad } from './util.js';
 import { banner, floatText, toast, ui } from './ui-bridge.js';
 import { char, characterStore, saveChar } from './save.js';
 import { audio, fx, scene } from './render.js';
@@ -20,44 +18,33 @@ import { addShake, aimAngle, aimPoint, dealDamage, later, touch } from './combat
 import { gainWeaponProf, phantomReady, skillCd, wtAfterCast, wtHeavy, wtOnGuard } from './tree-effects.js';
 import { castWeaponSkill, desperate, tf, titleAspd, variantParams } from './variants.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
+import { arrowMesh, bossProjMesh, phantomAxe } from './meshes.js';
 
-// スキルから使う戦闘コンテキスト（skills.js の c）
-export const combat = {
+// スキル（skills.js の c）と武器の効果に渡す戦闘コンテキスト。役目ごとの小さな形に分けてある
+// 使う側は必要な形だけを読む（例: 武器の効果は strikes で当て、feedback で見せる）
+// 見る・狙う（自分の状態・向き・狙った場所・近くの敵）
+export const senses = {
   me,
-  fx,
   S: () => S,
   wt: () => S.wt,
-  resetCd(id) { me.tcd[id] = 0; },
-  // 武器だけの道具（c.parry / c.primeCharge / c.poison / c.bleed / c.ambush / c.pay / c.trap）は、各武器のファイル（game/weapons/*.js）が足す
   aim: aimAngle,
-  col: () => RARITIES[S.wr].color,
-  later,
-  sfx: (n, o) => audio.sfx(n, o),
-  text: (t, cls) => floatText(me.x, 3, me.z, t, cls),
-  shake: addShake,
-  hit: (mb, mult, o) => dealDamage(mb, mult, o),
-  heal: (frac) => heal(S.mhp * frac, true),
-  buff: addBuff,
-  taunt: (r) => net.send({ t: 'taunt', r }),
   point: aimPoint,
   area: () => world.area,
   targets: (x,z,r) => [...mobs.values()].filter(m=>m.hp>0&&Math.hypot(m.x-x,m.z-z)<r+m.rad),
   range: () => me.releaseRange || S.bowMax, // 弓: 離したときの射程
-  arrow(o) {
-    const color = o.color ?? RARITIES[S.wr].color;
-    const mesh = arrowMesh(color, o.big);
-    mesh.position.set(me.x, 1.2, me.z); mesh.rotation.y = o.a;
-    // 射程: 指定がなければ、弓の通常攻撃は引かずに撃つ射程・スキルは最大射程（弓以外の投げナイフなどは24m）
-    const range = o.range ?? (S.W.ranged ? (o.type === 'normal' ? S.bowBase : S.bowMax) : 24);
-    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (range + 0.6) / (o.speed ?? 42), range, rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), color, sv: o.sv, cast: o.cast, tech: o.tech, poison: o.poison || 0, crit: o.crit, snipe: o.snipe, full: o.full, onHit: o.onHit });
-    // 射出の閃光
-    const fx0 = me.x + Math.sin(o.a) * 0.9, fz0 = me.z + Math.cos(o.a) * 0.9;
-    fx.flash(fx0, 1.3, fz0, color, o.big ? 14 : 8, 0.15, 6);
-    fx.parts.burst(fx0, 1.25, fz0, o.big ? 18 : 8, { color, speed: 5, size: 0.35, life: 0.25, gravity: 0 });
-    audio.sfx('swing');
+  col: () => RARITIES[S.wr].color,
+  reach: (normal) => fxReduce('reach', 1, normal),
+  nearest(range) {
+    let best = null, bd = range;
+    for (const mb of mobs.values()) { const d = Math.hypot(mb.x - me.x, mb.z - me.z); if (d < bd) { bd = d; best = mb; } }
+    return best;
   },
+};
+// 当てる（ダメージ・範囲・飛び道具・突進）
+export const strikes = {
+  hit: (mb, mult, o) => dealDamage(mb, mult, o),
   arc(range, deg, mult, o = {}) {
-    const a = o.a ?? me.a, arc = THREE.MathUtils.degToRad(deg) / 2;
+    const a = o.a ?? me.a, arc = degToRad(deg) / 2;
     for (const mb of [...mobs.values()]) {
       const dx = mb.x - me.x, dz = mb.z - me.z, d = Math.hypot(dx, dz);
       if (d > range + mb.rad) continue;
@@ -87,22 +74,51 @@ export const combat = {
   },
   proj(o) {
     const color = o.color ?? RARITIES[S.wr].color;
-    const mesh = o.shape === 'axe' ? phantomAxe(color) : fx.waveMesh(color);
+    const mesh = o.shape === 'axe' ? phantomAxe(color, S.wr, S.wst||0) : fx.waveMesh(color);
     mesh.position.set(o.sx ?? me.x, 1, o.sz ?? me.z); mesh.rotation.y = o.a;
     projs.push({ mesh, x: o.sx ?? me.x, z: o.sz ?? me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast, wave: o.shape !== 'axe', wtNo: !!o.wtNo, stun: o.stun, eclipse: !!o.eclipse });
     audio.sfx('wave');
+  },
+  arrow(o) {
+    const color = o.color ?? RARITIES[S.wr].color;
+    const mesh = arrowMesh(color, o.big);
+    mesh.position.set(me.x, 1.2, me.z); mesh.rotation.y = o.a;
+    // 射程: 指定がなければ、弓の通常攻撃は引かずに撃つ射程・スキルは最大射程（弓以外の投げナイフなどは24m）
+    const range = o.range ?? (S.W.ranged ? (o.type === 'normal' ? S.bowBase : S.bowMax) : 24);
+    projs.push({ mesh, arrow: true, x: me.x, z: me.z, sx: me.x, sz: me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (range + 0.6) / (o.speed ?? 42), range, rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), color, sv: o.sv, cast: o.cast, tech: o.tech, poison: o.poison || 0, crit: o.crit, snipe: o.snipe, full: o.full, onHit: o.onHit });
+    // 射出の閃光
+    const fx0 = me.x + Math.sin(o.a) * 0.9, fz0 = me.z + Math.cos(o.a) * 0.9;
+    fx.flash(fx0, 1.3, fz0, color, o.big ? 14 : 8, 0.15, 6);
+    fx.parts.burst(fx0, 1.25, fz0, o.big ? 18 : 8, { color, speed: 5, size: 0.35, life: 0.25, gravity: 0 });
+    audio.sfx('swing');
   },
   dash(a, dist, dur, iframe) {
     me.dashA = a; me.dashT = dur; me.dashSpeed = dist / dur; me.a = a;
     if (iframe) me.iframe = Math.max(me.iframe, iframe);
   },
-  reach: (normal) => fxReduce('reach', 1, normal),
-  nearest(range) {
-    let best = null, bd = range;
-    for (const mb of mobs.values()) { const d = Math.hypot(mb.x - me.x, mb.z - me.z); if (d < bd) { bd = d; best = mb; } }
-    return best;
-  },
 };
+// 見せる・鳴らす（エフェクト・音・文字・揺れ・時間差）
+export const feedback = {
+  fx,
+  sfx: (n, o) => audio.sfx(n, o),
+  text: (t, cls) => floatText(me.x, 3, me.z, t, cls),
+  shake: addShake,
+  later,
+};
+// 自分を整える（回復・バフ・クールタイム）
+export const selfCare = {
+  heal: (frac) => heal(S.mhp * frac, true),
+  buff: addBuff,
+  resetCd(id) { me.tcd[id] = 0; },
+};
+// 仲間・敵への合図（挑発）
+export const party = {
+  taunt: (r) => net.send({ t: 'taunt', r }),
+};
+// スキルに渡す c は全部をまとめたもの
+export const combat = { ...senses, ...strikes, ...feedback, ...selfCare, ...party };
+// 武器だけの道具（c.parry / c.primeCharge / c.poison / c.bleed / c.ambush / c.pay / c.trap）は、各武器のファイル（game/weapons/*.js）がここで足す
+export const extendCombat = (tools) => Object.assign(combat, tools);
 
 export function canAct() { return S && !me.dead && !me.crawl &&me.dodgeT <= 0 && me.skillT < 0 && me.dashT <= 0 && !me.guarding && me.staggerT <= 0 && me.downT <= 0 && !(me.sweepT > 0); }
 
@@ -126,46 +142,20 @@ export function doSwing() {
   const col = RARITIES[S.wr].color;
   const a = me.a;
   if (W.ranged) {
-    if (!fxSome('shoot', a, mult)) combat.arrow({ a, mult, type: 'normal' }); // 連射 など
+    if (!fxSome('shoot', a, mult)) strikes.arrow({ a, mult, type: 'normal' }); // 連射 など
     return;
   }
   const range = W.range * fxReduce('reach', 1, true);
   fx.slash(me.x, me.z, me.a, range, W.arc, fxReduce('swingColor', col), 1.0, me.combo % 2 === 1);
   audio.sfx('swing', { heavy: !!WEAPONS[S.wk]?.twoHanded || me.combo === 2 });
-  later(0.06, () => combat.arc(range, W.arc, mult, { a, type: 'normal' }));
+  later(0.06, () => strikes.arc(range, W.arc, mult, { a, type: 'normal' }));
   fxCall('swingExtra', a, range, col); // 連突き・一点突破 など
   const waved = me.combo === 2 && S.fx.has('wave');
-  if (waved) combat.proj({ a, mult: 1.4, type: 'normal' });
+  if (waved) strikes.proj({ a, mult: 1.4, type: 'normal' });
   fxCall('swingLate', a, waved); // 剣の心得A「閃光」・千本 など
   fxCall('swingLast', a); // 魔剣士 など
 }
 
-// 矢の見た目
-export function arrowMesh(color, big) {
-  // 小さくて見えにくかったので、光る矢じりと長い光の尾を付けて大きめにする
-  const g = new THREE.Group();
-  const s = big ? 2.0 : 1.5;
-  const bright = new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.35).multiplyScalar(2.2);
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * s, 0.05 * s, 1.2 * s, 6), new THREE.MeshBasicMaterial({ color: 0xfff4dc }));
-  shaft.rotation.x = Math.PI / 2; g.add(shaft);
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.13 * s, 0.38 * s, 6), new THREE.MeshBasicMaterial({ color: bright }));
-  head.rotation.x = Math.PI / 2; head.position.z = 0.75 * s; g.add(head);
-  const glowM = new THREE.MeshBasicMaterial({ color: bright, transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false });
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.28 * s, 10, 8), glowM);
-  orb.position.z = 0.7 * s; g.add(orb);
-  for (const rz of [0, Math.PI / 2]) {
-    const trail = new THREE.Mesh(new THREE.PlaneGeometry(0.3 * s, 3.2 * s), new THREE.MeshBasicMaterial({ color: bright, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    trail.rotation.set(Math.PI / 2, 0, 0); trail.rotateY(rz); trail.position.z = -1.0 * s; g.add(trail);
-  }
-  g.userData.isArrow = true;
-  return g;
-}
-export function phantomAxe(color) {
-  const group=new THREE.Group(),weapon=makeWeapon('axe',S.wr,S.wst||0),oldMaterials=new Set();
-  const material=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9});
-  weapon.traverse(part=>{if(part.material){oldMaterials.add(part.material);part.material=material;}});
-  for(const mat of oldMaterials)mat.dispose();weapon.rotation.x=Math.PI/2;group.add(weapon);return group;
-}
 
 // 他プレイヤーの矢（見た目だけ）
 export function fxArrow(x, z, a, color) {
@@ -229,7 +219,7 @@ export function sweepTick(dt) {
   if (!me.sweepHit && prev < SWEEP.hitAt && me.sweepT >= SWEEP.hitAt) {
     me.sweepHit = true;
     const kk = (S.flags.has('bulwark') ? 1.3 : 1) * fxReduce('sweepPower', 0.5); // 反撃の心得で強くなる。盾槍以外（守護騎士）は半分
-    combat.circle(me.x, me.z, SWEEP.r, SWEEP.mult * kk, { type: 'heavy', stun: SWEEP.stun * fxReduce('sweepStun', 1) });
+    strikes.circle(me.x, me.z, SWEEP.r, SWEEP.mult * kk, { type: 'heavy', stun: SWEEP.stun * fxReduce('sweepStun', 1) });
     fx.ringWave(me.x, me.z, 0xbfe0ff, SWEEP.r + 0.5, 0.4, 1.0, 1.0);
     fx.flash(me.x, 1.2, me.z, 0xbfe0ff, 50, 0.3);
     audio.sfx('heavy'); addShake(0.45);
@@ -330,10 +320,7 @@ export function updateProjs(dt) {
 
 // ---- ボスの弾 ----
 export function spawnBossProj(m) {
-  const g = new THREE.Group();
-  const core = new THREE.Mesh(new THREE.SphereGeometry(m.r, 14, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(m.c).multiplyScalar(1.6) }));
-  const halo = new THREE.Mesh(new THREE.SphereGeometry(m.r * 1.7, 14, 10), new THREE.MeshBasicMaterial({ color: m.c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
-  g.add(core, halo);
+  const g = bossProjMesh(m);
   g.position.set(m.x, 1.3, m.z);
   scene.add(g);
   bprojs.push({ ...m, mesh: g, dodged: false });
@@ -348,7 +335,7 @@ export function updateBossProjs(dt) {
     let gone = p.life <= 0;
     const d = Math.hypot(p.x - me.x, p.z - me.z);
     if (!gone && !me.dead && !me.crawl && d < p.r + 0.6) {
-      const facing = Math.abs(angDiff(Math.atan2(p.x - me.x, p.z - me.z), me.a)) < THREE.MathUtils.degToRad(80);
+      const facing = Math.abs(angDiff(Math.atan2(p.x - me.x, p.z - me.z), me.a)) < degToRad(80);
       if (me.guarding && S.guard && facing) {
         // ガードで弾を消す
         net.send({ t: 'pblock', id: p.id });

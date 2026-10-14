@@ -2,7 +2,7 @@ import { BALANCE, REVIVE, reviveStep } from '../../shared/balance.js';
 import * as THREE from 'three';
 import { inShape } from '../../shared/data.js';
 import { makeTelegraph } from '../fx.js';
-import { angDiff, clamp, now, rnd } from './util.js';
+import { angDiff, clamp, now, rnd, degToRad } from './util.js';
 import { banner, floatText, toast, ui } from './ui-bridge.js';
 import { char, characterStore } from './save.js';
 import { audio, fx, scene } from './render.js';
@@ -14,7 +14,7 @@ import { heightAt } from './area.js';
 import { addShake, stunValue, touch } from './combat.js';
 import { wtDr, wtOnGuard, wtOnHurt } from './tree-effects.js';
 import { tf } from './variants.js';
-import { combat, tryDodge } from './actions.js';
+import { strikes, tryDodge } from './actions.js';
 import { moveMe } from './loop.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 
@@ -77,15 +77,15 @@ export function resolveTele(te) {
   const srcMob = mobs.get(te.src);
   if (srcMob) {
     const off = Math.abs(angDiff(Math.atan2(me.x - srcMob.x, me.z - srcMob.z), srcMob.a));
-    if (off < THREE.MathUtils.degToRad(60)) raw *= tf('t_shell') ? 1 : 1.3; // 称号「甲殻の守り」は正面の割り増しなし
-    else if (off > THREE.MathUtils.degToRad(120)) raw *= 0.7;
+    if (off < degToRad(60)) raw *= tf('t_shell') ? 1 : 1.3; // 称号「甲殻の守り」は正面の割り増しなし
+    else if (off > degToRad(120)) raw *= 0.7;
   }
   // 盾槍のガード（攻撃してきた方向が正面なら軽減）
   if (me.guarding && S.guard) {
     const src = mobs.get(te.src) || { x: te.sh[0].x, z: te.sh[0].z };
     const dirTo = Math.atan2(src.x - me.x, src.z - me.z);
     const centered = Math.hypot(src.x - me.x, src.z - me.z) < 0.5;
-    if (centered || Math.abs(angDiff(dirTo, me.a)) < THREE.MathUtils.degToRad(80)) {
+    if (centered || Math.abs(angDiff(dirTo, me.a)) < degToRad(80)) {
       if (te.src) net.send({ t: 'threat', id: te.src, n: Math.round(te.dmg * 3) });
       // ガードゲージが尽きたらガードブレイク（そのまま全部のダメージを受ける）
       if (guardDamage(raw, te.kd)) { takeDamage(raw, src, false, true); return; }
@@ -198,14 +198,14 @@ export function onJustDodge() {
   if (S.justbuff > 0) addBuff('just', '見切り', 3, { dmgp: S.justbuff }, 0x9affff);
   fxCall('justDodge'); // 後の先・残影・見切り眼 など
   if (S.counter > 0) {
-    combat.circle(me.x, me.z, 5, S.counter / 100, { type: 'proc', noProc: true });
+    strikes.circle(me.x, me.z, 5, S.counter / 100, { type: 'proc', noProc: true });
     fx.ringWave(me.x, me.z, 0xbff8ff, 5.5, 0.35);
   }
   if (S.fx.has('mirror')) {
     addBuff('mirror', '八咫の加護', 5, { dmgp: 50 }, 0xffffff);
     fx.ringWave(me.x, me.z, 0xffffff, 7, 0.5);
     fx.parts.burst(me.x, 1, me.z, 60, { color: 0xbff8ff, speed: 10, size: 0.6 });
-    combat.circle(me.x, me.z, 6, 3.0, { type: 'proc', noProc: true });
+    strikes.circle(me.x, me.z, 6, 3.0, { type: 'proc', noProc: true });
   }
 }
 
