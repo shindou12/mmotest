@@ -1750,9 +1750,7 @@ function rollTitleDrop(m) {
     if (char.titles[d.id] || !d.when(k) || Math.random() >= d.chance) continue;
     char.titles[d.id] = true;
     const it = makeTitle(d.id);
-    spawnDrop(it, me.x + rnd(-1.5, 1.5), me.z + rnd(1, 2.5));
-    if (it.rarity < 4) banner('称号がドロップ！', it.name, RARITIES[it.rarity].color, 3);
-    toast(`称号${it.name}が落ちた：${TITLES[d.id].desc}`, RARITIES[it.rarity].color, true);
+    spawnDrop(it, me.x + rnd(-1.5, 1.5), me.z + rnd(1, 2.5)); // 通知は拾ったときに出る
     saveChar();
     return;
   }
@@ -1855,11 +1853,6 @@ function spawnDrop(it, x, z) {
   model.position.set(ox, heightAt(ox, oz) + 1, oz);
   scene.add(model);
   drops.push({ id: ++dropSeq, it, x, z, ox, oz, model, beam: null, t: 0, landed: false, spin: rnd(-1, 1) });
-  const r = it.rarity, col = RARITIES[r].color;
-  if (r >= 4) {
-    const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : it.slot === 'title' ? '称号' : '装飾品';
-    banner(r === 5 ? '★★★ 神器ドロップ ★★★' : '★ 伝説の' + what + ' ★', it.name, col, r);
-  }
 }
 // 着地: 物の音＋レア度の合図。エピック以上は光の柱
 function landDrop(d) {
@@ -1887,8 +1880,15 @@ function pickupDrop(d) {
   char.inv.unshift(d.it);
   saveChar();
   audio.sfx('pickup');
-  const cmp = itemPower(d.it) > itemPower(char.eq[d.it.slot]) ? '  ▲' : '';
-  toast(`${RARITIES[d.it.rarity].name}「${d.it.name}」を入手${cmp}`, RARITIES[d.it.rarity].color, d.it.rarity >= 4);
+  const it = d.it, r = it.rarity, col = RARITIES[r].color;
+  const cmp = itemPower(it) > itemPower(char.eq[it.slot]) ? '  ▲' : '';
+  toast(`${RARITIES[r].name}「${it.name}」を入手${cmp}`, col, r >= 4);
+  // レアな物の画面通知は、拾ったときに出す（落ちたときは札と音と光だけ）
+  if (r >= 4) {
+    const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : it.slot === 'title' ? '称号' : '装飾品';
+    banner(r === 5 ? '★★★ 神器を入手 ★★★' : '★ 伝説の' + what + 'を入手 ★', it.name, col, r);
+  } else if (it.slot === 'title') banner('称号を入手', it.name, col, 3);
+  if (it.slot === 'title' && TITLES[it.title]) toast(`${it.name}：${TITLES[it.title].desc}`, col);
   disposeDrop(d);
   drops.splice(drops.indexOf(d), 1);
   if (me.lootGo === d.id) me.lootGo = 0;

@@ -267,7 +267,8 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .loot.r2 { color: #6cb8ff; border-color: rgba(74, 168, 255, .7); font-size: 13px; }
 .loot.r3 { color: #c99aff; border-color: #b86cff; font-size: 14px; }
 .loot.r4 { color: #ffb252; border: 2px solid #ffa236; font-size: 15px; background: rgba(20, 10, 0, .85); box-shadow: 0 0 10px rgba(255, 162, 54, .45); }
-.loot.r5 { color: #fff; border: 2px solid #fff; font-size: 16px; background: #c8203f; box-shadow: 0 0 14px rgba(255, 61, 99, .8); }
+.loot.r5 { color: #d0102e; border: 2px solid #d0102e; font-size: 16px; font-weight: 800; background: #fff; box-shadow: 0 0 14px rgba(255, 61, 99, .8); }
+.loot.r5:hover { background: #fff; outline-color: #d0102e; }
 .plate { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 11px; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 .plate .pb { width: 60px; height: 5px; background: rgba(0,0,0,.6); border-radius: 3px; margin: 2px auto 0; overflow: hidden; }
 .plate .pb > div { height: 100%; background: #e44; }
