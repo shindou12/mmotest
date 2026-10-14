@@ -64,7 +64,7 @@ export const WEAPONS = {
   },
   dagger: {
     name: '短剣', range: 2.3, arc: 90, speed: 0.26, mult: 0.68, weight: 2, stun: 0.6, melee: true,
-    passive: ['回避のクールタイム -25%', '攻撃を当てるたびに攻撃速度+4%（最大+40%・3秒）'],
+    passive: [], // 短剣は武器ツリー（熟練度）で決める
     skill: { name: 'シャドウ・ダンス', cd: 4.5, desc: '目にも止まらぬ五連撃', mult: 1.0 },
   },
   axe: {

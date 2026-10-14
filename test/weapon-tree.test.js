@@ -164,3 +164,34 @@ test('tree motions (sword counter, greatsword riposte, ground slam) are continuo
   assert.ok(sampleTechnique('gt_slam', 0.22).lift > 1, 'ground slam leaves the ground');
   assert.ok(sampleTechnique('gt_slam', TREE_MOTIONS.gt_slam.hits[0]).lift < 0.05, 'and lands on the hit');
 });
+
+test('dagger: poison / assassin / blades classes, base passives moved into the tree, skills scale and branch', () => {
+  const c = fresh();
+  profOf(c, 'dagger').lv = 20;
+  assert.equal(TREES.dagger, undefined, 'old dagger tree is gone');
+  wtLearn(c, 'dk_agile'); wtLearn(c, 'dk_agile'); wtLearn(c, 'dk_vitalp'); wtLearn(c, 'dk_vitalp'); wtLearn(c, 'dk_vitalp'); wtChoose(c, 'dk_vitalp', 'A');
+  let E = wtEffects(c, 'dagger');
+  assert.equal(E.mods.dodgecd, 25, 'the old -25% dodge cooldown now lives in 身軽');
+  assert.equal(E.mods.critd, 35); assert.equal(E.mods.crit, 8);
+  assert.ok(wtLearn(c, 'dk_venom')); assert.ok(!wtCanLearn(c, 'dk_assassin')); assert.ok(wtLearn(c, 'dk_burst'));
+  const T0 = { id: 1, x: 0, z: 2, hp: 100, mhp: 100 };
+  const run = (id) => {
+    const k = ctx(wtEffects(c, 'dagger'));
+    Object.assign(k.c, { nearest: () => T0, targets: () => [T0], hit: (...a) => k.events.push({ m: 'hit', a }), arrow: (...a) => k.events.push({ m: 'arrow', a }),
+      poison: (...a) => k.events.push({ m: 'poison', a }), bleed: (...a) => k.events.push({ m: 'bleed', a }), ambush: (...a) => k.events.push({ m: 'ambush', a }), resetCd: () => {} });
+    TREE_SKILLS[id].run(k.c); k.run(); return k.events;
+  };
+  wtLearn(c, 'dk_pin'); wtLearn(c, 'dk_pin'); wtLearn(c, 'dk_pin'); wtChoose(c, 'dk_pin', 'A');
+  const knives = run('dk_pin').filter((e) => e.m === 'arrow');
+  assert.equal(knives.length, 3, 'three knives');
+  assert.ok(Math.abs(knives[0].a[0].mult - 3.4 * 0.7) < 1e-9);
+  assert.equal(knives[0].a[0].tech, 'dagger_pin', 'keeps the shared slow');
+  wtLearn(c, 'dk_bleed'); wtLearn(c, 'dk_bleed'); wtLearn(c, 'dk_bleed'); wtChoose(c, 'dk_bleed', 'A');
+  const bl = run('dk_bleed');
+  assert.equal(bl.filter((e) => e.m === 'hit').length, 2);
+  assert.deepEqual(bl.find((e) => e.m === 'bleed').a.slice(1), [0.6, true], 'deep cuts stack');
+  wtLearn(c, 'dk_smoke');
+  assert.deepEqual(run('dk_smoke').find((e) => e.m === 'ambush').a, [3]);
+  wtLearn(c, 'dk_vital');
+  T0.hp = 40; assert.equal(run('dk_vital').find((e) => e.m === 'hit').a[1], 5.4, 'low-HP targets take the big hit');
+});

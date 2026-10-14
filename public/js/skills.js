@@ -76,10 +76,12 @@ export const HEAVY = {
   dagger: {
     name: '瞬影', desc: '敵の間をすり抜けながら切り裂く（無敵あり）',
     run(c, lv) {
-      const a = c.aim(), sx = c.me.x, sz = c.me.z;
-      c.dash(a, lv === 2 ? 7.5 : 6, 0.18, 0.3);
+      // 武器ツリー「影歩き」: A は距離と無敵が伸び、B は通り抜けた敵に毒
+      const a = c.aim(), sx = c.me.x, sz = c.me.z, W = c.S().wt, far = W?.br('dk_shadow') === 'A' ? 1.3 : 1;
+      const len = (lv === 2 ? 7.5 : 6) * far;
+      c.dash(a, len, 0.18, far > 1 ? 0.5 : 0.3);
       c.later(0.16, () => {
-        c.line(lv === 2 ? 7.5 : 6, 2.4, lv === 2 ? 2.8 : 1.8, { type: 'heavy', a, sx, sz });
+        c.line(len, 2.4, lv === 2 ? 2.8 : 1.8, { type: 'heavy', a, sx, sz, poison: W?.br('dk_shadow') === 'B' ? 2 : 0 });
         c.fx.slash(c.me.x, c.me.z, a + Math.PI, 2.5, 160, c.col(), 1.0);
       });
     },
@@ -561,9 +563,8 @@ const weaponTree = (k, names, a1, a2, cap) => [
 ];
 
 export const TREES = {
-  // 片手剣・大剣は新しい武器ツリー（weapon-tree.js）に移った
+  // 片手剣・大剣・短剣は新しい武器ツリー（weapon-tree.js）に移った
   spear: { name: '盾槍', nodes: weaponTree('spear', ['盾槍の心得'], 'shieldbash', 'taunt', { name: '不動の盾', flag: 'bulwark', desc: 'ガード中の被ダメージを完全に防ぎ、ガードカウンターの威力 +30%' }) },
-  dagger: { name: '短剣', nodes: weaponTree('dagger', ['短剣の心得'], 'poison', 'smoke', { name: '暗殺術', mods: { crit: 8, critd: 40 }, desc: '会心率 +8%、会心ダメージ +40%' }) },
   axe: { name: '大斧', nodes: weaponTree('axe', ['大斧の心得'], 'warstomp', 'bloodlust', { name: '剛断', flag: 'execute', desc: 'HP30%以下の敵へのダメージ +50%' }) },
   bow: { name: '弓', nodes: weaponTree('bow', ['弓の心得'], 'backshot', 'focus', { name: '鷹の目', mods: { zone: 3 }, desc: '引き絞ったときの適性エリアの幅 +3m' }) },
   stat: {
