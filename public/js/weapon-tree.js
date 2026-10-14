@@ -202,10 +202,11 @@ const at = (c, sec, fn) => c.later(sec, fn);
 export const WT_SKILLS = {
   sw_aircut: {
     name: '空裂斬', kind: 'sword', cd: 9.6, motion: 'sword_aircut', duration: T.sword_aircut.duration,
+    motionOf: (W) => (W.br('sw_aircut') === 'A' ? 'sw_aircut_fan' : 'sword_aircut'),
     cdOf: (W) => (W.lv('sw_aircut') >= 2 ? 9.6 * 0.85 : 9.6),
     run(c) {
       const W = c.wt(), a = c.aim(), p = W.lv('sw_aircut') >= 2 ? 3.6 : 2.8, b = W.br('sw_aircut');
-      at(c, T.sword_aircut.hits[0], () => {
+      at(c, b === 'A' ? TREE_MOTIONS.sw_aircut_fan.hits[0] : T.sword_aircut.hits[0], () => {
         if (b === 'A') for (const d of [-0.32, 0, 0.32]) c.proj({ a: a + d, mult: p * 0.7, speed: 24, life: 0.55, rad: 1, type: 'tskill' });
         else if (b === 'B') c.proj({ a, mult: p, speed: 26, life: 0.85, rad: 1.6, type: 'tskill' });
         else c.proj({ a, mult: p, speed: 24, life: 0.55, rad: 1, type: 'tskill' });
@@ -226,7 +227,8 @@ export const WT_SKILLS = {
     },
   },
   sw_slant: {
-    name: 'スラントラッシュ', kind: 'sword', cd: 10.8,
+    name: 'スラントラッシュ', kind: 'sword', cd: 10.8, motion: 'sw_slant', duration: TREE_MOTIONS.sw_slant.duration,
+    motionOf: (W) => (W.br('sw_slant') === 'B' ? 'sw_slant_spin' : 'sw_slant'),
     run(c) {
       const W = c.wt(), each = W.lv('sw_slant') >= 2 ? 2.6 : 2.0, b = W.br('sw_slant');
       for (let i = 0; i < 3; i++) {
@@ -239,17 +241,18 @@ export const WT_SKILLS = {
           });
         });
       }
-      if (b === 'B') at(c, 0.72, () => { c.circle(c.me.x, c.me.z, 3.6, 2.0, { type: 'tskill' }); c.fx.ringWave(c.me.x, c.me.z, c.col(), 3.8, 0.35); c.sfx('wave'); });
+      if (b === 'B') at(c, TREE_MOTIONS.sw_slant_spin.hits[3], () => { c.circle(c.me.x, c.me.z, 3.6, 2.0, { type: 'tskill' }); c.fx.ringWave(c.me.x, c.me.z, c.col(), 3.8, 0.35); c.sfx('wave'); });
     },
   },
   sw_side: {
     name: '霞返し', kind: 'sword', cd: 10.8, motion: 'sword_sideturn', duration: T.sword_sideturn.duration,
+    motionOf: (W) => (W.br('sw_side') === 'A' ? 'sw_side_long' : 'sword_sideturn'),
     run(c) {
       const W = c.wt(), a = c.aim(), p = W.lv('sw_side') >= 2 ? 4.4 : 3.4, b = W.br('sw_side');
       const sx = c.me.x, sz = c.me.z, side = a + Math.PI / 2, dist = b === 'A' ? 6 : 3;
       c.dash(side, dist, b === 'A' ? 0.3 : 0.22, b === 'A' ? 0.35 : 0.25); c.me.a = a;
       if (b === 'A') at(c, 0.15, () => c.line(dist, 1.8, 1.2, { type: 'tskill', a: side, sx, sz }));
-      at(c, T.sword_sideturn.hits[0] + (b === 'A' ? 0.08 : 0), () => {
+      at(c, b === 'A' ? TREE_MOTIONS.sw_side_long.hits[0] : T.sword_sideturn.hits[0], () => {
         if (b === 'B') c.proj({ a, mult: p, speed: 24, life: 0.55, rad: 1.2, type: 'tskill' });
         else c.arc(3.7, 150, p, { type: 'tskill', a });
         c.fx.slash(c.me.x, c.me.z, a, 3.7, 150, c.col(), 1.15); c.sfx('swing');
@@ -264,10 +267,10 @@ export const WT_SKILLS = {
     },
   },
   sw_brave: {
-    name: 'ブレイブハート', kind: 'sword', cd: 21.6,
+    name: 'ブレイブハート', kind: 'sword', cd: 21.6, motion: 'sw_brave', duration: TREE_MOTIONS.sw_brave.duration,
     run(c) {
       const W = c.wt(), lv2 = W.lv('sw_brave') >= 2;
-      c.buff('sw_brave', 'ブレイブハート', lv2 ? 10 : 8, { atkp: lv2 ? 28 : 20, crit: 15 }, 0xffb040);
+      at(c, TREE_MOTIONS.sw_brave.hits[0], () => c.buff('sw_brave', 'ブレイブハート', lv2 ? 10 : 8, { atkp: lv2 ? 28 : 20, crit: 15 }, 0xffb040));
     },
   },
 };

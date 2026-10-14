@@ -37,6 +37,13 @@ function profile(style,i){
  case 'tether':return [{draw:1,lean:.03},{draw:0,lean:-.05}];
  case 'sideshot':return [{draw:1,lift:.1,leg:.3},{draw:0,lift:.12,bodyYaw:i?.18:-.1}];
  case 'trap':return [{draw:.8,lean:.18,lift:-.1},{draw:0,lean:.25,lift:-.16,guard:.2}];
+ case 'slant':case 'slantspin':
+  if(style==='slantspin'&&i===3)return [{yaw:-1.2,pitch:.1,bodyYaw:-.6,guard:.3,lean:.05},{yaw:1.1,pitch:.1,bodyYaw:Math.PI*2-.4,z:.5,lean:.15,leg:.3}];
+  return [{yaw:-sign*1.1,pitch:.2,bodyYaw:-sign*.35,lean:.1},{yaw:sign*1.0,pitch:.05,bodyYaw:sign*.4,z:.5,lean:.18,leg:.3}];
+ case 'brave':return [{pitch:.4,y:1.3,z:.3,guard:.3},{pitch:1.55,y:1.78,z:.12,lean:-.12,guard:1}];
+ case 'fan3':return [{yaw:-1.45,pitch:.15,bodyYaw:-.6,z:.25},{yaw:1.45,pitch:.15,bodyYaw:.65,z:.52,lean:.12,leg:.25}];
+ case 'sidelong':return [{yaw:1.3,pitch:.15,lean:-.12,bodyYaw:.3,leg:.35},{yaw:-.95,pitch:.1,bodyYaw:-.55,z:.5,lean:.2,leg:.3}];
+ case 'lightwave':return [{pitch:1.5,y:1.72,z:.16,lean:-.15},{pitch:-.05,y:1.3,z:.6,lean:.28,leg:.4}];
  case 'riposte':return [{yaw:-1.35,pitch:.05,bodyYaw:-.55,y:1.12,z:.2,guard:.6,lean:-.04},{yaw:1.45,pitch:.12,bodyYaw:.75,z:.52,lean:.18,leg:.38}];
  case 'gtriposte':return [{yaw:-.95,pitch:-.55,y:1.0,z:.34,bodyYaw:-.45,lean:.12},{yaw:.75,pitch:1.15,y:1.62,z:.3,bodyYaw:.5,lean:-.1,leg:.35}];
  case 'chime':return [{draw:.3,guard:1},{draw:0,bodyYaw:-.2,lean:-.1,guard:1}];
@@ -53,7 +60,8 @@ export const TECHNIQUE_FRAMES=Object.freeze(Object.fromEntries(Object.values(ALL
  const frames=[{at:0,...base}];
  t.hits.forEach((hit,i)=>{const [wind,impact]=profile(t.style,i),previous=t.hits[i-1]||0,next=t.hits[i+1]||t.duration;
  frames.push({at:Math.max(previous+.02,hit-.12),...base,...wind},{at:hit,...base,...impact},{at:Math.min(hit+.10,next-.02),...base,...impact});});
- frames.push({at:t.duration,...base});return [t.id,frames.sort((a,b)=>a.at-b.at)];
+ // 一回転で終わる動き（旋）は、最後の向きを一周ぶんにして巻き戻らないようにする
+ frames.push({at:t.duration,...base,bodyYaw:t.style==='slantspin'?Math.PI*2:0});return [t.id,frames.sort((a,b)=>a.at-b.at)];
 })));
 export function sampleTechnique(id,time){
  const frames=TECHNIQUE_FRAMES[id];if(!frames)return null;

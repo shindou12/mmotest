@@ -1343,6 +1343,7 @@ function wtHeavy(lv) {
   if (!W) return;
   const a = aimAngle();
   if (W.ks1 === 'gt_wave') {
+    me.motion = 'gt_wave'; me.motionT = 0; // 振り抜いて光波を飛ばす
     const big = lv === 2, moon = big && W.ks2 === 'gt_fullmoon';
     combat.proj({ a, mult: (big ? 2.0 : 1.0) * (moon ? 1.75 : 1), type: 'heavy', speed: big ? 22 : 24, life: big ? 0.75 : 0.55, rad: moon ? 3.4 : big ? 2.0 : 1.2, color: LIGHT_COLOR, stun: W.br('gt_break') === 'B' ? 6 : 1.5, eclipse: W.ks2 === 'gt_eclipse' });
     if (big) fx.flash(me.x, 1.5, me.z, LIGHT_COLOR, moon ? 60 : 35, 0.3);
@@ -1863,7 +1864,8 @@ function tryTreeSkill(i) {
 
 function startSkill(sk) {
   startAttack(); me.act++;
-  me.motion = sk.motion || '';me.skillDuration = sk.duration || .55;me.motionT = 0;
+  const mo = sk.motionOf && S.wt ? sk.motionOf(S.wt) : sk.motion; // 武器ツリーの分岐で動きが変わる技
+  me.motion = mo || '';me.skillDuration = MOTION_DURATIONS[mo] || sk.duration || .55;me.motionT = 0;
   me.skillT = 0; me.spin = !!sk.spin; me.sk++;
   me.a = aimAngle();
   // 回転系以外のスキルは、武器を振る（槍は突く）モーションを出す。他のプレイヤーにも見える
