@@ -1,0 +1,1 @@
+{"note":"リファクタリング後（5f26f03）。node e2e/perf.mjs の2回の結果","runs":[{"update":{"msPerFrameMedian":0.61,"msPerFrameMin":0.48},"render":{"msPerFrameMedian":158.23,"msPerFrameMin":150.09}},{"update":{"msPerFrameMedian":0.59,"msPerFrameMin":0.34},"render":{"msPerFrameMedian":156.41,"msPerFrameMin":150.17}}]}
