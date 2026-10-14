@@ -9,7 +9,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import {
-  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE, SKILL_VARIANTS, isVariant, affixVal, enhMult, titleReqOk,
+  FLOORS, WEAPONS, RARITIES, MAX_LEVEL, INSTINCT, BOW_ZONE, SKILL_VARIANTS, SV, isVariant, transcendCount, displayName, affixVal, enhMult, titleReqOk,
   migrateItem, makeTitle, TITLES, TITLE_DROPS, salvageMats, affixName, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost,
   CRAFT_MAX_TIER, weightedTier, loreTitle,
   WEAPON_SKILL_POOL, xpToNext, baseAtk, baseHp, inShape, starterWeapon, makeItem, floorLevel, itemWeight, weightClass, salvageValue,
@@ -1093,7 +1093,7 @@ const TYPE_MOD = { normal: 'normp', heavy: 'heavyp', wskill: 'wskillp' };
 function stunValue(o) {
   let st = o.stun ?? { normal: 1.2, heavy: 6, wskill: 3, tskill: 3 }[o.type] ?? 0;
   st *= S.W.stun * (S.W.melee ? 1 + (S.stunp + buffMod('stunp')) / 100 : 1);
-  if (o.sv?.key === 'sv_quake') st *= 2 + o.sv.t * 0.5;
+  if (o.sv?.key === 'sv_quake') st *= SV.quake(o.sv.t);
   if (tf('t_breaker')) st *= 1.3;
   return Math.round(st * 10) / 10;
 }
@@ -1184,16 +1184,16 @@ const desperate = () => tf('t_boss3') && me.hp < S.mhp * 0.5; // 称号「砂王
 function variantParams(v, second = false) {
   const t = v.t;
   const P = { mult: 1, range: 1, cd: 1 };
-  if (v.key === 'sv_giant') { P.range = 1.3 + t * 0.1; P.mult = 1 + t * 0.05; P.cd = 1.3; }
-  if (v.key === 'sv_rapid') { P.mult = 0.7; P.cd = 1 - (0.35 + t * 0.05); }
-  if (v.key === 'sv_heavy') { P.mult = 1.6 + t * 0.1; P.cd = 1.8; }
-  if (second) P.mult *= 0.4 + t * 0.1; // 二連の2回目
+  if (v.key === 'sv_giant') { P.range = SV.giantRange(t); P.mult = SV.giantMult(t); P.cd = 1.3; }
+  if (v.key === 'sv_rapid') { P.mult = SV.rapidMult; P.cd = Math.max(0.2, 1 - SV.rapidCd(t)); }
+  if (v.key === 'sv_heavy') { P.mult = SV.heavyMult(t); P.cd = 1.8; }
+  if (second) P.mult *= SV.twinMult(t); // 二連の2回目
   return P;
 }
 // スキルに渡すコンテキストを包んで、威力・範囲・色・当たったときの効果を差し込む
 function variantCtx(v, second = false) {
   const P = variantParams(v, second);
-  const cast = { left: 1 + Math.ceil(v.t / 2), hitSet: new Set(), exploded: false, quakeT: 0 };
+  const cast = { left: SV.stormChains(v.t), hitSet: new Set(), exploded: false, quakeT: 0 };
   const tag = (o = {}) => ({ ...o, sv: v, cast });
   const c = Object.create(combat);
   const color = () => v.color ?? combat.col();
@@ -1220,26 +1220,29 @@ function castWeaponSkill(sk) {
   };
   if (v.key === 'sv_blink') {
     // 瞬身: 狙った方向へ一瞬で移動してから発動
-    const a = aimAngle(), d = 4 + v.t;
+    const a = aimAngle(), d = SV.blinkDist(v.t);
     fx.parts.burst(me.x, 1, me.z, 25, { color: 0x9affff, speed: 4, size: 0.5, life: 0.4 });
-    combat.dash(a, d, 0.1, 0.35);
+    combat.dash(a, d, 0.1, 0.45);
     later(0.12, () => { fx.parts.burst(me.x, 1, me.z, 25, { color: 0x9affff, speed: 4, size: 0.5, life: 0.4 }); go(); });
   } else go();
   if (v.key === 'sv_gale') galeAt(aimPoint(), v);
   if (v.key === 'sv_holy') holyAt(aimPoint(), v);
+  if (v.key === 'sv_meteor') meteorsAt(aimPoint(), v);
+  if (v.key === 'sv_haste') addBuff('sv_haste', '疾駆', SV.hasteSec, { move: SV.haste(v.t), aspd: SV.haste(v.t) }, 0x9affc8);
+  if (v.key === 'sv_ward') { addBuff('sv_ward', '守護', SV.wardSec, { dr: SV.ward(v.t) }, 0xbfe0ff); fx.ringWave(me.x, me.z, 0xbfe0ff, 2.4, 0.4); }
   if (v.key === 'sv_heavy') { addShake(0.25); fx.parts.burst(me.x, 1, me.z, 30, { color: 0xff5040, speed: 7, size: 0.6, life: 0.4 }); }
   if (v.color) fx.flash(me.x, 1.5, me.z, v.color, 30, 0.3);
 }
 function onVariantHit(mb, dmg, o) {
   const v = o.sv, c = o.cast;
   if (v.key === 'sv_blaze') {
-    mb.burnUntil = now() + 3; mb.burnPow = 0.1 + v.t * 0.04;
+    mb.burnUntil = now() + 3; mb.burnPow = SV.blazeDot(v.t);
     if (!c.exploded) {
       c.exploded = true;
       fx.parts.burst(mb.x, 1, mb.z, 50, { color: 0xff7a20, speed: 8, size: 0.7, life: 0.6, gravity: -2 });
       fx.ringWave(mb.x, mb.z, 0xff6a20, 3, 0.35); fx.flash(mb.x, 1.5, mb.z, 0xff6a20, 40, 0.3);
       audio.sfx('flame'); addShake(0.2);
-      later(0.05, () => combat.circle(mb.x, mb.z, 2.6, 0.6, { type: 'dot', noProc: true }));
+      later(0.05, () => combat.circle(mb.x, mb.z, 2.6, SV.blazeBoom, { type: 'dot', noProc: true }));
     }
   }
   if (v.key === 'sv_storm' && c.left > 0) {
@@ -1252,7 +1255,7 @@ function onVariantHit(mb, dmg, o) {
     }
     if (best) {
       c.left--; c.hitSet.add(best.id);
-      const from = mb, to = best, pow = 0.3 + v.t * 0.08;
+      const from = mb, to = best, pow = SV.stormMult(v.t);
       later(0.08, () => {
         fx.lightning(to.x, to.z, 0xffe040);
         for (let k = 0; k <= 8; k++) fx.parts.emit(from.x + (to.x - from.x) * k / 8, 1.3, from.z + (to.z - from.z) * k / 8, { color: 0xfff080, size: 0.5, life: 0.25, speed: 1, gravity: 0 });
@@ -1261,7 +1264,11 @@ function onVariantHit(mb, dmg, o) {
       });
     }
   }
-  if (v.key === 'sv_drain') heal(dmg * (0.08 + v.t * 0.03) * BALANCE.lifestealEfficiency, true);
+  if (v.key === 'sv_drain') heal(dmg * SV.drain(v.t) * BALANCE.lifestealEfficiency, true);
+  if (v.key === 'sv_venom' && o.type !== 'dot') {
+    mb.poisonUntil = now() + SV.venomSec; mb.poisonPow = SV.venomDot(v.t);
+    fx.parts.burst(mb.x, 1.2, mb.z, 14, { color: 0x8aff5a, speed: 3, size: 0.45, life: 0.6, gravity: -1 });
+  }
   if (v.key === 'sv_quake' && now() - c.quakeT > 0.2) {
     c.quakeT = now();
     fx.ringWave(mb.x, mb.z, 0xd8b080, 3.5, 0.35);
@@ -1278,13 +1285,13 @@ function onVariantHit(mb, dmg, o) {
       fx.parts.burst(x, 1, z, 40, { color: 0xd8f6ff, speed: 8, size: 0.55, life: 0.5, gravity: 6 });
       fx.ringWave(x, z, 0x80d8ff, 3.2, 0.3); fx.flash(x, 1.5, z, 0x80d8ff, 30, 0.25);
       audio.sfx('hit', { crit: true });
-      combat.circle(x, z, 3, 0.5 + v.t * 0.1, { type: 'wskill', noProc: true });
+      combat.circle(x, z, 3, SV.frost(v.t), { type: 'wskill', noProc: true });
     });
   }
 }
 // 旋風: 狙った場所に竜巻を残す
 function galeAt(p, v) {
-  const life = 2 + v.t * 0.25, pow = 0.12 + v.t * 0.03;
+  const life = SV.galeLife(v.t), pow = SV.galeMult(v.t);
   fx.ringWave(p.x, p.z, 0x8affb0, 3, 0.4);
   audio.sfx('wave');
   for (let k = 0; k * 0.1 < life; k++) {
@@ -1305,9 +1312,24 @@ function holyAt(p, v) {
     fx.flash(p.x, 3, p.z, 0xfff0a0, 60, 0.4, 16);
     fx.parts.burst(p.x, 0.5, p.z, 50, { color: 0xfff6c0, speed: 6, size: 0.6, life: 0.6, gravity: -4 });
     audio.sfx('thunder'); addShake(0.2);
-    combat.circle(p.x, p.z, 3, 0.6 + v.t * 0.12, { type: 'wskill', noProc: true });
-    heal(S.mhp * (0.03 + v.t * 0.01), true);
+    combat.circle(p.x, p.z, 3, SV.holyMult(v.t), { type: 'wskill', noProc: true });
+    heal(S.mhp * SV.holyHeal(v.t) / 100, true);
   });
+}
+// 流星: 狙った場所の周りに、少しずつずれて流星が降る
+function meteorsAt(p, v) {
+  const n = SV.meteorCount(v.t), pow = SV.meteorMult(v.t);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, r = i === 0 ? 0 : 1.5 + Math.random() * 2;
+    const x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r;
+    later(0.25 + i * 0.18, () => {
+      fx.ringWave(x, z, 0xffa060, 2.2, 0.25, 0.1, 0.2);
+      fx.beam(x, z, 0xffa060, 10, 0.5, 0.25);
+      fx.parts.burst(x, 0.4, z, 30, { color: i % 2 ? 0xffd080 : 0xff7a30, speed: 7, size: 0.55, life: 0.5, up: 2 });
+      audio.sfx('impact'); addShake(0.12);
+      combat.circle(x, z, 2.2, pow, { type: 'wskill', noProc: true });
+    });
+  }
 }
 
 // スキルから使う戦闘コンテキスト（skills.js の c）
@@ -1846,6 +1868,7 @@ function chestOpen(C) { return Date.now() - (char.chests?.[C.id] || 0) < chestCd
 // ======================================================================
 // 落ちた物は宙を舞って地面に落ち（flip）、着地すると名前の札が出る。札をクリックで拾う（遠ければ歩いて行く）
 const LOOT = { flip: 0.55, height: 2.4, toss: 1.6, pickR: 2.4, life: 150, stagger: 0.16 };
+const TRANS_COLOR = 0xff7ab0; // 超越の特性の色
 let dropSeq = 0;
 // src: 飛び出す元（倒した敵・宝箱）。なければ近くから放り出す / delay: 何秒後に飛び出すか
 function spawnDrop(it, x, z, src = null, delay = 0) {
@@ -1863,9 +1886,15 @@ function landDrop(d) {
   const r = d.it.rarity, col = RARITIES[r].color;
   d.model.position.set(d.x, heightAt(d.x, d.z), d.z);
   d.model.userData.item.rotation.set(0, d.spin * Math.PI, 0);
-  if (Math.hypot(d.x - me.x, d.z - me.z) < 40) audio.sfx('drop', { rarity: r, slot: d.it.slot });
+  const stars = transcendCount(d.it);
+  if (Math.hypot(d.x - me.x, d.z - me.z) < 40) audio.sfx('drop', { rarity: r, slot: d.it.slot, stars });
   fx.parts.burst(d.x, 0.2, d.z, 6 + r * 4, { color: r >= 2 ? col : 0xd8c8a8, speed: 2 + r * 0.6, size: 0.35, life: 0.45, gravity: 2 });
-  if (r >= 3) d.beam = fx.beam(d.x, d.z, col, 6 + r * 4, 0.25 + r * 0.08);
+  if (stars) {
+    // 超越: 桃色の光の柱と、星が舞い上がる
+    d.beam = fx.beam(d.x, d.z, TRANS_COLOR, 12 + stars * 4, 0.45 + stars * 0.1);
+    fx.parts.burst(d.x, 0.5, d.z, 30 + stars * 20, { color: TRANS_COLOR, speed: 5, size: 0.5, life: 1.0, gravity: -3 });
+    fx.ringWave(d.x, d.z, TRANS_COLOR, 4 + stars * 2, 0.6);
+  } else if (r >= 3) d.beam = fx.beam(d.x, d.z, col, 6 + r * 4, 0.25 + r * 0.08);
   if (r >= 4) {
     fx.flash(d.x, 3, d.z, col, 120, 1.2, 40);
     fx.ringWave(d.x, d.z, col, 10, 1.0);
@@ -1883,14 +1912,14 @@ function pickupDrop(d) {
   char.inv.unshift(d.it);
   saveChar();
   audio.sfx('pickup');
-  const it = d.it, r = it.rarity, col = RARITIES[r].color;
+  const it = d.it, r = it.rarity, col = RARITIES[r].color, stars = transcendCount(it), name = displayName(it);
   const cmp = itemPower(it) > itemPower(char.eq[it.slot]) ? '  ▲' : '';
-  toast(`${RARITIES[r].name}「${it.name}」を入手${cmp}`, col, r >= 4);
+  toast(`${RARITIES[r].name}「${name}」を入手${cmp}`, col, r >= 4 || stars > 0);
   // レアな物の画面通知は、拾ったときに出す（落ちたときは札と音と光だけ）
-  if (r >= 4) {
-    const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : it.slot === 'title' ? '称号' : '装飾品';
-    banner(r === 5 ? '★★★ 神器を入手 ★★★' : '★ 伝説の' + what + 'を入手 ★', it.name, col, r);
-  } else if (it.slot === 'title') banner('称号を入手', it.name, col, 3);
+  const what = it.slot === 'weapon' ? '武器' : it.slot === 'armor' ? '防具' : it.slot === 'title' ? '称号' : '装飾品';
+  if (r >= 4) banner(r === 5 ? '神器を入手' : '伝説の' + what + 'を入手', name, col, r + stars);
+  else if (stars) banner('超越の' + what + 'を入手', name, '#ff7ab0', 4);
+  else if (it.slot === 'title') banner('称号を入手', name, col, 3);
   if (it.slot === 'title' && TITLES[it.title]) toast(`${it.name}：${TITLES[it.title].desc}`, col);
   disposeDrop(d);
   drops.splice(drops.indexOf(d), 1);
@@ -2511,7 +2540,7 @@ function update(dt) {
   for (const mb of [...mobs.values()]) {
     if (mb.poisonUntil > t) {
       mb.poisonT -= dt;
-      if (mb.poisonT <= 0) { mb.poisonT = 0.5; dealDamage(mb, 0.12, { type: 'dot', noProc: true }); fx.parts.emit(mb.x, 1.2, mb.z, { color: 0x8aff5a, size: 0.4, life: 0.5, speed: 1, gravity: 1 }); }
+      if (mb.poisonT <= 0) { mb.poisonT = 0.5; dealDamage(mb, Math.max(0.12, mb.poisonPow || 0), { type: 'dot', noProc: true }); fx.parts.emit(mb.x, 1.2, mb.z, { color: 0x8aff5a, size: 0.4, life: 0.5, speed: 1, gravity: 1 }); }
     }
     // 燃焼（スキル変化「爆炎」）
     if (mb.burnUntil > t) {

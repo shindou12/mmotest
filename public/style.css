@@ -81,11 +81,11 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 
 #prompt { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--acc); padding: 8px 16px; border-radius: 8px; }
 #toasts { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
-.toast { padding: 6px 16px; background: rgba(0,0,0,.6); border-radius: 6px; border-left: 3px solid; font-size: 14px; animation: toast 3.5s forwards; white-space: nowrap; }
+.toast { padding: 6px 16px; background: rgba(0,0,0,.6); border-radius: 6px; border-left: 3px solid; font-size: 14px; animation: toast 6s forwards; white-space: nowrap; }
 .toast.big { font-size: 20px; padding: 10px 24px; border-left-width: 5px; box-shadow: 0 0 30px currentColor; }
 @keyframes toast { 0% { opacity: 0; transform: translateY(-8px) } 8% { opacity: 1; transform: none } 85% { opacity: 1 } 100% { opacity: 0 } }
 #banner { position: absolute; top: 30%; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; }
-#banner.show { animation: banner 3.4s forwards; }
+#banner.show { animation: banner 5s forwards; }
 #banner .b1 { font-size: 16px; letter-spacing: .5em; color: #bfe6ff; }
 #banner .b2 { font-size: clamp(32px, 5vw, 56px); font-weight: bold; letter-spacing: .15em; text-shadow: 0 0 24px currentColor, 0 3px 4px #000; }
 @keyframes banner { 0% { opacity: 0; transform: scale(1.15); letter-spacing: .5em } 12% { opacity: 1; transform: none } 80% { opacity: 1 } 100% { opacity: 0 } }
@@ -269,6 +269,13 @@ input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px s
 .loot.r4 { color: #ffb252; border: 2px solid #ffa236; font-size: 15px; background: rgba(20, 10, 0, .85); box-shadow: 0 0 10px rgba(255, 162, 54, .45); }
 .loot.r5 { color: #d0102e; border: 2px solid #d0102e; font-size: 16px; font-weight: 800; background: #fff; box-shadow: 0 0 14px rgba(255, 61, 99, .8); }
 .loot.r5:hover { background: #fff; outline-color: #d0102e; }
+/* 超越の特性つき: 頭に★（数＝超越の特性の数）、桃色の枠が脈打つ */
+.loot .stars { color: #ff7ab0; margin-right: 3px; letter-spacing: -.05em; text-shadow: 0 0 6px rgba(255, 122, 176, .9); }
+.loot.r5 .stars { color: #ff3d8a; text-shadow: none; }
+.loot.tx { border: 2px solid #ff7ab0; animation: lootTx 1.4s ease-in-out infinite; }
+.loot.r5.tx { border-color: #d0102e; }
+@keyframes lootTx { 0%, 100% { box-shadow: 0 0 6px rgba(255, 122, 176, .5) } 50% { box-shadow: 0 0 16px rgba(255, 122, 176, 1) } }
+@media (prefers-reduced-motion: reduce) { .loot.tx { animation: none; box-shadow: 0 0 10px rgba(255, 122, 176, .8); } }
 .plate { position: absolute; transform: translate(-50%, -100%); text-align: center; font-size: 11px; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 .plate .pb { width: 60px; height: 5px; background: rgba(0,0,0,.6); border-radius: 3px; margin: 2px auto 0; overflow: hidden; }
 .plate .pb > div { height: 100%; background: #e44; }

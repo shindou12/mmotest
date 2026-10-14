@@ -13,7 +13,7 @@
 // 最後に Root から Mediator（ステートマシン）へ届き、今の状態に応じて「何をするか」を裁定する。
 import {
   FLOORS, WEAPONS, RARITIES, AFFIXES, UNIQUE_FX, MAX_LEVEL, MAX_FLOOR, ARMOR_CLASSES, ARMOR_TYPES, INSTINCT, BOW_ZONE,
-  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, affixText, tierLabel, tierColor,
+  WEAPON_SKILL_POOL, xpToNext, itemWeight, weightClass, salvageValue, SKILL_VARIANTS, isVariant, transcendCount, displayName, affixText, tierLabel, tierColor,
   enhMult, TITLES, TITLE_REQ, titleReqOk, ENH_MAX, ENH_RATE, enhCost, affixCost, skillCost, loreCost, CRAFT_MAX_TIER, affixName, FX_REQ,
 } from '../../shared/data.js';
 import { AREAS, AREA_TYPES, CELL, CLEAR_KILLS, WEATHERS, grid, boundR, obstaclesOf, hazardsOf, chestsOf, HAZARDS } from '../../shared/areas.js';
@@ -247,8 +247,8 @@ export function createUI(game) {
     const up = showUp && it.slot !== 'title' && game.itemPower(it) > game.itemPower(game.char.eq[it.slot]) ? '<span class="up">▲</span>' : '';
     const sv = it.affixes.some(([k]) => isVariant(k)) ? '<span class="svb" title="スキル変化">✧</span>' : '';
     const tr = it.affixes.some(([, t]) => t >= 6) ? ' trans' : '';
-    if (eq) return `<div class="cell r${it.rarity}${tr}" style="border-color:${c};color:${c}"><span class="gi">${glyphOf(it)}</span><span>${esc(it.name)}${enhTag(it)}<br><small class="dim">${it.slot === 'title' ? '称号' : `iLv${it.ilvl}・重さ${itemWeight(it)}`}</small></span></div>`;
-    return `<div class="cell r${it.rarity}${tr}${sel ? ' sel' : ''}" style="border-color:${c};color:${c}">${up}${sv}<span class="lv">${it.slot === 'title' ? '' : it.ilvl}</span><span class="gi">${glyphOf(it)}</span><span style="font-size:9px;max-width:58px;overflow:hidden;white-space:nowrap">${esc(it.name)}</span>${enhTag(it)}${it.by ? `<span class="by">${esc(it.by)}</span>` : ''}</div>`;
+    if (eq) return `<div class="cell r${it.rarity}${tr}" style="border-color:${c};color:${c}"><span class="gi">${glyphOf(it)}</span><span>${esc(displayName(it))}${enhTag(it)}<br><small class="dim">${it.slot === 'title' ? '称号' : `iLv${it.ilvl}・重さ${itemWeight(it)}`}</small></span></div>`;
+    return `<div class="cell r${it.rarity}${tr}${sel ? ' sel' : ''}" style="border-color:${c};color:${c}">${up}${sv}<span class="lv">${it.slot === 'title' ? '' : it.ilvl}</span><span class="gi">${glyphOf(it)}</span><span style="font-size:9px;max-width:58px;overflow:hidden;white-space:nowrap">${esc(displayName(it))}</span>${enhTag(it)}${it.by ? `<span class="by">${esc(it.by)}</span>` : ''}</div>`;
   };
   // 特性の1行（ティアのバッジ付き）
   const affixRow = (a) => {
@@ -282,7 +282,7 @@ export function createUI(game) {
         + (it.lore ? `<div class="lore">${esc(it.lore)}</div>` : '');
     }
     const type = it.slot === 'weapon' ? WEAPONS[it.kind].name : it.slot === 'armor' ? `防具（${ARMOR_CLASSES[it.armor || 'medium'].name}${atype ? '・' + atype.name : ''}）` : '装飾品';
-    let h = `<div class="tn" style="color:${r.color}">${esc(it.name)}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
+    let h = `<div class="tn" style="color:${r.color}">${esc(displayName(it))}${enhTag(it)}</div><div class="dim">${r.name} ${type} ・ iLv${it.ilvl} ・ 重さ ${itemWeight(it)}</div>`;
     const e = enhMult(it), ev = (v) => Math.round(v * e * 10) / 10;
     h += '<div class="base">';
     if (it.atk) h += `<div>攻撃力 <b>+${ev(it.atk)}</b></div>`;
@@ -569,7 +569,7 @@ export function createUI(game) {
     const c = game.char;
     return (c.gold || 0) >= (cost.gold || 0) && (c.mats.shard || 0) >= (cost.shard || 0) && (!cost.gemKey || (c.mats.gems[cost.gemKey] || 0) >= (cost.gem || 0));
   };
-  const head = (it) => `<div class="sd-head" style="--rc:${RARITIES[it.rarity].color}"><span class="gi">${glyphOf(it)}</span><div><b>${esc(it.name)}${enhTag(it)}</b><small>${RARITIES[it.rarity].name}・iLv${it.ilvl}${game.char.inv.includes(it) ? '' : '・装備中'}</small></div></div>`;
+  const head = (it) => `<div class="sd-head" style="--rc:${RARITIES[it.rarity].color}"><span class="gi">${glyphOf(it)}</span><div><b>${esc(displayName(it))}${enhTag(it)}</b><small>${RARITIES[it.rarity].name}・iLv${it.ilvl}${game.char.inv.includes(it) ? '' : '・装備中'}</small></div></div>`;
   const doBtn = (label, enabled) => ({ html: `<button class="sd-do" ${enabled ? '' : 'disabled'}>${label}</button>`, setup: (v) => v.on('click', 'smith:do') });
   const msgBlock = () => (sm.msg ? [{ html: `<div class="sd-msg ${sm.ok ? 'ok' : 'ng'}">${esc(sm.msg)}</div>` }] : []);
 
@@ -984,7 +984,9 @@ export function createUI(game) {
         const el = document.createElement('div');
         floatLayer.el.appendChild(el);
         v = new View(el, 'loot' + d.id, floatLayer);
-        v.set({ cls: { loot: true, ['r' + d.it.rarity]: true }, text: d.it.name, attr: { title: `${RARITIES[d.it.rarity].name}（クリックで拾う）` } });
+        const stars = transcendCount(d.it);
+        v.set({ cls: { loot: true, ['r' + d.it.rarity]: true, tx: stars > 0 }, attr: { title: `${RARITIES[d.it.rarity].name}${stars ? `・超越の特性 ${stars}つ` : ''}（クリックで拾う）` } });
+        v.set({ html: (stars ? `<span class="stars">${'★'.repeat(stars)}</span>` : '') + esc(d.it.name) });
         v.on('click', 'loot:pick', () => ({ id: d.id }));
         v.size = { w: el.offsetWidth, h: el.offsetHeight };
         loot.set(d.id, v);
@@ -1017,13 +1019,13 @@ export function createUI(game) {
     H.toasts.el.appendChild(el);
     const v = new View(el, 'toast', H.toasts);
     v.set({ cls: { toast: true, big }, style: { 'border-color': color, color }, text });
-    setTimeout(() => v.remove(), 3600);
+    setTimeout(() => v.remove(), 6000);
     while (H.toasts.el.children.length > 5) H.toasts.el.firstChild.remove();
   };
   let bannerUntil = 0, bannerPrio = 0;
   P.banner = (top, main, color, prio = 0) => {
     if (now() < bannerUntil && prio < bannerPrio) return;
-    bannerUntil = now() + 2.5; bannerPrio = prio;
+    bannerUntil = now() + 4.5; bannerPrio = prio;
     H.banner.set({ html: `<div class="b1">${esc(top)}</div><div class="b2" style="color:${color}">${esc(main)}</div>`, cls: { show: false } });
     void H.banner.el.offsetWidth;
     H.banner.set({ cls: { show: true } });

@@ -153,23 +153,49 @@ export const CRAFT_MAX_TIER = 5; // 鍛冶屋で付けられる上限
 export const tierLabel = (t) => (t >= 7 ? '超越 II' : t === 6 ? '超越 I' : `T${t}`);
 export const tierColor = (t) => (t >= 6 ? '#ff7ab0' : ['#9aa3b5', '#9fd8ff', '#7ab8ff', '#c8a0ff', '#ffc060'][t - 1]);
 
-// 特性「スキル変化」: 武器にだけ付き、武器スキルの性質を大きく変える（1つの武器に1つまで）
-// t はティア（1〜5）。数値はティアで強くなる
+// 特性「スキル変化」: 武器にだけ付き、武器スキルの性質を大きく変える（1つの武器に1つまで）。超越の特性として扱う
+// t はティア（1〜7）。数値はティアで強くなる（V にまとめて、説明文と実際の効果で同じ式を使う）
+export const SV = {
+  twinMult: (t) => 0.4 + t * 0.1,
+  giantRange: (t) => 1.4 + t * 0.1, giantMult: (t) => 1 + t * 0.08,
+  rapidCd: (t) => 0.4 + t * 0.05, rapidMult: 0.8,
+  blazeDot: (t) => 0.13 + t * 0.05, blazeBoom: 0.8,
+  stormChains: (t) => 2 + Math.ceil(t / 2), stormMult: (t) => 0.4 + t * 0.1,
+  drain: (t) => 0.1 + t * 0.04,
+  blinkDist: (t) => 5 + t,
+  quake: (t) => 2.5 + t * 0.6,
+  frost: (t) => 0.65 + t * 0.12,
+  galeLife: (t) => 2.5 + t * 0.25, galeMult: (t) => 0.15 + t * 0.04,
+  heavyMult: (t) => 1.8 + t * 0.12,
+  holyMult: (t) => 0.75 + t * 0.15, holyHeal: (t) => 4 + t,
+  venomDot: (t) => 0.16 + t * 0.04, venomSec: 5,
+  meteorCount: (t) => 3 + Math.floor(t / 3), meteorMult: (t) => 0.4 + t * 0.08,
+  hasteSec: 4, haste: (t) => 15 + t * 3,
+  wardSec: 3, ward: (t) => 25 + t * 4,
+};
+const pct = (v) => Math.round(v * 100);
 export const SKILL_VARIANTS = {
-  sv_twin: { name: '二連', icon: '⟳', desc: (t) => `武器スキルが少し後にもう一度発動する（2回目の威力 ${40 + t * 10}%）` },
-  sv_giant: { name: '巨大化', icon: '⬣', desc: (t) => `武器スキルの範囲・射程 +${30 + t * 10}%、威力 +${t * 5}%。クールタイム +30%` },
-  sv_rapid: { name: '迅速', icon: '⚡', desc: (t) => `武器スキルのクールタイム -${35 + t * 5}%。威力 -30%` },
-  sv_blaze: { name: '爆炎', icon: '🔥', color: 0xff6a20, desc: (t) => `炎属性になる。当たった敵を3秒間燃やす（毎秒 威力${10 + t * 4}%）。最初に当たった所で爆発する` },
-  sv_storm: { name: '雷鳴', icon: '⚡', color: 0xffe040, desc: (t) => `雷属性になる。当たった敵から近くの敵${1 + Math.ceil(t / 2)}体へ雷が連鎖する（威力${30 + t * 8}%）` },
-  sv_drain: { name: '吸命', icon: '♥', color: 0xc060ff, desc: (t) => `武器スキルで与えたダメージの${8 + t * 3}%を回復する` },
-  sv_blink: { name: '瞬身', icon: '➶', color: 0x9affff, desc: (t) => `発動の直前に、狙った方向へ${4 + t}m瞬間移動する（無敵あり）` },
-  sv_quake: { name: '崩撃', icon: '◎', color: 0xd8b080, desc: (t) => `ボスのスタン値が${(2 + t * 0.5).toFixed(1)}倍。当たった所に衝撃波が走る` },
-  sv_frost: { name: '氷結', icon: '❄', color: 0x80d8ff, desc: (t) => `氷属性になる。当たった敵が凍りつき、1秒後に氷が砕けて周りの敵にも威力${50 + t * 10}%` },
-  sv_gale: { name: '旋風', icon: '🌀', color: 0x8affb0, desc: (t) => `風属性になる。狙った場所に竜巻が${(2 + t * 0.25).toFixed(1)}秒残り、0.4秒ごとに威力${12 + t * 3}%` },
-  sv_heavy: { name: '剛撃', icon: '✊', color: 0xff5040, desc: (t) => `武器スキルが必ず会心になり、威力 ×${(1.6 + t * 0.1).toFixed(1)}。クールタイム +80%` },
-  sv_holy: { name: '聖光', icon: '✚', color: 0xfff0a0, desc: (t) => `光属性になる。発動の0.6秒後、狙った場所に光の柱が落ちて威力${60 + t * 12}%。自分のHPを${3 + t}%回復する` },
+  sv_twin: { name: '二連', icon: '⟳', desc: (t) => `武器スキルが少し後にもう一度発動する（2回目の威力 ${pct(SV.twinMult(t))}%）` },
+  sv_giant: { name: '巨大化', icon: '⬣', desc: (t) => `武器スキルの範囲・射程 +${pct(SV.giantRange(t) - 1)}%、威力 +${pct(SV.giantMult(t) - 1)}%。クールタイム +30%` },
+  sv_rapid: { name: '迅速', icon: '⚡', desc: (t) => `武器スキルのクールタイム -${pct(SV.rapidCd(t))}%。威力 -${pct(1 - SV.rapidMult)}%` },
+  sv_blaze: { name: '爆炎', icon: '🔥', color: 0xff6a20, desc: (t) => `炎属性になる。当たった敵を3秒間燃やす（毎秒 威力${pct(SV.blazeDot(t))}%）。最初に当たった所で爆発する（威力${pct(SV.blazeBoom)}%）` },
+  sv_storm: { name: '雷鳴', icon: '⚡', color: 0xffe040, desc: (t) => `雷属性になる。当たった敵から近くの敵${SV.stormChains(t)}体へ雷が連鎖する（威力${pct(SV.stormMult(t))}%）` },
+  sv_drain: { name: '吸命', icon: '♥', color: 0xc060ff, desc: (t) => `武器スキルで与えたダメージの${pct(SV.drain(t))}%を回復する` },
+  sv_blink: { name: '瞬身', icon: '➶', color: 0x9affff, desc: (t) => `発動の直前に、狙った方向へ${SV.blinkDist(t)}m瞬間移動する（無敵あり）` },
+  sv_quake: { name: '崩撃', icon: '◎', color: 0xd8b080, desc: (t) => `ボスのスタン値が${SV.quake(t).toFixed(1)}倍。当たった所に衝撃波が走る` },
+  sv_frost: { name: '氷結', icon: '❄', color: 0x80d8ff, desc: (t) => `氷属性になる。当たった敵が凍りつき、1秒後に氷が砕けて周りの敵にも威力${pct(SV.frost(t))}%` },
+  sv_gale: { name: '旋風', icon: '🌀', color: 0x8affb0, desc: (t) => `風属性になる。狙った場所に竜巻が${SV.galeLife(t).toFixed(1)}秒残り、0.4秒ごとに威力${pct(SV.galeMult(t))}%` },
+  sv_heavy: { name: '剛撃', icon: '✊', color: 0xff5040, desc: (t) => `武器スキルが必ず会心になり、威力 ×${SV.heavyMult(t).toFixed(2)}。クールタイム +80%` },
+  sv_holy: { name: '聖光', icon: '✚', color: 0xfff0a0, desc: (t) => `光属性になる。発動の0.6秒後、狙った場所に光の柱が落ちて威力${pct(SV.holyMult(t))}%。自分のHPを${SV.holyHeal(t)}%回復する` },
+  sv_venom: { name: '猛毒', icon: '☠', color: 0x8aff5a, desc: (t) => `毒属性になる。当たった敵を${SV.venomSec}秒間 毒にする（0.5秒ごとに威力${pct(SV.venomDot(t))}%）` },
+  sv_meteor: { name: '流星', icon: '☄', color: 0xffa060, desc: (t) => `発動すると、狙った場所の周りに流星が${SV.meteorCount(t)}つ降る（各 威力${pct(SV.meteorMult(t))}%）` },
+  sv_haste: { name: '疾駆', icon: '»', color: 0x9affc8, desc: (t) => `発動すると${SV.hasteSec}秒間、移動速度と攻撃速度 +${SV.haste(t)}%` },
+  sv_ward: { name: '守護', icon: '⛨', color: 0xbfe0ff, desc: (t) => `発動すると${SV.wardSec}秒間、被ダメージ -${SV.ward(t)}%` },
 };
 export const isVariant = (key) => key.startsWith('sv_');
+// 超越の特性の数（T6以上の特性と、スキル変化）。名前の頭に、この数だけ★を付ける
+export const transcendCount = (it) => (it?.affixes || []).filter(([k, t]) => isVariant(k) || t >= 6).length;
+export const displayName = (it) => '★'.repeat(transcendCount(it)) + (it?.name || '');
 export const affixName = (key) => (isVariant(key) ? `スキル変化「${SKILL_VARIANTS[key].name}」` : AFFIXES[key].name);
 export const affixVal = (key, tier) => (isVariant(key) ? tier : AFFIXES[key].tiers[tier - 1]);
 // 特性の説明文（例: 攻撃力 +7%）
@@ -477,8 +503,8 @@ export function makeItem(ilvl, rarity, opts = {}) {
   const bias = opts.bias || [];
   const keys = Object.keys(AFFIXES).map((k) => [k, Math.random() / (bias.includes(k) ? 2 : 1)]).sort((a, b) => a[1] - b[1]).map(([k]) => k);
   for (let i = 0; i < r.affixes; i++) { const t = rollTier(ilvl, rarity); it.affixes.push([keys[i], t, affixVal(keys[i], t)]); }
-  // 武器はレア以上でときどき「スキル変化」が付く（特性1つと入れ替わる）
-  if (slot === 'weapon' && it.affixes.length && Math.random() < [0, 0, 0.2, 0.35, 0.6, 0.8][rarity]) {
+  // 武器はレア以上でまれに「スキル変化」が付く（特性1つと入れ替わる。超越扱いなので出にくい）
+  if (slot === 'weapon' && it.affixes.length && Math.random() < [0, 0, 0.08, 0.15, 0.3, 0.45][rarity]) {
     const local = bias.filter(isVariant);
     const sv = local.length && Math.random() < 0.35 ? pick(local) : pick(Object.keys(SKILL_VARIANTS)), t = rollTier(ilvl, rarity);
     it.affixes[it.affixes.length - 1] = [sv, t, t];
