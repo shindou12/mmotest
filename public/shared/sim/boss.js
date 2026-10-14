@@ -1,0 +1,168 @@
+// World のメソッド: ボスの出現・スタン・行動の選択（技の中身は boss-patterns.js）。sim.js が World.prototype に足す
+import { BALANCE, partySize, enemyScale, floorPressure, attackPressure } from '../balance.js';
+import { bossLevel, mobHp, mobDmg } from '../data.js';
+
+import { rnd, pick, dist, r2, HATE_RESET, HATE_ABSORB, angDiff } from './common.js';
+import { STUN_TIME } from './tuning.js';
+import { BOSS_PATTERNS } from './boss-patterns.js';
+
+export const BossMethods = {
+  spawnBoss(A) {
+    const n = partySize(this.areaPlayers(A.id).length);
+    const lv = bossLevel(A.n);
+    const hp = Math.round(mobHp(lv) * BALANCE.bossHp * floorPressure(A.n) * enemyScale(n, true));
+    const b = {
+      id: this.seq++, scaleN: n, kind: 'boss', d: 2, t: A.fdef.boss.t, lv, hp, mhp: hp, x: A.lair.x, z: A.lair.z - 5, a: 0,
+      st: 0, actT: 2.5, busyT: 0, enraged: false, phase: 1, last: null, dash: null, arch: { speed: 3.4 }, threat: new Map(),
+      hateT: HATE_RESET.boss, hateMax: HATE_RESET.boss, stun: 0, stunMax: Math.round(BALANCE.bossStun * (1 + BALANCE.bossStunPerPlayer * (n - 1))), stunT: 0,
+    };
+    A.mobs.set(b.id, b);
+    A.boss = b;
+    return b;
+  },
+
+  resetBoss(A) {
+    if (A.boss) A.mobs.delete(A.boss.id);
+    for (const m of [...A.mobs.values()]) if (m.kind === 'add') A.mobs.delete(m.id);
+    A.boss = null; A.bossState = 'idle'; A.bossCd = 5; A.timers = []; A.projs = [];
+    this.broadcastArea(A.id, { t: 'bossReset' });
+  },
+
+  // スタン: 一定時間固まり、出している最中の攻撃もすべて取り消す
+  stunBoss(A, b) {
+    b.stunT = STUN_TIME;
+    b.stun = 0;
+    b.stunMax = Math.round(b.stunMax * 1.3);
+    b.dash = null; b.busyT = 0; b.actT = STUN_TIME + 0.6;
+    A.timers = [];
+    A.projs = [];
+    this.broadcastArea(A.id, { t: 'stun', id: b.id, sec: STUN_TIME });
+  },
+
+  // ---- ボス ----
+  tickBoss(A, b, alive, dt) {
+    const L = A.lair;
+    const inArena = alive.filter((p) => dist(p, L) < L.r + 4);
+    if (!inArena.length) {
+      A.noTargetT += dt;
+      if (A.noTargetT > 8) { this.resetBoss(A); return; }
+    } else A.noTargetT = 0;
+
+    // フェーズ: 1 → 激昂(65%) → 最終形態(35%)。移行時は大技で割り込む
+    if (!b.enraged && b.hp < b.mhp * 0.65) {
+      b.enraged = true; b.phase = 2;
+      b.arch.speed = 4.6;
+      this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 2 });
+      b.dash = null; b.busyT = 0; b.actT = 0.4; b.forced = 'shock';
+    }
+    if (b.phase === 2 && b.hp < b.mhp * 0.35) {
+      b.phase = 3;
+      b.arch.speed = 5.2;
+      this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 3 });
+      b.dash = null; b.busyT = 0; b.actT = 0.6; b.forced = 'ultimate';
+    }
+
+    if (b.stunT > 0) { b.stunT -= dt; b.st = 4; return; }
+
+    if (b.dash) {
+      b.dash.t += dt;
+      const k = Math.min(1, b.dash.t / b.dash.dur);
+      b.x = b.dash.fx + (b.dash.tx - b.dash.fx) * k;
+      b.z = b.dash.fz + (b.dash.tz - b.dash.fz) * k;
+      if (k >= 1) b.dash = null;
+      b.st = 3;
+      // 正面でガードしている盾槍に当たると突進が止まる
+      for (const p of alive) {
+        if (!p.gd || Math.hypot(p.x - b.x, p.z - b.z) > 3.2) continue;
+        if (Math.abs(angDiff(p.a, Math.atan2(b.x - p.x, b.z - p.z))) > 1.4) continue;
+        b.dash = null; b.busyT = 1.2; b.st = 2;
+        b.stun += 25;
+        this.addThreat(b, p.id, 800);
+        if (b.target === p.id) b.hateT = Math.min(b.hateMax, b.hateT + HATE_ABSORB);
+        this.broadcastArea(A.id, { t: 'guardStop', id: b.id, pid: p.id, x: r2(b.x), z: r2(b.z) });
+        if (b.stun >= b.stunMax) this.stunBoss(A, b);
+        break;
+      }
+      return;
+    }
+    b.busyT -= dt; b.actT -= dt;
+    if (b.busyT > 0) { b.st = 2; return; }
+
+    // 狙う相手はヘイト順（たまに気まぐれで別の人）
+    let target = this.threatTarget(b, inArena, L.r + 6) || alive.find((p) => p.id === b.target && dist(p, L) < L.r + 4);
+    if (!target) target = inArena.length ? pick(inArena) : null;
+    b.target = target ? target.id : null;
+    if (!target) { b.st = 0; return; }
+    const ang = Math.atan2(target.x - b.x, target.z - b.z);
+    b.a = ang;
+    const d = dist(target, b);
+    if (d > 4.5) {
+      b.x += Math.sin(ang) * b.arch.speed * dt;
+      b.z += Math.cos(ang) * b.arch.speed * dt;
+      this.clampArena(A, b);
+      b.st = 1;
+    } else b.st = 0;
+
+    if (b.actT <= 0) {
+      const bd = A.fdef.boss;
+      const pats = b.phase === 3 ? [...bd.patterns, ...(bd.p3 || [])] : bd.patterns;
+      const forced = b.forced;
+      let pat = forced || pick(pats);
+      b.forced = null;
+      if (!forced && pat === b.last && pats.length > 1) pat = pick(pats.filter((p) => p !== b.last));
+      b.last = pat;
+      const victim = Math.random() < 0.2 && inArena.length > 1 ? pick(inArena) : target;
+      const busy = this.bossPattern(A, b, pat, victim, inArena);
+      b.busyT = busy;
+      // 攻撃の間隔は短め。フェーズが進むほど詰めてきて、連続攻撃も増える
+      const gap = [0, rnd(0.6, 1.1), rnd(0.35, 0.7), rnd(0.15, 0.45)][b.phase || 1];
+      b.actT = busy + gap * 0.8;
+      const chain = [0, 0.25, 0.5, 0.7][b.phase || 1];
+      if (Math.random() < chain) b.actT = busy + 0.05;
+    }
+  },
+
+  clampArena(A, o) {
+    const L = A.lair;
+    const dx = o.x - L.x, dz = o.z - L.z, d = Math.hypot(dx, dz);
+    const max = L.r - 1.5;
+    if (d > max) { o.x = L.x + dx / d * max; o.z = L.z + dz / d * max; }
+  },
+
+  // 突進（予兆の直線 → 遅れて高速移動）
+  bossCharge(A, b, tx, tz, delay, dmg, col) {
+    const ang = Math.atan2(tx - b.x, tz - b.z);
+    const len = Math.min(26, Math.hypot(tx - b.x, tz - b.z) + 6);
+    const sx = b.x, sz = b.z;
+    this.tele(A, b, [{ k: 'line', x: r2(sx), z: r2(sz), a: r2(ang), len: r2(len), w: 4.2 }], delay, dmg, col, 1);
+    this.later(A, delay, () => {
+      if (A.boss !== b) return;
+      const end = { x: sx + Math.sin(ang) * (len - 1), z: sz + Math.cos(ang) * (len - 1) };
+      this.clampArena(A, end);
+      b.a = ang;
+      b.dash = { fx: b.x, fz: b.z, tx: end.x, tz: end.z, t: 0, dur: 0.25 };
+    });
+  },
+
+  bossPattern(A, b, pat, target, inArena) {
+    const L = A.lair;
+    const sp = [1, 0.9, 0.78, 0.68][b.phase || 1];
+    const base = mobDmg(b.lv) * 3.3 * BALANCE.bossDamage * floorPressure(A.n) * attackPressure(b.scaleN);
+    const col = b.phase === 3 ? '#ff1a8a' : b.enraged ? '#ff2a6a' : '#ff3a3a';
+    // 遠距離攻撃と突進は、ときどき離れている別の人を狙う
+    if (['shot', 'charge', 'chase'].includes(pat) && inArena.length > 1 && Math.random() < (pat === 'shot' ? 0.6 : 0.4)) {
+      const far = inArena.filter((p) => p.id !== target.id).sort((p, q) => dist(q, b) - dist(p, b))[0];
+      if (far) {
+        target = far;
+        this.broadcastArea(A.id, { t: 'chat', from: '', text: `${A.fdef.boss.name}が ${far.name} に狙いを変えた！`, color: '#ff9a8a' });
+      }
+    }
+    const ang = Math.atan2(target.x - b.x, target.z - b.z);
+    b.a = ang;
+    const tid = target.id;
+    this.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: pat, tid });
+    // 技ごとの中身は sim/boss-patterns.js の登録表
+    if (Object.hasOwn(BOSS_PATTERNS, pat)) { const t = BOSS_PATTERNS[pat](this, A, b, target, { L, sp, base, col, ang, tid, inArena }); if (t !== undefined) return t; }
+    return 1;
+  },
+};
