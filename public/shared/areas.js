@@ -404,8 +404,8 @@ export const MOB_POOL = {
 // 天候: 粒子（particles）、霧の近さ・遠さの倍率（near/far）、霧と空の色を寄せる色（tint/mix）、日差しの強さ（sun）、環境音（amb）
 export const WEATHERS = {
   rain: { name: '雨', icon: '🌧', particles: 'downpour', count: 1400, near: 0.4, far: 0.55, tint: 0x5a6880, mix: 0.55, sun: 0.4, amb: 'rain' },
-  fog: { name: '霧', icon: '🌫', particles: 'mist', count: 260, near: 0.15, far: 0.42, tint: 0xd4dee2, mix: 0.7, sun: 0.7, amb: 'fog' },
-  sandstorm: { name: '砂嵐', icon: '🌪', particles: 'sand', count: 1600, near: 0.1, far: 0.3, tint: 0xd09a58, mix: 0.75, sun: 0.6, amb: 'sandstorm' },
+  fog: { name: '霧', icon: '🌫', particles: 'mist', count: 260, near: 0.5, far: 0.7, tint: 0xd4dee2, mix: 0.5, sun: 0.8, amb: 'fog' }, // 雰囲気程度（遠くがかすむくらい）
+  sandstorm: { name: '砂嵐', icon: '🌪', particles: 'sand', count: 900, near: 0.5, far: 0.7, tint: 0xd09a58, mix: 0.5, sun: 0.75, amb: 'sandstorm' }, // 雰囲気程度
 };
 // エリアごとの天候（屋内の迷宮・ダンジョンにはない）
 export const AREA_WEATHER = {

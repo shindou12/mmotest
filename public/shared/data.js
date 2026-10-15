@@ -344,7 +344,7 @@ export const FLOORS = [
   },
   {
     n: 2, name: '霧の森', ground: 0x2f5a3a, ground2: 0x3f6f4a, fog: 0x9ab8b0, skyTop: 0x6a8a90, skyBot: 0xb7cfc8,
-    sun: 0xe0f0ff, sunI: 1.4, hemi: [0xb0d0d0, 0x203828], fogNear: 18, fogFar: 85,
+    sun: 0xe0f0ff, sunI: 1.4, hemi: [0xb0d0d0, 0x203828], fogNear: 30, fogFar: 120,
     props: [['pine', 110, 0x24553a, 0x4a3a2a], ['mushroom', 40, 0xd8584a, 0xf0e8d8], ['rock', 25, 0x6a7a74]],
     particles: 'firefly', amb: 'forest',
     music: { root: 57, mode: 'dorian', bpm: 80, prog: [0, 3, 6, 4], feel: 'mystic' },
