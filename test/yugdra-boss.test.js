@@ -90,9 +90,30 @@ test('the root ripple is a thin line spanning the whole room that sweeps across 
   assert.ok(Math.abs(Math.hypot(mids.at(-1).x - mids[0].x, mids.at(-1).z - mids[0].z) - 36) < 0.1);
 });
 
+test('the spore field scatters small slow blasts over the cross with gaps left between them, then yugdra keeps attacking', () => {
+  const { w, A, L, b, tick, sent } = fight(1);
+  const before = sent('tele').length;
+  const busy = w.bossPattern(A, b, 'spores', w.players.get(1), [...w.players.values()]);
+  assert.ok(busy <= 1.0); // すぐ次の技へ
+  assert.equal(sent('cast').at(-1).name, '胞子の野');
+  tick(1.5);
+  const s = sent('tele').slice(before).filter((m) => m.sh[0].k === 'circle' && m.sh[0].r === 1.8);
+  assert.ok(s.length >= 18 && s.length <= 22, String(s.length));
+  for (const m of s) {
+    assert.ok(m.d >= 2600 && m.d <= 3400); // 起動が遅い
+    assert.equal(m.kd, undefined);
+    assert.ok(free(A.def, m.sh[0].x, m.sh[0].z)); // 十字の床の上
+  }
+  for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) assert.ok(Math.hypot(s[i].sh[0].x - s[j].sh[0].x, s[i].sh[0].z - s[j].sh[0].z) >= 4.2); // すき間がある
+  // ダメージは小さめ（根の奔流の 1/4 未満）
+  w.bossPattern(A, b, 'torrent', w.players.get(1), [...w.players.values()]);
+  assert.ok(s[0].dmg * 4 < sent('tele').at(-1).dmg);
+  assert.ok(Math.hypot(L.x, L.z) >= 0);
+});
+
 test('every move yugdra uses has an authored motion, plus the drain stance', async () => {
   const { YUGDRA_MOTIONS } = await import('../public/js/models/bosses/yugdra-motion.js');
   const { yugdra } = await import('../public/shared/sim/bosses/yugdra.js');
-  const moves = new Set([...yugdra.patterns({ bar: 1, basePats: ['torrent', 'nova', 'rain'] }), ...yugdra.patterns({ wrath: true }), 'drain']);
+  const moves = new Set([...yugdra.patterns({ bar: 1, basePats: ['torrent', 'nova', 'rain'] }), ...yugdra.patterns({ wrath: true, sporeCd: 0 }), 'drain']);
   for (const p of moves) assert.ok(YUGDRA_MOTIONS[p], p);
 });

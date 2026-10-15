@@ -36,6 +36,12 @@ export const YUGDRA_MOTIONS = {
     keys: [[0, N], [0.45, { 'arms.1.rotation.x': -2.6, 'arms.1.rotation.z': 0.3, 'body.rotation.x': -0.15, 'body.rotation.y': 0.25 }],
       [0.6, { 'arms.1.rotation.x': 0.7, 'arms.1.rotation.z': 0, 'body.rotation.x': 0.3, 'body.rotation.y': -0.15, 'treeCrown.rotation.x': 0.1 }], [1.2, {}], [1.6, N]],
   },
+  // 胞子の野（大技）: 両腕を高く掲げて樹冠を大きく震わせ、胞子をまき散らす
+  spores: {
+    dur: 1.6,
+    keys: [[0, N], [0.4, { ...raise, 'arms.0.rotation.x': -2.8, 'arms.1.rotation.x': -2.8, 'arms.0.rotation.z': -0.6, 'arms.1.rotation.z': 0.6, 'body.rotation.x': -0.25 }],
+      [0.6, { 'treeCrown.rotation.x': 0.18 }], [0.8, { 'treeCrown.rotation.x': -0.18 }], [1.0, { 'treeCrown.rotation.x': 0.15 }], [1.2, { 'treeCrown.rotation.x': -0.1 }], [1.6, N]],
+  },
   // 吸い上げ（根瘤が切られるまで）: 両腕を大きく広げたまま、樹冠を反らす
   drain: {
     dur: 1.0, hold: true,
