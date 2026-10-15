@@ -8,5 +8,5 @@ test('heavier weapons gain more damage reduction per level', () => {
   const hi = at(30);
   assert.ok(hi.dagger < hi.bow && hi.bow < hi.sword && hi.sword < hi.spear && hi.spear < hi.greatsword && hi.greatsword < hi.axe);
   for (const k of WEAPON_KINDS) assert.ok(weaponDef(k, 30) > weaponDef(k, 10)); // レベルで伸びる
-  assert.ok(hi.axe >= 15 && hi.axe <= 25 && hi.dagger <= 5);
+  assert.ok(hi.axe >= 4 && hi.axe <= 8 && hi.dagger <= 2); // 傾向をつけるだけで、固くしすぎない
 });

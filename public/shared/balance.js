@@ -10,7 +10,7 @@ export const BALANCE = Object.freeze({
   potionHeal: 0.30, potionCooldown: 8, lifestealEfficiency: 0.55,
   deathSeconds: 5,
   questXp: 0.60,
-  weaponDef: 0.06, // 武器の重さ×レベルあたりの被ダメ軽減（%）。重い武器ほどレベルとともに固くなる
+  weaponDef: 0.02, // 武器の重さ×レベルあたりの被ダメ軽減（%）。重い武器ほどレベルとともに固くなる
 });
 
 // 這いずり（HP0で倒れる → 仲間の攻撃のスタン値で起き上がる）。単位はスタン値
