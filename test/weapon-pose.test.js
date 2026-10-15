@@ -10,7 +10,7 @@ const poses = [{}, { moving: true, walkT: .4 }, { swing: .1 }, { swing: .55 }, {
 function point(object) { return object.getWorldPosition(new THREE.Vector3()); }
 
 test('all weapon styles stay anchored to the palm through every player pose', () => {
-  for (const kind of WEAPON_KINDS) for (let style = 0; style < 4; style++) {
+  for (const kind of WEAPON_KINDS) for (let style = 0; style < (kind === 'greatsword' ? 8 : 4); style++) {
     const model = makePlayer('#448a9b');setPlayerWeapon(model, kind, 3, style);
     const u = model.userData;
     assert.equal(u.weapon.parent, kind === 'bow' ? u.handL : u.hand);
@@ -57,12 +57,14 @@ test('spear thrust points forward, sweep extends sideways, shield faces the enem
 
 test('greatsword and axe support hand stays on the lower handle during idle and attacks', () => {
   for (const kind of ['greatsword', 'axe']) {
-    const model = makePlayer('#448a9b');setPlayerWeapon(model, kind, 0);
-    const u = model.userData;
-    for (const pose of [{}, { swing: .1 }, { swing: .5 }, { swing: .24, combo: 2 }, { swing: .7, combo: 2 }]) {
-      animatePlayer(model, { ...base, ...pose, kind });model.updateMatrixWorld(true);
-      const lowerGrip = u.weaponModel.localToWorld(new THREE.Vector3(0, GRIP_Y[kind] - .18, 0));
-      assert.ok(lowerGrip.distanceTo(point(u.handL)) < .025, `${kind}: support hand is detached`);
+    for (let style = 0; style < 4; style++) {
+      const model = makePlayer('#448a9b');setPlayerWeapon(model, kind, 0, style);
+      const u = model.userData;
+      for (const pose of [{}, { swing: .1 }, { swing: .5 }, { swing: .24, combo: 2 }, { swing: .7, combo: 2 }]) {
+        animatePlayer(model, { ...base, ...pose, kind });model.updateMatrixWorld(true);
+        const lowerGrip = u.weaponModel.localToWorld(new THREE.Vector3(0, GRIP_Y[kind] - .18, 0));
+        assert.ok(lowerGrip.distanceTo(point(u.handL)) < .025, `${kind}/${style}: support hand is detached`);
+      }
     }
   }
 });

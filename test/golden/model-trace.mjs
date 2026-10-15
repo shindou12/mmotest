@@ -31,7 +31,7 @@ export function modelTraces() {
   const random = Math.random; Math.random = () => 0.5;
   const out = {};
   try {
-    for (const kind of ['sword', 'greatsword', 'spear', 'dagger', 'axe', 'bow']) for (let rarity = 0; rarity < RARITIES.length; rarity++) for (let style = 0; style < 4; style++) {
+    for (const kind of ['sword', 'greatsword', 'spear', 'dagger', 'axe', 'bow']) for (let rarity = 0; rarity < RARITIES.length; rarity++) for (let style = 0; style < (kind === 'greatsword' ? 8 : 4); style++) {
       out[`weapon/${kind}/${rarity}/${style}`] = shape(makeWeapon(kind, rarity, style));
     }
     for (let look = 0; look < ARMOR_LOOK_NAMES.length; look++) {

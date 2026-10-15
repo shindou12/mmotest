@@ -311,6 +311,8 @@ export const UNIQUES = [
   { key: 'muramasa', name: '妖刀 村正', rarity: 6, slot: 'weapon', kind: 'dagger', fx: ['vamp'], lore: '血を求めて止まぬ妖刀。' },
   { key: 'dainsleif', name: 'ダーインスレイヴ', rarity: 6, slot: 'weapon', kind: 'greatsword', fx: ['vamp', 'flame'], lore: '一度抜けば血を見ずには収まらぬ。' },
   { key: 'laevateinn', name: 'レーヴァテイン', rarity: 6, slot: 'weapon', kind: 'sword', fx: ['flame'], lore: '世界を焼く炎の枝。' },
+  { key: 'oni_kiba', name: '鬼牙', rarity: 6, slot: 'weapon', kind: 'sword', fx: [], lore: '鬼の牙のように前へ湾曲した刃を持つ剣。' },
+  { key: 'sosei', name: '双星剣', rarity: 6, slot: 'weapon', kind: 'sword', fx: [], lore: '二つに分かれた切先が双星を刻む剣。' },
   { key: 'labrys', name: 'ラブリュス', rarity: 6, slot: 'weapon', kind: 'axe', fx: ['flame'], lore: '迷宮の王が掲げた両刃の斧。' },
   { key: 'yoichi', name: '与一の弓', rarity: 6, slot: 'weapon', kind: 'bow', fx: ['thunder'], lore: '揺れる扇の的をも射抜いたという名弓。' },
   { key: 'artemis', name: 'アルテミスの銀弓', rarity: 7, slot: 'weapon', kind: 'bow', fx: ['skillcrit', 'star'], lore: '月の女神の銀の弓。' },

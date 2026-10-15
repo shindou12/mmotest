@@ -1,5 +1,6 @@
 // トゥーン調のキャラクター / 武器 / モンスター（プリミティブ＋押し出し形状で造形）
 import * as THREE from 'three';
+import { uniqueWeaponStyle } from '../shared/weapon-appearances.js';
 import { animatePlayer } from './player-motion.js';
 export { animatePlayer } from './player-motion.js';
 import { GRIP_Y } from './weapon-pose.js';
@@ -12,6 +13,7 @@ import { BOSS_MODELS } from './models/boss-models.js';
 import { applyBossMotion, endBossMotion } from './models/boss-motion.js';
 import { ARMOR_LOOKS } from './models/armor-looks.js';
 import { SHIELD_MODELS } from './models/shield-models.js';
+import { setGripHand } from './models/grip-hands.js';
 
 // 共通の道具（mesh・sphere・extrude・finish・bowString など）は models/kit.js
 
@@ -19,17 +21,32 @@ import { SHIELD_MODELS } from './models/shield-models.js';
 // 武器
 // ---------------------------------------------------------------------------
 
-// 装備から武器の形を決める: 伝説・神器は専用形（3）、それ以外は名前から 0〜2
+// 装備から武器の形を決める: 固有武器はIDごとの形、未登録の伝説・神器は3、それ以外は名前から選ぶ
 export function weaponStyle(it) {
   if (!it) return 0;
-  if (it.rarity >= 6) return 3;
+  if (it.rarity >= 6) return uniqueWeaponStyle(it.kind,it.unique) ?? 3;
   const s = [...String(it.name || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  if (it.kind === 'greatsword') {
+    if (s % 8 === 0) return 4;
+    if (s % 8 === 1) return 5;
+  }
   return s % 3;
 }
 // 武器の飾りの段階（0〜5）: レアリティ8段（粗悪〜神器）を、金具・光る縁などの見た目の段階にまとめる
 const visTier = (r) => (r >= 6 ? r - 2 : Math.max(0, r - 1));
 
 export function makeWeapon(kind, rarityIn = 0, style = 0) {
+  return makeWeaponShape(kind, rarityIn, style);
+}
+
+// Preview candidates use exactly the gameplay rarity materials, batching and outline.
+// The gameplay registry and item appearance selection remain the default path.
+export function makeWeaponPreview(kind, rarityIn, style, builder) {
+  if (typeof builder !== 'function') throw new TypeError('A preview shape builder is required');
+  return makeWeaponShape(kind, rarityIn, style, builder);
+}
+
+function makeWeaponShape(kind, rarityIn, style, builder) {
   const g = new THREE.Group();
   const rc = new THREE.Color(RARITIES[rarityIn].color);
   const rarity = visTier(rarityIn);
@@ -54,8 +71,9 @@ export function makeWeapon(kind, rarityIn = 0, style = 0) {
   const blade = (pts, depth, y = 0.12, mat = steel) => { edge(pts.map(([x, yy]) => [x, yy]), depth); const m = mesh(extrude(pts, depth), mat, [0, y, 0]); g.add(m); return m; };
   const k = { g, steel, gold, grip, gem, edge, handle, rc, rarity, glowM, blade, style };
   const V = WEAPON_MODELS[kind];
-  if (style && V?.styles[style]) { V.styles[style](V.prep ? { ...k, ...V.prep(k) } : k); return finish(g, 0.8); }
-  M.base(k);
+  if (builder) builder(k);
+  else if (style && V?.styles[style]) V.styles[style](V.prep ? { ...k, ...V.prep(k) } : k);
+  else M.base(k);
   return finish(g, 0.8);
 }
 
@@ -238,6 +256,7 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
   w.rotation.y = offHand ? -Math.PI / 2 : 0;
   u.wKind = kind;
   (offHand ? u.handL : u.hand).add(u.weapon);
+  setGripHand(u,WEAPON_MODELS[kind]?.gripHand);
   u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);
   animatePlayer(model, { t: 0, moving: false, walkT: 0, kind, combo: 0, swing: -1, spin: -1, sweep: -1, dodge: 0, down: 0, hurt: 0 });
 

@@ -5,7 +5,12 @@ import * as THREE from 'three';
 import { WEAPON_DEFS } from '../weapons/index.js';
 import { mesh, sphere, cone, cyl, lathe, extrude, bowString } from './kit.js';
 import { toon } from '../toon.js';
+import { UNIQUE_SWORDS } from './unique-swords.js';
+import { UNIQUE_GREATSWORDS } from './unique-greatswords.js';
+import { GREATSWORD_FORMS } from './greatsword-forms.js';
+import { katana, leaf } from './sword-forms.js';
+import { makeSwordHand } from './grip-hands.js';
 
 // 武器のファイルの形の関数に渡す道具（武器のファイルは three.js を直接読まない。サーバーも同じファイルを読むため）
-const KIT = { THREE, mesh, sphere, cone, cyl, lathe, extrude, bowString, toon };
+const KIT = { THREE, mesh, sphere, cone, cyl, lathe, extrude, bowString, toon, makeSwordHand, uniqueSwords: UNIQUE_SWORDS, uniqueGreatswords: UNIQUE_GREATSWORDS, greatswordForms: GREATSWORD_FORMS, swordForms: { katana: k=>{katana(k,'A');k.g.userData.appearance='refined-katana';}, leaf: k=>{leaf(k,'A');k.g.userData.appearance='refined-leaf';} } };
 export const WEAPON_MODELS = Object.fromEntries(WEAPON_DEFS.map((d) => [d.wk, d.model(KIT)]));
