@@ -316,6 +316,16 @@ export function animateMob(model, s) {
     u.curAct = s.act;
     if (!applyBossMotion(u, motions?.[s.act.p], s.act)) { endBossMotion(u, motions?.[s.act.p]); s.act.done = true; u.curAct = null; }
   }
+  // スタン（全ボス・全敵共通）: 膝をつくように前かがみになり、腕が下がる
+  if (s.stun) {
+    u.body.rotation.x = 0.35;
+    if (!u.hover && !u.float) u.body.position.y = -0.25;
+    if (u.head) u.head.rotation.x = 0.45;
+    if (u.arm) u.arm.rotation.x = 0.5;
+    if (u.guardArm) u.guardArm.rotation.x = 0.3;
+    if (u.arms) u.arms.forEach((a) => { a.rotation.x = 0.4; });
+  } else if (u.stunPose) u.body.position.y = 0;
+  u.stunPose = !!s.stun;
   // スタン（全ボス・全敵共通の見た目）: 黄色くゆっくり点滅する。予兆の赤い点滅より優先
   const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0, stun = s.stun ? Math.sin(t * 7) * 0.5 + 0.5 : 0;
   for (const mm of u.mats) {

@@ -87,6 +87,9 @@ export function dealDamage(mb, mult, o = {}) {
     const wc = RARITIES[stats.S.wr].color;
     view.fx.parts.burst(mb.x, 1.2, mb.z, crit ? 18 : 8, { color: crit ? 0xffd84a : wc, speed: crit ? 9 : 6, size: crit ? 0.5 : 0.35, life: 0.4 });
     view.audio.sfx('hit', { crit });
+    // 被弾の揺れ（小さく短く）。スタン中のボスは重い音・黄色い火花・ほんの一瞬の止めで「今が攻め時」の手応え
+    jolt(mb, stunned > 1 ? 0.12 : 0.08, stunned > 1 ? 0.22 : crit ? 0.1 : 0.06);
+    if (stunned > 1) { view.audio.sfx('stunHit'); view.fx.parts.burst(mb.x, 2.2, mb.z, 14, { color: 0xffe060, speed: 11, size: 0.55, life: 0.35 }); rules.setHitStop(Math.max(rules.hitStop, 0.035)); }
   }
   const vamp = stats.S.vamp + stats.buffMod('vamp');
   if (vamp > 0) rules.heal(dmg * vamp / 100 * BALANCE.lifestealEfficiency, false);
@@ -119,3 +122,9 @@ export function dealDamage(mb, mult, o = {}) {
 export function later(sec, fn) { state.pending.push({ at: now() + sec, fn }); }
 
 export function setShake(v) { shake = v; }
+
+// 敵をビクッと揺らす（sec 秒で収まる。amp はずれの大きさ m）
+export function jolt(mb, sec, amp) {
+  if (mb.jolt > 0 && mb.joltAmp > amp) return; // 大きい揺れの最中は上書きしない
+  mb.jolt = sec; mb.joltMax = sec; mb.joltAmp = amp;
+}

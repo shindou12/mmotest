@@ -566,6 +566,29 @@ export class AudioEngine {
         break;
       }
       case 'ui': tone('sine', 1000, 0, 0.05, 0.05); break;
+      // ---- スタン（全ボス共通） ----
+      case 'stunBreak': {
+        // 入った瞬間: 鎧が砕ける金属音（不協和な倍音）＋重い低音＋ガラスが散る音＋きらめく上昇音
+        [2093, 2793, 3520, 4186].forEach((f, i) => tone('triangle', f, f * 0.96, 0.9, 0.09, i * 0.012).connect(this.revSend));
+        tone('sine', 150, 32, 0.7, 0.6); tone('square', 80, 40, 0.25, 0.18);
+        this.noiseHit(t, 0.4, 'highpass', 3000, 0.6, B).g.connect(this.revSend);
+        this.noiseHit(t, 0.45, 'lowpass', 900, 0.4, B);
+        [0, 4, 7, 12, 16].forEach((s, i) => tone('sine', mtof(84 + s), 0, 0.35, 0.07, 0.12 + i * 0.05).connect(this.revSend));
+        break;
+      }
+      case 'stunTweet': [0, 0.11].forEach((at, i) => tone('sine', 2600 + i * 500, 3400 + i * 500, 0.07, 0.035, at).connect(this.revSend)); break; // ピヨピヨ
+      case 'stunHit': {
+        // スタン中に殴った音: 重い打撃＋硬いものを叩く高い音
+        tone('sine', 180, 45, 0.18, 0.4); tone('triangle', 1600, 1100, 0.12, 0.1).connect(this.revSend);
+        this.noiseHit(t, 0.3, 'bandpass', 1400, 0.1, B, 1.5);
+        break;
+      }
+      case 'stunEnd': {
+        // 立ち上がる: 下から上へ吹き上がる音と、うなり声のような低音
+        const n = this.noiseHit(t, 0.25, 'bandpass', 300, 0.45, B, 2); n.f.frequency.exponentialRampToValueAtTime(2400, t + 0.4);
+        tone('sawtooth', 70, 110, 0.5, 0.18).connect(this.revSend);
+        break;
+      }
       case 'equip': this.noiseHit(t, 0.2, 'bandpass', 4000, 0.06, B, 3); tone('triangle', 700, 0, 0.1, 0.06, 0.03); break;
       case 'step': this.noiseHit(t, 0.03, 'lowpass', 500 + Math.random() * 300, 0.05, B); break;
       case 'enrage': tone('sawtooth', 80, 160, 1.0, 0.3).connect(this.revSend); this.noiseHit(t, 0.3, 'lowpass', 800, 1.0, B); break;

@@ -9,8 +9,8 @@ import { bprojs, me, mobs, others, teles, world } from './state.js';
 import { S } from './stats.js';
 import { enterArea, env, heightAt } from './area.js';
 import { BOSS_DEATH, onMobDie, onSnap, removeOther } from './snapshot.js';
-import { die, onTele, revived } from './hurt.js';
-import { addShake } from './combat.js';
+import { die, onTele, revived, setHitStop } from './hurt.js';
+import { addShake, jolt } from './combat.js';
 import { tf } from './variants.js';
 import { clearBossProjs, gainXp, heal, spawnBossProj } from './actions.js';
 import { countClear, grantTitle, questEvent, rollTitleDrop } from './progress.js';
@@ -139,8 +139,15 @@ export function onMsg(m) {
       const b = mobs.get(m.id);
       if (b) b.act = null; // スタンで技の動きも止まる
       banner('', 'STUN!', '#ffd84a', 3);
-      audio.sfx('impact'); audio.sfx('perfect'); addShake(0.8);
-      if (b) { fx.ringWave(b.x, b.z, 0xffd84a, 8, 0.6); fx.parts.burst(b.x, 4, b.z, 80, { color: 0xffe080, speed: 10, size: 0.6, life: 1 }); }
+      // 入った瞬間の手応え: 一瞬止める・砕ける音・強い光と揺れ・飛び散る破片
+      audio.sfx('stunBreak'); addShake(1.4); setHitStop(0.18);
+      if (b) {
+        fx.flash(b.x, 3, b.z, 0xffe060, 120, 0.35, 30);
+        fx.ringWave(b.x, b.z, 0xffd84a, 12, 0.6); fx.ringWave(b.x, b.z, 0xffffff, 6, 0.35);
+        fx.parts.burst(b.x, 4, b.z, 160, { color: 0xffe080, speed: 16, size: 0.7, life: 1.1 });
+        fx.parts.burst(b.x, 3, b.z, 60, { color: 0xffffff, speed: 22, size: 0.4, life: 0.5 });
+        b.tweetT = 0.5; jolt(b, 0.35, 0.5);
+      }
       break;
     }
     case 'guardStop': {

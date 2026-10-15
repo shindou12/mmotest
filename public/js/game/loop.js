@@ -296,11 +296,18 @@ export function update(dt) {
     mb.a += angDiff(mb.ta, mb.a) * k;
     mb.flash = Math.max(0, mb.flash - dt * 6);
     mb.model.position.set(mb.x, field.heightAt(mb.x, mb.z), mb.z);
+    // 被弾の揺れ（ビクッと震えてすぐ収まる）
+    if (mb.jolt > 0) { mb.jolt -= dt; const k = Math.max(0, mb.jolt / mb.joltMax) * mb.joltAmp; mb.model.position.x += Math.sin(t * 95) * k; mb.model.position.z += Math.cos(t * 83) * k * 0.6; }
     mb.model.rotation.y = mb.a;
     if (mb.act) { mb.act.age = now() - mb.act.start; if (mb.act.done) mb.act = null; }
     view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, act: mb.act, stun: mb.stunT > 0 });
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) view.fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[state.world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
+    // スタン中はピヨピヨと鳴り続け、終わったら立ち上がる音
+    if (mb.kind === 2) {
+      if (mb.stunT > 0) { mb.tweetT = (mb.tweetT ?? 0.5) - dt; if (mb.tweetT <= 0) { mb.tweetT = 0.45; view.audio.sfx('stunTweet'); } mb.wasStun = true; }
+      else if (mb.wasStun) { mb.wasStun = false; view.audio.sfx('stunEnd'); view.fx.ringWave(mb.x, mb.z, 0xd8c8a0, 6, 0.4); }
+    }
     if (mb.stunT > 0 && Math.random() < 0.5) {
       // スタン中: 頭上で星が回る
       const a = t * 6 + Math.random() * 6, h = 2.6 * mb.model.scale.y;
