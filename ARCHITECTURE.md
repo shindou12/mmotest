@@ -104,19 +104,19 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 ```
   組み立て役        main.js → game/wiring.js（中心の処理のポートを埋める） / game/weapon-api.js（武器の効果の道具） / actions.js の combat（スキルの道具）
        │ 差し込む
-  中心の処理        combat・hurt・stats・loop・tree-effects・variants・items・loot・progress
+  中心の処理        combat・hurt・stats・loop・actions・input・tree-effects・variants・items・loot・progress
        │ 読むのは game/ports.js の入れ物だけ（state・stats・view・screen・link・field・rules）
   拡張する部分      武器のファイル（js/weapons/*.js: 効果は effects(api)）・スキル（c を受け取る）・登録表（models・motions・env・sim）
        │
   端（具体的な実装） state・save（状態とセーブ）・render・meshes・labels（three.js）・ui-bridge / ui（DOM）・net-client / net（通信）
-                    input（入力）・area・snapshot（エリアとサーバーの状態の反映）・actions（攻撃とスキルの道具の組み立て）
+                    area・snapshot（エリアとサーバーの状態の反映）
 ```
 
 - 中心の処理は、具体的なモジュールを import しない。`game/ports.js` の入れ物から `state.me`・`stats.S`・`view.fx`・`rules.dealDamage` のように読む。
   中身は `game/wiring.js` が起動のときに差し込む（書き換わる値は getter）。描画や通信を差し替えて、中心の処理だけを動かすこともできる。
 - 中心の処理に新しい道具を渡すときは、`game/wiring.js` に1行足す。
 - 入れ物は読み込みの時点ではまだ空なので、中心の処理のファイルの一番外側（関数の外）では入れ物を使わない。
-- 入力（input.js）と攻撃の道具の組み立て（actions.js）は、読み込みの時点で道具をまとめる端（アダプター）として、具体的なモジュールを直接読む。
+- スキルに渡す道具（actions.js の combat）とガードゲージの初期値は、ポートが埋まったあとに組み立て役が作る（`buildCombat()`・`initGuard()`）。
 
 ## 武器ごとの効果（フック）の仕組み
 
