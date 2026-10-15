@@ -338,6 +338,8 @@ export const FLOORS = [
       { t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 },
       { t: 'bat', name: 'ケイブバット', color: 0x5a4a6a }, { t: 'mushroom', name: 'ドクキノコ', color: 0xc84a6a },
     ],
+    // ドロップの調整: item 落とす確率の倍率 / weapon 武器の割合 / rare 特性2つ以上の格の出やすさ
+    drops: { item: 1.5, weapon: 0.8, rare: 0.8 },
     // 迷宮区の番兵（ai: 動き方。look: 'player' はプレイヤーの姿を暗く染めて大きくしたもの。weapon / armor はその装備の見た目）
     elites: [{ t: 'knight', ai: 'sentinel', look: 'player', weapon: 'spear', armor: 5, scale: 1.35, name: '迷宮の近衛騎士', color: 0x6a4a2a, accent: 0xffb030 }],
     boss: { name: 'コボルド王 グラズ', t: 'knight', appearance: 'graz', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, brain: 'graz', bars: 3, patterns: ['slam', 'cone', 'charge', 'combo', 'breath'] },
@@ -480,11 +482,11 @@ export function rarityRamp(i, ilvl) {
   return R[2] + (1 - R[2]) * k;
 }
 // ドロップの格を抽選する（DROP_GRADES の番号: 0〜3 特性の数 / 4 伝説 / 5 神器）。見た目のレアリティは中身の出来で決まる
-export function rollRarity(boost = 0, minRarity = 0, ilvl = 99) {
-  // boost: 0=通常, 1=ボス / ilvl: 低いほど特性の多い格・固有装備が出にくい
+export function rollRarity(boost = 0, minRarity = 0, ilvl = 99, rare = 1) {
+  // boost: 0=通常, 1=ボス / ilvl: 低いほど特性の多い格・固有装備が出にくい / rare: 特性2つ以上の格の出やすさ（階層の drops.rare）
   const ws = DROP_GRADES.map((r, i) => {
     if (i < minRarity) return 0;
-    let w = r.w * rarityRamp(i, ilvl);
+    let w = r.w * rarityRamp(i, ilvl) * (i >= 2 ? rare : 1);
     if (i >= 3) w *= 1 + boost * 5;
     if (i === 2) w *= 1 + boost * 1.5;
     return w;
@@ -500,7 +502,8 @@ export function makeItem(ilvl, grade, opts = {}) {
   grade = Math.max(0, Math.min(DROP_GRADES.length - 1, grade | 0));
   const r = DROP_GRADES[grade];
   let rarity = r.rarity ?? 0;
-  let slot = opts.slot || pick(['weapon', 'weapon', 'weapon', 'armor', 'acc']);
+  // opts.weapon: 武器の割合（階層の drops.weapon）。指定がなければ 3/5
+  let slot = opts.slot || (opts.weapon == null ? pick(['weapon', 'weapon', 'weapon', 'armor', 'acc']) : Math.random() < opts.weapon ? 'weapon' : pick(['armor', 'acc']));
   let kind = opts.kind || null;
   let unique = null;
   if (opts.uniqueDef) {

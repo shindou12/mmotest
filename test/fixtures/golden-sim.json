@@ -25,19 +25,19 @@
   }
  },
  "04 field fight": {
-  "hash": "4092d499ceb9dda81c241cea",
+  "hash": "e8decbc4c75a6db92498de49",
   "types": {
    "snap": 600,
    "tele": 63,
    "roster": 60,
    "die": 24,
    "xp": 24,
-   "gold": 15,
-   "loot": 4
+   "gold": 17,
+   "loot": 10
   }
  },
  "05 to labyrinth": {
-  "hash": "751f299c100752f17c2e4576",
+  "hash": "2b9c6112f03b2253dc762437",
   "types": {
    "warped": 3,
    "snap": 30,
@@ -45,13 +45,13 @@
   }
  },
  "06 lever": {
-  "hash": "0260d7ddce1f9862618b90b4",
+  "hash": "669f588e3b0e316c4593db20",
   "types": {
    "snap": 15
   }
  },
  "07 enter lair": {
-  "hash": "6b32fbed78406e3f00c84bd5",
+  "hash": "9d3debdc799586748f573394",
   "types": {
    "bossStart": 3,
    "snap": 90,
@@ -61,15 +61,16 @@
   }
  },
  "08 boss fight": {
-  "hash": "ead18d2f71716c1fc55efa24",
+  "hash": "2a18b06a8af320e87830d038",
   "types": {
    "snap": 900,
    "roster": 90,
-   "bossAct": 12,
-   "tele": 15,
+   "bossAct": 9,
+   "aim": 3,
+   "proj": 21,
    "stun": 12,
    "hateReset": 6,
-   "aim": 3,
+   "tele": 12,
    "pdown": 3,
    "prev": 3,
    "bossEv": 3,
@@ -88,15 +89,15 @@
   }
  },
  "10 floor 2 field": {
-  "hash": "53a72c12cb523efd80b803bc",
+  "hash": "728bee3569d40f850ace20bf",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 57,
-   "die": 9,
-   "xp": 9,
-   "gold": 9,
+   "tele": 30,
+   "die": 12,
+   "xp": 12,
+   "gold": 7,
    "loot": 4
   }
  },
@@ -109,32 +110,35 @@
   }
  },
  "12 floor 3 field": {
-  "hash": "1cd2969e52f630dad9118b17",
+  "hash": "11b273d4e532e97a8ba9a0a9",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 42
+   "tele": 15,
+   "die": 3,
+   "xp": 3,
+   "gold": 3,
+   "loot": 2
   }
  },
  "13 wipe": {
-  "hash": "f907306cc17fe838c3c1afdc",
+  "hash": "a6a0bdaf6d2faeb0065a83ca",
   "types": {
    "pdown": 9,
    "bleed": 3,
    "snap": 60,
    "roster": 6,
-   "tele": 12
+   "tele": 6
   }
  },
  "14 leave": {
-  "hash": "8a8ebcbec11e5451c5a4c4aa",
+  "hash": "9082ff75819e22d3c195ec6f",
   "types": {
    "chat": 2,
    "leave": 2,
    "snap": 20,
-   "roster": 2,
-   "tele": 2
+   "roster": 2
   }
  },
  "saves": "4f53cda18c2baa0c0354bb5f"
