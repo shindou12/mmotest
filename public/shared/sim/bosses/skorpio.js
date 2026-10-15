@@ -60,7 +60,7 @@ export const skorpio = {
     }
     if (world.tickCast(A, b, dt)) return true;
     if (b.burrow) { this.tickBurrow(world, A, b, dt); return true; }
-    if (b.stackCd <= 0 && !b.forced && inArena.length) { b.forced = 'stack'; b.stackCd = STACK.cd; }
+    if (b.stackCd <= 0 && b.stackT <= 0 && !b.forced && inArena.length) { b.forced = 'stack'; b.stackCd = STACK.cd; } // 前の印が残っている間は出さない
     return false;
   },
 
