@@ -8,7 +8,7 @@ import { toon, glow, outline, compact, gradientMap } from './toon.js';
 import { buildGraz } from './graz-model.js';
 import { buildYugdra, animateYugdra } from './yugdra-model.js';
 import { buildSkorpio, animateSkorpio } from './skorpio-model.js';
-import { captureBossRig, resetBossRig, applyBossMotion } from './boss-motion.js';
+import { captureBossRig, resetBossRig, applyBossMotion, sampleBossPose } from './boss-motion.js';
 
 function mesh(geo, mat, pos, rot, scale) {
   const m = new THREE.Mesh(geo, mat);
@@ -847,7 +847,9 @@ export function animateMob(model, s) {
   const u = model.userData;
   resetBossRig(u);
   const t = s.t;
-  const moving = s.st === 1, wind = s.st === 2, atk = s.st === 3;
+  const authored = s.bossMove ? sampleBossPose(u.identity, s.bossMove, s.bossTime, s.bossPhase, s.bossSpeed) : null;
+  const moving = !authored && s.st === 1, wind = !authored && s.st === 2, atk = !authored && s.st === 3;
+  const baseState = authored ? { ...s, st: 0 } : s;
   if (u.squash) {
     const k = moving ? Math.abs(Math.sin(t * 8)) : Math.sin(t * 3) * 0.3 + 0.5;
     const w = wind ? 0.25 : 0;
@@ -867,10 +869,10 @@ export function animateMob(model, s) {
   if (u.float) { u.body.position.y = Math.sin(t * 2.5) * 0.3; if (u.shell) { u.shell.rotation.y = t * 2; u.shell.rotation.x = Math.sin(t) * 0.4; } }
   if (u.sigil) { u.sigil.rotation.z = t; u.sigil.scale.setScalar(s.enraged ? 2.2 + Math.sin(t * 8) * 0.2 : 1.8); }
   u.body.rotation.x = wind ? -0.2 : atk ? 0.22 : 0;
-  if (u.identity === 'yugdra') animateYugdra(u, s);
-  if (u.identity === 'skorpio') animateSkorpio(u, s);
+  if (u.identity === 'yugdra') animateYugdra(u, baseState);
+  if (u.identity === 'skorpio') animateSkorpio(u, baseState);
   if (s.bossMove) applyBossMotion(u, s);
-  const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0;
+  const flash = s.flash || 0, warn = s.st === 2 && (!authored || s.bossTime < authored.spec.hits[0]) ? (Math.sin(t * 30) * 0.5 + 0.5) : 0;
   for (const mm of u.mats) {
     if (flash > 0) { mm.m.emissive.setRGB(1, 1, 1); mm.m.emissiveIntensity = flash * 1.5; }
     else if (warn > 0) { mm.m.emissive.setRGB(1, 0.15, 0.1); mm.m.emissiveIntensity = warn * 0.6 + mm.ei * 0.5; }

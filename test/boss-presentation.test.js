@@ -27,6 +27,17 @@ test('playback handles late joins, duplicate snapshots, replaced actions and stu
  assert.equal(p.receive({id:7,p:'slam',seq:3},10.2,'graz'),true);assert.equal(p.sample(7,10.3,'graz').pattern,'slam');
  p.cancel(7);assert.equal(p.sample(7,10.4,'graz'),null);assert.equal(p.receive({id:7,p:'cone',age:Infinity},12,'graz'),false);
 });
+test('authored attack entry does not flash the generic wind-up pose on its first frame',()=>{
+ for(const id of BOSS_DEMO_MOVES){
+  const [identity,pattern]=id.split('/'),b=FLOORS.find(f=>f.boss.appearance===identity).boss;
+  const original=makeMob(b.t,b.color,b.scale,b.accent,true,identity),fresh=makeMob(b.t,b.color,b.scale,b.accent,true,identity);
+  animateMob(original,{t:2,st:0});animateMob(fresh,{t:2,st:2,bossMove:pattern,bossTime:0,bossPhase:1});original.updateMatrixWorld(true);fresh.updateMatrixWorld(true);
+  for(let i=0;i<fresh.userData.motionRest.length;i++){
+    const a=original.userData.motionRest[i].node.matrixWorld.elements,c=fresh.userData.motionRest[i].node.matrixWorld.elements;
+    assert.ok(c.every((n,j)=>Math.abs(n-a[j])<1e-8),id+' enters through the generic wind pose');
+  }
+ }
+});
 test('server sends active presentation age to late joiners and removes it on stun',()=>{
  const world=new World({unlocked:3}),messages=[];world.addPlayer(1,m=>messages.push(m));const p=world.players.get(1);p.joined=true;p.area='f1_lab';const A=world.area(p.area);p.x=A.lair.x;p.z=A.lair.z+6;const b=world.spawnBoss(A);
  world.bossPattern(A,b,'cone',p,[p]);const act=messages.find(m=>m.t==='bossAct');assert.equal(act.seq,1);assert.equal(act.phase,1);assert.equal(act.sp,.9);
