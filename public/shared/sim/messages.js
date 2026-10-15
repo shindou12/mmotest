@@ -1,5 +1,6 @@
 // プレイヤーからのメッセージの処理。t（種類）ごとの登録表。メッセージの種類を足すときは、ここに関数を足す
 // 引数: world（World）, p（送った人）, m（メッセージ）, A（その人のいるエリア）, id（送った人の id）
+import { normalizeWeaponStyle } from '../weapon-appearances.js';
 import { MOTION_DURATIONS } from '../motion-catalog.js';
 import { REVIVE, reviveStep } from '../balance.js';
 import { WEAPONS, MAX_FLOOR } from '../data.js';
@@ -24,10 +25,11 @@ export const MESSAGES = {
     p.pm = typeof m.pm === 'string' && Object.hasOwn(MOTION_DURATIONS,m.pm) ? m.pm : '';
     p.pt = typeof m.pt === 'number' && Number.isFinite(m.pt) ? Math.max(0, Math.min(2, m.pt)) : 0;
     // wst: 武器の形 / arm: 防具の見た目 / rc: 被弾リアクション（1 のけぞり・2 ダウン）。他のプレイヤーにも同じに見せる
-    for (const k of ['x', 'z', 'a', 'hp', 'mhp', 'lv', 'sw', 'sk', 'wr', 'dg', 'gd', 'wst', 'arm', 'rc', 'cl']) {
+    for (const k of ['x', 'z', 'a', 'hp', 'mhp', 'lv', 'sw', 'sk', 'wr', 'dg', 'gd', 'arm', 'rc', 'cl']) {
       if (typeof m[k] === 'number' && isFinite(m[k])) p[k] = m[k];
     }
     if (typeof m.wk === 'string') p.wk = m.wk;
+    p.wst = normalizeWeaponStyle(p.wk,m.wst === undefined ? p.wst : m.wst);
     p.dead = !!m.dead;
   },
   hit(world, p, m, A, id) {

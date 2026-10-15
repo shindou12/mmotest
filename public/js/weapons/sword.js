@@ -2,6 +2,7 @@
 // 登録は weapons/index.js に1行だけ。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）もここの stats（サーバーも読むので three.js は直接 import しない）
 import { L3, T, at } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
+import { SWORD_UNIQUE_STYLES } from '../../shared/weapon-appearances.js';
 import { BALANCE } from '../../shared/balance.js';
 import { clamp, now, rnd } from '../game/util.js';
 
@@ -277,21 +278,11 @@ const model = (kit) => {
       g.userData.appearance='refined-straight-sword';
     },
     styles: {
-      1: (k) => { // 刀: 反りのある片刃
-        const { g, gold, handle, blade } = k;
-        const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x + 0.045, y]); }
-        for (let i = 10; i >= 0; i--) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x - (t > 0.92 ? 0 : 0.03), y]); }
-        blade(pts, 0.03);
-        g.add(mesh(cyl(0.1, 0.1, 0.03, 14), gold, [0, 0.1, 0], [Math.PI / 2, 0, 0]));
-        handle(0.5, 0.032);
-      },
-      2: (k) => { // 幅広の葉形
-        const { g, gold, gem, handle, blade } = k;
-        blade([[-0.06, 0], [0.06, 0], [0.13, 0.55], [0.1, 0.95], [0, 1.25], [-0.1, 0.95], [-0.13, 0.55]], 0.04);
-        g.add(mesh(new THREE.BoxGeometry(0.42, 0.07, 0.09), gold, [0, 0.08, 0]));
-        g.add(mesh(sphere(0.05, 10, 8), gem, [0, 0.08, 0.05]));
-        handle(0.38);
-      },
+      [SWORD_UNIQUE_STYLES.amenomurakumo]: kit.uniqueSwords.amenomurakumo,
+      [SWORD_UNIQUE_STYLES.durandal]: kit.uniqueSwords.durandal,
+      [SWORD_UNIQUE_STYLES.laevateinn]: kit.uniqueSwords.laevateinn,
+      1: kit.swordForms.katana,
+      2: kit.swordForms.leaf,
       3: (k) => { // 専用: 光の結晶の刃と翼の鍔
         const { g, steel, gold, gem, handle, glowM, blade } = k;
         const pts = [[-0.07, 0], [0.07, 0], [0.09, 0.8], [0.04, 1.3], [0, 1.5], [-0.04, 1.3], [-0.09, 0.8]];

@@ -1,5 +1,6 @@
 // トゥーン調のキャラクター / 武器 / モンスター（プリミティブ＋押し出し形状で造形）
 import * as THREE from 'three';
+import { uniqueWeaponStyle } from '../shared/weapon-appearances.js';
 import { animatePlayer } from './player-motion.js';
 export { animatePlayer } from './player-motion.js';
 import { GRIP_Y } from './weapon-pose.js';
@@ -19,10 +20,10 @@ import { setGripHand } from './models/grip-hands.js';
 // 武器
 // ---------------------------------------------------------------------------
 
-// 装備から武器の形を決める: 伝説・神器は専用形（3）、それ以外は名前から 0〜2
+// 装備から武器の形を決める: 固有片手剣はIDごとの形、未登録の伝説・神器は3、それ以外は名前から0〜2
 export function weaponStyle(it) {
   if (!it) return 0;
-  if (it.rarity >= 6) return 3;
+  if (it.rarity >= 6) return uniqueWeaponStyle(it.kind,it.unique) ?? 3;
   const s = [...String(it.name || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
   return s % 3;
 }

@@ -1,6 +1,8 @@
-# 通常片手剣3系統のリファイン確認
+# 通常片手剣3系統のリファイン確認（制作履歴）
 
 作業ブランチ: `codex/normal-swords-refine`。基点: 握りを改善した `codex/sword-grip-phase2` の `01ac237`。
+
+採用結果: 直剣・刀・葉形剣はすべてAを採用し、本体のstyle 0〜2へ反映済み。以後の制作は1種類につき1案とする。現在の表示・固有剣は [sword-models.md](sword-models.md) を参照。
 
 ## 今回の範囲
 
@@ -32,7 +34,7 @@
 
 形状候補は `public/js/models/prototypes/normal-sword-candidates.js`。
 プレビュー用の生成入口 `makeWeaponPreview` は、ゲームと同じ材質・レア度の色と光・結合・輪郭線を使う。
-通常の `makeWeapon` の結果は従来通り。新しい刀・葉形剣は確認用で、装備データの割り当てはまだ切り替えていない。
+レビュー時は確認用だったが、現在はAを通常の `makeWeapon` へ採用している。Beforeは採用前の形を再現する保存用の定義で、ゲーム本体の形とは独立している。
 
 UIはRootの配下に配置し、Viewは描画パラメータを受け取る。操作イベントは親へ伝播し、再生・停止を含むMediatorの状態機械が処理する。
 
