@@ -1,15 +1,18 @@
 // 砂塵の大蠍 スコルピオ（3層・最後のボス）の行動ロジック。仕様は docs/design/boss-sheets/skorpio.md
 // 細長い砂の回廊で戦う。登場は砂の中から。HPバー3本: 1本目が割れると「潜行」が加わり、2本目が割れると詠唱「大砂嵐」（DPSチェック）→ 怒り。
-// 毒針の刻印（頭割り）は戦いのあいだ一定の間隔で使う。刻印が付いている間は、集まった塊を狙う大技（突進・潜行）を出さない。
+// 毒針の刻印（頭割り＝集まる）は戦いのあいだ一定の間隔で使う。2本目からの潜行は「砂喰らい」（離れる印）: 狙った人の足元から飛び出す。
+// 集まる印と離れる印は同時に出さない（片方が付いている間と、終わった直後はもう片方を出さない）。刻印の間は突進も出さない。
 import { rnd, r2, pick } from '../common.js';
 
 const STING = { len: 26, w: 3.5, delay: 0.85, dmg: 0.7 }; // 尾の一突き: 細く長い直線（高い頻度で出す）
 const STING3 = { n: 3, every: 0.45 }; // 尾の三連突き（怒り）: 狙い直しながら一突きを3回
 const PINCER = { arc: 1.7, len: 10, delay: 1.0, dmg: 0.85 }; // 鋏の挟み撃ち: 正面の扇
 const CHARGE = { w: 6, delay: 1.25, speed: 34, max: 60, dmg: 1.2 }; // 突進: 狙った人の方へ、回廊の端まで
-const STACK = { name: '毒針の刻印', sec: 5, r: 3.0, dmg: 1.35, cd: 16, first: 6 }; // 頭割り: 合計 dmg（基本威力の倍率）を人数で割る
+const STACK = { name: '毒針の刻印', sec: 5, r: 3.0, dmg: 1.35, cd: 16, first: 6, after: 1.5 }; // after: 弾けてから潜行（離れる）を出さない秒数 // 頭割り: 合計 dmg（基本威力の倍率）を人数で割る
 // 潜行: sink 秒で沈み、chase 秒のあいだ狙った人を追う（step 秒ごとに盛り上がりの小さな円）。最後に飛び出す（大きな円）
 const BURROW = { sink: 0.5, chase: 4.0, speed: 6.2, step: 0.32, trail: { r: 1.6, delay: 0.55, dmg: 0.3 }, erupt: { r: 4.5, delay: 0.9, dmg: 1.1 }, rise: 0.7, cd: 14, entry: 0.8 };
+// 砂喰らい（2本目からの潜行）: 狙った人に赤い円（外向きの矢印）が付いてまわり、潜行の終わりにその人の足元から飛び出す。割らない（中にいる人は全員）
+const AWAY = { name: '砂喰らい', r: 5.0, dmg: 1.0, after: 3 }; // after: 終わってから刻印（集まる）を出さない秒数
 const STORM = { name: '大砂嵐', sec: 6, need: 0.05, delay: 1.0, dmg: 1.1 }; // DPSチェック: need は中断に必要なダメージ（最大HPの割合）
 
 // 回廊の端までの距離（ang の向き）
@@ -91,12 +94,14 @@ export const skorpio = {
     }
     if (!B.erupted) {
       B.erupted = true;
+      if (B.mark) return; // 砂喰らい: 飛び出すのは印の付いた人の足元（印が弾けるときに awayMark が知らせる）
       const E = BURROW.erupt;
       world.tele(A, b, [{ k: 'circle', x: r2(b.x), z: r2(b.z), r: E.r }], E.delay, B.base * E.dmg * (B.entry ? BURROW.entry : 1), '#ff2a2a', 1);
       return;
     }
     if (B.t >= BURROW.sink + BURROW.chase + BURROW.erupt.delay) {
       b.burrow = null;
+      b.stackCd = Math.max(b.stackCd, AWAY.after); // 離れる印の直後に集まる印は出さない
       b.busyT = BURROW.rise; b.actT = BURROW.rise + rnd(0.6, 0.9); // 飛び出した直後は隙
       b.st = 2;
       if (L) world.clampArena(A, b);
@@ -150,17 +155,24 @@ export const skorpio = {
       const p = pick(inArena.filter((q) => !q.down)) || target;
       world.stackMark(A, b, p, STACK.sec, STACK.r, base * STACK.dmg);
       world.broadcastArea(A.id, { t: 'cast', id: b.id, name: STACK.name, d: STACK.sec * 1000, need: 0 });
-      b.stackT = STACK.sec;
+      b.stackT = STACK.sec + STACK.after; // 集まる印の間と直後は、離れる印（潜行）・突進を出さない
       b.a = Math.atan2(p.x - b.x, p.z - b.z);
       return 0.9;
     },
     burrow(world, A, b, target, { base }) {
       // 潜行: 沈んで、狙った人を追いかけ、足元から飛び出す
       if (b.stackT > 0 && !b.entry) { sting(world, A, b, target, base); return STING.delay + 0.35; } // 刻印中は潜らない
-      b.burrow = { t: 0, tid: target.id, stepT: 0, base, entry: !!b.entry };
+      const mark = !b.entry; // 登場は走って振り切れる追いかけ。2本目からは砂喰らい（狙った人の足元から飛び出す）
+      b.burrow = { t: 0, tid: target.id, stepT: 0, base, entry: !!b.entry, mark };
       b.entry = false;
       b.burrowCd = BURROW.cd;
       const total = BURROW.sink + BURROW.chase + BURROW.erupt.delay + BURROW.rise;
+      if (mark) {
+        world.awayMark(A, b, target, BURROW.sink + BURROW.chase + BURROW.erupt.delay, AWAY.r, base * AWAY.dmg, (q) => {
+          b.x = q.x; b.z = q.z; world.clampArena(A, b); // 印の付いた人の足元から飛び出す
+        });
+        world.broadcastArea(A.id, { t: 'cast', id: b.id, name: AWAY.name, d: Math.round((total - BURROW.rise) * 1000), need: 0 });
+      }
       world.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: 'burrow', tid: target.id, d: Math.round(total * 1000) });
       return total;
     },

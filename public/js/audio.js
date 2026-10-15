@@ -571,6 +571,10 @@ export class AudioEngine {
         for (const [f, at, v] of [[784, 0, 0.16], [1175, 0.0, 0.08], [784, 0.42, 0.12], [1175, 0.42, 0.06]]) tone('sine', f, f * 0.995, 1.1, v, at).connect(this.revSend);
         break;
       }
+      case 'awayMark': { // 離れる印: 避ける＝低い音（うなる低音を2回）
+        for (const at of [0, 0.32]) { tone('sawtooth', 110, 82, 0.4, 0.16, at); tone('sine', 55, 45, 0.5, 0.25, at); }
+        break;
+      }
       case 'stunBreak': {
         // 入った瞬間: 鎧が砕ける金属音（不協和な倍音）＋重い低音＋ガラスが散る音＋きらめく上昇音
         [2093, 2793, 3520, 4186].forEach((f, i) => tone('triangle', f, f * 0.96, 0.9, 0.09, i * 0.012).connect(this.revSend));

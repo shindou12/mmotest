@@ -165,17 +165,23 @@ export const BossMethods = {
     b.tauntBy = p.id; b.tauntT = sec; b.target = p.id;
     this.broadcastArea(A.id, { t: 'mark', id: b.id, tid: p.id });
   },
-  // 頭割り（全ボス共通の「集まる」）: p の足元に黄色い円が付いてまわり、sec 秒で弾ける。
-  // 弾けた瞬間に円の中の人数を数え、合計ダメージ dmg を人数で割って配る（数えるのはサーバー。画面ごとに数えると食い違うため）
-  // 半径 r は全ボス共通の予兆の倍率（BALANCE.bossRange）で広げる
-  stackMark(A, b, p, sec, r, dmg) {
+  // 人に付く印（全ボス共通）。p の足元に円が付いてまわり、sec 秒で弾ける。半径 r は全ボス共通の予兆の倍率（BALANCE.bossRange）で広げる
+  //   頭割り（stackMark・黄色・内向きの矢印＝集まる）: 弾けた瞬間に円の中の人数を数え、合計ダメージ dmg を人数で割って配る
+  //     （数えるのはサーバー。画面ごとに数えると食い違うため）
+  //   離れる印（awayMark・赤・外向きの矢印＝離れる）: 割らない。円の中にいる人は全員 dmg を受ける（kd: 吹き飛ばし）
+  //   onFire(q): 弾けた場所を受け取る（ボスがそこへ飛び出す など）
+  stackMark(A, b, p, sec, r, dmg) { this.markPlayer(A, b, p, sec, r, dmg, { split: true }); },
+  awayMark(A, b, p, sec, r, dmg, onFire) { this.markPlayer(A, b, p, sec, r, dmg, { split: false, kd: 1, onFire }); },
+  markPlayer(A, b, p, sec, r, dmg, { split, kd = 0, onFire }) {
     const R = r2(r * BALANCE.bossRange);
-    this.broadcastArea(A.id, { t: 'stack', id: b.id, tid: p.id, r: R, d: Math.round(sec * 1000) });
+    this.broadcastArea(A.id, { t: 'stack', id: b.id, tid: p.id, r: R, d: Math.round(sec * 1000), ...(split ? {} : { kind: 'away' }) });
     this.later(A, sec, () => {
       if (A.boss !== b) return;
       const q = this.livePlayer(A, p.id) || p; // 倒れた人は、倒れた場所で弾ける
       const n = Math.max(1, this.areaPlayers(A.id).filter((o) => !o.dead && !o.down && Math.hypot(o.x - q.x, o.z - q.z) <= R).length);
-      this.broadcastArea(A.id, { t: 'tele', id: this.seq++, src: 0, boss: b.id, sh: [{ k: 'circle', x: r2(q.x), z: r2(q.z), r: R }], d: 120, dmg: Math.round(dmg / n), c: '#ffd84a', n });
+      const per = split ? dmg / n : dmg;
+      this.broadcastArea(A.id, { t: 'tele', id: this.seq++, src: 0, boss: b.id, sh: [{ k: 'circle', x: r2(q.x), z: r2(q.z), r: R }], d: 120, dmg: Math.round(per), c: split ? '#ffd84a' : '#ff2a2a', n, ...(kd ? { kd: 1 } : {}) });
+      onFire?.(q);
     });
   },
   // 走って近づく（ダメージなし）。dash と同じ動きなので、正面でガードしている盾槍に止められる

@@ -203,9 +203,10 @@ export function onMsg(m) {
       break;
     }
     case 'stack': {
-      // 頭割り（全ボス共通の「集まる」）: 狙われた人の足元に付いてまわる。弾けたときの人数割りはサーバーが行う
+      // 人に付く印（全ボス共通）: 頭割り（集まる・黄）／離れる印（kind: 'away'・赤）。狙われた人の足元に付いてまわる。弾けたときの人数割りはサーバーが行う
+      const away = m.kind === 'away';
       const tgt = () => (m.tid === me.id ? me : others.get(m.tid));
-      const o = stackMarkMesh(m.r);
+      const o = stackMarkMesh(m.r, away);
       stackMarks = stackMarks.filter((s) => s.o.parent); // 消えた印は外す
       stackMarks.push({ o, boss: m.id });
       fx.add(o, m.d / 1000, (g, k) => {
@@ -213,7 +214,7 @@ export function onMsg(m) {
         if (t) g.position.set(t.x, heightAt(t.x, t.z), t.z);
         g.setProgress(k, now());
       });
-      audio.sfx('stack');
+      audio.sfx(away ? 'awayMark' : 'stack');
       break;
     }
     case 'mark': {

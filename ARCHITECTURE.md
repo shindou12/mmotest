@@ -237,7 +237,7 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - brain が持つもの: `spawn` / `tick`（true で行動しない）/ `patterns`・`gap`・`chain`（技の選び方）/ `moves`（ボス固有の技）/ `repeatable`（なくてもよい。同じ技を続けて出してよい技の名前）。
   - brain の無いボスは今までどおり共通ロジック（激昂 65% → 最終形態 35%）で動く。
   - 共通の部品（`sim/boss.js`）: `startCast`（詠唱バー・中断ゲージ。最後の引数で詠唱中の構えの動きを指定できる）/ `markTarget`（狙い替えの「！」。挑発で取り返せる）/ `rushTo`（走って近づく）/
-    `stackMark`（頭割り: 黄色い円が1人に付いてまわり、弾けた瞬間にサーバーが円の中の人数を数えてダメージを割る）。
+    `stackMark`（頭割り: 黄色い円が1人に付いてまわり、弾けた瞬間にサーバーが円の中の人数を数えてダメージを割る）/ `awayMark`（離れる印: 赤い円。割らずに中の全員が受ける）。
     画面側は `game/net-client.js` の `bossEv` / `cast` / `castP` / `castEnd` / `mark` / `judge` / `stack`（見た目は `game/meshes.js` の `stackMarkMesh`）と、`ui/panels/hud.js` のボスの欄。
   - ボスに攻撃を当てさせない間（砂塵の大蠍の潜行）は、ボスに `burrow` を持たせる（`messages.js` の `hit` が見る）。
   - `sim.js` から `boss-brains.js` と `bosses/*.js` を直接 import しておく（下の「sim の import の深さ」）。

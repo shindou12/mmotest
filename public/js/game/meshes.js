@@ -92,10 +92,12 @@ export function aimLineMesh() {
   return line;
 }
 
-// 頭割り（全ボス共通の「集まる」）: 足元の黄色い円（弾ける範囲）と、そこへ向かって縮む輪＋内向きの矢印、頭上の黄色い輪。
-// setProgress(k, t): k = 0→1 で外側の輪が START 倍の大きさから円の縁まで縮む。矢印は輪に沿って並び、内側へ流れる
-export function stackMarkMesh(r) {
-  const START = 2.6, ARROWS = 8, Y = 0xffd84a;
+// 人に付く印（全ボス共通）。足元の円（弾ける範囲）と、円の縁へ向かって縮む輪（時間）、頭上の輪。
+//   頭割り（集まる）: 黄色。矢印は縮む輪に沿って並び、内側へ流れる（ここへ集まれ）
+//   離れる印（away）: 赤。矢印は円の縁から外側へ流れる（この人から離れろ）
+// setProgress(k, t): k = 0→1 で外側の輪が START 倍の大きさから円の縁まで縮む
+export function stackMarkMesh(r, away = false) {
+  const START = 2.6, ARROWS = 8, Y = away ? 0xff3a2a : 0xffd84a;
   const mat = (op) => new THREE.MeshBasicMaterial({ color: Y, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false, depthTest: false });
   const flat = (geo, op) => { const m = new THREE.Mesh(geo, mat(op)); m.rotation.x = -Math.PI / 2; m.renderOrder = 6; return m; };
   const g = new THREE.Group();
@@ -108,14 +110,15 @@ export function stackMarkMesh(r) {
   const arrows = [];
   for (let i = 0; i < ARROWS; i++) {
     const piv = new THREE.Group(); piv.rotation.y = (i / ARROWS) * Math.PI * 2;
-    const a = flat(arrowGeo, 0.95); a.rotation.z = Math.PI; a.position.y = 0.1; piv.add(a); g.add(piv); arrows.push(a);
+    const a = flat(arrowGeo, 0.95); a.rotation.z = away ? 0 : Math.PI; a.position.y = 0.1; piv.add(a); g.add(piv); arrows.push(a);
   }
   const halo = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 6, 32), mat(0.95)); halo.rotation.x = Math.PI / 2; halo.position.y = 3.3;
   g.add(disc, edge, outer, halo);
   g.setProgress = (k, t) => {
     const cur = r * (START - (START - 1) * Math.min(1, k));
     outer.scale.setScalar(cur);
-    for (const a of arrows) a.position.z = cur - 0.35 - ((t * 1.6) % 1) * Math.min(1.2, cur - r + 0.3); // 輪から内側へ流れる
+    const f = (t * 1.6) % 1;
+    for (const a of arrows) a.position.z = away ? r + 0.4 + f * 1.6 : cur - 0.35 - f * Math.min(1.2, cur - r + 0.3); // 離れる: 縁から外へ／集まる: 輪から内側へ
     halo.rotation.z = t * 3;
     disc.material.opacity = 0.16 + 0.14 * k;
   };

@@ -78,6 +78,54 @@ test('stack: the yellow mark follows one player and its total damage is split by
   assert.ok(Math.abs(t.sh[0].x - P[0].x) < 0.01);
 });
 
+test('away mark: a red circle follows one player; everyone inside takes the full hit (not split) and is knocked back', () => {
+  const { w, A, b, tick, sent } = fight();
+  const P = [1, 2, 3].map((id) => w.players.get(id));
+  P.forEach((p, i) => { p.x = A.lair.x + i * 0.8; p.z = A.lair.z; });
+  let at = null;
+  w.awayMark(A, b, P[0], 4, 5, 600, (q) => { at = { x: q.x, z: q.z }; });
+  const s = sent('stack').at(-1);
+  assert.equal(s.kind, 'away'); assert.equal(s.r, K(5));
+  tick(4.1);
+  const t = sent('tele').at(-1);
+  assert.equal(t.c, '#ff2a2a'); assert.equal(t.kd, 1);
+  assert.equal(t.n, 3); assert.equal(t.dmg, 600); // 3人入っていても割られない
+  assert.ok(at && Math.abs(at.x - P[0].x) < 0.01);
+});
+
+test('from the second bar, burrowing marks one player and skorpio bursts out right under that player', () => {
+  const { w, A, b, tick, sent } = fight();
+  tick(6);
+  while (b.burrow || b.cast) tick(0.1);
+  b.hp = b.mhp * 0.6; b.stackCd = 99;
+  tick(0.1);
+  b.burrowCd = 0; b.stackT = 0;
+  for (let i = 0; i < 200 && !b.burrow; i++) tick(0.05);
+  assert.ok(b.burrow?.mark, 'marked burrow');
+  const m = sent('stack').at(-1);
+  assert.equal(m.kind, 'away');
+  assert.ok(sent('cast').some((c) => c.name === '砂喰らい'));
+  const p = w.players.get(m.tid);
+  p.x = A.lair.x + 9; p.z = A.lair.z + 20; // 走って逃げても、飛び出すのはその人の足元
+  tick(5.6);
+  assert.ok(Math.hypot(b.x - p.x, b.z - p.z) < 0.5, `${b.x},${b.z} vs ${p.x},${p.z}`);
+});
+
+test('the gather mark and the away mark never overlap', () => {
+  const { b, tick, inbox } = fight();
+  tick(6);
+  b.hp = b.mhp * 0.6; // 2本目（潜行＝離れる印が出る）
+  tick(120);
+  const marks = inbox.filter((m) => m.t === 'stack').map((m) => ({ kind: m.kind || 'stack', from: inbox.indexOf(m), d: m.d }));
+  assert.ok(marks.some((m) => m.kind === 'away') && marks.some((m) => m.kind === 'stack'), JSON.stringify(marks.map((m) => m.kind)));
+  // 印が付いてから弾けるまでのあいだに、もう片方の印が付かない（弾けた印は c が黄色／赤の tele）
+  for (const m of marks) {
+    const end = inbox.findIndex((x, j) => j > m.from && x.t === 'tele' && (x.c === '#ffd84a' || (x.c === '#ff2a2a' && x.n != null)));
+    const between = inbox.slice(m.from + 1, end).filter((x) => x.t === 'stack');
+    assert.equal(between.length, 0, `${m.kind} overlaps`);
+  }
+});
+
 test('skorpio marks a stack early and keeps doing it, and never charges or burrows while a mark is out', () => {
   const { b, tick, sent, inbox } = fight();
   tick(48);
