@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  WT_NODE, WT_SKILLS, ROW_REQ, PROF_MAX, profLevel, profOf, profNeed, gainProf, wtOf, wtSpent, wtLeft, wtCanLearn, wtLearn, wtChoose, wtEffects,
+  WT_NODE, WT_SKILLS, ROW_REQ, PROF_MAX, profLevel, profOf, profNeed, gainProf, wtOf, wtSpent, wtLeft, wtCanLearn, wtLearn, wtChoose, wtEffects, wtCanRefund, wtRefund, WT_REFUND_COST, WT_RESET_COST,
 } from '../public/js/weapon-tree.js';
 import { TREE_SKILLS, TREES } from '../public/js/skills.js';
 
@@ -279,4 +279,24 @@ test('bow: sniper / rapid / trapper classes, range passives, skills scale and br
   assert.equal(tr.length, 3); assert.ok(Math.abs(tr[0].a[2].mult - 3.3 * 0.6) < 1e-9);
   wtLearn(c, 'bw_back'); wtLearn(c, 'bw_back'); wtLearn(c, 'bw_back'); wtChoose(c, 'bw_back', 'A');
   assert.equal(run('bw_back').filter((e) => e.m === 'arrow').length, 5, 'fan of five');
+});
+
+test('right-click refund: one point back at a time; level 3 → 2 drops the A/B choice; the first keystone stays while the second needs it', () => {
+  const c = fresh();
+  profOf(c, 'sword').lv = 20;
+  for (let i = 0; i < 3; i++) assert.ok(wtLearn(c, 'sw_aircut'));
+  assert.ok(wtChoose(c, 'sw_aircut', 'A'));
+  const spent = wtSpent(wtOf(c, 'sword'));
+  assert.ok(wtRefund(c, 'sw_aircut'));
+  assert.equal(wtOf(c, 'sword').lv.sw_aircut, 2);
+  assert.equal(wtOf(c, 'sword').br.sw_aircut, undefined);
+  assert.equal(wtSpent(wtOf(c, 'sword')), spent - 1);
+  assert.ok(!wtCanRefund(c, 'sw_norm'), 'not learned');
+  assert.ok(wtLearn(c, 'sw_mage'));
+  const ks2 = Object.values(WT_NODE).find((n) => n.kind === 'ks2' && n.from === 'sw_mage');
+  assert.ok(wtLearn(c, ks2.id));
+  assert.ok(!wtCanRefund(c, 'sw_mage'), 'the second keystone depends on it');
+  assert.ok(wtRefund(c, ks2.id)); assert.ok(wtRefund(c, 'sw_mage'));
+  // 1ポイント戻す方が、全部の振り直しより1ポイントあたりは割高
+  assert.ok(WT_REFUND_COST(10) > WT_RESET_COST(10) / 10);
 });

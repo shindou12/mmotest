@@ -1,6 +1,6 @@
 import { WEAPONS, DEFAULT_WEAPON } from '../../shared/data.js';
 import { TREE_SKILLS } from '../skills.js';
-import { WT_NODE, WT_RESET_COST, gainProf, hasWTree, profLevel, profOf, wtChoose, wtLearn, wtOf, wtReset, wtSpent, WT_LEGACY } from '../weapon-tree.js';
+import { WT_NODE, WT_REFUND_COST, WT_RESET_COST, gainProf, hasWTree, profLevel, profOf, wtCanRefund, wtChoose, wtLearn, wtOf, wtRefund, wtReset, wtSpent, WT_LEGACY } from '../weapon-tree.js';
 import { clamp, now } from './util.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 import { rules, screen, state, stats, view } from './ports.js';
@@ -108,6 +108,19 @@ export function wtChooseBranch(id, b) {
   const n = WT_NODE[id];
   view.audio.sfx('perfect');
   screen.toast(`${n.name}が「${n[b].name}」に変化`, '#ffd84a');
+  stats.calcStats(); state.saveChar();
+}
+// 右クリック: 1ポイントだけ戻す（ゴールドを払う）
+export function wtRefundNode(id) {
+  const n = WT_NODE[id];
+  if (!n || !wtCanRefund(state.char, id)) { view.audio.sfx('ui'); return; }
+  const cost = WT_REFUND_COST(wtSpent(wtOf(state.char, n.wk)));
+  if ((state.char.gold || 0) < cost) { screen.toast(`1ポイント戻すには ${cost}G 必要です`, '#f88'); view.audio.sfx('ui'); return; }
+  state.char.gold -= cost;
+  wtRefund(state.char, id);
+  if (!wtOf(state.char, n.wk).lv[id]) state.char.slots = state.char.slots.map((s) => (s === id ? null : s));
+  view.audio.sfx('ui');
+  screen.toast(`${n.name}を1ポイント戻しました（-${cost}G）`, '#9fe');
   stats.calcStats(); state.saveChar();
 }
 export function wtResetTree(wk) {

@@ -498,6 +498,8 @@ export function createUI(game) {
       'tree:slot'(ev) { game.setSlot(ev.payload.slot, ev.payload.skill); },
       'tree:reset'() { if (hasWTree(ui.treeTab)) game.wtResetTree(ui.treeTab); else game.resetTree(); },
       'wt:learn'(ev) { game.wtLearnNode(ev.payload.node); },
+      'wt:refund'(ev) { ev.preventDefault = true; game.wtRefundNode(ev.payload.node); },
+      'tree:refund'(ev) { ev.preventDefault = true; game.refundNode(ev.payload.node); },
       'wt:choose'(ev) { game.wtChooseBranch(ev.payload.node, ev.payload.b); },
     }),
     settings: panelState('settings', {

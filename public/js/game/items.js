@@ -116,6 +116,21 @@ export function setSlot(i, skill) {
   state.char.slots[i] = skill;
   view.audio.sfx('equip'); state.saveChar(); screen.ui.refresh();
 }
+// 右クリック: 共通ツリーのノードを1ポイントだけ戻す（全部の振り直しと同じく無料）。上の段の前提が崩れるときは戻せない
+export function refundNode(id) {
+  const n = NODE_INDEX[id], tree = state.char.tree || {};
+  if (!n || !(tree[id] > 0)) { view.audio.sfx('ui'); return; }
+  const after = { ...tree, [id]: tree[id] - 1 };
+  const nodes = Object.keys(after).filter((k) => after[k] > 0 && NODE_INDEX[k]?.tree === n.tree);
+  const below = (tier) => nodes.reduce((a, k) => a + (NODE_INDEX[k].tier < tier ? after[k] : 0), 0);
+  if (nodes.some((k) => NODE_INDEX[k].tier > 0 && below(NODE_INDEX[k].tier) < NODE_INDEX[k].tier * 2)) {
+    screen.toast('上の段のノードの前提になっているため戻せません', '#f88'); view.audio.sfx('ui'); return;
+  }
+  if (after[id] <= 0) { delete after[id]; if (n.active) state.char.slots = (state.char.slots || [null, null]).map((s) => (s === n.active ? null : s)); }
+  state.char.tree = after;
+  view.audio.sfx('ui'); stats.calcStats(); state.saveChar();
+  screen.toast(`${n.name}を1ポイント戻しました`, '#9fe');
+}
 export function resetTree() {
   state.char.tree = {}; state.char.slots = [null, null];
   view.audio.sfx('ui'); stats.calcStats(); state.saveChar();

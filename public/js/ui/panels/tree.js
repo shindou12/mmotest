@@ -55,7 +55,7 @@ export function installTree(ui) {
                 for (const b of nv.el.querySelectorAll('.slotbtns button')) {
                   nv.add('slot' + b.dataset.slot, b).on('click', 'tree:slot', (e) => { e.stopPropagation(); return { slot: Number(b.dataset.slot) }; });
                 }
-                nv.on('click', 'tree:learn');
+                nv.on('click', 'tree:learn'); nv.on('contextmenu', 'tree:refund');
               },
             };
           });
@@ -102,7 +102,7 @@ export function installTree(ui) {
                 html: `<div class="wt-node ks ${r.kind === 'ks2' ? 'k2' : ''} ${sel ? 'have' : ''} ${other ? 'other' : ''} ${can ? 'can' : ''}">
                   <div class="wt-top"><span class="wt-ic"><span>${n.icon}</span></span><b class="wt-nm">${esc(n.name)}</b><small class="wt-kind k-${r.kind}">${kindName}</small></div>
                   <div class="wt-desc">${esc(n.desc)}</div><div class="wt-tags">${n.tags.map(tag).join('')}</div></div>`,
-                setup: (nv) => { nv.link((ev) => { ev.payload.node = n.id; }); nv.on('click', 'wt:learn'); },
+                setup: (nv) => { nv.link((ev) => { ev.payload.node = n.id; }); nv.on('click', 'wt:learn'); nv.on('contextmenu', 'wt:refund'); },
               };
             }
             const lv = st.lv[n.id] || 0, b = lv === 3 ? st.br[n.id] : null;
@@ -126,7 +126,7 @@ export function installTree(ui) {
                 for (const el of nv.el.querySelectorAll('.slotbtns button')) {
                   nv.add('slot' + el.dataset.slot, el).on('click', 'tree:slot', (e) => { e.stopPropagation(); return { slot: Number(el.dataset.slot) }; });
                 }
-                nv.on('click', 'wt:learn');
+                nv.on('click', 'wt:learn'); nv.on('contextmenu', 'wt:refund');
               },
             };
           });

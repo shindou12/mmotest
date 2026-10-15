@@ -14,6 +14,7 @@ export const PROF_MAX = 20;
 export const ROW_REQ = [1, 3, 6, 9, 12, 16];
 export const profNeed = (lv) => xpToNext(2 * lv + 1);
 export const WT_RESET_COST = (spent) => 100 + spent * 20;
+export const WT_REFUND_COST = (spent) => 30 + spent * 5; // 1ポイントだけ戻す（右クリック）
 
 // tags: 共通の要素（画面の絞り込み用）
 export const WT_TAGS = {
@@ -83,6 +84,26 @@ export function wtChoose(char, id, b) {
   const st = wtOf(char, n.wk);
   if (st.lv[id] !== 3 || st.br[id]) return false;
   st.br[id] = b;
+  return true;
+}
+// 1ポイントだけ戻せるか: 習得済みで、2つ目の奥義の前提になっている1つ目の奥義ではないこと
+export function wtCanRefund(char, id) {
+  const n = WT_NODE[id];
+  if (!n) return false;
+  const st = wtOf(char, n.wk);
+  if (n.kind === 'ks1') return st.ks1 === id && !st.ks2;
+  if (n.kind === 'ks2') return st.ks2 === id;
+  return (st.lv[id] || 0) > 0;
+}
+export function wtRefund(char, id) {
+  if (!wtCanRefund(char, id)) return false;
+  const n = WT_NODE[id], st = wtOf(char, n.wk);
+  if (n.kind === 'ks1' || n.kind === 'ks2') st[n.kind] = null;
+  else {
+    if (st.lv[id] === 3) delete st.br[id]; // 段階3 → 2 で A・B の選択も外れる
+    st.lv[id] -= 1;
+    if (!st.lv[id]) delete st.lv[id];
+  }
   return true;
 }
 export function wtReset(char, wk) { char.wt[wk] = { lv: {}, br: {}, ks1: null, ks2: null }; }

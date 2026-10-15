@@ -18,11 +18,11 @@ import { net, roster } from './game/net-client.js';
 import { buildEnv, env, setPin, waypointOk, waypointWarp } from './game/area.js';
 import { takeDamage } from './game/hurt.js';
 import { dealDamage } from './game/combat.js';
-import { migrateWeaponTrees, skillCd, wtChooseBranch, wtLearnNode, wtResetTree } from './game/tree-effects.js';
+import { migrateWeaponTrees, skillCd, wtChooseBranch, wtLearnNode, wtRefundNode, wtResetTree } from './game/tree-effects.js';
 import { canAct, doHeavy, doSwing, tryDodge, tryTreeSkill, tryWeaponSkill } from './game/actions.js';
 import { acceptQuest, chestOpen, claimQuest, exploredOf, nearestInteract } from './game/progress.js';
 import { coins, lootClick } from './game/loot.js';
-import { equip, findItem, learn, resetTree, salvage, salvageCommon, setAutoSalvage, setSetting, setSlot, smithAffix, smithEnhance, smithLore, smithSkill, unequip } from './game/items.js';
+import { equip, findItem, learn, refundNode, resetTree, salvage, salvageCommon, setAutoSalvage, setSetting, setSlot, smithAffix, smithEnhance, smithLore, smithSkill, unequip } from './game/items.js';
 import { bowGuide, hazardAt, loop, setBowGuide } from './game/loop.js';
 import { makeBowGuide } from './game/meshes.js';
 import './game/weapons/index.js';
@@ -103,7 +103,7 @@ const game = {
     if (it.kind === 'lever') { net.send({ t: 'interact', what: 'lever' }); audio.sfx('equip'); }
     if (it.kind === 'chest' && !chestOpen(it.chest)) net.send({ t: 'interact', what: 'chest', id: it.chest.id });
   },
-  equip, unequip, salvage, salvageCommon, setAutoSalvage, learn, setSlot, resetTree, wtLearnNode, wtChooseBranch, wtResetTree, skillCd, setSetting, acceptQuest,
+  equip, unequip, salvage, salvageCommon, setAutoSalvage, learn, refundNode, setSlot, resetTree, wtLearnNode, wtRefundNode, wtChooseBranch, wtResetTree, skillCd, setSetting, acceptQuest,
   smithEnhance, smithAffix, smithSkill, smithLore,
   claimQuest: (id) => claimQuest(QUEST_INDEX[id]),
   warp: (n) => net.send({ t: 'warp', floor: n }),
