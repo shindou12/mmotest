@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { makeWeapon, makeWeaponPreview } from '../models.js';
+import { makeWeapon } from '../models.js';
+import { SWORD_UNIQUE_STYLES } from '../../shared/weapon-appearances.js';
 import { NEW_SWORD_CANDIDATES } from '../models/new-sword-candidates.js';
 import { Root, View, Mediator } from '../ui/core.js';
 
@@ -9,7 +10,7 @@ const existing=[
 ].map(([name,description,rarity],style)=>({key:'existing/'+style,name,description,make:()=>makeWeapon('sword',rarity,style)}));
 const candidateNames={'oni-kiba':'Oni Kiba','sosei':'Sōsei'};
 const candidateDescriptions={'oni-kiba':'Forward-hooked blade, weighted toward the tip.','sosei':'Slim blade divides into two distinct prongs.'};
-const candidates=NEW_SWORD_CANDIDATES.map(d=>({key:'new/'+d.id,name:candidateNames[d.id],description:candidateDescriptions[d.id],make:()=>makeWeaponPreview('sword',6,0,d.build)}));
+const candidates=NEW_SWORD_CANDIDATES.map(d=>({key:'new/'+d.id,name:candidateNames[d.id],description:candidateDescriptions[d.id],make:()=>makeWeapon('sword',6,SWORD_UNIQUE_STYLES[d.id==='oni-kiba'?'oni_kiba':'sosei'])}));
 const models=new Map([...candidates,...existing].map(d=>[d.key,d.make()]));
 
 // Passive view: render receives layout, selection, and camera values from the mediator.

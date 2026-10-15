@@ -281,6 +281,8 @@ const model = (kit) => {
       [SWORD_UNIQUE_STYLES.amenomurakumo]: kit.uniqueSwords.amenomurakumo,
       [SWORD_UNIQUE_STYLES.durandal]: kit.uniqueSwords.durandal,
       [SWORD_UNIQUE_STYLES.laevateinn]: kit.uniqueSwords.laevateinn,
+      [SWORD_UNIQUE_STYLES.oni_kiba]: kit.uniqueSwords.oni_kiba,
+      [SWORD_UNIQUE_STYLES.sosei]: kit.uniqueSwords.sosei,
       1: kit.swordForms.katana,
       2: kit.swordForms.leaf,
       3: (k) => { // 専用: 光の結晶の刃と翼の鍔

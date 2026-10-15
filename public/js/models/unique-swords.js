@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { cyl, sphere, extrude } from './kit.js';
 import { toon, glow } from '../toon.js';
 import { facetedBlade, diamond, add, leatherHilt } from './sword-geometry.js';
+import { NEW_SWORD_CANDIDATES } from './new-sword-candidates.js';
 
 const neutral=new THREE.Color(0xdfe7f0);
 function blade(k,profile,tip,colors,light,intensity=.06){
@@ -62,4 +63,8 @@ function laevateinn(k){
   add(k,sphere(.021,8,6),ember,[0,-.378,.030]);
   identify(k,'laevateinn');
 }
-export const UNIQUE_SWORDS=Object.freeze({amenomurakumo,durandal,laevateinn});
+const candidateById=Object.fromEntries(NEW_SWORD_CANDIDATES.map(candidate=>[candidate.id,candidate.build]));
+function candidateSword(source,id){return k=>{source(k);identify(k,id);};}
+const oniKiba=candidateSword(candidateById['oni-kiba'],'oni_kiba');
+const sosei=candidateSword(candidateById.sosei,'sosei');
+export const UNIQUE_SWORDS=Object.freeze({amenomurakumo,durandal,laevateinn,oni_kiba:oniKiba,sosei});

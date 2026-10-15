@@ -5,8 +5,8 @@ import { Root, View, Mediator } from '../ui/core.js';
 import { sampleSequence } from './sword-comparison-timeline.js';
 import { makeNormalSwordCandidate } from '../models/prototypes/normal-sword-candidates.js';
 
-const uniqueNames={amenomurakumo:['Ameno-Murakumo','Cloud bronze / jade / serpent-born'],durandal:['Durandal','Ivory steel / blue grip / knight cross'],laevateinn:['Laevateinn','Scorched iron / ember core / flame branch']};
-const uniques=UNIQUES.filter(d=>d.kind==='sword').map(d=>({item:{...d,unique:d.key},style:weaponStyle({...d,unique:d.key}),name:uniqueNames[d.key][0],description:uniqueNames[d.key][1]}));
+const uniqueNames={amenomurakumo:['Ameno-Murakumo','Cloud bronze / jade / serpent-born'],durandal:['Durandal','Ivory steel / blue grip / knight cross'],laevateinn:['Laevateinn','Scorched iron / ember core / flame branch'],oni_kiba:['Oni Kiba','Forward-hooked blade / bronze guard'],sosei:['Sōsei','Split-tip blade / quiet ring guard']};
+const uniques=UNIQUES.filter(d=>d.kind==='sword').map(d=>({item:{...d,unique:d.key},style:weaponStyle({...d,unique:d.key}),name:uniqueNames[d.key]?.[0]||d.name,description:uniqueNames[d.key]?.[1]||d.lore}));
 const normals=['Straight sword','Katana','Leaf blade'].map((name,style)=>({item:{kind:'sword',rarity:1},style,name,description:'Adopted A / actual game model'}));
 // Passive view: model identities, camera, poses, layout and labels are supplied by the presenter.
 class SwordView extends View{

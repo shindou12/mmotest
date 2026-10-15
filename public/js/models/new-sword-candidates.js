@@ -1,4 +1,4 @@
-// Two silhouette-first sword studies. These are preview-only until a model is selected.
+// Two silhouette-first sword models shared by the candidate viewer and gameplay registry.
 import * as THREE from 'three';
 import { cyl, sphere, extrude } from './kit.js';
 import { toon, glow } from '../toon.js';
