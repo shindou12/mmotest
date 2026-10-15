@@ -205,10 +205,7 @@ export const BossMethods = {
     const brain = BOSS_BRAINS[A.fdef.boss.brain];
     if (!brain && ['shot', 'charge', 'chase'].includes(pat) && inArena.length > 1 && Math.random() < (pat === 'shot' ? 0.6 : 0.4)) {
       const far = inArena.filter((p) => p.id !== target.id).sort((p, q) => dist(q, b) - dist(p, b))[0];
-      if (far) {
-        target = far;
-        this.broadcastArea(A.id, { t: 'chat', from: '', text: `${A.fdef.boss.name}が ${far.name} に狙いを変えた！`, color: '#ff9a8a' });
-      }
+      if (far) target = far;
     }
     const ang = Math.atan2(target.x - b.x, target.z - b.z);
     b.a = ang;

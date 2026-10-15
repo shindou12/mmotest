@@ -29,7 +29,7 @@ export const graz = {
     while (b.bar < bar) {
       b.bar++;
       if (b.bar === 2) {
-        world.broadcastArea(A.id, { t: 'bossEv', id: b.id, title: '近衛兵召集', sub: '詠唱中に攻撃を集中して止めろ！', color: '#ffb84a', sfx: 'enrage' });
+        world.broadcastArea(A.id, { t: 'bossEv', id: b.id, color: '#ffb84a', sfx: 'enrage' });
         world.startCast(A, b, SUMMON.name, SUMMON.sec, b.mhp * SUMMON.need, () => this.summon(world, A, b));
       }
       if (b.bar === 3) {
@@ -37,7 +37,7 @@ export const graz = {
         b.cast = null; b.track = null; b.rampage = true; b.enraged = true; b.phase = 2;
         b.arch.speed = 4.4;
         b.dash = null; b.busyT = 0; b.actT = 0.8; b.forced = 'spin';
-        world.broadcastArea(A.id, { t: 'bossEv', id: b.id, title: '暴走', sub: '大振りの後の隙を狙え！', color: '#ff5a5a', sfx: 'phase' });
+        world.broadcastArea(A.id, { t: 'bossEv', id: b.id, color: '#ff5a5a', sfx: 'phase' });
       }
     }
     if (world.tickCast(A, b, dt)) return true;

@@ -116,7 +116,6 @@ export function onMsg(m) {
     }
     case 'enrage': {
       const final = m.p === 3;
-      banner(final ? '最終形態' : '激昂', final ? 'ボスが本気を出した！' : '攻撃が激しくなる…', final ? '#ff4ab0' : '#ff5a5a', 3);
       audio.sfx(final ? 'phase' : 'enrage'); addShake(final ? 1.4 : 0.8);
       const b = mobs.get(m.id);
       if (b) {
@@ -144,7 +143,7 @@ export function onMsg(m) {
       for (let i = teles.length - 1; i >= 0; i--) if (teles[i].src === m.id) { teles[i].meshes.forEach((g) => fx.dispose(g)); teles.splice(i, 1); }
       clearBossProjs();
       const b = mobs.get(m.id);
-      banner('STUN!', `${m.sec}秒間 動けない・被ダメージ1.3倍`, '#ffd84a', 3);
+      banner('', 'STUN!', '#ffd84a', 3);
       audio.sfx('impact'); audio.sfx('perfect'); addShake(0.8);
       if (b) { fx.ringWave(b.x, b.z, 0xffd84a, 8, 0.6); fx.parts.burst(b.x, 4, b.z, 80, { color: 0xffe080, speed: 10, size: 0.6, life: 1 }); }
       break;
@@ -160,13 +159,12 @@ export function onMsg(m) {
     }
     case 'hateReset': {
       const b = mobs.get(m.id);
-      if (b) { toast('ヘイトがリセットされた！ 狙いを取り直そう', '#ff9a8a'); fx.ringWave(b.x, b.z, 0xff9a8a, 6, 0.5); }
+      if (b) fx.ringWave(b.x, b.z, 0xff9a8a, 6, 0.5);
       break;
     }
     // ---- ボスの共通部品（brain のあるボスが使う） ----
     case 'bossEv': {
-      // HPバーが割れたときなどの出来事
-      banner(m.title, m.sub, m.color, 3);
+      // HPバーが割れたときなどの出来事（文章は出さない。音と揺れと光だけ）
       if (m.sfx) audio.sfx(m.sfx);
       addShake(0.8);
       const b = mobs.get(m.id);
@@ -177,13 +175,11 @@ export function onMsg(m) {
       // 詠唱バー（技名）。need: 中断ゲージあり
       const b = mobs.get(m.id);
       if (b) b.cast = { name: m.name, start: performance.now(), dur: m.d, need: !!m.need, k: 0 };
-      if (m.need) toast(`${m.name}：詠唱中に攻撃を集中すると止められる！`, '#ffd27a');
       break;
     }
     case 'castP': { const b = mobs.get(m.id); if (b?.cast) b.cast.k = m.k; break; }
     case 'castEnd': {
       const b = mobs.get(m.id);
-      if (b?.cast?.need) toast(m.ok ? `${b.cast.name}を止められなかった…` : `${b.cast.name}を阻止した！`, m.ok ? '#ff9a8a' : '#9affc8');
       if (b) b.cast = null;
       break;
     }
@@ -191,7 +187,7 @@ export function onMsg(m) {
       // 狙いを替えた（全ボス共通の「！」）
       const t = m.tid === me.id ? me : others.get(m.tid);
       if (t) { floatText(t.x, 3.2, t.z, '！', 'aggro'); fx.ringWave(t.x, t.z, 0xff3a2a, 3, 0.5); }
-      if (m.tid === me.id) { toast('狙われた！', '#ff6a5a'); audio.sfx('telegraph'); }
+      if (m.tid === me.id) audio.sfx('telegraph');
       break;
     }
     case 'judge': {
@@ -218,7 +214,7 @@ export function onMsg(m) {
         pos.setXYZ(0, b.x, 1.6, b.z); pos.setXYZ(1, t.x, 1.0, t.z); pos.needsUpdate = true;
         o.material.opacity = 0.4 + 0.6 * Math.abs(Math.sin(k * 20));
       });
-      if (m.tid === me.id) { audio.sfx('telegraph'); toast('ボスに狙われている！', '#ff6a5a'); }
+      if (m.tid === me.id) audio.sfx('telegraph');
       break;
     }
     case 'disconnected': addChat('', 'サーバーとの接続が切れました。ページを再読み込みしてください。', '#f66'); break;

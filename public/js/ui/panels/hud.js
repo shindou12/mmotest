@@ -121,11 +121,11 @@ export function installHud(ui) {
         H.bossCut.set({ style: { width: clamp((c.k || 0) * 100, 0, 100) + '%' } });
       }
       const tname = boss.target === me.id ? 'あなた' : game.others.get(boss.target)?.name;
-      H.bossTarget.set({ text: (tname ? `ターゲット：${tname}` : '') + (boss.hateT != null ? `　ヘイトリセットまで ${Math.max(0, boss.hateT).toFixed(0)}秒` : ''), cls: { me: boss.target === me.id } });
+      H.bossTarget.set({ text: tname ? `ターゲット：${tname}` : '', cls: { me: boss.target === me.id } });
       const stunned = boss.stunT > 0;
       H.bossStun.set({ style: { width: (stunned ? 100 : clamp(boss.stunPct || 0, 0, 100)) + '%' } });
       H.bossStunBar.set({ cls: { stunned } });
-      H.bossStunT.set({ text: stunned ? `STUN ${boss.stunT.toFixed(1)}秒（被ダメ1.3倍）` : 'スタン' });
+      H.bossStunT.set({ text: stunned ? `STUN ${boss.stunT.toFixed(1)}秒` : 'スタン' });
     }
     // 調べる・ボス部屋の案内
     const it = game.nearestInteract();

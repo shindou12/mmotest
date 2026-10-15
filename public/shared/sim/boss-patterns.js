@@ -191,7 +191,6 @@ export const BOSS_PATTERNS = {
     // 聖域: アリーナ全体が爆発する大技。光る小さな安全地帯にだけ逃げ込める
     const a = Math.random() * Math.PI * 2, rr = rnd(6, L.r - 6);
     const safe = { x: L.x + Math.sin(a) * rr, z: L.z + Math.cos(a) * rr };
-    world.broadcastArea(A.id, { t: 'chat', from: '', text: `${A.fdef.boss.name}が力を溜めている…光の輪へ逃げろ！`, color: '#ffd84a' });
     world.tele(A, b, [{ k: 'ring', x: r2(safe.x), z: r2(safe.z), r0: 4, r1: rr + L.r + 2 }], 2.4 * sp, base * 1.8, col, 1);
     return 2.6 * sp;
   },

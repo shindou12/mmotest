@@ -64,7 +64,8 @@ test('breaking the second bar turns graz into the rampage with big swings', () =
   const { b, tick, sent } = fight();
   tick(2); b.hp = b.mhp * 0.3; tick(0.1);
   assert.ok(b.rampage); assert.equal(b.bar, 3);
-  assert.equal(sent('bossEv').at(-1).title, '暴走');
+  assert.equal(sent('bossEv').at(-1).sfx, 'phase'); // 暴走の合図（文章はなし）
+  assert.equal(sent('bossEv').at(-1).title, undefined);
   tick(1);
   assert.equal(sent('bossAct').at(-1).p, 'spin');
 });
