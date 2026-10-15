@@ -37,6 +37,10 @@ export function onMsg(m) {
     case 'roster': roster = m.r; world.unlocked = m.unlocked; renderParty(); break;
     case 'tele': onTele(m); break;
     case 'die': onMobDie(m); break;
+    case 'escape': // きらめくトカゲが地面に潜って逃げた
+      fx.parts.burst(m.x, 0.5, m.z, 60, { color: 0xffd84a, speed: 6, size: 0.45, life: 0.8, gravity: 4 });
+      fx.ringWave(m.x, m.z, 0xffd84a, 3, 0.4); audio.sfx('dodge');
+      break;
     case 'xp':
       gainXp(m.n);
       questEvent(m.boss ? { type: 'boss', floor: m.boss } : { type: 'kill', name: m.nm, area: m.ar });

@@ -18,6 +18,7 @@ export const ARCH = {
   mage: { speed: 2.8, hp: 0.8, dmg: 1.05, wind: 1.3, range: 11, aggro: 15, ranged: true },
   // 番兵（迷宮区の精鋭）: 正面を盾で守り、3連斬りと踏み込み突き。攻撃の後は盾が下がる（guard: 盾、lunge: 踏み込める距離）
   sentinel: { speed: 3.4, hp: 1.6, dmg: 1.1, wind: 0.8, range: 9, aggro: 14, guard: true, lunge: 4.5 },
+  treasure: { speed: 8.6, hp: 1.6, dmg: 0, wind: 1, range: 0, aggro: 0, flee: true }, // きらめくトカゲ: プレイヤーより速く逃げる（攻撃しない）
   rootknot: { speed: 0, hp: 2.0, dmg: 0, wind: 1, range: 0, aggro: 0 }, // ボスの手下: 動かず攻撃しない（霧の大樹の根瘤）
 };
 export const CHEST_COOLDOWN = 300; // ダンジョン最奥の宝箱

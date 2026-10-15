@@ -311,6 +311,8 @@ export function update(dt) {
     } else view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, act: mb.act, stun: mb.stunT > 0 });
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) view.fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[state.world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
+    // きらめくトカゲ: いつもきらめき、走ると金色の粒を残す
+    if (mb.t === 'lizard') view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 1.4), mb.z + rnd(-0.6, 0.6), { color: Math.random() < 0.5 ? 0xffd84a : 0xffffff, size: 0.35, life: 0.6, speed: 0.6, gravity: -0.5 });
     // ボスとつながる手下（吸い上げの根瘤）: 手下から大樹へ光の粒が流れ込む
     if (mb.link) {
       const boss = [...state.mobs.values()].find((o) => o.kind === 2);

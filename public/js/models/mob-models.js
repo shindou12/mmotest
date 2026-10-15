@@ -180,6 +180,25 @@ export const MOB_MODELS = {
     p.add(mesh(cone(0.09, 0.35, 8), glow(ac.clone().multiplyScalar(1.4)), [0, 0.35, 0.12], [0.9, 0, 0]));
     parts.tail = tail;
   },
+  lizard(k) { // きらめくトカゲ: 金色に光る細長い体、4本足、長いしっぽ。走ると脚が回り、しっぽが揺れる
+    const { body, parts } = k;
+    const gold = glow(0xffd84a), shine = glow(0xfff6c0), dark = toon(0x8a5a10);
+    const b = new THREE.Group(); b.position.y = 0.35; body.add(b);
+    b.add(mesh(capsule(0.22, 0.8, 8), gold, [0, 0, 0], [Math.PI / 2, 0, 0]));
+    for (let i = 0; i < 4; i++) b.add(mesh(sphere(0.06, 6, 4), shine, [(i % 2 ? 1 : -1) * 0.1, 0.2, -0.3 + i * 0.2]));
+    const head = new THREE.Group(); head.position.set(0, 0.06, 0.62); b.add(head);
+    head.add(mesh(sphere(0.2, 10, 8), gold, [0, 0, 0.08], null, [0.9, 0.7, 1.3]));
+    for (const s of [-1, 1]) head.add(mesh(sphere(0.045, 6, 4), dark, [s * 0.13, 0.08, 0.15]));
+    const legs = [];
+    for (const [x, z] of [[-0.22, 0.32], [0.22, 0.32], [-0.22, -0.3], [0.22, -0.3]]) {
+      const leg = new THREE.Group(); leg.position.set(x, -0.05, z); b.add(leg);
+      leg.add(mesh(capsule(0.05, 0.22, 6), gold, [Math.sign(x) * 0.08, -0.12, 0], [0, 0, Math.sign(x) * 0.9]));
+      legs.push(leg);
+    }
+    const tail = new THREE.Group(); tail.position.set(0, 0, -0.55); b.add(tail);
+    tail.add(mesh(cone(0.14, 0.9, 8), gold, [0, 0, -0.42], [-Math.PI / 2, 0, 0]));
+    parts.legs = legs; parts.tail = tail; parts.head = head;
+  },
   rootknot(k) { // 根瘤（霧の大樹の手下）: 地面から盛り上がった節くれだった瘤と、脈打つ光る芯。動かない
     const { body, m, mD, parts } = k;
     const b = new THREE.Group(); b.position.y = 0.55; body.add(b);

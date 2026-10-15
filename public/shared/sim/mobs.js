@@ -1,8 +1,8 @@
 // World のメソッド: 敵の出現・撃破・移動・ヘイト・攻撃。sim.js が World.prototype に足す
 import { TECHNIQUES } from '../techniques.js';
 import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from '../balance.js';
-import { FLOORS, RARITIES, MAX_FLOOR, mobHp, mobDmg, mobXp, makeItem, rollRarity, mobDef } from '../data.js';
-import { collide, pathStep, obstaclesOf } from '../areas.js';
+import { FLOORS, RARITIES, MAX_FLOOR, mobHp, mobDmg, mobXp, makeItem, rollRarity, mobDef, floorLevel, TREASURE_ID } from '../data.js';
+import { collide, pathStep, obstaclesOf, insideOpen } from '../areas.js';
 
 import { MOB_ATTACKS } from './mob-attacks.js';
 import { rnd, dist, r2, ARCH, HATE_RESET } from './common.js';
@@ -10,6 +10,8 @@ import { ELITE, NAMED } from './tuning.js';
 
 const SENTINEL_OPEN = 1.2; // 番兵が攻撃を出し切った後、盾が下がっている秒数
 const SENTINEL_REWARD = { xp: 4, gold: 6, rarity: 0.4 }; // 番兵の報酬（精鋭より一段おいしく）
+// きらめくトカゲ: 寿命・走る秒数・止まる秒数・逃げ出す距離・1回にまくコインの量の基準・報酬
+const TREASURE = { life: 45, run: 2.2, rest: 0.9, scare: 18, coin: 2, xp: 5, gold: 20 };
 
 export const MobsMethods = {
   // ---- テレグラフ（予兆） ----
@@ -52,8 +54,8 @@ export const MobsMethods = {
     A.mobs.delete(mob.id);
     const isBoss = mob.kind === 'boss';
     this.broadcastArea(A.id, { t: 'die', id: mob.id, x: r2(mob.x), z: r2(mob.z), boss: isBoss });
-    const sentinel = mob.ai === 'sentinel';
-    let xp = mobXp(mob.lv) * (A.def.mobs?.xp || 1) * (mob.named ? NAMED.xp : sentinel ? SENTINEL_REWARD.xp : mob.elite ? ELITE.xp : 1);
+    const sentinel = mob.ai === 'sentinel', treasure = mob.ai === 'treasure';
+    let xp = mobXp(mob.lv) * (A.def.mobs?.xp || 1) * (mob.named ? NAMED.xp : treasure ? TREASURE.xp : sentinel ? SENTINEL_REWARD.xp : mob.elite ? ELITE.xp : 1);
     if (mob.named) A.namedT = NAMED.respawn;
     if (isBoss) xp *= 12;
     if (mob.kind === 'add') xp *= 0.3;
@@ -62,9 +64,9 @@ export const MobsMethods = {
       const mult = levelXpMultiplier(p.lv, mob.lv);
       this.send(p, { t: 'xp', n: Math.max(1, Math.round(xp * mult)), nm: isBoss ? A.fdef.boss.name : mob.name, ar: A.id, boss: isBoss ? A.n : 0, el: mob.named ? 3 : mob.elite ? 1 : 0 });
       // ゴールド（個人ごと）。雑魚はたまに落とさない。ボス・ネームドは金貨袋
-      let gold = (3 + mob.lv * 1.5) * rnd(0.7, 1.3) * (isBoss ? 40 : mob.named ? 15 : sentinel ? SENTINEL_REWARD.gold : mob.elite ? 3 : 1) * (mob.kind === 'add' ? 0.2 : 1);
+      let gold = (3 + mob.lv * 1.5) * rnd(0.7, 1.3) * (isBoss ? 40 : mob.named ? 15 : treasure ? TREASURE.gold : sentinel ? SENTINEL_REWARD.gold : mob.elite ? 3 : 1) * (mob.kind === 'add' ? 0.2 : 1);
       if (!isBoss && !mob.named && !mob.elite && Math.random() < 0.25) gold = 0;
-      if (gold >= 1) this.send(p, { t: 'gold', n: Math.round(gold), x: r2(mob.x), z: r2(mob.z), bag: isBoss || !!mob.named });
+      if (gold >= 1) this.send(p, { t: 'gold', n: Math.round(gold), x: r2(mob.x), z: r2(mob.z), bag: isBoss || !!mob.named || treasure });
       // 個人ドロップ（友達と取り合いにならない）
       const items = [];
       const ilvl = mob.lv;
@@ -74,6 +76,10 @@ export const MobsMethods = {
         items.push(makeItem(ilvl + 1, rollRarity(1, 2, ilvl, DR.rare), B));
         items.push(makeItem(ilvl + 1, rollRarity(1, 1, ilvl, DR.rare), B));
         if (Math.random() < 0.5) items.push(makeItem(ilvl, rollRarity(1, 0, ilvl, DR.rare), B));
+      } else if (treasure) {
+        // きらめくトカゲ: 良い装備が2つ（1つは良品以上が確定）
+        items.push(makeItem(ilvl + 2, rollRarity(1, 2, ilvl), B));
+        items.push(makeItem(ilvl + 1, rollRarity(0.6, 1, ilvl), B));
       } else if (mob.named) {
         // ネームド: レア以上が必ず出る（エピック以上はアイテムレベルで出やすくなる）
         items.push(makeItem(ilvl + 2, rollRarity(1, 2, ilvl, DR.rare), B));
@@ -135,6 +141,7 @@ export const MobsMethods = {
 
   tickMob(A, m, alive, dt) {
     const Ar = m.arch;
+    if (Ar.flee) { this.tickTreasure(A, m, alive, dt); return; }
     m.cd -= dt; m.provoked -= dt; m.tauntT -= dt; m.openT -= dt;
     // 盾（番兵）: 攻撃中と、攻撃を出し切った直後の隙（openT）は下がる
     m.guard = !!Ar.guard && m.st < 2 && m.openT <= 0;
@@ -173,6 +180,52 @@ export const MobsMethods = {
       if (d > 0.5) { m.a = Math.atan2(m.wx - m.x, m.wz - m.z); this.moveMob(A, m, m.a, Ar.speed * 0.4, dt); }
       else m.st = 0;
       if (m.hp < m.mhp) m.hp = Math.min(m.mhp, m.hp + m.mhp * 0.05 * dt);
+    }
+  },
+
+  // ---- きらめくトカゲ ----
+  // まれに屋外へ出る。走って逃げる → 立ち止まってコインをまく、をくり返し、時間が来ると地面に潜って消える
+  spawnTreasure(A) {
+    const p = this.areaPlayers(A.id).find((q) => !q.dead);
+    if (!p) return null;
+    for (let tries = 0; tries < 16; tries++) {
+      const a = Math.random() * Math.PI * 2, r = rnd(18, 28), x = p.x + Math.sin(a) * r, z = p.z + Math.cos(a) * r;
+      if (!insideOpen(A.def, x, z, 4)) continue;
+      const m = this.spawnMob(A, TREASURE_ID, x, z, floorLevel(A.n) + 3, 'treasure');
+      Object.assign(m, { lifeT: TREASURE.life, phaseT: 0.6, running: false });
+      this.sysArea(A.id, 'どこかで何かがきらめいた…', '#ffd84a');
+      return m;
+    }
+    return null;
+  },
+  tickTreasure(A, m, alive, dt) {
+    m.lifeT -= dt;
+    if (m.lifeT <= 0) { // 時間切れ: 地面に潜って逃げる（報酬なし）
+      A.mobs.delete(m.id);
+      this.broadcastArea(A.id, { t: 'escape', id: m.id, x: r2(m.x), z: r2(m.z) });
+      return;
+    }
+    m.phaseT -= dt;
+    if (m.phaseT <= 0) {
+      m.running = !m.running;
+      m.phaseT = m.running ? TREASURE.run : TREASURE.rest;
+      if (!m.running) this.scatterCoins(A, m); // 立ち止まるたびにコインをまく
+    }
+    if (!m.running) { m.st = 0; return; }
+    let near = null, nd = Infinity;
+    for (const p of alive) { const d = dist(p, m); if (d < nd) { nd = d; near = p; } }
+    let ang;
+    if (near && nd < TREASURE.scare) ang = Math.atan2(m.x - near.x, m.z - near.z) + Math.sin(this.time * 2.3 + m.id) * 0.5; // 逃げる（少し蛇行）
+    else ang = m.a + Math.sin(this.time * 1.1 + m.id) * 0.04;
+    // 外周に近づいたら内側へ曲がる
+    const nx = m.x + Math.sin(ang) * 3, nz = m.z + Math.cos(ang) * 3;
+    if (A.def.shape === 'open' && !insideOpen(A.def, nx, nz, 4)) ang = Math.atan2(-m.x, -m.z) + (Math.random() - 0.5);
+    m.a = ang;
+    this.moveMob(A, m, ang, m.arch.speed * (near && nd < TREASURE.scare ? 1 : 0.45), dt);
+  },
+  scatterCoins(A, m) {
+    for (const p of this.areaPlayers(A.id)) {
+      for (let i = 0; i < 3; i++) this.send(p, { t: 'gold', n: Math.round(TREASURE.coin + m.lv * 0.6), x: r2(m.x + rnd(-1.8, 1.8)), z: r2(m.z + rnd(-1.8, 1.8)), bag: false });
     }
   },
 

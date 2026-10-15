@@ -7,6 +7,7 @@ import { rnd, pick, dist, r2 } from './common.js';
 import { NAMED } from './tuning.js';
 
 const SWARM_HP = 0.4; // 群れの雑魚の体力の倍率
+const TREASURE_EVERY = 30, TREASURE_CHANCE = 0.04; // きらめくトカゲの出現判定の間隔（秒）と確率
 
 export const AreaTickMethods = {
   tickArea(A, dt) {
@@ -67,6 +68,15 @@ export const AreaTickMethods = {
         const mob = this.spawnMob(A, pt.ch === 'K' ? ELITE_BASE : pt.ch === 'G' ? 1 : pick(def.mobs.pool || [0, 1]), pt.x, pt.z, lv, 'mob', elite);
         if (pt.ch === 'G') { mob.gatekeeper = true; mob.name = '門番'; }
         pt.mobId = mob.id;
+      }
+    }
+
+    // きらめくトカゲ: 屋外で 30 秒ごとに 4% の確率（1エリアに1匹まで）
+    if (def.mobs && def.shape === 'open' && players.length) {
+      A.treasureT = (A.treasureT ?? TREASURE_EVERY) - dt;
+      if (A.treasureT <= 0) {
+        A.treasureT = TREASURE_EVERY;
+        if (![...A.mobs.values()].some((m) => m.kind === 'treasure') && Math.random() < TREASURE_CHANCE) this.spawnTreasure(A);
       }
     }
 

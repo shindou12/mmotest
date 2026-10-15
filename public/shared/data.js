@@ -325,7 +325,10 @@ export const UNIQUES = [
 // 敵の定義: 0〜99 は階層の敵（FLOORS[].mobs）、100 以上は迷宮区の番兵（FLOORS[].elites[i - 100]）、
 // 負の数はボスの手下（FLOORS[].boss.minions[-1 - i]）
 export const ELITE_BASE = 100;
-export const mobDef = (fdef, i) => (i < 0 ? fdef.boss.minions[-1 - i] : i >= ELITE_BASE ? fdef.elites[i - ELITE_BASE] : fdef.mobs[i]);
+// きらめくトカゲ（どの階層の屋外にもまれに出る。逃げ回ってコインをまき、倒すと良い装備が出る）
+export const TREASURE_ID = 200;
+export const TREASURE_DEF = { t: 'lizard', ai: 'treasure', name: 'きらめくトカゲ', color: 0xffd84a, scale: 1.5 };
+export const mobDef = (fdef, i) => (i === TREASURE_ID ? TREASURE_DEF : i < 0 ? fdef.boss.minions[-1 - i] : i >= ELITE_BASE ? fdef.elites[i - ELITE_BASE] : fdef.mobs[i]);
 
 export const FLOORS = [
   {
