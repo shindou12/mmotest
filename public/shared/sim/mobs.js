@@ -68,8 +68,8 @@ export const MobsMethods = {
       // 個人ドロップ（友達と取り合いにならない）
       const items = [];
       const ilvl = mob.lv;
-      const DR = A.fdef.drops || {}; // 階層ごとのドロップの調整（落とす確率・武器の割合・良い品の出やすさ）
-      const B = { bias: A.def.bias, kinds: A.def.kinds, weapon: DR.weapon }; // エリアの出やすい武器種・付きやすい特性
+      const DR = A.fdef.drops || {}; // 階層ごとのドロップの調整（武器の別枠・良い品の出やすさ）
+      const B = { bias: A.def.bias, kinds: A.def.kinds }; // エリアの出やすい武器種・付きやすい特性
       if (isBoss) {
         items.push(makeItem(ilvl + 1, rollRarity(1, 2, ilvl, DR.rare), B));
         items.push(makeItem(ilvl + 1, rollRarity(1, 1, ilvl, DR.rare), B));
@@ -80,9 +80,11 @@ export const MobsMethods = {
         items.push(makeItem(ilvl, rollRarity(0.6, 1, ilvl, DR.rare), B));
       } else if (sentinel) {
         items.push(makeItem(ilvl, rollRarity(SENTINEL_REWARD.rarity, 1, ilvl, DR.rare), B)); // 番兵: 必ず1つ、良い品が少し出やすい
-      } else if (Math.random() < (mob.elite ? 0.6 : mob.kind === 'add' ? 0.08 : 0.34) * (DR.item ?? 1)) {
+      } else if (Math.random() < (mob.elite ? 0.6 : mob.kind === 'add' ? 0.08 : 0.34)) {
         items.push(makeItem(ilvl, rollRarity(mob.elite ? 0.25 : 0, mob.elite ? 1 : 0, ilvl, DR.rare), B));
       }
+      // 武器の別枠（階層の drops.weapon）: 雑魚・精鋭がもう1つ、武器だけを落とすことがある
+      if (DR.weapon && mob.kind === 'mob' && !mob.named && !sentinel && Math.random() < DR.weapon) items.push(makeItem(ilvl, rollRarity(0, 0, ilvl, DR.rare), { ...B, slot: 'weapon' }));
       if (items.length) {
         this.send(p, { t: 'loot', sx: r2(mob.x), sz: r2(mob.z), items: items.map((it) => ({ it, x: r2(mob.x + rnd(-1.6, 1.6)), z: r2(mob.z + rnd(-1.6, 1.6)) })) });
         for (const it of items) {

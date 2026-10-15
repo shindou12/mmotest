@@ -338,8 +338,8 @@ export const FLOORS = [
       { t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 },
       { t: 'bat', name: 'ケイブバット', color: 0x5a4a6a }, { t: 'mushroom', name: 'ドクキノコ', color: 0xc84a6a },
     ],
-    // ドロップの調整: item 落とす確率の倍率 / weapon 武器の割合 / rare 特性2つ以上の格の出やすさ
-    drops: { item: 1.5, weapon: 0.8, rare: 0.8 },
+    // ドロップの調整: weapon 雑魚が武器だけを別枠で落とす確率 / rare 特性2つ以上の格の出やすさ
+    drops: { weapon: 0.17, rare: 0.8 },
     // 迷宮区の番兵（ai: 動き方。look: 'player' はプレイヤーの姿を暗く染めて大きくしたもの。weapon / armor はその装備の見た目）
     elites: [{ t: 'knight', ai: 'sentinel', look: 'player', weapon: 'spear', armor: 5, scale: 1.35, name: '迷宮の近衛騎士', color: 0x6a4a2a, accent: 0xffb030 }],
     boss: { name: 'コボルド王 グラズ', t: 'knight', appearance: 'graz', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, brain: 'graz', bars: 3, patterns: ['slam', 'cone', 'charge', 'combo', 'breath'] },
@@ -502,8 +502,7 @@ export function makeItem(ilvl, grade, opts = {}) {
   grade = Math.max(0, Math.min(DROP_GRADES.length - 1, grade | 0));
   const r = DROP_GRADES[grade];
   let rarity = r.rarity ?? 0;
-  // opts.weapon: 武器の割合（階層の drops.weapon）。指定がなければ 3/5
-  let slot = opts.slot || (opts.weapon == null ? pick(['weapon', 'weapon', 'weapon', 'armor', 'acc']) : Math.random() < opts.weapon ? 'weapon' : pick(['armor', 'acc']));
+  let slot = opts.slot || pick(['weapon', 'weapon', 'weapon', 'armor', 'acc']);
   let kind = opts.kind || null;
   let unique = null;
   if (opts.uniqueDef) {
