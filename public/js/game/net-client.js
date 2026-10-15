@@ -8,7 +8,7 @@ import { audio, fx } from './render.js';
 import { bprojs, me, mobs, others, teles, world } from './state.js';
 import { S } from './stats.js';
 import { enterArea, env, heightAt } from './area.js';
-import { onMobDie, onSnap, removeOther } from './snapshot.js';
+import { BOSS_DEATH, onMobDie, onSnap, removeOther } from './snapshot.js';
 import { die, onTele, revived } from './hurt.js';
 import { addShake } from './combat.js';
 import { tf } from './variants.js';
@@ -124,13 +124,7 @@ export function onMsg(m) {
       }
       break;
     }
-    case 'bossClear': {
-      banner(`第${m.n}層 攻略`, 'CONGRATULATIONS!', '#ffd84a', 3);
-      audio.sfx('clear');
-      const L = env?.lair || { x: 0, z: 0 };
-      for (let i = 0; i < 6; i++) setTimeout(() => fx.parts.burst(L.x + rnd(-8, 8), rnd(4, 10), L.z + rnd(-8, 8), 80, { color: [0xffd84a, 0x6ad0ff, 0xff6ab0][i % 3], size: 0.6, speed: 10, life: 1.5, gravity: -4 }), i * 250);
-      break;
-    }
+    case 'bossClear': setTimeout(() => bossCleared(m), BOSS_DEATH.fall * 1000); break; // ボスが崩れ落ちて爆発してから
     case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); clearBossProjs(); break;
     case 'proj': spawnBossProj(m); break;
     case 'pgone': {
@@ -164,7 +158,7 @@ export function onMsg(m) {
     case 'bossAct': {
       // 技の始まり: 技ごとの動きを再生する（動きのデータがある技だけ。暴走中など段階で速くなる技は sp で縮める）
       const b = mobs.get(m.id);
-      if (b) b.act = { p: m.p, start: now(), sp: b.enraged ? 0.9 : 1 };
+      if (b) b.act = { p: m.p, start: now(), sp: b.enraged ? 0.9 : 1, d: m.d ? m.d / 1000 : 0 };
       if (b && m.p === 'throw') flyingSword(b);
       break;
     }
@@ -249,4 +243,12 @@ function flyingSword(b) {
     if (f < 1) { o.position.set(x, heightAt(x, z) + 3 * b.model.scale.x * 0.5, z); o.rotateX(t * 28); }
     else { o.position.set(x, heightAt(x, z) + 1.6 * b.model.scale.x, z); o.rotateX(Math.PI * 0.92); } // 刃を下にして刺さる
   });
+}
+
+// 討伐: 爆発に合わせて「討伐！」と花火
+function bossCleared(m) {
+  banner(`第${m.n}層 攻略`, '討伐！', '#ffd84a', 3);
+  audio.sfx('clear');
+  const L = env?.lair || { x: 0, z: 0 };
+  for (let i = 0; i < 6; i++) setTimeout(() => fx.parts.burst(L.x + rnd(-8, 8), rnd(4, 10), L.z + rnd(-8, 8), 80, { color: [0xffd84a, 0x6ad0ff, 0xff6ab0][i % 3], size: 0.6, speed: 10, life: 1.5, gravity: -4 }), i * 250);
 }

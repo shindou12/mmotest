@@ -5,6 +5,8 @@ import { rnd, r2, angDiff } from '../common.js';
 
 const LOW_HP = 0.3; // 狙いを替えるHPの割合
 const MARK_CD = 10; // 狙いを替える間隔（秒）
+const RUSH = { speed: 9, every: 4, r: 2.8, lead: 0.15, min: 0.45, dmg: 0.7 }; // 走り寄り: every m おきに目の前を斬る（ボスが着く lead 秒後に弾ける。予兆は最低 min 秒）
+const FRENZY = { arc: 1.6, len: 10, first: 0.55, step: 0.3, slam: { at: 1.0, delay: 1.0, r: 6.5 }, rest: 2.0 }; // 暴走乱舞
 const SUMMON = { name: '近衛兵召集', sec: 4, need: 0.06, adds: 3, mob: 1 }; // need: 中断に必要なダメージ（最大HPの割合）
 const JUDGE = { name: '王の裁き', track: 2.0, turn: 0.9, lock: 0.75, len: 34, w: 6, waves: { n: 4, w: 8.5, half: 14, segs: 4, gap: 0.2, spread: 0.07, delay: 0.45 } }; // turn: 向きを合わせる速さ（rad/秒）。
 // waves: 本線の通り道に、横向きの太い帯（幅 w）が手元から gap 秒ずつ n 本すき間なく並び、
@@ -38,7 +40,7 @@ export const graz = {
         if (b.cast || b.track) world.broadcastArea(A.id, { t: 'castEnd', id: b.id, ok: 0 });
         b.cast = null; b.track = null; b.rampage = true; b.enraged = true; b.phase = 2;
         b.arch.speed = 4.4;
-        b.dash = null; b.busyT = 0; b.actT = 0.8; b.forced = 'spin';
+        b.dash = null; b.busyT = 0; b.actT = 0.8; b.forced = 'frenzy'; // 暴走に入った瞬間は暴走乱舞
         world.broadcastArea(A.id, { t: 'bossEv', id: b.id, color: '#ff5a5a', sfx: 'phase' });
       }
     }
@@ -88,11 +90,26 @@ export const graz = {
       const p = world.livePlayer(A, b.rushTid);
       b.rushTid = null;
       if (p) {
-        b.busyT = world.rushTo(A, b, p) + 0.3;
+        const dur = world.rushTo(A, b, p, RUSH.speed);
+        b.busyT = dur + 0.3;
         b.actT = Math.max(b.actT, b.busyT + 0.2);
+        if (b.dash) this.rushSlashes(world, A, b, dur);
       }
     }
     return false;
+  },
+
+  // 走り寄りながら目の前を斬る: 通り道に every m おきの円。ボスがそこへ着くころに弾ける
+  rushSlashes(world, A, b, dur) {
+    const D = b.dash, len = Math.hypot(D.tx - D.fx, D.tz - D.fz);
+    if (len < 1) return;
+    world.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: 'rush', d: Math.round(dur * 1000) });
+    const base = world.bossBaseDamage(A, b);
+    for (let d = RUSH.every; d <= len + 2; d += RUSH.every) {
+      const k = Math.min(1, (d + 1.5) / len);
+      const x = D.fx + (D.tx - D.fx) * k, z = D.fz + (D.tz - D.fz) * k;
+      world.tele(A, b, [{ k: 'circle', x: r2(x), z: r2(z), r: RUSH.r }], Math.max(RUSH.min, (d / len) * dur + RUSH.lead), base * RUSH.dmg, '#ff3a3a');
+    }
   },
 
   summon(world, A, b) {
@@ -108,7 +125,7 @@ export const graz = {
 
   // 使う技（同じ名前を複数書くと出やすくなる）
   patterns(b) {
-    if (b.rampage) return ['spin', 'spin', 'cleave', 'cleave', 'charge', 'judge'];
+    if (b.rampage) return ['frenzy', 'spin', 'spin', 'cleave', 'cleave', 'charge', 'judge'];
     return b.bar >= 2 ? [...b.basePats, 'judge'] : b.basePats;
   },
   gap: (b) => (b.rampage ? rnd(0.3, 0.5) : b.bar >= 2 ? rnd(0.5, 0.9) : rnd(0.6, 1.1)),
@@ -145,6 +162,16 @@ export const graz = {
       world.broadcastArea(A.id, { t: 'judge', id: b.id, tid: p.id, d: Math.round(JUDGE.track * 1000), len: JUDGE.len, w: JUDGE.w });
       const V = JUDGE.waves;
       return JUDGE.lock + V.gap * (V.n - 1) + V.spread * (V.segs - 1) + V.delay + 0.9; // 溜め（track）の間は tick が行動を止めているので、その後の分だけ
+    },
+    frenzy(world, A, b, target, { base, ang }) {
+      // 暴走乱舞: 体を回しながら前・横・後ろ・反対の横を斬り、最後に足元を叩きつける → 大きな隙
+      const F = FRENZY, x = r2(b.x), z = r2(b.z);
+      for (let k = 0; k < 4; k++) {
+        const a = ang + k * Math.PI / 2;
+        world.later(A, k * F.step, () => { if (A.boss === b) world.tele(A, b, [{ k: 'cone', x, z, a: r2(a), arc: F.arc, len: F.len }], F.first, base * 1.2, '#ff2a2a'); });
+      }
+      world.later(A, F.slam.at, () => { if (A.boss === b) world.tele(A, b, [{ k: 'circle', x, z, r: F.slam.r }], F.slam.delay, base * 1.6, '#ff2a2a', 1); });
+      return F.slam.at + F.slam.delay + F.rest;
     },
     spin(world, A, b, target, { base }) {
       // 暴走・回転斬り: 自分の周りを一周 → 大きな隙

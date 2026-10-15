@@ -132,6 +132,8 @@ export const BossMethods = {
   },
 
   // ---- ボスの共通部品（brain から使う） ----
+  // 技の基本の威力（各技はこれに倍率を掛ける）
+  bossBaseDamage(A, b) { return mobDmg(b.lv) * 3.3 * BALANCE.bossDamage * floorPressure(A.n) * attackPressure(b.scaleN); },
   // 詠唱: 名前とバーを出す。need > 0 なら、詠唱中に need 以上のダメージで中断してスタン。終われば done() を呼ぶ
   startCast(A, b, name, sec, need, done) {
     b.cast = { name, t: sec, need, dealt: 0, done };
@@ -199,7 +201,7 @@ export const BossMethods = {
   bossPattern(A, b, pat, target, inArena) {
     const L = A.lair;
     const sp = [1, 0.9, 0.78, 0.68][b.phase || 1];
-    const base = mobDmg(b.lv) * 3.3 * BALANCE.bossDamage * floorPressure(A.n) * attackPressure(b.scaleN);
+    const base = this.bossBaseDamage(A, b);
     const col = b.phase === 3 ? '#ff1a8a' : b.enraged ? '#ff2a6a' : '#ff3a3a';
     // 遠距離攻撃と突進は、ときどき離れている別の人を狙う
     const brain = BOSS_BRAINS[A.fdef.boss.brain];

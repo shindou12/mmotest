@@ -83,6 +83,29 @@ export function onSnap(m) {
   for (const id of [...mobs.keys()]) if (!seenM.has(id)) removeMob(id);
 }
 
+// ボスの撃破: 前へ崩れ落ちながら白く光り（BOSS_DEATH.fall 秒）、バーンと爆発して消える。「討伐！」は bossClear が爆発に合わせて出す
+export const BOSS_DEATH = { fall: 1.1 };
+function bossDeath(mb, accent) {
+  mobs.delete(mb.id); // 以後は snap で動かさない
+  const u = mb.model.userData, y0 = mb.model.position.y;
+  audio.sfx('enrage'); addShake(0.6);
+  let boomed = false;
+  fx.add(mb.model, BOSS_DEATH.fall, (o, k) => {
+    u.body.rotation.x = k * 0.9; u.body.rotation.z = Math.sin(k * 30) * 0.08 * (1 - k);
+    o.position.y = y0 - k * k * 0.8 * o.scale.y;
+    for (const mm of u.mats) { mm.m.emissive.setRGB(1, 1, 1); mm.m.emissiveIntensity = k * 2.2 + Math.sin(k * 40) * 0.3; }
+    if (k >= 0.999 && !boomed) {
+      boomed = true;
+      const x = mb.x, z = mb.z;
+      fx.flash(x, 3, z, 0xffffff, 160, 0.5, 40);
+      fx.parts.burst(x, 2, z, 360, { color: 0x9ad8ff, size: 1.0, speed: 20, life: 2, gravity: -3 });
+      fx.parts.burst(x, 2, z, 160, { color: accent, size: 0.8, speed: 12, life: 1.4 });
+      fx.ringWave(x, z, 0xffffff, 22, 0.8); fx.ringWave(x, z, accent, 14, 0.6);
+      audio.sfx('mobdie'); audio.sfx('impact'); audio.sfx('thunder'); addShake(2.2);
+    }
+  });
+}
+
 export function removeMob(id) {
   const mb = mobs.get(id);
   if (!mb) return;
@@ -130,6 +153,7 @@ export function onMobDie(m) {
   fxCall('onKill', mb); // ブレイブハートA「猛り」 など
   if (mb && tf('t_blood') && now() - mb.localT < 1.2 && S) { heal(S.mhp * 0.06, true); fx.parts.burst(me.x, 1, me.z, 14, { color: 0xff4a5a, speed: 3, size: 0.4, life: 0.5 }); }
   const fdef = FLOORS[world.floor - 1];
+  if (m.boss && mb) { bossDeath(mb, fdef.boss.accent); return; }
   const col = mb ? (m.boss ? fdef.boss.accent : fdef.mobs[0].color) : 0xffffff;
   // ポリゴン片が砕け散る演出
   fx.parts.burst(m.x, 1.2, m.z, m.boss ? 300 : 40, { color: 0x9ad8ff, size: m.boss ? 0.9 : 0.45, speed: m.boss ? 16 : 7, life: m.boss ? 2 : 0.9, gravity: -3 });

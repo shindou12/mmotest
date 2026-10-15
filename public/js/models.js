@@ -316,9 +316,11 @@ export function animateMob(model, s) {
     u.curAct = s.act;
     if (!applyBossMotion(u, motions?.[s.act.p], s.act)) { endBossMotion(u, motions?.[s.act.p]); s.act.done = true; u.curAct = null; }
   }
-  const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0;
+  // スタン（全ボス・全敵共通の見た目）: 黄色くゆっくり点滅する。予兆の赤い点滅より優先
+  const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0, stun = s.stun ? Math.sin(t * 7) * 0.5 + 0.5 : 0;
   for (const mm of u.mats) {
     if (flash > 0) { mm.m.emissive.setRGB(1, 1, 1); mm.m.emissiveIntensity = flash * 1.5; }
+    else if (s.stun) { mm.m.emissive.setRGB(1, 0.82, 0.15); mm.m.emissiveIntensity = 0.35 + stun * 0.55; }
     else if (warn > 0) { mm.m.emissive.setRGB(1, 0.15, 0.1); mm.m.emissiveIntensity = warn * 0.6 + mm.ei * 0.5; }
     else { mm.m.emissive.copy(mm.e); mm.m.emissiveIntensity = mm.ei; }
   }

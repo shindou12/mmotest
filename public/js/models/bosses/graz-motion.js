@@ -3,6 +3,7 @@
 //   keys: [時刻, { '部位.rotation.x': 値, 'aim.pitch': 刃の上下, 'aim.yaw': 刃の左右, ... }]
 //         書いていない値は直前のキーを引き継ぐ。最初と最後は構え（N）
 //   sp: true … 段階で速くなる技（暴走中は 0.9 倍の時間）
+//   stretch: true … サーバーが長さ（bossAct の d）を決める技。その長さに合わせて伸び縮みする（走り寄り）
 //   hide: [[開始, 終了, '部位'], ...] … その間だけ消す（大剣投げで手から剣が離れる）
 const N = {
   'body.rotation.x': 0, 'body.rotation.y': 0, 'body.position.y': 0, 'head.rotation.x': 0,
@@ -57,6 +58,28 @@ export const GRAZ_MOTIONS = {
       [2.6, { 'body.rotation.x': -0.38 }], [2.8, { ...down, 'arm.rotation.x': 0.8, 'body.rotation.x': 0.5, 'body.position.y': -0.25, 'guardArm.rotation.x': 0, 'guardArm.rotation.z': 0, 'aim.pitch': 2.3 }],
       [3.1, { 'body.position.y': -0.18, 'body.rotation.x': 0.4 }], [3.35, { 'body.position.y': -0.35, 'body.rotation.x': 0.6, 'head.rotation.x': 0.45, 'aim.pitch': 2.5 }],
       [3.9, {}], [4.25, N]],
+  }),
+  // 暴走乱舞（前 0.55 / 横 0.85 / 後ろ 1.15 / 反対の横 1.45 秒 → 足元の叩きつけ 2.0 秒）→ 大きな隙
+  // 斬るたびに体を 90° ずつ回す。一周して終わるので体の向きは 2π で止める
+  frenzy: m({
+    dur: 4.0,
+    keys: [[0, N],
+      ...[0, 1, 2, 3].flatMap((k) => [
+        [0.55 + k * 0.3 - 0.2, { 'body.rotation.y': k * Math.PI / 2 - 0.5, 'arm.rotation.x': -1.2, 'arm.rotation.z': 1.0, 'body.rotation.x': -0.1, 'aim.pitch': 1.6, 'aim.yaw': 1.9 }],
+        [0.55 + k * 0.3, { 'body.rotation.y': k * Math.PI / 2 + 0.4, 'arm.rotation.x': -1.3, 'arm.rotation.z': 0.5, 'body.rotation.x': 0.15, 'aim.pitch': 1.6, 'aim.yaw': -0.8 }],
+      ]),
+      [1.75, { ...up, 'body.rotation.y': Math.PI * 2 }], [1.9, {}],
+      [2.05, { ...down, 'arm.rotation.x': 0.9, 'body.rotation.x': 0.6, 'body.position.y': -0.3, 'aim.pitch': 2.6 }],
+      [2.2, { 'arm.rotation.x': 0.6, 'body.rotation.x': 0.55, 'head.rotation.x': 0.45 }], [3.6, {}], [4.0, { ...N, 'body.rotation.y': Math.PI * 2 }]],
+  }),
+  // 走り寄り（長さはサーバーが決める）: 前のめりに走りながら、左右交互に斬り続ける
+  rush: m({
+    dur: 1.6, stretch: true,
+    keys: [[0, N],
+      ...[0, 1, 2, 3, 4, 5].map((k) => [0.12 + k * 0.24, k % 2
+        ? { 'body.rotation.x': 0.4, 'body.rotation.y': -0.4, 'arm.rotation.x': -1.0, 'arm.rotation.z': 0.4, 'aim.pitch': 1.7, 'aim.yaw': -0.9, 'guardArm.rotation.x': -0.6 }
+        : { 'body.rotation.x': 0.4, 'body.rotation.y': 0.4, 'arm.rotation.x': -1.3, 'arm.rotation.z': 1.0, 'aim.pitch': 1.6, 'aim.yaw': 1.6, 'guardArm.rotation.x': -0.6 }]),
+      [1.6, N]],
   }),
   // 暴走・回転斬り（1.1 秒）→ 大きな隙（剣先を地面に落としてうなだれる）。一周して終わるので体の向きは -2π で止める
   spin: m({

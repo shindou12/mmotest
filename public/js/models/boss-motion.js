@@ -1,5 +1,5 @@
 // ボスの技ごとの動きの再生（どのボスでも共通）。動きのデータは BOSS_MODELS[外観].motions（例: bosses/graz-motion.js）
-// act: { p: 技の名前, age: 始まってからの秒数, sp: 速さの倍率（sp の付いた技だけ時間を縮める） }
+// act: { p: 技の名前, age: 始まってからの秒数, sp: 速さの倍率（sp の付いた技だけ時間を縮める）, d: 長さ（stretch の技だけ） }
 // キー 'aim.pitch' / 'aim.yaw' は武器の向き（体から見た刃の向き。pitch: 0=真上 π/2=水平 π=真下、yaw: 0=正面 +π/2=剣の腕の側）。
 //   motion.aim = { node: 武器, grip: 握り, ref: 体 } の部位名で指定する
 import * as THREE from 'three';
@@ -28,12 +28,10 @@ function sample(keys, t) {
   return prev.full;
 }
 
-export function motionDuration(motion, sp = 1) { return motion.dur * (motion.sp ? sp : 1); }
-
 // 動きを当てる。終わっていたら false
 export function applyBossMotion(u, motion, act) {
   if (!motion) return false;
-  const scale = motion.sp ? act.sp || 1 : 1;
+  const scale = motion.stretch && act.d ? act.d / motion.dur : motion.sp ? act.sp || 1 : 1;
   const t = act.age / scale;
   if (!(t >= 0) || t > motion.dur) return false;
   const pose = sample(motion.keys, t);

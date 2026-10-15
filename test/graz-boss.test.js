@@ -67,7 +67,7 @@ test('breaking the second bar turns graz into the rampage with big swings', () =
   assert.equal(sent('bossEv').at(-1).sfx, 'phase'); // 暴走の合図（文章はなし）
   assert.equal(sent('bossEv').at(-1).title, undefined);
   tick(1);
-  assert.equal(sent('bossAct').at(-1).p, 'spin');
+  assert.equal(sent('bossAct').at(-1).p, 'frenzy'); // 暴走に入った瞬間は暴走乱舞
 });
 
 test('the judgement tracks the weakest player slowly, then fires a wide knockback line', () => {
