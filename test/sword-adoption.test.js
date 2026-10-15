@@ -52,6 +52,6 @@ test('the existing snapshot style field carries all five allowlisted unique IDs 
   const p=w.players.get(1);
   for(const style of [4,5,6,7,8]){w.handle(1,{t:'st',wk:'sword',wst:style});assert.equal(p.wst,style);w.snapshot(w.area(p.area));const snap=inbox.filter(m=>m.t==='snap').at(-1);assert.equal(snap.p[0][16],style);}
   for(const bad of [9,99,-1,4.5,'4',{},null,Infinity]){w.handle(1,{t:'st',wk:'sword',wst:bad});assert.equal(p.wst,0);}
-  for(const kind of WEAPON_KINDS.filter(k=>k!=='sword'))for(const style of[4,5,6,7,8])assert.equal(normalizeWeaponStyle(kind,style),0);
+  for(const kind of WEAPON_KINDS.filter(k=>k!=='sword'&&k!=='greatsword'))for(const style of[4,5,6,7,8])assert.equal(normalizeWeaponStyle(kind,style),0);
   for(const kind of WEAPON_KINDS)for(const style of[0,1,2,3])assert.equal(normalizeWeaponStyle(kind,style),style);
 });

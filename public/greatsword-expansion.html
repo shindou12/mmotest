@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>大剣モデル拡張プレビュー</title>
+  <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#14212b;color:#e8ece7;font:14px system-ui,-apple-system,sans-serif}
+    #root{height:100vh;min-height:720px;position:relative;overflow:hidden}
+    canvas{position:absolute;inset:0;width:100%;height:100%}
+    header{position:absolute;left:28px;right:28px;top:18px;z-index:2}
+    header small{color:#91a8ae;letter-spacing:2px;font-size:10px}
+    h1{font-size:24px;font-weight:500;margin:7px 0 5px}
+    header p{color:#9db0b3;font-size:12px;margin:0}
+    #captions{position:absolute;inset:0;pointer-events:none;z-index:1}
+    .caption{position:absolute;height:100%;padding:8px 12px;border-top:1px solid #344b51;background:linear-gradient(90deg,rgba(20,33,43,.90),rgba(20,33,43,.12))}
+    .caption small{font-size:9px;letter-spacing:1.5px;color:#91a8ae}
+    .caption strong{display:block;font-size:13px;font-weight:500;margin-top:3px}
+    .caption span{display:block;font-size:10px;line-height:1.35;color:#bdc8c5;margin-top:3px;max-width:300px}
+    footer{position:absolute;left:28px;right:28px;bottom:14px;z-index:2;display:flex;align-items:end;justify-content:space-between;gap:16px}
+    #note{font-size:10px;line-height:1.45;color:#9db0b3;max-width:560px}
+    #controls{display:flex;gap:8px}
+    select{border:1px solid #4a646b;border-radius:6px;background:#20333d;color:#e8ece7;padding:8px 10px}
+    @media(max-width:700px){
+      #root{min-height:760px}
+      header{left:14px;right:14px;top:12px}
+      h1{font-size:19px}
+      header p{font-size:10px;line-height:1.4}
+      .caption{padding:5px 6px}
+      .caption small{font-size:7px;letter-spacing:1px}
+      .caption strong{font-size:10px}
+      .caption span{font-size:8px;line-height:1.2}
+      footer{left:12px;right:12px;bottom:9px;gap:6px}
+      #note{font-size:8px;max-width:190px}
+      #controls{gap:5px}
+      select{font-size:9px;padding:6px 5px;max-width:150px}
+    }
+  </style>
+</head>
+<body>
+  <main id="root">
+    <canvas id="scene"></canvas>
+    <header><small>MMOTEST / GREAT SWORD / MODEL EXPANSION</small><h1>大剣の通常形とユニーク形</h1><p>通常6系統。ユニークは従来の共通モデルと専用モデルを同じ画面で比較できます。</p></header>
+    <div id="captions"></div>
+    <footer>
+      <div id="note">輪郭・トゥーン材質・照明・縮尺はゲームのモデルと共通です。武器性能、モーション、スキル演出は変更していません。</div>
+      <nav id="controls">
+        <select id="mode" aria-label="表示する武器グループ"><option value="normal">通常モデル</option><option value="unique">ユニーク比較</option></select>
+        <select id="angle" aria-label="見る角度"><option value="three-quarter">斜め</option><option value="front">正面</option><option value="side">側面</option></select>
+      </nav>
+    </footer>
+  </main>
+  <script type="module" src="./js/previews/greatsword-expansion.js"></script>
+</body>
+</html>

@@ -238,6 +238,10 @@ const model = (kit) => {
       1: kit.greatswordForms.cleaver,
       2: kit.greatswordForms.zweihander,
       3: kit.greatswordForms.flamberge,
+      4: kit.greatswordForms.odachi,
+      5: kit.greatswordForms.falchion,
+      6: kit.uniqueGreatswords.excalibur,
+      7: kit.uniqueGreatswords.dainsleif,
     },
   };
   return model;

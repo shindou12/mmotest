@@ -86,4 +86,36 @@ function flamberge(k) {
   g.userData.appearance = 'greatsword-flamberge';
 }
 
-export const GREATSWORD_FORMS = Object.freeze({ balanced, cleaver, zweihander, flamberge });
+function odachi(k) {
+  const { g, steel, gold, gem, blade } = k;
+  const length = 2.48, cuttingEdge = [], spine = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10, y = t * length;
+    const bend = 0.15 * t * t;
+    const half = 0.14 + 0.022 * Math.sin(t * Math.PI);
+    cuttingEdge.push([bend + half, y]);
+    spine.push([bend - half * 0.72, y]);
+  }
+  blade([...cuttingEdge, [0.16, length + 0.18], ...spine.reverse()], 0.09);
+  centerLine(k, 1.7, 0.048, 0xc2ccd3, 0.018);
+  hilt(k, 0.92, 0.047);
+  // A round tsuba and a gently curved edge distinguish the odachi at game scale.
+  add(k, new THREE.TorusGeometry(0.17, 0.025, 5, 18), gold, [0, 0.12, 0.038]);
+  add(k, new THREE.CylinderGeometry(0.052, 0.052, 0.085, 8), steel, [0, 0.12, 0]);
+  add(k, new THREE.OctahedronGeometry(0.064, 0), gem, [0, -0.87, 0.02], null, [0.86, 1.1, 0.78]);
+  g.userData.appearance = 'greatsword-odachi';
+}
+
+function falchion(k) {
+  const { g, gold, steel, blade } = k;
+  // A forward-swept, single-edge profile: shorter and broader at the tip than the odachi.
+  blade([[-0.15, 0], [0.15, 0], [0.19, 0.52], [0.27, 0.91], [0.39, 1.28], [0.37, 1.53], [0.28, 1.81], [0.12, 2.10], [-0.06, 2.28], [-0.20, 2.08], [-0.14, 1.63], [-0.11, 1.15], [-0.12, 0.64]], 0.12);
+  centerLine(k, 1.22, 0.064, 0xaeb9c6, 0.022);
+  plate(k, [[-0.38, 0.21], [-0.31, 0.10], [-0.16, 0.14], [0, 0.11], [0.16, 0.14], [0.31, 0.10], [0.38, 0.21], [0.31, 0.27], [0.15, 0.22], [0, 0.20], [-0.15, 0.22], [-0.31, 0.27]], 0.13, gold);
+  hilt(k, 0.83, 0.052);
+  add(k, new THREE.BoxGeometry(0.19, 0.10, 0.13), steel, [0, 0.12, 0]);
+  add(k, new THREE.OctahedronGeometry(0.069, 0), gold, [0, -0.80, 0], null, [1.05, 0.82, 0.78]);
+  g.userData.appearance = 'greatsword-falchion';
+}
+
+export const GREATSWORD_FORMS = Object.freeze({ balanced, cleaver, zweihander, flamberge, odachi, falchion });

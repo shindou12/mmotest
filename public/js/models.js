@@ -20,11 +20,15 @@ import { setGripHand } from './models/grip-hands.js';
 // 武器
 // ---------------------------------------------------------------------------
 
-// 装備から武器の形を決める: 固有片手剣はIDごとの形、未登録の伝説・神器は3、それ以外は名前から0〜2
+// 装備から武器の形を決める: 固有武器はIDごとの形、未登録の伝説・神器は3、それ以外は名前から選ぶ
 export function weaponStyle(it) {
   if (!it) return 0;
   if (it.rarity >= 6) return uniqueWeaponStyle(it.kind,it.unique) ?? 3;
   const s = [...String(it.name || '')].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  if (it.kind === 'greatsword') {
+    if (s % 8 === 0) return 4;
+    if (s % 8 === 1) return 5;
+  }
   return s % 3;
 }
 // 武器の飾りの段階（0〜5）: レアリティ8段（粗悪〜神器）を、金具・光る縁などの見た目の段階にまとめる

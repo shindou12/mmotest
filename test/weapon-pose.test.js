@@ -10,7 +10,7 @@ const poses = [{}, { moving: true, walkT: .4 }, { swing: .1 }, { swing: .55 }, {
 function point(object) { return object.getWorldPosition(new THREE.Vector3()); }
 
 test('all weapon styles stay anchored to the palm through every player pose', () => {
-  for (const kind of WEAPON_KINDS) for (let style = 0; style < 4; style++) {
+  for (const kind of WEAPON_KINDS) for (let style = 0; style < (kind === 'greatsword' ? 8 : 4); style++) {
     const model = makePlayer('#448a9b');setPlayerWeapon(model, kind, 3, style);
     const u = model.userData;
     assert.equal(u.weapon.parent, kind === 'bow' ? u.handL : u.hand);
