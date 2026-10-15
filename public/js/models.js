@@ -9,6 +9,7 @@ import { mesh, sphere, capsule, cyl, lathe, extrude, finish } from './models/kit
 import { WEAPON_MODELS } from './models/weapon-models.js';
 import { MOB_MODELS } from './models/mob-models.js';
 import { BOSS_MODELS } from './models/boss-models.js';
+import { applyBossMotion, endBossMotion } from './models/boss-motion.js';
 import { ARMOR_LOOKS } from './models/armor-looks.js';
 import { SHIELD_MODELS } from './models/shield-models.js';
 
@@ -307,6 +308,14 @@ export function animateMob(model, s) {
   if (u.sigil) { u.sigil.rotation.z = t; u.sigil.scale.setScalar(s.enraged ? 2.2 + Math.sin(t * 8) * 0.2 : 1.8); }
   u.body.rotation.x = wind ? -0.2 : atk ? 0.22 : 0;
   if (Object.hasOwn(BOSS_MODELS, u.identity)) BOSS_MODELS[u.identity].animate?.(u, s);
+  // 技ごとの動き（s.act: { p, age, sp }）。終わったら構えに戻して act.done を立てる。
+  // 途中で別の技に替わった・取り消された（スタンなど）ときも、前の動きを構えに戻す
+  const motions = BOSS_MODELS[u.identity]?.motions;
+  if (u.curAct && u.curAct !== s.act) { endBossMotion(u, motions?.[u.curAct.p]); u.curAct = null; }
+  if (s.act && !s.act.done) {
+    u.curAct = s.act;
+    if (!applyBossMotion(u, motions?.[s.act.p], s.act)) { endBossMotion(u, motions?.[s.act.p]); s.act.done = true; u.curAct = null; }
+  }
   const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0;
   for (const mm of u.mats) {
     if (flash > 0) { mm.m.emissive.setRGB(1, 1, 1); mm.m.emissiveIntensity = flash * 1.5; }

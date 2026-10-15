@@ -239,6 +239,9 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - 共通の部品（`sim/boss.js`）: `startCast`（詠唱バー・中断ゲージ）/ `markTarget`（狙い替えの「！」。挑発で取り返せる）/ `rushTo`（走って近づく）。
     画面側は `game/net-client.js` の `bossEv` / `cast` / `castP` / `castEnd` / `mark` / `judge` と、`ui/panels/hud.js` のボスの欄。
   - `sim.js` から `boss-brains.js` と `bosses/*.js` を直接 import しておく（下の「sim の import の深さ」）。
+- ボスの技ごとの動き: `public/js/models/bosses/<名前>-motion.js` にキーフレームを書き、`boss-models.js` の外観に `motions` として登録する。
+  - キーは `'部位.rotation.x'` などの値と、武器の向き `'aim.pitch'` / `'aim.yaw'`。技名はサーバーの `bossAct` の `p`（詠唱は `cast`）。
+  - 再生は `models/boss-motion.js`（どのボスでも共通）。サーバーの予兆の発動時刻に振り下ろしが合うように時刻を書く。
 - プレイヤーからのメッセージ: `public/shared/sim/messages.js` の `MESSAGES[t]` に関数を足す。
   - 送る側は `net.send({ t, ... })`。
 

@@ -297,7 +297,8 @@ export function update(dt) {
     mb.flash = Math.max(0, mb.flash - dt * 6);
     mb.model.position.set(mb.x, field.heightAt(mb.x, mb.z), mb.z);
     mb.model.rotation.y = mb.a;
-    view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged });
+    if (mb.act) { mb.act.age = now() - mb.act.start; if (mb.act.done) mb.act = null; }
+    view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, act: mb.act });
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) view.fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[state.world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
     if (mb.stunT > 0 && Math.random() < 0.5) {

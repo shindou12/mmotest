@@ -1,7 +1,7 @@
 import { RARITIES, TITLES, floorLevel, migrateItem } from '../../shared/data.js';
 import { AREAS } from '../../shared/areas.js';
 import { Net } from '../net.js';
-import { rnd } from './util.js';
+import { now, rnd } from './util.js';
 import { addChat, banner, floatText, renderParty, toast, ui } from './ui-bridge.js';
 import { char, characterStore, saveChar } from './save.js';
 import { audio, fx } from './render.js';
@@ -143,6 +143,7 @@ export function onMsg(m) {
       for (let i = teles.length - 1; i >= 0; i--) if (teles[i].src === m.id) { teles[i].meshes.forEach((g) => fx.dispose(g)); teles.splice(i, 1); }
       clearBossProjs();
       const b = mobs.get(m.id);
+      if (b) b.act = null; // スタンで技の動きも止まる
       banner('', 'STUN!', '#ffd84a', 3);
       audio.sfx('impact'); audio.sfx('perfect'); addShake(0.8);
       if (b) { fx.ringWave(b.x, b.z, 0xffd84a, 8, 0.6); fx.parts.burst(b.x, 4, b.z, 80, { color: 0xffe080, speed: 10, size: 0.6, life: 1 }); }
@@ -160,6 +161,13 @@ export function onMsg(m) {
       if (b) fx.ringWave(b.x, b.z, 0xff9a8a, 6, 0.5);
       break;
     }
+    case 'bossAct': {
+      // 技の始まり: 技ごとの動きを再生する（動きのデータがある技だけ。暴走中など段階で速くなる技は sp で縮める）
+      const b = mobs.get(m.id);
+      if (b) b.act = { p: m.p, start: now(), sp: b.enraged ? 0.9 : 1 };
+      if (b && m.p === 'throw') flyingSword(b);
+      break;
+    }
     // ---- ボスの共通部品（brain のあるボスが使う） ----
     case 'bossEv': {
       // HPバーが割れたときなどの出来事（文章は出さない。音と揺れと光だけ）
@@ -173,12 +181,13 @@ export function onMsg(m) {
       // 詠唱バー（技名）。need: 中断ゲージあり
       const b = mobs.get(m.id);
       if (b) b.cast = { name: m.name, start: performance.now(), dur: m.d, need: !!m.need, k: 0 };
+      if (b && m.need) b.act = { p: 'cast', start: now() }; // 詠唱の構え
       break;
     }
     case 'castP': { const b = mobs.get(m.id); if (b?.cast) b.cast.k = m.k; break; }
     case 'castEnd': {
       const b = mobs.get(m.id);
-      if (b) b.cast = null;
+      if (b) { b.cast = null; if (!m.ok) b.act = null; } // 止められた → 構えを解く
       break;
     }
     case 'mark': {
@@ -217,4 +226,27 @@ export function onMsg(m) {
     }
     case 'disconnected': addChat('', 'サーバーとの接続が切れました。ページを再読み込みしてください。', '#f66'); break;
   }
+}
+
+// 大剣投げ: 手から離れた大剣が回りながら前へ飛び、地面に刺さる（見た目だけ。当たり判定は予兆の線）
+const THROW = { release: 1.12, land: 1.32, life: 1.8, from: 3, to: 30 };
+function flyingSword(b) {
+  const src = b.model.userData.weaponModel;
+  if (!src) return;
+  const g = src.clone(true);
+  g.traverse((o) => { if (o.isMesh) { o.geometry = o.geometry.clone(); o.material = o.material.clone(); } });
+  g.scale.setScalar(b.model.scale.x); g.visible = false;
+  let a0 = null, sx = 0, sz = 0;
+  fx.add(g, THROW.life, (o, k) => {
+    const t = k * THROW.life;
+    if (t < THROW.release) return;
+    if (a0 === null) { a0 = b.a; sx = b.x; sz = b.z; }
+    o.visible = true;
+    const f = Math.min(1, (t - THROW.release) / (THROW.land - THROW.release));
+    const d = THROW.from + (THROW.to - THROW.from) * f;
+    const x = sx + Math.sin(a0) * d, z = sz + Math.cos(a0) * d;
+    o.rotation.set(0, a0, 0);
+    if (f < 1) { o.position.set(x, heightAt(x, z) + 3 * b.model.scale.x * 0.5, z); o.rotateX(t * 28); }
+    else { o.position.set(x, heightAt(x, z) + 1.6 * b.model.scale.x, z); o.rotateX(Math.PI * 0.92); } // 刃を下にして刺さる
+  });
 }
