@@ -1,0 +1,85 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Boss motion trials</title>
+<script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script>
+<style>html,body{margin:0;background:#14212c;color:#e8e7dc;font-family:Arial,sans-serif}#root{position:relative;width:100vw;height:100vh;overflow:hidden}canvas{position:absolute;inset:0}header{position:absolute;left:30px;top:24px;letter-spacing:3px;font-size:12px;color:#a5b8bc}h1{position:absolute;left:30px;top:41px;margin:0;font-size:29px;font-weight:500}#detail{position:absolute;left:31px;top:84px;font-size:13px;color:#acbec2;letter-spacing:.6px}#phase{position:absolute;left:30px;bottom:37px;letter-spacing:2px;font-size:12px;color:#d1dbd8}#controls{position:absolute;right:25px;bottom:25px;display:flex;gap:7px}button{background:#213744;border:1px solid #506569;border-radius:4px;padding:9px 11px;color:#e8e7dc;cursor:pointer}button.selected{border-color:#ddb970;color:#f8d78e}#hit{position:absolute;right:30px;top:30px;width:9px;height:9px;border-radius:50%;background:#f6d18d;opacity:0}</style>
+</head><body><main id="root"><canvas></canvas><header>MMOTEST / BOSS MOTION &amp; EFFECT TRIALS</header><h1></h1><div id="detail"></div><div id="phase"></div><div id="hit"></div><nav id="controls"><button data-type="select" data-index="0">Grasz</button><button data-type="select" data-index="1">Yugdra</button><button data-type="select" data-index="2">Skorpio</button><button data-type="move">Next move</button><button data-type="pause">Pause</button></nav></main>
+<script type="module">
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+import {makeMob,animateMob,makePlayer,setPlayerArmor} from './js/models.js';import {FX,makeTelegraph} from './js/fx.js';import {BossEffects} from './js/boss-effects.js';import {BOSS_DEMO_MOVES,bossMoveSpec} from './shared/boss-moves.js';
+const names=['Grasz','Yugdra','Skorpio'],details=['SWORD / SHIELD · GOLDEN BLADE TRAIL / FRACTURE','BRANCHES / ROOTS · ROOT WAVE / LEAF RAIN','PINCERS / STINGER · SAND CHIPS / VENOM'];
+import {FLOORS} from './shared/data.js';
+// Passive components bubble all input to Root. Only Mediator changes playback state.
+class Component{constructor(parent){this.parent=parent;}bubble(e){return this.parent.handle(e);}}
+class ControlView extends Component{
+ constructor(parent,element){super(parent);this.element=element;element.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>this.bubble({type:b.dataset.type,index:Number(b.dataset.index)})));}
+ render(p){this.element.style.display=p.capture?'none':'flex';this.element.querySelectorAll('[data-type="select"]').forEach((b,i)=>b.classList.toggle('selected',i===p.index));this.element.querySelector('[data-type="pause"]').textContent=p.paused?'Play':'Pause';}
+}
+class TextView extends Component{
+ constructor(parent,element){super(parent);this.element=element;}
+ render(p){this.element.querySelector('h1').textContent=p.title;this.element.querySelector('#detail').textContent=p.detail;this.element.querySelector('#phase').textContent=p.phase;this.element.querySelector('#hit').style.opacity=p.hit?.95:0;}
+}
+function demoEvents(spec){
+ const h=spec.hits,events=[];
+ if(spec.kind==='cleave')events.push({due:h[0],shape:{k:'cone',x:0,z:0,a:0,arc:1.9,len:11}});
+ if(spec.kind==='overhead')events.push({due:h[0],shape:{k:'circle',x:0,z:6.1,r:4.5}});
+ if(spec.kind==='roots')h.forEach((due,i)=>events.push({due,shape:{k:'ring',x:0,z:0,r0:i*4.2,r1:i*4.2+3}}));
+ if(spec.kind==='canopy')[[0,8],[-3,7],[4,5],[-6,-1],[5,-4],[0,-5],[7,1]].forEach(([x,z],i)=>events.push({due:h[0]+i*.09,shape:{k:'circle',x,z,r:2.6}}));
+ if(spec.kind==='pincers')h.forEach((due,i)=>events.push({due,shape:{k:'circle',x:i===0?-1:i===1?1:0,z:5.8,r:3.2}}));
+ if(spec.kind==='venom')events.push({due:h[0],projectile:true});return events;
+}
+class SceneView extends Component{
+ constructor(parent,canvas){
+  super(parent);this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});this.renderer.setClearColor(0x14212c);this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  this.scene=new THREE.Scene();this.camera=new THREE.OrthographicCamera(-20,20,11,-11,.1,160);this.camera.position.set(17,16,27);this.camera.lookAt(0,3.9,2);
+  this.scene.add(new THREE.HemisphereLight(0xfff1cc,0x526976,2));const sun=new THREE.DirectionalLight(0xffe5bb,2.3);sun.position.set(-10,22,15);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-23,right:23,top:23,bottom:-23,near:.5,far:70});sun.shadow.bias=-.0005;this.scene.add(sun);const rim=new THREE.DirectionalLight(0x7bb1d2,1.15);rim.position.set(10,10,-20);this.scene.add(rim);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(120,120),new THREE.MeshStandardMaterial({color:0x354b50,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-.012;floor.receiveShadow=true;this.scene.add(floor);
+  const grid=new THREE.GridHelper(80,20,0x4e6565,0x405455);grid.position.y=.012;this.scene.add(grid);
+  this.models=FLOORS.slice(0,3).map(f=>{const b=f.boss,m=makeMob(b.t,b.color,b.scale,b.accent,true,b.appearance);m.userData.aura.visible=false;this.scene.add(m);return m;});
+  this.dummy=makePlayer('#547590');setPlayerArmor(this.dummy,5);this.dummy.position.set(0,0,8);this.dummy.rotation.y=Math.PI;this.scene.add(this.dummy);
+  this.fx=new FX(this.scene);this.bossEffects=new BossEffects(this.scene,this.fx);this.telegraphs=[];this.last=-1;this.key='';this.once=new Set();
+  this.composer=new EffectComposer(this.renderer);this.composer.addPass(new RenderPass(this.scene,this.camera));this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(1280,720),.28,.5,.92));this.composer.addPass(new OutputPass());
+ }
+ reset(){this.bossEffects.clearAll();for(const it of this.fx.items.splice(0))this.fx.dispose(it.obj);this.fx.parts.n=0;this.fx.parts.update(0);for(const t of this.telegraphs)this.fx.dispose(t.mesh);this.telegraphs=[];this.once.clear();this.last=-1;}
+ step(p,age,dt){
+  const model=this.models[p.index],act=age>=0&&age<=p.spec.duration?{pattern:p.spec.pattern,age,phase:1,speed:p.spec.sp,spec:p.spec,key:p.moveId}:null;
+  const st=age<0?0:age<p.spec.hits[0]?2:age<p.spec.duration?3:0;
+  animateMob(model,{t:Math.max(0,age),st,enraged:false,bossMove:act?.pattern,bossTime:act?.age,bossPhase:1});
+  this.bossEffects.update(model,act,dt,Math.max(0,age));
+  for(const [i,e] of demoEvents(p.spec).entries()){
+   if(e.shape&&age>=Math.max(0,e.due-.8)&&age<e.due&&!this.once.has('t'+i)){const mesh=makeTelegraph(e.shape,'#e86459');this.scene.add(mesh);this.telegraphs.push({mesh,event:e});this.once.add('t'+i);}
+   if(e.shape&&age>=e.due-.25&&age<e.due&&!this.once.has('p'+i)){this.bossEffects.prepare(model,e.shape,e.due-age);this.once.add('p'+i);}
+   if(age>=e.due&&!this.once.has('h'+i)){
+    this.once.add('h'+i);
+    if(e.shape)this.bossEffects.impact(model,e.shape);
+    if(e.projectile)for(const a of [-.22,0,.22]){
+      const x=Math.sin(a)*2,z=Math.cos(a)*2,visual=this.bossEffects.projectile(model,x,1.3,z),color=visual?.color||0xc4ed68,startY=visual?.startY||1.3;
+      const g=new THREE.Group();g.add(new THREE.Mesh(new THREE.SphereGeometry(.33,10,6),new THREE.MeshBasicMaterial({color})),new THREE.Mesh(new THREE.SphereGeometry(.55,10,6),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.25,depthWrite:false})));g.position.set(x,startY,z);this.bossEffects.own(model,g,1.35,(o,k,delta)=>{o.position.x+=Math.sin(a)*14*delta;o.position.z+=Math.cos(a)*14*delta;o.position.y=THREE.MathUtils.lerp(startY,1.3,Math.min(1,k*1.35/.24));o.scale.setScalar(1-k*.25);});
+    }
+   }
+  }
+  this.telegraphs=this.telegraphs.filter(t=>{if(age>=t.event.due){this.fx.dispose(t.mesh);return false;}t.mesh.setProgress(Math.max(0,1-(t.event.due-age)/.8));return true;});
+  this.fx.update(dt);
+ }
+ render(p){
+  const width=p.width,height=p.height;this.renderer.setSize(width,height);this.composer.setSize(width,height);const h=p.index===1?22.5:21.5;this.camera.left=-h*width/height/2;this.camera.right=h*width/height/2;this.camera.top=h/2;this.camera.bottom=-h/2;this.camera.updateProjectionMatrix();
+  this.models.forEach((m,i)=>m.visible=i===p.index);const key=p.index+'/'+p.moveId;
+  if(key!==this.key||p.age<this.last){this.reset();this.key=key;}
+  if(p.age-this.last>.08){let t=Math.max(-.55,this.last);while(t<p.age-1e-6){const next=Math.min(p.age,t+1/60);this.step(p,next,next-t);t=next;}}
+  else this.step(p,p.age,Math.max(0,p.age-this.last));
+  this.last=p.age;this.composer.render();
+ }
+}
+class Presenter{
+ static params(s,width,height){const move=s.move??Math.floor(s.time/6)%2,moveId=BOSS_DEMO_MOVES[s.index*2+move],spec=bossMoveSpec(...moveId.split('/')),age=s.time%3-.55,first=spec.hits[0],last=spec.hits.at(-1);return{width,height,index:s.index,moveId,spec,age,capture:s.mode==='capture',paused:s.mode==='paused',title:names[s.index]+' · '+spec.title,detail:details[s.index],phase:age<0||age>spec.duration?'READY':age<first-.07?'ANTICIPATION':age>last+.14?'RECOVERY':'STRIKE / IMPACT',hit:spec.hits.some(h=>Math.abs(age-h)<.08)};}
+}
+class Mediator{
+ constructor(root){this.root=root;this.state={index:0,time:0,move:null,mode:'playing'};}
+ handle(e){const s=this.state;if(e.type==='select'){s.index=e.index;s.time=0;s.move=null;}if(e.type==='move'){s.move=((s.move??Math.floor(s.time/6)%2)+1)%2;s.time=0;}if(e.type==='pause')s.mode=s.mode==='paused'?'playing':'paused';if(e.type==='tick'&&s.mode==='playing')s.time+=e.dt;if(e.type==='capture'){s.mode='capture';s.index=e.index;s.time=e.time;s.move=null;}this.root.render(Presenter.params(s,e.width||innerWidth,e.height||innerHeight));}
+}
+class Root{
+ constructor(element){this.element=element;this.scene=new SceneView(this,element.querySelector('canvas'));this.text=new TextView(this,element);this.controls=new ControlView(this,element.querySelector('#controls'));this.mediator=new Mediator(this);}
+ handle(e){return this.mediator.handle(e);}render(p){this.scene.render(p);this.text.render(p);this.controls.render(p);}
+}
+const root=new Root(document.getElementById('root'));root.handle({type:'tick',dt:0});let last=performance.now();function loop(t){const dt=Math.min(.05,(t-last)/1000);last=t;if(root.mediator.state.mode==='playing')root.handle({type:'tick',dt});requestAnimationFrame(loop);}requestAnimationFrame(loop);
+window.ready=true;window.drawFrame=(index,time)=>root.handle({type:'capture',index,time,width:1280,height:720});window.trial=root;
+</script></body></html>

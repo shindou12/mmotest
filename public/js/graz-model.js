@@ -134,6 +134,7 @@ export function buildGraz(body, accent) {
   guardArm.add(mesh(cylinder(.14,.15,.24),M.iron,[-.065,-.45,.06]));
   const shield=kingShield(M);shield.position.set(-.245,-.32,.21);shield.rotation.y=-.35;guardArm.add(shield);
   parts.shield=shield;
+  parts.guardArm=guardArm;
 
   // Cape is a group with its pivot at the original cape anchor. No floor drag.
   const cape=new THREE.Group();cape.name='graz-cape';cape.position.set(0,.85,-.05);body.add(cape);

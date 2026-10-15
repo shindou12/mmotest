@@ -1,5 +1,6 @@
 import { MOTION_DURATIONS } from './motion-catalog.js';
 import { TECHNIQUES } from './techniques.js';
+import { bossMoveSpec } from './boss-moves.js';
 // ワールドシミュレーション（サーバー権威）。Node でもブラウザ（ソロモード）でも動く。
 // 世界は「エリア」単位で動く（町・フィールド・狩場・ダンジョン・迷宮区）。
 import { BALANCE, REVIVE, reviveStep, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from './balance.js';
@@ -470,6 +471,7 @@ export class World {
 
   // スタン: 一定時間固まり、出している最中の攻撃もすべて取り消す
   stunBoss(A, b) {
+    b.presentation = null;
     b.stunT = STUN_TIME;
     b.stun = 0;
     b.stunMax = Math.round(b.stunMax * 1.3);
@@ -786,12 +788,14 @@ export class World {
       b.arch.speed = 4.6;
       this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 2 });
       b.dash = null; b.busyT = 0; b.actT = 0.4; b.forced = 'shock';
+      b.presentation = null;
     }
     if (b.phase === 2 && b.hp < b.mhp * 0.35) {
       b.phase = 3;
       b.arch.speed = 5.2;
       this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 3 });
       b.dash = null; b.busyT = 0; b.actT = 0.6; b.forced = 'ultimate';
+      b.presentation = null;
     }
 
     if (b.stunT > 0) { b.stunT -= dt; b.st = 4; return; }
@@ -901,7 +905,9 @@ export class World {
     const ang = Math.atan2(target.x - b.x, target.z - b.z);
     b.a = ang;
     const tid = target.id;
-    this.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: pat, tid });
+    b.actSeq = (b.actSeq || 0) + 1;
+    b.presentation = { p: pat, phase: b.phase || 1, sp, seq: b.actSeq, started: this.time };
+    this.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: pat, tid, ar: A.id, phase: b.phase || 1, sp, seq: b.actSeq });
     switch (pat) {
       case 'shot': {
         // 狙った相手へ弾を扇状に撃つ（盾槍のガードで消せる）
@@ -1120,7 +1126,13 @@ export class World {
       Math.round(m.hateT * 10) / 10, m.kind === 'boss' ? Math.round(m.stun / m.stunMax * 100) : 0, m.stunT > 0 ? Math.round(m.stunT * 10) / 10 : 0,
     ]);
     const plates = A.plates.map((t) => this.time - t <= PLATE_WINDOW ? 1 : 0);
-    this.broadcastArea(A.id, { t: 'snap', ar: A.id, p: ps, m: ms, bs: A.bossState, door: A.door ? 1 : 0, pl: plates });
+    const bm = [];
+    if (A.boss?.presentation && A.boss.stunT <= 0) {
+      const b = A.boss, a = b.presentation, age = this.time - a.started;
+      const spec = bossMoveSpec(A.fdef.boss.appearance, a.p, a.phase, a.sp);
+      if (spec && age <= spec.duration) bm.push({ id: b.id, p: a.p, phase: a.phase, sp: a.sp, seq: a.seq, age });
+    }
+    this.broadcastArea(A.id, { t: 'snap', ar: A.id, p: ps, m: ms, bs: A.bossState, door: A.door ? 1 : 0, pl: plates, bm });
   }
 }
 

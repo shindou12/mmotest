@@ -67,6 +67,11 @@ export function buildYugdra(body, accent) {
 export function animateYugdra(u,s) {
   const stride=s.st===1?Math.sin(s.t*4)*.17:0;
   u.legs2[0].rotation.x=stride;u.legs2[1].rotation.x=-stride;
+  plantYugdraRoots(u);
+  u.treeCrown.rotation.z=Math.sin(s.t*.85)*.017;
+  u.treeMotes.rotation.y=Math.sin(s.t*.7)*.10;
+}
+export function plantYugdraRoots(u) {
   // Keep the lowest root planted as the trunk leans and the legs take a step.
   let low=Infinity;
   for(const {leg,point} of u.rootTips) {
@@ -74,6 +79,4 @@ export function animateYugdra(u,s) {
     low=Math.min(low,y*Math.cos(u.body.rotation.x)-z*Math.sin(u.body.rotation.x));
   }
   u.body.position.y=Math.max(0,.025-low);
-  u.treeCrown.rotation.z=Math.sin(s.t*.85)*.017;
-  u.treeMotes.rotation.y=Math.sin(s.t*.7)*.10;
 }

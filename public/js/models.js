@@ -8,6 +8,7 @@ import { toon, glow, outline, compact, gradientMap } from './toon.js';
 import { buildGraz } from './graz-model.js';
 import { buildYugdra, animateYugdra } from './yugdra-model.js';
 import { buildSkorpio, animateSkorpio } from './skorpio-model.js';
+import { captureBossRig, resetBossRig, applyBossMotion } from './boss-motion.js';
 
 function mesh(geo, mat, pos, rot, scale) {
   const m = new THREE.Mesh(geo, mat);
@@ -838,11 +839,13 @@ export function makeMob(t, color, scale = 1, accent = null, boss = false, appear
   body.traverse((o) => { if (o.isMesh && o.material.emissive && !o.userData.noOutline) parts.mats.push({ m: o.material, e: o.material.emissive.clone(), ei: o.material.emissiveIntensity }); });
   parts.mats = [...new Map(parts.mats.map((x) => [x.m.uuid, x])).values()];
   root.userData = parts;
+  captureBossRig(parts);
   return root;
 }
 
 export function animateMob(model, s) {
   const u = model.userData;
+  resetBossRig(u);
   const t = s.t;
   const moving = s.st === 1, wind = s.st === 2, atk = s.st === 3;
   if (u.squash) {
@@ -866,6 +869,7 @@ export function animateMob(model, s) {
   u.body.rotation.x = wind ? -0.2 : atk ? 0.22 : 0;
   if (u.identity === 'yugdra') animateYugdra(u, s);
   if (u.identity === 'skorpio') animateSkorpio(u, s);
+  if (s.bossMove) applyBossMotion(u, s);
   const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0;
   for (const mm of u.mats) {
     if (flash > 0) { mm.m.emissive.setRGB(1, 1, 1); mm.m.emissiveIntensity = flash * 1.5; }

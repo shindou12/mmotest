@@ -1,5 +1,7 @@
 import { MOTION_DURATIONS } from '../shared/motion-catalog.js';
 import { TREE_MOTIONS } from '../shared/tree-motions.js';
+import { BossPlayback } from '../shared/boss-moves.js';
+import { BossEffects } from './boss-effects.js';
 import { SPEAR_TIMINGS } from '../shared/skill-timings.js';
 import { counterAngle } from './spear-motion.js';
 import { CharacterStore, CHARACTER_KEY } from './character-store.js';
@@ -110,6 +112,8 @@ addEventListener('resize', () => {
 });
 
 const fx = new FX(scene);
+const bossPlayback = new BossPlayback();
+const bossEffects = new BossEffects(scene, fx);
 const ambient = new AmbientParticles(scene);
 const weatherParts = new AmbientParticles(scene, 1600); // 天候（雨・霧・砂嵐）の粒子
 const audio = new AudioEngine();
@@ -402,6 +406,10 @@ function onMsg(m) {
       break;
     case 'warped': enterArea(m.area, m.x, m.z); break;
     case 'snap': onSnap(m); break;
+    case 'bossAct': {
+      if (!m.ar || m.ar === world.area) bossPlayback.receive(m, now(), mobs.get(m.id)?.model.userData.identity);
+      break;
+    }
     case 'roster': roster = m.r; world.unlocked = m.unlocked; renderParty(); break;
     case 'tele': onTele(m); break;
     case 'die': onMobDie(m); break;
@@ -483,6 +491,8 @@ function onMsg(m) {
       break;
     }
     case 'enrage': {
+      bossPlayback.cancel(m.id);
+      if (mobs.get(m.id)) bossEffects.clear(mobs.get(m.id).model);
       const final = m.p === 3;
       banner(final ? '最終形態' : '激昂', final ? 'ボスが本気を出した！' : '攻撃が激しくなる…', final ? '#ff4ab0' : '#ff5a5a', 3);
       audio.sfx(final ? 'phase' : 'enrage'); addShake(final ? 1.4 : 0.8);
@@ -500,7 +510,7 @@ function onMsg(m) {
       for (let i = 0; i < 6; i++) setTimeout(() => fx.parts.burst(L.x + rnd(-8, 8), rnd(4, 10), L.z + rnd(-8, 8), 80, { color: [0xffd84a, 0x6ad0ff, 0xff6ab0][i % 3], size: 0.6, speed: 10, life: 1.5, gravity: -4 }), i * 250);
       break;
     }
-    case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); clearBossProjs(); break;
+    case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); clearBossProjs(); bossPlayback.clear(); bossEffects.clearAll(); break;
     case 'proj': spawnBossProj(m); break;
     case 'pgone': {
       const i = bprojs.findIndex((p) => p.id === m.id);
@@ -508,6 +518,8 @@ function onMsg(m) {
       break;
     }
     case 'stun': {
+      bossPlayback.cancel(m.id);
+      if (mobs.get(m.id)) bossEffects.clear(mobs.get(m.id).model);
       // スタン: そのボスが出していた攻撃はすべて取り消される
       for (let i = teles.length - 1; i >= 0; i--) if (teles[i].src === m.id) { teles[i].meshes.forEach((g) => fx.dispose(g)); teles.splice(i, 1); }
       clearBossProjs();
@@ -570,6 +582,7 @@ function enterArea(id, x, z) {
   const def = AREAS[id];
   const prev = world.area;
   world.area = id; world.def = def; world.floor = def.floor;
+  bossPlayback.clear(); bossEffects.clearAll();
   world.door = false; world.plates = []; world.bossState = 'idle';
   const fdef = FLOORS[def.floor - 1];
   buildEnv(id);
@@ -695,6 +708,7 @@ function onSnap(m) {
   if (m.ar !== world.area) return;
   world.bossState = m.bs;
   world.door = !!m.door;
+  for (const a of m.bm || []) bossPlayback.receive(a, now(), mobs.get(a.id)?.model.userData.identity);
   world.plates = m.pl || [];
   const seenP = new Set();
   for (const p of m.p) {
@@ -761,6 +775,7 @@ function onSnap(m) {
 function removeMob(id) {
   const mb = mobs.get(id);
   if (!mb) return;
+  bossPlayback.cancel(id); bossEffects.clear(mb.model);
   if (mb.label) mb.label.material.map.dispose();
   fx.dispose(mb.model);
   mobs.delete(id);
@@ -837,6 +852,10 @@ function updateTeles() {
   for (let i = teles.length - 1; i >= 0; i--) {
     const te = teles[i];
     const k = clamp((t - te.start) / te.dur, 0, 1);
+    if (!te.bossPrepared && te.dur * (1 - k) <= .25 && k < 1) {
+      te.bossPrepared = true;
+      for (const sh of te.sh) bossEffects.prepare(mobs.get(te.src)?.model, sh, Math.max(.04, te.dur * (1 - k)));
+    }
     te.meshes.forEach((g) => g.setProgress(k));
     if (k >= 1) {
       resolveTele(te);
@@ -850,6 +869,7 @@ function resolveTele(te) {
   const big = te.dmg > (S ? S.mhp * 0.12 : 20);
   for (const s of te.sh) {
     // 着弾演出
+    if (bossEffects.impact(mobs.get(te.src)?.model, s)) continue;
     const c = new THREE.Color(te.color);
     if (s.k === 'circle') { fx.ringWave(s.x, s.z, c, s.r, 0.35); fx.parts.burst(s.x, 0.3, s.z, Math.min(40, 6 + s.r * 4), { color: c, speed: 6, size: 0.5, life: 0.5, up: 2 }); }
     else if (s.k === 'ring') fx.ringWave(s.x, s.z, c, s.r1, 0.5);
@@ -2303,21 +2323,25 @@ function updateProjs(dt) {
 
 // ---- ボスの弾 ----
 function spawnBossProj(m) {
+  const visual = bossEffects.projectile(mobs.get(m.src)?.model, m.x, 1.3, m.z);
+  const visualColor = visual?.color ?? m.c;
   const g = new THREE.Group();
-  const core = new THREE.Mesh(new THREE.SphereGeometry(m.r, 14, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(m.c).multiplyScalar(1.6) }));
-  const halo = new THREE.Mesh(new THREE.SphereGeometry(m.r * 1.7, 14, 10), new THREE.MeshBasicMaterial({ color: m.c, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const core = new THREE.Mesh(new THREE.SphereGeometry(m.r, 14, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(visualColor).multiplyScalar(1.6) }));
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(m.r * 1.7, 14, 10), new THREE.MeshBasicMaterial({ color: visualColor, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
   g.add(core, halo);
-  g.position.set(m.x, 1.3, m.z);
+  g.position.set(m.x, visual?.startY || 1.3, m.z);
   scene.add(g);
-  bprojs.push({ ...m, mesh: g, dodged: false });
+  bprojs.push({ ...m, c: visualColor, visualStartY: visual?.startY, visualAge: 0, mesh: g, dodged: false });
 }
 function clearBossProjs() { for (const p of bprojs.splice(0)) fx.dispose(p.mesh); }
 function updateBossProjs(dt) {
   for (let i = bprojs.length - 1; i >= 0; i--) {
     const p = bprojs[i];
     p.x += p.vx * dt; p.z += p.vz * dt; p.life -= dt;
-    p.mesh.position.set(p.x, 1.3, p.z);
-    if (Math.random() < 0.6) fx.parts.emit(p.x, 1.3, p.z, { color: p.c, size: 0.4, life: 0.3, speed: 0.3, gravity: 0 });
+    p.visualAge += dt;
+    const py = p.visualStartY ? THREE.MathUtils.lerp(p.visualStartY, 1.3, Math.min(1, p.visualAge / .24)) : 1.3;
+    p.mesh.position.set(p.x, py, p.z);
+    if (Math.random() < 0.6) fx.parts.emit(p.x, py, p.z, { color: p.c, size: 0.4, life: 0.3, speed: 0.3, gravity: 0 });
     let gone = p.life <= 0;
     const d = Math.hypot(p.x - me.x, p.z - me.z);
     if (!gone && !me.dead && !me.crawl && d < p.r + 0.6) {
@@ -3347,7 +3371,9 @@ function update(dt) {
     mb.flash = Math.max(0, mb.flash - dt * 6);
     mb.model.position.set(mb.x, heightAt(mb.x, mb.z), mb.z);
     mb.model.rotation.y = mb.a;
-    animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged });
+    const bossAct = mb.stunT > 0 ? null : bossPlayback.sample(mb.id, t, mb.model.userData.identity);
+    animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, bossMove: bossAct?.pattern, bossTime: bossAct?.age, bossPhase: bossAct?.phase, bossSpeed: bossAct?.speed });
+    bossEffects.update(mb.model, bossAct, dt, t);
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.elite && Math.random() < 0.15) fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
     if (mb.stunT > 0 && Math.random() < 0.5) {
@@ -3565,6 +3591,7 @@ function enterPreview() {
 loop();
 
 window.__game = { me, others, mobs, drops, teles, npcs, bprojs, projs, char: () => char, world, fx, S: () => S, net, settings, env: () => env, ui: () => ui, cam, camera, coins, audio, api: game,
+  bossPlayback, bossEffects,
   // 自動テスト用の操作（通常攻撃・強攻撃・スキル）
   dbg: { canAct, hit: (mb, mult, o) => dealDamage(mb, mult, o), press: (on) => (on ? input.pointerDown(0) : input.pointerUp(0)), swing: () => { if (canAct() && me.swingT >= me.swingDur) doSwing(); }, heavy: doHeavy, tree: tryTreeSkill, ws: tryWeaponSkill, dodge: tryDodge },
 };
