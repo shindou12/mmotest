@@ -2,7 +2,7 @@
  "save/legacyTrees": {
   "char": "4227626f0482d59e88087f91",
   "stored": "a8e782d02acc5e2657875f7a",
-  "S": "7634131ad9207556707ff031",
+  "S": "ad0858c9a4ba6e341af10d4c",
   "wt": {
    "sword": {
     "lv": {},
@@ -23,7 +23,7 @@
  "save/newTrees": {
   "char": "4b6f959a0414a3459be84075",
   "stored": "4b6f959a0414a3459be84075",
-  "S": "c4d324113e201a0488969eb1",
+  "S": "4a7582ef1cd4e8a776240345",
   "wt": {
    "dagger": {
     "lv": {
@@ -50,23 +50,23 @@
   "size": 11926
  },
  "dom/inventory": {
-  "hash": "e0feddda0b0c8668a0020a4b",
+  "hash": "ff0e195ab03b21476d757dab",
   "size": 13547
  },
  "dom/tree": {
-  "hash": "2acf9eaf87ba3580a7a5ab4b",
+  "hash": "ae8c9aab75d5fa64f85c0313",
   "size": 24800
  },
  "dom/map": {
-  "hash": "4876f5ffe6138967cd2d09a5",
+  "hash": "80cdc667616e56f822a478a9",
   "size": 24819
  },
  "dom/settings": {
-  "hash": "b498b3f1615a09b93fbd7ea2",
+  "hash": "39577e70a0c8fd1e1ad2fac5",
   "size": 24847
  },
  "dom/closed": {
-  "hash": "736a42e862f5639d5097ffc0",
+  "hash": "df69b08ad027b6fa2ef6f822",
   "size": 24854
  },
  "run": {
@@ -108,7 +108,7 @@
   "lv": 1
  },
  "dom/after-run": {
-  "hash": "1da940f027d00670020ae516",
+  "hash": "5772ba5c850075b6859da760",
   "size": 24937
  },
  "errors": []
