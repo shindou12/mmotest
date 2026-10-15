@@ -35,6 +35,7 @@ export const MESSAGES = {
     if (!mob || mob.hp <= 0) return;
     const dmg = Math.max(0, Math.min(Number(m.dmg) || 0, 1e9));
     mob.hp -= dmg;
+    if (mob.cast) world.castDamage(A, mob, dmg);
     world.applyTechniqueControl(A, p, mob, m.tech);
     // 盾槍はヘイトを稼ぎやすい
     world.addThreat(mob, p.id, dmg * (WEAPONS[p.wk]?.threat ?? 1));

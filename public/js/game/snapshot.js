@@ -65,6 +65,7 @@ export function onSnap(m) {
         rad = 0.75 * sc;
       }
       mb = { id, model, name, rad, kind, elite, x, z, a, hp, mhp, lv, st, flash: 0, label: null, localT: 0, poisonUntil: 0, poisonT: 0 };
+      if (kind === 2) mb.bars = fdef.boss.bars || 1;
       if (kind !== 2) mb.label = makeMobLabel(mb);
       model.position.set(x, heightAt(x, z), z);
       scene.add(model);

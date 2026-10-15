@@ -10,6 +10,7 @@ server.js ──────────────► public/shared/sim.js（W
                                └─ sim/  役目ごとのメソッドと登録表（World に足す）
                                    ├─ messages.js     ★ プレイヤーからのメッセージ（t ごとの登録表 MESSAGES）
                                    ├─ boss-patterns.js ★ ボスの技（技ごとの登録表 BOSS_PATTERNS）
+                                   ├─ boss-brains.js  ★ ボスごとの行動ロジック（登録表 BOSS_BRAINS。中身は bosses/<名前>.js）
                                    ├─ mob-attacks.js  ★ 敵の攻撃の形（敵の形 t ごとの登録表 MOB_ATTACKS）
                                    ├─ mobs.js / boss.js / area-tick.js / interact.js   敵・ボス・エリアの毎フレーム・レバーや宝箱
                                    └─ common.js       共通の道具と定数
@@ -231,6 +232,13 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 - ボスの技: `public/shared/sim/boss-patterns.js` の `BOSS_PATTERNS[名前]` に関数を足す。
   - 戻り値は次の行動までの秒数。
   - `public/shared/data.js` のボスの `patterns` / `p3` に名前を書くと使われる。
+- ボスごとの行動ロジック（brain）: `public/shared/sim/bosses/<名前>.js` を作り、`boss-brains.js` の `BOSS_BRAINS` に登録して、
+  `data.js` のボスに `brain: '<名前>'` と `bars`（HPバーの本数）を書く。見本は `bosses/graz.js`（仕様は `docs/design/boss-sheets/graz.md`）。
+  - brain が持つもの: `spawn` / `tick`（true で行動しない）/ `patterns`・`gap`・`chain`（技の選び方）/ `moves`（ボス固有の技）。
+  - brain の無いボスは今までどおり共通ロジック（激昂 65% → 最終形態 35%）で動く。
+  - 共通の部品（`sim/boss.js`）: `startCast`（詠唱バー・中断ゲージ）/ `markTarget`（狙い替えの「！」。挑発で取り返せる）/ `rushTo`（走って近づく）。
+    画面側は `game/net-client.js` の `bossEv` / `cast` / `castP` / `castEnd` / `mark` / `judge` と、`ui/panels/hud.js` のボスの欄。
+  - `sim.js` から `boss-brains.js` と `bosses/*.js` を直接 import しておく（下の「sim の import の深さ」）。
 - プレイヤーからのメッセージ: `public/shared/sim/messages.js` の `MESSAGES[t]` に関数を足す。
   - 送る側は `net.send({ t, ... })`。
 

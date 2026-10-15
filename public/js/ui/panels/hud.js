@@ -104,9 +104,22 @@ export function installHud(ui) {
     const boss = game.boss();
     H.boss.set({ visible: !!boss });
     if (boss) {
-      H.bossName.set({ text: `Lv${boss.lv} ${boss.name}`, cls: { enraged: !!boss.enraged } });
+      const bars = boss.bars || 1;
+      const left = bars > 1 ? `　×${Math.max(1, Math.ceil(boss.hp / boss.mhp * bars - 1e-6))}` : '';
+      H.bossName.set({ text: `Lv${boss.lv} ${boss.name}${left}`, cls: { enraged: !!boss.enraged } });
       const pct = clamp(boss.hp / boss.mhp * 100, 0, 100) + '%';
       H.bossHp.set({ style: { width: pct } }); H.bossLag.set({ style: { width: pct } });
+      // HPバー複数本: 区切り線と残り本数
+      H.bossSeg.set({ visible: bars > 1, style: { '--bars': String(bars) } });
+      // 詠唱バー（技名）と中断ゲージ
+      const c = boss.cast && performance.now() - boss.cast.start < boss.cast.dur + 500 ? boss.cast : null; // 終わりの知らせが来なくても時間で消す
+      H.bossCast.set({ visible: !!c });
+      if (c) {
+        H.bossCastName.set({ text: c.name });
+        H.bossCastFill.set({ style: { width: clamp((performance.now() - c.start) / c.dur * 100, 0, 100) + '%' } });
+        H.bossCutBar.set({ visible: !!c.need });
+        H.bossCut.set({ style: { width: clamp((c.k || 0) * 100, 0, 100) + '%' } });
+      }
       const tname = boss.target === me.id ? 'あなた' : game.others.get(boss.target)?.name;
       H.bossTarget.set({ text: (tname ? `ターゲット：${tname}` : '') + (boss.hateT != null ? `　ヘイトリセットまで ${Math.max(0, boss.hateT).toFixed(0)}秒` : ''), cls: { me: boss.target === me.id } });
       const stunned = boss.stunT > 0;

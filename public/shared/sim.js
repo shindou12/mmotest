@@ -19,6 +19,8 @@ import './tree-motions.js';
 import { InteractMethods } from './sim/interact.js';
 import { MobsMethods } from './sim/mobs.js';
 import { AreaTickMethods } from './sim/area-tick.js';
+import './sim/boss-brains.js';
+import './sim/bosses/graz.js';
 import { BossMethods } from './sim/boss.js';
 
 export class World {

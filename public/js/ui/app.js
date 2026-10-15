@@ -60,7 +60,8 @@ export function createUI(game) {
   for (const [k, sel] of Object.entries({
     meName: '#me-name', meLv: '#me-lv', hp: '#me-hp', hpT: '#me-hp-t', xp: '#me-xp', xpT: '#me-xp-t', floor: '#me-floor', buffs: '#buffs',
     boss: '#boss', bossName: '#boss-name', bossHp: '#boss-hp', bossLag: '#boss-hp-lag', bossStunBar: '#boss-stun-bar', bossStun: '#boss-stun',
-    bossStunT: '#boss-stun-t', bossTarget: '#boss-target', party: '#party', quests: '#quests', minimap: '#minimap', charge: '#charge',
+    bossStunT: '#boss-stun-t', bossTarget: '#boss-target', bossSeg: '#boss-seg', bossCast: '#boss-cast', bossCastName: '#boss-cast-name',
+    bossCastFill: '#boss-cast-fill', bossCutBar: '#boss-cut-bar', bossCut: '#boss-cut', party: '#party', quests: '#quests', minimap: '#minimap', charge: '#charge',
     hotbar: '#hotbar', chat: '#chat', chatLog: '#chat-log', chatIn: '#chat-in', prompt: '#prompt', toasts: '#toasts', banner: '#banner',
     mode: '#mode-tag', help: '#help', topbar: '#topbar', stamina: '#stamina', vitals: '#vitals', gold: '#gold',
   })) H[k] = hud.add(k, sel, k === 'minimap' ? CanvasView : View);

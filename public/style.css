@@ -58,6 +58,18 @@ button.big { font-size: 18px; padding: 12px; letter-spacing: .2em; background: l
 #boss-hp { background: linear-gradient(90deg, #b3122a, #ff4a5a); transition: width .1s; }
 #boss-hp-lag { background: #fff3; transition: width .8s .3s; }
 @keyframes pulse { from { opacity: 1 } to { opacity: .6 } }
+/* HPバー複数本: 区切り線（--bars 本） */
+#boss-seg { background: repeating-linear-gradient(90deg, transparent 0, transparent calc(100% / var(--bars) - 2px), rgba(0,0,0,.75) calc(100% / var(--bars) - 2px), rgba(0,0,0,.75) calc(100% / var(--bars))); }
+/* 詠唱バー（技名）と中断ゲージ */
+#boss-cast { margin: 4px auto 0; width: 60%; }
+#boss-cast-name { font-size: 14px; font-weight: bold; color: #ffd27a; letter-spacing: .15em; text-shadow: 0 0 8px #f80, 0 2px 3px #000; }
+.bar.cast { height: 8px; margin: 2px 0; border-color: rgba(255,200,120,.5); }
+#boss-cast-fill { background: linear-gradient(90deg, #c87a1a, #ffd27a); transition: none; }
+.bar.cut { height: 10px; border-color: rgba(120,200,255,.5); }
+#boss-cut { background: linear-gradient(90deg, #2a7acc, #8fd8ff); }
+.bar.cut span { line-height: 9px; font-size: 8px; }
+/* ボスの狙い替え（全ボス共通の「！」） */
+.dmg.aggro { color: #ff3a2a; font-size: 40px; text-shadow: 0 0 10px #ff8a3a, 0 2px 3px #000; }
 
 #party { position: absolute; top: 205px; right: 12px; width: 180px; padding: 8px; font-size: 12px; }
 #party .pm { margin-bottom: 6px; }

@@ -5,6 +5,7 @@ import { bossLevel, mobHp, mobDmg } from '../data.js';
 import { rnd, pick, dist, r2, HATE_RESET, HATE_ABSORB, angDiff } from './common.js';
 import { STUN_TIME } from './tuning.js';
 import { BOSS_PATTERNS } from './boss-patterns.js';
+import { BOSS_BRAINS } from './boss-brains.js';
 
 export const BossMethods = {
   spawnBoss(A) {
@@ -16,6 +17,8 @@ export const BossMethods = {
       st: 0, actT: 2.5, busyT: 0, enraged: false, phase: 1, last: null, dash: null, arch: { speed: 3.4 }, threat: new Map(),
       hateT: HATE_RESET.boss, hateMax: HATE_RESET.boss, stun: 0, stunMax: Math.round(BALANCE.bossStun * (1 + BALANCE.bossStunPerPlayer * (n - 1))), stunT: 0,
     };
+    const brain = BOSS_BRAINS[A.fdef.boss.brain];
+    if (brain) brain.spawn(this, A, b);
     A.mobs.set(b.id, b);
     A.boss = b;
     return b;
@@ -34,6 +37,8 @@ export const BossMethods = {
     b.stun = 0;
     b.stunMax = Math.round(b.stunMax * 1.3);
     b.dash = null; b.busyT = 0; b.actT = STUN_TIME + 0.6;
+    if (b.cast || b.track) this.broadcastArea(A.id, { t: 'castEnd', id: b.id, ok: 0 });
+    b.cast = null; b.track = null;
     A.timers = [];
     A.projs = [];
     this.broadcastArea(A.id, { t: 'stun', id: b.id, sec: STUN_TIME });
@@ -48,14 +53,17 @@ export const BossMethods = {
       if (A.noTargetT > 8) { this.resetBoss(A); return; }
     } else A.noTargetT = 0;
 
+    // ボスごとの行動ロジック（brain）があれば、段階の切り替えはそちらに任せる。true なら今回は行動しない
+    const brain = BOSS_BRAINS[A.fdef.boss.brain];
+    if (brain) { if (brain.tick(this, A, b, inArena, dt)) return; }
     // フェーズ: 1 → 激昂(65%) → 最終形態(35%)。移行時は大技で割り込む
-    if (!b.enraged && b.hp < b.mhp * 0.65) {
+    else if (!b.enraged && b.hp < b.mhp * 0.65) {
       b.enraged = true; b.phase = 2;
       b.arch.speed = 4.6;
       this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 2 });
       b.dash = null; b.busyT = 0; b.actT = 0.4; b.forced = 'shock';
     }
-    if (b.phase === 2 && b.hp < b.mhp * 0.35) {
+    if (!brain && b.phase === 2 && b.hp < b.mhp * 0.35) {
       b.phase = 3;
       b.arch.speed = 5.2;
       this.broadcastArea(A.id, { t: 'enrage', id: b.id, p: 3 });
@@ -105,21 +113,65 @@ export const BossMethods = {
 
     if (b.actT <= 0) {
       const bd = A.fdef.boss;
-      const pats = b.phase === 3 ? [...bd.patterns, ...(bd.p3 || [])] : bd.patterns;
+      const pats = brain ? brain.patterns(b) : b.phase === 3 ? [...bd.patterns, ...(bd.p3 || [])] : bd.patterns;
       const forced = b.forced;
       let pat = forced || pick(pats);
       b.forced = null;
       if (!forced && pat === b.last && pats.length > 1) pat = pick(pats.filter((p) => p !== b.last));
       b.last = pat;
-      const victim = Math.random() < 0.2 && inArena.length > 1 ? pick(inArena) : target;
+      // brain のあるボスは狙いを気まぐれに変えない（狙い方を読めるように）
+      const victim = !brain && Math.random() < 0.2 && inArena.length > 1 ? pick(inArena) : target;
       const busy = this.bossPattern(A, b, pat, victim, inArena);
       b.busyT = busy;
       // 攻撃の間隔は短め。フェーズが進むほど詰めてきて、連続攻撃も増える
-      const gap = [0, rnd(0.6, 1.1), rnd(0.35, 0.7), rnd(0.15, 0.45)][b.phase || 1];
+      const gap = brain ? brain.gap(b) : [0, rnd(0.6, 1.1), rnd(0.35, 0.7), rnd(0.15, 0.45)][b.phase || 1];
       b.actT = busy + gap * 0.8;
-      const chain = [0, 0.25, 0.5, 0.7][b.phase || 1];
+      const chain = brain ? brain.chain(b) : [0, 0.25, 0.5, 0.7][b.phase || 1];
       if (Math.random() < chain) b.actT = busy + 0.05;
     }
+  },
+
+  // ---- ボスの共通部品（brain から使う） ----
+  // 詠唱: 名前とバーを出す。need > 0 なら、詠唱中に need 以上のダメージで中断してスタン。終われば done() を呼ぶ
+  startCast(A, b, name, sec, need, done) {
+    b.cast = { name, t: sec, need, dealt: 0, done };
+    b.busyT = 0.3; b.dash = null; // 詠唱中は tickCast が行動を止める
+    this.broadcastArea(A.id, { t: 'cast', id: b.id, name, d: Math.round(sec * 1000), need: need > 0 ? 1 : 0 });
+  },
+  tickCast(A, b, dt) {
+    const c = b.cast;
+    if (!c) return false;
+    if (c.need > 0 && c.dealt >= c.need) { this.stunBoss(A, b); return true; } // 中断（stunBoss が詠唱を消す）
+    c.t -= dt;
+    if (c.t > 0) { b.st = 2; return true; }
+    b.cast = null;
+    this.broadcastArea(A.id, { t: 'castEnd', id: b.id, ok: 1 });
+    c.done?.();
+    return false;
+  },
+  // 詠唱中に受けたダメージ（中断ゲージ）
+  castDamage(A, b, dmg) {
+    const c = b.cast;
+    if (!c || !(c.need > 0)) return;
+    c.dealt += dmg;
+    this.broadcastArea(A.id, { t: 'castP', id: b.id, k: Math.round(Math.min(1, c.dealt / c.need) * 100) / 100 });
+  },
+  // 狙いを替える（全ボス共通の「！」マーク）。挑発と同じ仕組みなので、挑発で取り返せる
+  markTarget(A, b, p, sec = 6) {
+    b.tauntBy = p.id; b.tauntT = sec; b.target = p.id;
+    this.broadcastArea(A.id, { t: 'mark', id: b.id, tid: p.id });
+  },
+  // 走って近づく（ダメージなし）。dash と同じ動きなので、正面でガードしている盾槍に止められる
+  rushTo(A, b, p, speed = 16, stop = 3.5) {
+    const d = Math.hypot(p.x - b.x, p.z - b.z);
+    if (d <= stop + 0.5) return 0;
+    const ang = Math.atan2(p.x - b.x, p.z - b.z);
+    const end = { x: b.x + Math.sin(ang) * (d - stop), z: b.z + Math.cos(ang) * (d - stop) };
+    this.clampArena(A, end);
+    b.a = ang;
+    const dur = (d - stop) / speed;
+    b.dash = { fx: b.x, fz: b.z, tx: end.x, tz: end.z, t: 0, dur };
+    return dur;
   },
 
   clampArena(A, o) {
@@ -150,7 +202,8 @@ export const BossMethods = {
     const base = mobDmg(b.lv) * 3.3 * BALANCE.bossDamage * floorPressure(A.n) * attackPressure(b.scaleN);
     const col = b.phase === 3 ? '#ff1a8a' : b.enraged ? '#ff2a6a' : '#ff3a3a';
     // 遠距離攻撃と突進は、ときどき離れている別の人を狙う
-    if (['shot', 'charge', 'chase'].includes(pat) && inArena.length > 1 && Math.random() < (pat === 'shot' ? 0.6 : 0.4)) {
+    const brain = BOSS_BRAINS[A.fdef.boss.brain];
+    if (!brain && ['shot', 'charge', 'chase'].includes(pat) && inArena.length > 1 && Math.random() < (pat === 'shot' ? 0.6 : 0.4)) {
       const far = inArena.filter((p) => p.id !== target.id).sort((p, q) => dist(q, b) - dist(p, b))[0];
       if (far) {
         target = far;
@@ -161,7 +214,8 @@ export const BossMethods = {
     b.a = ang;
     const tid = target.id;
     this.broadcastArea(A.id, { t: 'bossAct', id: b.id, p: pat, tid });
-    // 技ごとの中身は sim/boss-patterns.js の登録表
+    // 技ごとの中身: ボス固有の技（brain.moves）→ 共通の登録表（sim/boss-patterns.js）の順に探す
+    if (brain?.moves && Object.hasOwn(brain.moves, pat)) { const t = brain.moves[pat](this, A, b, target, { L, sp, base, col, ang, tid, inArena }); if (t !== undefined) return t; }
     if (Object.hasOwn(BOSS_PATTERNS, pat)) { const t = BOSS_PATTERNS[pat](this, A, b, target, { L, sp, base, col, ang, tid, inArena }); if (t !== undefined) return t; }
     return 1;
   },

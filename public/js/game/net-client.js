@@ -7,7 +7,7 @@ import { char, characterStore, saveChar } from './save.js';
 import { audio, fx } from './render.js';
 import { bprojs, me, mobs, others, teles, world } from './state.js';
 import { S } from './stats.js';
-import { enterArea, env } from './area.js';
+import { enterArea, env, heightAt } from './area.js';
 import { onMobDie, onSnap, removeOther } from './snapshot.js';
 import { die, onTele, revived } from './hurt.js';
 import { addShake } from './combat.js';
@@ -17,6 +17,7 @@ import { countClear, grantTitle, questEvent, rollTitleDrop } from './progress.js
 import { LOOT, spawnDrop, spawnGold } from './loot.js';
 import { salvageTarget, spawnSalvaged } from './items.js';
 import { aimLineMesh } from './meshes.js';
+import { makeTelegraph } from '../fx.js';
 
 // ======================================================================
 // ネットワーク
@@ -160,6 +161,48 @@ export function onMsg(m) {
     case 'hateReset': {
       const b = mobs.get(m.id);
       if (b) { toast('ヘイトがリセットされた！ 狙いを取り直そう', '#ff9a8a'); fx.ringWave(b.x, b.z, 0xff9a8a, 6, 0.5); }
+      break;
+    }
+    // ---- ボスの共通部品（brain のあるボスが使う） ----
+    case 'bossEv': {
+      // HPバーが割れたときなどの出来事
+      banner(m.title, m.sub, m.color, 3);
+      if (m.sfx) audio.sfx(m.sfx);
+      addShake(0.8);
+      const b = mobs.get(m.id);
+      if (b) fx.ringWave(b.x, b.z, parseInt(String(m.color).slice(1), 16), 16, 0.8);
+      break;
+    }
+    case 'cast': {
+      // 詠唱バー（技名）。need: 中断ゲージあり
+      const b = mobs.get(m.id);
+      if (b) b.cast = { name: m.name, start: performance.now(), dur: m.d, need: !!m.need, k: 0 };
+      if (m.need) toast(`${m.name}：詠唱中に攻撃を集中すると止められる！`, '#ffd27a');
+      break;
+    }
+    case 'castP': { const b = mobs.get(m.id); if (b?.cast) b.cast.k = m.k; break; }
+    case 'castEnd': {
+      const b = mobs.get(m.id);
+      if (b?.cast?.need) toast(m.ok ? `${b.cast.name}を止められなかった…` : `${b.cast.name}を阻止した！`, m.ok ? '#ff9a8a' : '#9affc8');
+      if (b) b.cast = null;
+      break;
+    }
+    case 'mark': {
+      // 狙いを替えた（全ボス共通の「！」）
+      const t = m.tid === me.id ? me : others.get(m.tid);
+      if (t) { floatText(t.x, 3.2, t.z, '！', 'aggro'); fx.ringWave(t.x, t.z, 0xff3a2a, 3, 0.5); }
+      if (m.tid === me.id) { toast('狙われた！', '#ff6a5a'); audio.sfx('telegraph'); }
+      break;
+    }
+    case 'judge': {
+      // 溜めながら向きを合わせる大技: 予兆と同じ太さの帯を、ボスの向きに合わせて回す（向きは snap で動く）
+      const b = mobs.get(m.id);
+      if (!b) break;
+      const band = makeTelegraph({ k: 'line', x: 0, z: 0, a: 0, len: m.len, w: m.w }, '#ffb84a');
+      fx.add(band, m.d / 1000, (o, k) => {
+        o.position.set(b.x, heightAt(b.x, b.z), b.z); o.rotation.y = b.a;
+        o.setProgress(k * 0.6);
+      });
       break;
     }
     case 'aim': {
