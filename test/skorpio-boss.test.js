@@ -107,7 +107,10 @@ test('from the second bar, burrowing marks one player and skorpio bursts out rig
   assert.ok(sent('cast').some((c) => c.name === '砂喰らい'));
   const p = w.players.get(m.tid);
   p.x = A.lair.x + 9; p.z = A.lair.z + 20; // 走って逃げても、飛び出すのはその人の足元
+  const before = sent('tele').length;
   tick(5.6);
+  // 盛り上がりの小さな円（細かいダメージ）は落とさない。当たるのは印が弾けたときの一撃だけ
+  assert.equal(sent('tele').slice(before).filter((t) => t.sh[0].k === 'circle' && t.sh[0].r === K(1.6)).length, 0);
   assert.ok(Math.hypot(b.x - p.x, b.z - p.z) < 0.5, `${b.x},${b.z} vs ${p.x},${p.z}`);
 });
 

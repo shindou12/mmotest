@@ -85,7 +85,7 @@ export const skorpio = {
         world.clampArena(A, b);
       }
       B.stepT -= dt;
-      if (B.stepT <= 0) {
+      if (!B.mark && B.stepT <= 0) { // 盛り上がりの小さな円は登場の追いかけだけ。砂喰らいは飛び出す一撃だけ（砂ぼこりは画面側で出す）
         B.stepT = BURROW.step;
         const T = BURROW.trail;
         world.tele(A, b, [{ k: 'circle', x: r2(b.x), z: r2(b.z), r: T.r }], T.delay, B.base * T.dmg, '#ff3a3a');
