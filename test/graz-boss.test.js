@@ -83,10 +83,11 @@ test('the judgement tracks the weakest player slowly, then fires a wide knockbac
   tick(1.6);
   const t = sent('tele').at(-1);
   assert.equal(t.sh[0].k, 'line'); assert.equal(t.sh[0].w, 6); assert.equal(t.kd, 1);
-  // 衝撃波の通り道から、横へ亀裂が手元から順に4本（本線と直角）
+  // 通り道に横向きの帯が4本並び、それぞれ中心から左右へ4段ずつ広がる（本線と直角）
   const before = sent('tele').length;
-  tick(1.4);
-  const cracks = sent('tele').slice(before).filter((m) => m.sh[0].len === 16);
-  assert.equal(cracks.length, 4 * 3); // 3人それぞれに4本
-  for (const c of cracks) assert.ok(Math.abs(Math.cos(c.sh[0].a - t.sh[0].a)) < 0.01); // 直角
+  tick(2);
+  const waves = sent('tele').slice(before).filter((m) => m.sh.length === 2);
+  assert.equal(waves.length, 4 * 4 * 3); // 帯4本 × 4段 × 3人
+  for (const v of waves) for (const s of v.sh) assert.ok(Math.abs(Math.cos(s.a - t.sh[0].a)) < 0.01); // 直角
+  assert.ok(waves.every((v) => v.sh[0].w === 8.5));
 });
