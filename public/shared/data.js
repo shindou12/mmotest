@@ -55,6 +55,8 @@ export const WEAPON_KINDS = Object.keys(WEAPONS);
 export const DEFAULT_WEAPON = 'sword';
 // 生存本能（近接武器のパッシブ）: 常に被ダメージを少し軽減する
 export const INSTINCT = { dr: 8 };
+// 武器の重さによる固さ: 重い武器ほど、レベルが上がるにつれて被ダメージ軽減（%）が伸びる（短剣・弓は柔らかく、大剣・大斧は固い）
+export const weaponDef = (kind, lv) => (WEAPONS[kind]?.weight ?? 0) * Math.max(0, lv) * BALANCE.weaponDef;
 // 武器に付くスキルの候補（1つ目が最初の武器の基本のスキル）。中身は WEAPONS[kind].skillPool
 export const WEAPON_SKILL_POOL = Object.fromEntries(WEAPON_KINDS.map((k) => [k, WEAPONS[k].skillPool]));
 // 品質を固めるまでは3階層で運用

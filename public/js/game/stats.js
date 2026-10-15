@@ -1,4 +1,4 @@
-import { INSTINCT, SKILL_VARIANTS, WEAPONS, WEAPON_SKILL_POOL, affixVal, baseAtk, baseHp, enhMult, isVariant, itemWeight, titleReqOk, weightClass, DEFAULT_WEAPON } from '../../shared/data.js';
+import { INSTINCT, SKILL_VARIANTS, WEAPONS, WEAPON_SKILL_POOL, affixVal, baseAtk, baseHp, enhMult, isVariant, itemWeight, titleReqOk, weightClass, weaponDef, DEFAULT_WEAPON } from '../../shared/data.js';
 import { WEAPON_SKILLS, treeEffects } from '../skills.js';
 import { wtEffects } from '../weapon-tree.js';
 import { fxCall } from './weapon-fx.js';
@@ -78,7 +78,7 @@ export function calcStats() {
     crit: 5 + m('crit'), critd: 150 + m('critd'), aspd: m('aspd'), move: m('move'),
     vamp: m('vamp') + (fxs.has('vamp') ? 4 : 0) + P.vamp, cdr: Math.min(60, m('cdr') + (fxs.has('star') ? 35 : 0)),
     // 生存本能: 近接武器は常に被ダメ軽減
-    def: Math.min(65, m('def') + base(eq.armor, 'def') + P.def + (W.melee ? INSTINCT.dr : 0)), wr: eq.weapon ? eq.weapon.rarity : 0,
+    def: Math.min(65, m('def') + base(eq.armor, 'def') + P.def + (W.melee ? INSTINCT.dr : 0) + weaponDef(wk, state.char.lv)), wr: eq.weapon ? eq.weapon.rarity : 0,
     sv, title, titleOn, tfx,
     normp: m('normp'), heavyp: m('heavyp') + P.heavy, wskillp: m('wskillp'), dodgecd: Math.min(60, m('dodgecd')),
     justbuff: m('justbuff'), counter: m('counter'), backwater: m('backwater'), maxPot: 3 + m('potion') + (state.char.potBonus || 0),
