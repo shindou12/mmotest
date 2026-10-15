@@ -322,6 +322,9 @@ export const UNIQUES = [
 
 // --- 階層データ ------------------------------------------------------------
 // props: [種類, 数, 色1, 色2]
+// 敵の定義: 0 以上は階層の敵（FLOORS[].mobs）、負の数はボスの手下（FLOORS[].boss.minions[-1 - i]）
+export const mobDef = (fdef, i) => (i < 0 ? fdef.boss.minions[-1 - i] : fdef.mobs[i]);
+
 export const FLOORS = [
   {
     n: 1, name: '始まりの草原', ground: 0x4c8a3a, ground2: 0x79b552, fog: 0xbfe3ff, skyTop: 0x5aa8ff, skyBot: 0xd8f0ff,
@@ -345,7 +348,8 @@ export const FLOORS = [
       { t: 'wisp', name: 'フォレストウィスプ', color: 0x8cffb0 }, { t: 'beast', name: 'ミストウルフ', color: 0x8a9a9a },
       { t: 'mushroom', name: 'ミストマタンゴ', color: 0x7a8ad0 }, { t: 'mage', name: 'ゴブリンシャーマン', color: 0x4a7a3a },
     ],
-    boss: { name: '霧の大樹 ユグドラ', t: 'golem', appearance: 'yugdra', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, patterns: ['rain', 'shock', 'combo', 'cage', 'summon', 'cone', 'shot', 'checker', 'haven'], p3: ['spiral', 'nova'] },
+    boss: { name: '霧の大樹 ユグドラ', t: 'golem', appearance: 'yugdra', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, brain: 'yugdra', bars: 3, patterns: ['torrent', 'torrent', 'nova', 'rain'],
+      minions: [{ t: 'rootknot', name: '吸い上げの根瘤', color: 0x6a8a3a, link: true, scale: 1.6 }] }, // minions: ボスの手下（link: 大樹へ光の線、scale: 大きさ）
   },
   {
     n: 3, name: '砂塵の荒野', ground: 0xc9a066, ground2: 0xe0bf86, fog: 0xf0d6a8, skyTop: 0xf0b070, skyBot: 0xffe6c0,

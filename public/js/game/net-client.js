@@ -182,13 +182,13 @@ export function onMsg(m) {
       // 詠唱バー（技名）。need: 中断ゲージあり
       const b = mobs.get(m.id);
       if (b) b.cast = { name: m.name, start: performance.now(), dur: m.d, need: !!m.need, k: 0 };
-      if (b && m.need) b.act = { p: 'cast', start: now() }; // 詠唱の構え
+      if (b && (m.act || m.need)) b.act = { p: m.act || 'cast', start: now(), fromCast: true }; // 詠唱の構え（m.act があればその動き）
       break;
     }
     case 'castP': { const b = mobs.get(m.id); if (b?.cast) b.cast.k = m.k; break; }
     case 'castEnd': {
       const b = mobs.get(m.id);
-      if (b) { b.cast = null; if (!m.ok) b.act = null; } // 止められた → 構えを解く
+      if (b) { b.cast = null; if (b.act?.fromCast) b.act = null; } // 詠唱が終わった → 構えを解く
       break;
     }
     case 'mark': {

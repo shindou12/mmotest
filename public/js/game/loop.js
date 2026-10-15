@@ -303,6 +303,14 @@ export function update(dt) {
     view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, act: mb.act, stun: mb.stunT > 0 });
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) view.fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[state.world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
+    // ボスとつながる手下（吸い上げの根瘤）: 手下から大樹へ光の粒が流れ込む
+    if (mb.link) {
+      const boss = [...state.mobs.values()].find((o) => o.kind === 2);
+      if (boss) for (let i = 0; i < 2; i++) {
+        const k = Math.random(), x = mb.x + (boss.x - mb.x) * k, z = mb.z + (boss.z - mb.z) * k;
+        view.fx.parts.emit(x + rnd(-0.3, 0.3), 1.0 + k * 3 + Math.sin(k * Math.PI) * 1.5, z + rnd(-0.3, 0.3), { color: 0x9cff7a, size: 0.55, life: 0.35, speed: 0.4, gravity: 0 });
+      }
+    }
     // スタン中はピヨピヨと鳴り続け、終わったら立ち上がる音
     if (mb.kind === 2) {
       if (mb.stunT > 0) { mb.tweetT = (mb.tweetT ?? 0.5) - dt; if (mb.tweetT <= 0) { mb.tweetT = 0.45; view.audio.sfx('stunTweet'); } mb.wasStun = true; }

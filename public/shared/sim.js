@@ -21,6 +21,7 @@ import { MobsMethods } from './sim/mobs.js';
 import { AreaTickMethods } from './sim/area-tick.js';
 import './sim/boss-brains.js';
 import './sim/bosses/graz.js';
+import './sim/bosses/yugdra.js';
 import { BossMethods } from './sim/boss.js';
 
 export class World {

@@ -3,5 +3,6 @@
 // brain に必要なもの: spawn(world, A, b) / tick(world, A, b, inArena, dt) → true で行動しない /
 //   patterns(b) → 技の名前の配列 / gap(b)・chain(b) → 次の行動までの間隔・連続攻撃の確率 / moves（ボス固有の技）
 import { graz } from './bosses/graz.js';
+import { yugdra } from './bosses/yugdra.js';
 
-export const BOSS_BRAINS = { graz };
+export const BOSS_BRAINS = { graz, yugdra };

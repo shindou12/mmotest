@@ -1,4 +1,4 @@
-import { FLOORS, RARITIES, WEAPONS } from '../../shared/data.js';
+import { FLOORS, RARITIES, WEAPONS, mobDef } from '../../shared/data.js';
 import { makeMob, makePlayer, setPlayerArmor, setPlayerWeapon } from '../models.js';
 import { now } from './util.js';
 import { audio, fx, scene } from './render.js';
@@ -57,9 +57,9 @@ export function onSnap(m) {
         model = makeMob(b.t, b.color, b.scale, b.accent, true, b.appearance);
         name = b.name; rad = 0.9 * b.scale;
       } else {
-        const md = fdef.mobs[d];
+        const md = mobDef(fdef, d);
         // elite: 1 精鋭 / 2 門番 / 3 ネームド（秘境の主）
-        const sc = kind === 1 ? 0.8 : elite === 3 ? 1.9 : elite ? 1.3 : 1;
+        const sc = md.scale ?? (kind === 1 ? 0.8 : elite === 3 ? 1.9 : elite ? 1.3 : 1); // md.scale: ボスの手下の大きさ
         model = makeMob(md.t, md.color, sc, elite === 3 ? 0xff60d0 : elite ? 0xffb030 : null);
         name = elite === 3 ? `★ ${world.def.named?.name || md.name}` : elite === 2 ? '門番' : (elite ? '精鋭 ' : '') + md.name;
         rad = 0.75 * sc;
@@ -67,6 +67,7 @@ export function onSnap(m) {
       mb = { id, model, name, rad, kind, elite, x, z, a, hp, mhp, lv, st, flash: 0, label: null, localT: 0, poisonUntil: 0, poisonT: 0 };
       if (kind === 2) mb.bars = fdef.boss.bars || 1;
       if (kind !== 2) mb.label = makeMobLabel(mb);
+      if (kind !== 2 && mobDef(fdef, d)?.link) mb.link = true; // ボスとつながる手下（光る線を引く）
       model.position.set(x, heightAt(x, z), z);
       scene.add(model);
       mobs.set(id, mb);

@@ -1,7 +1,7 @@
 // World のメソッド: 敵の出現・撃破・移動・ヘイト・攻撃。sim.js が World.prototype に足す
 import { TECHNIQUES } from '../techniques.js';
 import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from '../balance.js';
-import { FLOORS, RARITIES, MAX_FLOOR, mobHp, mobDmg, mobXp, makeItem, rollRarity } from '../data.js';
+import { FLOORS, RARITIES, MAX_FLOOR, mobHp, mobDmg, mobXp, makeItem, rollRarity, mobDef } from '../data.js';
 import { collide, pathStep, obstaclesOf } from '../areas.js';
 
 import { MOB_ATTACKS } from './mob-attacks.js';
@@ -17,7 +17,7 @@ export const MobsMethods = {
 
   // ---- モンスター ----
   spawnMob(A, defIdx, x, z, lv, kind = 'mob', elite = false) {
-    const def = A.fdef.mobs[defIdx];
+    const def = mobDef(A.fdef, defIdx);
     const arch = ARCH[def.t];
     const scaleN = partySize(this.areaPlayers(A.id).length);
     let hp = mobHp(lv) * floorPressure(A.n) * enemyScale(scaleN) * arch.hp * (kind === 'add' ? 0.5 : 1) * (elite ? ELITE.hp : 1);

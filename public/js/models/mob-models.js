@@ -180,6 +180,16 @@ export const MOB_MODELS = {
     p.add(mesh(cone(0.09, 0.35, 8), glow(ac.clone().multiplyScalar(1.4)), [0, 0.35, 0.12], [0.9, 0, 0]));
     parts.tail = tail;
   },
+  rootknot(k) { // 根瘤（霧の大樹の手下）: 地面から盛り上がった節くれだった瘤と、脈打つ光る芯。動かない
+    const { body, m, mD, parts } = k;
+    const b = new THREE.Group(); b.position.y = 0.55; body.add(b);
+    b.add(mesh(new THREE.DodecahedronGeometry(0.75, 0), m, [0, 0.05, 0], [0.3, 0.5, 0.1], [1.1, 0.9, 1]));
+    b.add(mesh(new THREE.DodecahedronGeometry(0.5, 0), mD, [0.35, 0.45, -0.1], [0.8, 0.2, 0.4]));
+    const core = mesh(sphere(0.32, 12, 8), glow(0x9cff7a), [0, 0.25, 0.45], null, [1, 1.2, 0.7]);
+    b.add(core);
+    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + 0.3; b.add(mesh(cone(0.16, 0.9, 6), mD, [Math.sin(a) * 0.75, -0.45, Math.cos(a) * 0.75], [Math.cos(a) * 1.2, 0, -Math.sin(a) * 1.2])); }
+    parts.squash = b; parts.knotCore = core;
+  },
   mage(k) { // 魔術師: ローブとフード、光る杖、周りを回る紋様
     const { body, c, ac, eyeM, parts } = k;
     const robe = toon(c), robeD = toon(c.clone().multiplyScalar(0.5));

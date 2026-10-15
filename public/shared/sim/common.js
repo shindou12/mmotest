@@ -16,6 +16,7 @@ export const ARCH = {
   mushroom: { speed: 1.6, hp: 1.25, dmg: 0.95, wind: 1.0, range: 3.2, aggro: 10 },
   scorpion: { speed: 4.2, hp: 1.25, dmg: 1.2, wind: 0.8, range: 5.0, aggro: 13 },
   mage: { speed: 2.8, hp: 0.8, dmg: 1.05, wind: 1.3, range: 11, aggro: 15, ranged: true },
+  rootknot: { speed: 0, hp: 2.0, dmg: 0, wind: 1, range: 0, aggro: 0 }, // ボスの手下: 動かず攻撃しない（霧の大樹の根瘤）
 };
 export const CHEST_COOLDOWN = 300; // ダンジョン最奥の宝箱
 export const SMALL_CHEST_COOLDOWN = 600; // 屋外の小さな宝箱
