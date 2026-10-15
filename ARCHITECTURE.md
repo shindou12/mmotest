@@ -97,6 +97,8 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 
 - sim.js は、分ける前と同じモジュール（motion-catalog・techniques・balance・data・areas）を直接読む。
 - `sim/common.js` は何も import しない。
+- 武器のファイル（`js/weapons/*.js`）も sim.js から3段目で見つかるようにしてある（sim.js が `js/weapons/index.js`・`common.js`・`game/util.js`・`tree-motions.js` を直接読む）。
+  武器のファイルが新しいモジュールを読むときも同じく、sim.js からの段を3段目までに保つ（`python3` などで数えられる。sim.js が1段目）。
 - `sim/*.js` から新しいモジュールを読むときは、sim.js からも直接読むか、戦闘の golden（`npm run test:golden`）で差が出ないことを確かめる。
 
 ### 層と依存の向き（依存性の逆転）
@@ -154,29 +156,25 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
 
 ### 武器の種類を足す
 
-新しい武器は、**サーバーと共通の表に1項目 ＋ 武器のファイル1つ ＋ 登録1行** で足せる。ほかのファイルは直さない。
+新しい武器は、**`public/js/weapons/<wk>.js` を1つ足して、`public/js/weapons/index.js` の `WEAPON_DEFS` に1行足すだけ**。ほかのファイルは直さない。
 
-| 何を | どこに |
-|---|---|
-| サーバーと共通の数値（名前・射程・速さ・重さ・握る位置 grip・盾 shield・両手持ち・スキルの候補 skillPool など） | `public/shared/data.js` の `WEAPONS` に1項目 |
-| その武器のすべて（下の一覧） | `public/js/weapons/<wk>.js` を1つ |
-| 登録 | `public/js/weapons/index.js` の `WEAPON_DEFS` に1行（並び順がツリー画面の順・効果を呼ぶ順の基本） |
+`public/js/weapons/<wk>.js` は `export default { wk, kindOrder, stats, tab, glyph, tree, skills, mods, legacy, heavy, weaponSkills, model, motion?, effects }` を書く。
+登録表（WEAPONS・HEAVY・WEAPON_SKILLS・WEAPON_MODELS・WEAPON_MOTIONS・武器の効果）は、どれも `WEAPON_DEFS` から集めて作られる。
 
-`public/js/weapons/<wk>.js` は `export default { wk, tab, glyph, tree, skills, mods, legacy, heavy, weaponSkills, model, motion?, effects }` を書く。
-登録表（HEAVY・WEAPON_SKILLS・WEAPON_MODELS・WEAPON_MOTIONS・武器の効果）は、どれも `WEAPON_DEFS` から集めて作られる。
-
+- `stats`・`kindOrder`: サーバーと共通の数値（名前・射程・速さ・重さ・握る位置 grip・盾 shield・両手持ち・スキルの候補 skillPool など）と、`WEAPONS` での並び順。
+  `shared/data.js` の `WEAPONS` に集まる。サーバー（Node）もこのファイルを読むので、three.js や DOM は直接 import しない。
 - `tab`・`glyph`: 武器ツリー画面のタブの並びと、装備アイコンの文字。
 - `tree`・`skills`・`mods`・`legacy`: 武器ツリー（段とノード、Q/E スキル、ツリーが足す能力値、旧ツリーからの移行）。
-- `heavy`: 強攻撃（`run(c, lv)`）。`weaponSkills`: 武器に付くスキル（id → `{ name, kind, cd, run(c) }`。id は `skillPool` に書く）。
-- `model`: 形（`base(k)` が基本の形、`styles[1|2|3](k)` が形違い。`k` は材質と道具）。
-- `motion`（近接と違うときだけ）: `{ pose, swing, technique, afterSwing, rest }`。書いたものだけ近接の動きを上書きする。
+- `heavy`: 強攻撃（`run(c, lv)`）。`weaponSkills`: 武器に付くスキル（id → `{ name, kind, cd, run(c) }`。id は `stats.skillPool` に書く）。
+- `model(kit)`: 形を返す関数。`kit` に three.js と形の道具（`THREE`・`mesh`・`sphere`・`cone`・`cyl`・`lathe`・`extrude`・`bowString`・`toon`）が入る。
+  返す形は `{ base(k), styles: { 1, 2, 3 }, prep? }`（`base` が基本の形、`styles` が形違い）。
+- `motion(rig)`（近接と違うときだけ）: 構えを返す関数。`rig` に `THREE`・`aimHand`・`orientWeapon`・`ease`・`applyMeleePose`・`spearPose` が入る。
+  返すのは `{ pose, swing, technique, afterSwing, rest }` の書いたものだけで、近接の動きを上書きする。
 - `effects`: 武器ツリーの効果。`function effects({ player, field, attack, tree, show, party, register })` の中で
   `register('<wk>', { フック: 関数 }, { フック: 順 })` で登録する（使える道具は `game/weapon-api.js` の一覧）。
   - スキルに渡す道具（`combat` 文脈）を足すときは `attack.extendCombat({ ... })`。
   - 能力値 S は計算し直されるので、分割代入せず `player.S` で読む。
 - 初期武器のスキルを `skillPool` の1つ目から変えるときだけ、`shared/data.js` の `STARTER_SKILL` にも足す。
-
-サーバーと共通の数値だけを `shared/data.js` に置くのは、サーバー（Node）が three.js を使う武器のファイルを読めないため。
 
 ### クラス・マスター・パッシブ（武器ツリーのノード）を足す
 

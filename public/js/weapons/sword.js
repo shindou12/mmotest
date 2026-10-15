@@ -1,14 +1,9 @@
 // 片手剣のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・構え・武器ツリーの効果。
-// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
-import * as THREE from 'three';
+// 登録は weapons/index.js に1行だけ。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）もここの stats（サーバーも読むので three.js は直接 import しない）
 import { L3, T, at } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
 import { BALANCE } from '../../shared/balance.js';
-import { aimHand, orientWeapon } from '../pose-rig.js';
-import { applyMeleePose } from '../motions/melee.js';
 import { clamp, now, rnd } from '../game/util.js';
-import { cyl, extrude, mesh, sphere } from '../models/kit.js';
-import { toon } from '../toon.js';
 
 const SWORD = {
   name: '片手剣',
@@ -146,6 +141,16 @@ function mods(st, br, mods) {
 const legacy = { prefixes: ['sword_'], slots: ['slant', 'brave', 'sword_parry', 'sword_aircut', 'sword_sideturn', 'sword_dance'] };
 
 // ---------------------------------------------------------------------------
+// サーバーと共通の数値（shared/data.js の WEAPONS に集まる。サーバーもこのファイルを読む）
+// weight: 装備重量（回避のクールタイムに影響） / stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ / melee: 近接武器（生存本能を持つ）
+// ---------------------------------------------------------------------------
+const stats = {
+  name: '片手剣', skillPool: ['vorpal', 'square', 'leap', 'horizon', 'retreat'], grip: -0.15, range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4, stun: 1.0, melee: true,
+  passive: [], // 片手剣は武器ツリー（熟練度）で決める
+  skill: { name: 'ヴォーパル・ストライク', cd: 5, desc: '前方へ突進しながら貫く', mult: 3.2 },
+};
+
+// ---------------------------------------------------------------------------
 // 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
 // ---------------------------------------------------------------------------
 const heavy = {
@@ -233,65 +238,74 @@ const weaponSkills = {
 // ---------------------------------------------------------------------------
 // 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
 // ---------------------------------------------------------------------------
-const model = {
-  base(k) {
-    const { g, steel, gold, gem, edge, handle } = k;
-    const w = 0.075, L = 1.3;
-    const pts = [[-w, 0], [w, 0], [w, L - 0.22], [0, L], [-w, L - 0.22]];
-    edge(pts, 0.035);
-    g.add(mesh(extrude(pts, 0.035), steel, [0, 0.12, 0]));
-    g.add(mesh(new THREE.BoxGeometry(0.022, L * 0.7, 0.05), toon(0x9aa4b4), [0, 0.12 + L * 0.4, 0]));
-    const guard = mesh(new THREE.TorusGeometry(0.26, 0.03, 6, 16, Math.PI * 0.7), gold, [0, -0.05, 0], [0, 0, Math.PI * 0.15]);
-    g.add(guard);
-    g.add(mesh(sphere(0.05, 10, 8), gem, [0, 0.1, 0.04]));
-    handle(0.42);
-  },
-  styles: {
-    1: (k) => { // 刀: 反りのある片刃
-      const { g, gold, handle, blade } = k;
-      const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x + 0.045, y]); }
-      for (let i = 10; i >= 0; i--) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x - (t > 0.92 ? 0 : 0.03), y]); }
-      blade(pts, 0.03);
-      g.add(mesh(cyl(0.1, 0.1, 0.03, 14), gold, [0, 0.1, 0], [Math.PI / 2, 0, 0]));
-      handle(0.5, 0.032);
-    },
-    2: (k) => { // 幅広の葉形
-      const { g, gold, gem, handle, blade } = k;
-      blade([[-0.06, 0], [0.06, 0], [0.13, 0.55], [0.1, 0.95], [0, 1.25], [-0.1, 0.95], [-0.13, 0.55]], 0.04);
-      g.add(mesh(new THREE.BoxGeometry(0.42, 0.07, 0.09), gold, [0, 0.08, 0]));
-      g.add(mesh(sphere(0.05, 10, 8), gem, [0, 0.08, 0.05]));
-      handle(0.38);
-    },
-    3: (k) => { // 専用: 光の結晶の刃と翼の鍔
-      const { g, steel, gold, gem, handle, glowM, blade } = k;
-      const pts = [[-0.07, 0], [0.07, 0], [0.09, 0.8], [0.04, 1.3], [0, 1.5], [-0.04, 1.3], [-0.09, 0.8]];
-      blade(pts, 0.03, 0.12, glowM(1.3));
-      g.add(mesh(extrude(pts.map(([x, y]) => [x * 0.55, y * 0.96]), 0.045), steel, [0, 0.14, 0]));
-      for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.42, 0.18], [0.36, 0.05], [0.5, -0.02], [0.2, -0.06]].map(([x, y]) => [x * s, y]), 0.03), gold, [0, 0.08, 0]));
-      g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0, 0.1, 0.03]));
+// kit: 形の道具（THREE・mesh・sphere・cone・cyl・lathe・extrude・bowString・toon）。models/weapon-models.js が渡す
+const model = (kit) => {
+  const { THREE, mesh, sphere, cyl, extrude, toon } = kit;
+  const model = {
+    base(k) {
+      const { g, steel, gold, gem, edge, handle } = k;
+      const w = 0.075, L = 1.3;
+      const pts = [[-w, 0], [w, 0], [w, L - 0.22], [0, L], [-w, L - 0.22]];
+      edge(pts, 0.035);
+      g.add(mesh(extrude(pts, 0.035), steel, [0, 0.12, 0]));
+      g.add(mesh(new THREE.BoxGeometry(0.022, L * 0.7, 0.05), toon(0x9aa4b4), [0, 0.12 + L * 0.4, 0]));
+      const guard = mesh(new THREE.TorusGeometry(0.26, 0.03, 6, 16, Math.PI * 0.7), gold, [0, -0.05, 0], [0, 0, Math.PI * 0.15]);
+      g.add(guard);
+      g.add(mesh(sphere(0.05, 10, 8), gem, [0, 0.1, 0.04]));
       handle(0.42);
     },
-  },
+    styles: {
+      1: (k) => { // 刀: 反りのある片刃
+        const { g, gold, handle, blade } = k;
+        const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x + 0.045, y]); }
+        for (let i = 10; i >= 0; i--) { const t = i / 10, y = t * 1.35, x = Math.sin(t * 1.2) * 0.12; pts.push([x - (t > 0.92 ? 0 : 0.03), y]); }
+        blade(pts, 0.03);
+        g.add(mesh(cyl(0.1, 0.1, 0.03, 14), gold, [0, 0.1, 0], [Math.PI / 2, 0, 0]));
+        handle(0.5, 0.032);
+      },
+      2: (k) => { // 幅広の葉形
+        const { g, gold, gem, handle, blade } = k;
+        blade([[-0.06, 0], [0.06, 0], [0.13, 0.55], [0.1, 0.95], [0, 1.25], [-0.1, 0.95], [-0.13, 0.55]], 0.04);
+        g.add(mesh(new THREE.BoxGeometry(0.42, 0.07, 0.09), gold, [0, 0.08, 0]));
+        g.add(mesh(sphere(0.05, 10, 8), gem, [0, 0.08, 0.05]));
+        handle(0.38);
+      },
+      3: (k) => { // 専用: 光の結晶の刃と翼の鍔
+        const { g, steel, gold, gem, handle, glowM, blade } = k;
+        const pts = [[-0.07, 0], [0.07, 0], [0.09, 0.8], [0.04, 1.3], [0, 1.5], [-0.04, 1.3], [-0.09, 0.8]];
+        blade(pts, 0.03, 0.12, glowM(1.3));
+        g.add(mesh(extrude(pts.map(([x, y]) => [x * 0.55, y * 0.96]), 0.045), steel, [0, 0.14, 0]));
+        for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.42, 0.18], [0.36, 0.05], [0.5, -0.02], [0.2, -0.06]].map(([x, y]) => [x * s, y]), 0.03), gold, [0, 0.08, 0]));
+        g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0, 0.1, 0.03]));
+        handle(0.42);
+      },
+    },
+  };
+  return model;
 };
 
 // ---------------------------------------------------------------------------
 // 構え・振り（motions/index.js が近接の動きに上書きする）
 // ---------------------------------------------------------------------------
-// 片手剣の構え: ガード中（守護騎士）だけ独自。ほかは近接の構え
-function applySwordPose(u, s) {
-  if (s.guard) {
-    // 片手剣のガード（守護騎士）: 剣を横に倒して胸の前で受ける。左手は刃の腹に添える
-    const yaw = -1.38, pitch = .22;
-    u.armR.position.z = 0;
-    const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(.22, 1.26, .46), new THREE.Vector3(1, -.6, -.3));
-    const axis = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
-    aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, .5), new THREE.Vector3(-1, -.6, -.2));
-    orientWeapon(u, yaw, pitch);
-    return;
+// rig: 構えの道具（THREE・aimHand・orientWeapon・ease・applyMeleePose・spearPose）。motions/index.js が渡す
+const motion = (rig) => {
+  const { THREE, aimHand, orientWeapon, applyMeleePose } = rig;
+  // 片手剣の構え: ガード中（守護騎士）だけ独自。ほかは近接の構え
+  function applySwordPose(u, s) {
+    if (s.guard) {
+      // 片手剣のガード（守護騎士）: 剣を横に倒して胸の前で受ける。左手は刃の腹に添える
+      const yaw = -1.38, pitch = .22;
+      u.armR.position.z = 0;
+      const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(.22, 1.26, .46), new THREE.Vector3(1, -.6, -.3));
+      const axis = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+      aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, .5), new THREE.Vector3(-1, -.6, -.2));
+      orientWeapon(u, yaw, pitch);
+      return;
+    }
+    applyMeleePose(u, s);
   }
-  applyMeleePose(u, s);
-}
-const motion = { pose: applySwordPose };
+  return { pose: applySwordPose };
+};
 
 // ---------------------------------------------------------------------------
 // 武器ツリーの効果。api: 武器の効果に渡す道具（game/weapon-api.js が役目ごとの小さな形で作る）。game/weapons/index.js が呼ぶ
@@ -486,6 +500,6 @@ function effects({ player, attack, tree, show, party, register }) {
 }
 
 // 武器の登録（weapons/index.js が集める）
-//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   kindOrder・stats: サーバーと共通の数値（WEAPONS の並び順と中身） / tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
 //   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
-export default { wk: 'sword', tab: 1, glyph: '剣', tree: SWORD, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };
+export default { wk: 'sword', kindOrder: 0, stats, tab: 1, glyph: '剣', tree: SWORD, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };

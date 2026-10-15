@@ -1,10 +1,8 @@
 // 短剣のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・武器ツリーの効果。
-// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
-import * as THREE from 'three';
+// 登録は weapons/index.js に1行だけ。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）もここの stats（サーバーも読むので three.js は直接 import しない）
 import { L3, T, at } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
 import { angDiff, degToRad, now } from '../game/util.js';
-import { cyl, extrude, mesh, sphere } from '../models/kit.js';
 
 export const KNIFE_COLOR = 0xcab4ff;
 // 短剣: 「速さ」「急所」「毒」。クラスは 毒刃 / 暗殺 / 連刃
@@ -140,6 +138,16 @@ function mods(st, br, mods) {
 const legacy = { prefixes: ['dagger_'], slots: ['poison', 'smoke', 'dagger_flank', 'dagger_vital', 'dagger_bleed', 'dagger_pin', 'dagger_quicken'] };
 
 // ---------------------------------------------------------------------------
+// サーバーと共通の数値（shared/data.js の WEAPONS に集まる。サーバーもこのファイルを読む）
+// weight: 装備重量（回避のクールタイムに影響） / stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ / melee: 近接武器（生存本能を持つ）
+// ---------------------------------------------------------------------------
+const stats = {
+  name: '短剣', skillPool: ['shadow', 'phantom', 'fan', 'venom'], grip: -0.08, range: 2.3, arc: 90, speed: 0.26, mult: 0.68, weight: 2, stun: 0.6, melee: true,
+  passive: [], // 短剣は武器ツリー（熟練度）で決める
+  skill: { name: 'シャドウ・ダンス', cd: 4.5, desc: '目にも止まらぬ五連撃', mult: 1.0 },
+};
+
+// ---------------------------------------------------------------------------
 // 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
 // ---------------------------------------------------------------------------
 const heavy = {
@@ -210,41 +218,46 @@ const weaponSkills = {
 // ---------------------------------------------------------------------------
 // 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
 // ---------------------------------------------------------------------------
-const model = {
-  base(k) {
-    const { g, steel, gold, gem, edge, handle } = k;
-    const pts = [[-0.06, 0], [0.065, 0], [0.07, 0.4], [0.02, 0.72], [-0.04, 0.5]];
-    edge(pts, 0.03);
-    g.add(mesh(extrude(pts, 0.03), steel, [0, 0.12, 0]));
-    g.add(mesh(new THREE.TorusGeometry(0.1, 0.022, 6, 12, Math.PI), gold, [0, 0.1, 0]));
-    g.add(mesh(sphere(0.035, 8, 6), gem, [0, 0.11, 0.03]));
-    handle(0.3, 0.03);
-  },
-  styles: {
-    1: (k) => { // クナイ: 菱形の刃と輪の柄頭
-      const { g, gold, grip, blade } = k;
-      blade([[0, 0], [0.07, 0.25], [0, 0.65], [-0.07, 0.25]], 0.035);
-      g.add(mesh(cyl(0.028, 0.028, 0.3, 8), grip, [0, -0.08, 0]));
-      g.add(mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 12), gold, [0, -0.28, 0]));
-    },
-    2: (k) => { // クリス: 波打つ刃
-      const { g, gold, handle, blade } = k;
-      const pts = [];
-      for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push([0.05 + Math.sin(t * 14) * 0.025 - t * 0.04, t * 0.7]); }
-      pts.push([0, 0.78]);
-      for (let i = 8; i >= 0; i--) { const t = i / 8; pts.push([-(0.05 + Math.sin(t * 14 + 1.2) * 0.025 - t * 0.04), t * 0.7]); }
-      blade(pts, 0.03);
-      g.add(mesh(new THREE.BoxGeometry(0.2, 0.05, 0.06), gold, [0, 0.1, 0]));
-      handle(0.28, 0.028);
-    },
-    3: (k) => { // 専用: 月の形の双刃
-      const { g, steel, gem, handle, glowM, blade } = k;
-      blade([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]], 0.03, 0.12, glowM(1.2));
-      g.add(mesh(extrude([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]].map(([x, y]) => [-x * 0.7, y * 0.8]), 0.025), steel, [0, 0.12, 0]));
-      g.add(mesh(new THREE.OctahedronGeometry(0.05), gem, [0, 0.1, 0.03]));
+// kit: 形の道具（THREE・mesh・sphere・cone・cyl・lathe・extrude・bowString・toon）。models/weapon-models.js が渡す
+const model = (kit) => {
+  const { THREE, mesh, sphere, cyl, extrude } = kit;
+  const model = {
+    base(k) {
+      const { g, steel, gold, gem, edge, handle } = k;
+      const pts = [[-0.06, 0], [0.065, 0], [0.07, 0.4], [0.02, 0.72], [-0.04, 0.5]];
+      edge(pts, 0.03);
+      g.add(mesh(extrude(pts, 0.03), steel, [0, 0.12, 0]));
+      g.add(mesh(new THREE.TorusGeometry(0.1, 0.022, 6, 12, Math.PI), gold, [0, 0.1, 0]));
+      g.add(mesh(sphere(0.035, 8, 6), gem, [0, 0.11, 0.03]));
       handle(0.3, 0.03);
     },
-  },
+    styles: {
+      1: (k) => { // クナイ: 菱形の刃と輪の柄頭
+        const { g, gold, grip, blade } = k;
+        blade([[0, 0], [0.07, 0.25], [0, 0.65], [-0.07, 0.25]], 0.035);
+        g.add(mesh(cyl(0.028, 0.028, 0.3, 8), grip, [0, -0.08, 0]));
+        g.add(mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 12), gold, [0, -0.28, 0]));
+      },
+      2: (k) => { // クリス: 波打つ刃
+        const { g, gold, handle, blade } = k;
+        const pts = [];
+        for (let i = 0; i <= 8; i++) { const t = i / 8; pts.push([0.05 + Math.sin(t * 14) * 0.025 - t * 0.04, t * 0.7]); }
+        pts.push([0, 0.78]);
+        for (let i = 8; i >= 0; i--) { const t = i / 8; pts.push([-(0.05 + Math.sin(t * 14 + 1.2) * 0.025 - t * 0.04), t * 0.7]); }
+        blade(pts, 0.03);
+        g.add(mesh(new THREE.BoxGeometry(0.2, 0.05, 0.06), gold, [0, 0.1, 0]));
+        handle(0.28, 0.028);
+      },
+      3: (k) => { // 専用: 月の形の双刃
+        const { g, steel, gem, handle, glowM, blade } = k;
+        blade([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]], 0.03, 0.12, glowM(1.2));
+        g.add(mesh(extrude([[-0.03, 0], [0.04, 0], [0.16, 0.3], [0.12, 0.62], [0.02, 0.78], [0.06, 0.5], [0.02, 0.25]].map(([x, y]) => [-x * 0.7, y * 0.8]), 0.025), steel, [0, 0.12, 0]));
+        g.add(mesh(new THREE.OctahedronGeometry(0.05), gem, [0, 0.1, 0.03]));
+        handle(0.3, 0.03);
+      },
+    },
+  };
+  return model;
 };
 
 // ---------------------------------------------------------------------------
@@ -356,6 +369,6 @@ function effects({ player, attack, tree, show, register }) {
 }
 
 // 武器の登録（weapons/index.js が集める）
-//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   kindOrder・stats: サーバーと共通の数値（WEAPONS の並び順と中身） / tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
 //   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
-export default { wk: 'dagger', tab: 5, glyph: '短', tree: DAGGER, skills, mods, legacy, heavy, weaponSkills, model, effects };
+export default { wk: 'dagger', kindOrder: 3, stats, tab: 5, glyph: '短', tree: DAGGER, skills, mods, legacy, heavy, weaponSkills, model, effects };

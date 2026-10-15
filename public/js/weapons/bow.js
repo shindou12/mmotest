@@ -1,12 +1,8 @@
 // 弓のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・構え・武器ツリーの効果。
-// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
-import * as THREE from 'three';
+// 登録は weapons/index.js に1行だけ。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）もここの stats（サーバーも読むので three.js は直接 import しない）
 import { L3, T, at, spOff } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
-import { aimHand, ease } from '../pose-rig.js';
-import { bowString, cyl, extrude, mesh, sphere } from '../models/kit.js';
 import { clamp, now, rnd } from '../game/util.js';
-import { toon } from '../toon.js';
 
 // 弓: 「射程」「手数」「罠」。クラスは 狙撃手（最大まで引く）/ 連射（通常攻撃）/ 罠師（回避で罠）
 // 弓を引くと射程の円が広がる仕組み（最大射程・弓を引く速さ）は弓そのものの特性
@@ -131,6 +127,17 @@ function mods(st, br, mods) {
 const legacy = { prefixes: ['bow_'], slots: ['backshot', 'focus', 'bow_double', 'bow_tether', 'bow_side', 'bow_trap', 'bow_chime'] };
 
 // ---------------------------------------------------------------------------
+// サーバーと共通の数値（shared/data.js の WEAPONS に集まる。サーバーもこのファイルを読む）
+// weight: 装備重量（回避のクールタイムに影響） / stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ / melee: 近接武器（生存本能を持つ）
+// 弓: 矢を飛ばす。弓を引くと足元から射程の円が広がり、矢はその円の端まで届く
+//   baseRange: 引かずに撃つ矢の射程 / range: 最大射程 / draw: 弓を引く速さ（円が広がる速さ m/秒）。最大射程まで引くと最大の溜め撃ち
+// ---------------------------------------------------------------------------
+const stats = {
+  name: '弓', skillPool: ['multishot', 'arrowrain', 'snipe', 'blast'], grip: 0, range: 22, arc: 0, speed: 0.4, mult: 0.6, weight: 3, stun: 0.3, ranged: true, baseRange: 9, draw: 14, offHand: true,
+  passive: ['弓を引くと足元から射程の円が広がる（引かずに撃つ矢は9m・最大射程22m）', '最大射程まで引くと最大の溜め撃ち（弓を引く速さ 毎秒14m）'],
+};
+
+// ---------------------------------------------------------------------------
 // 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
 // ---------------------------------------------------------------------------
 const heavy = {
@@ -193,101 +200,110 @@ const weaponSkills = {
 // ---------------------------------------------------------------------------
 // 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
 // ---------------------------------------------------------------------------
-const model = {
-  base(k) {
-    const { g, gold, grip, gem, rc, rarity } = k;
-    const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
-    const R = 0.8, arc = Math.PI * 0.72;
-    const limb = new THREE.TorusGeometry(R, 0.045, 6, 28, arc);
-    limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
-    g.add(mesh(limb, wood));
-    const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
-    bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
-    g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip, [0, 0, 0]));
-    for (const s of [-1, 1]) g.add(mesh(sphere(0.06, 8, 6), gold, [sx, s * tip, 0]));
-    g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
-  },
-  prep(k) { // 形違いの前に作る道具・材質（形違いのときだけ）
-    const { g, rc, rarity } = k;
-    const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
-    const string = (tip, sx) => bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
-    return { wood, string };
-  },
-  styles: {
-    1: (k) => { // 1: リカーブ（先端が反る） 2: ロングボウ（長い）
-      const { g, grip, gem, wood, string, style } = k;
-      const R = style === 2 ? 1.25 : 0.75, arc = style === 2 ? Math.PI * 0.62 : Math.PI * 0.66;
-      const limb = new THREE.TorusGeometry(R, style === 2 ? 0.04 : 0.05, 6, 28, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+// kit: 形の道具（THREE・mesh・sphere・cone・cyl・lathe・extrude・bowString・toon）。models/weapon-models.js が渡す
+const model = (kit) => {
+  const { THREE, mesh, sphere, cyl, extrude, bowString, toon } = kit;
+  const model = {
+    base(k) {
+      const { g, gold, grip, gem, rc, rarity } = k;
+      const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
+      const R = 0.8, arc = Math.PI * 0.72;
+      const limb = new THREE.TorusGeometry(R, 0.045, 6, 28, arc);
+      limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
       g.add(mesh(limb, wood));
       const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
-      if (style === 1) for (const s of [-1, 1]) g.add(mesh(new THREE.TorusGeometry(0.12, 0.035, 5, 10, Math.PI * 0.8), wood, [sx + 0.1, s * tip, 0], [0, 0, s > 0 ? 0.3 : Math.PI - 0.3]));
-      string(tip, sx);
-      g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip));
+      bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
+      g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip, [0, 0, 0]));
+      for (const s of [-1, 1]) g.add(mesh(sphere(0.06, 8, 6), gold, [sx, s * tip, 0]));
       g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
     },
-    2: (k) => model.styles[1](k), // 1 と同じ作り（style で長さが変わる）
-    3: (k) => { // 専用: 三日月と刃の翼
-      const { g, gold, gem, glowM, string } = k;
-      const R = 0.85, arc = Math.PI * 0.8;
-      const limb = new THREE.TorusGeometry(R, 0.05, 6, 32, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
-      g.add(mesh(limb, toon(0xe8e0d0)));
-      const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
-      for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.18, 0.1 * s], [0.35, 0.45 * s], [0.12, 0.25 * s]], 0.025), glowM(1.3), [0.02, s * 0.2, 0]));
-      string(tip, sx);
-      g.add(mesh(cyl(0.06, 0.06, 0.3, 8), gold));
-      g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0.06, 0, 0]));
+    prep(k) { // 形違いの前に作る道具・材質（形違いのときだけ）
+      const { g, rc, rarity } = k;
+      const wood = toon(rarity >= 3 ? new THREE.Color(0x6a4428).lerp(rc, 0.3) : 0x6a4428);
+      const string = (tip, sx) => bowString(g, tip, sx, rarity >= 2 ? rc : 0xeeeeee);
+      return { wood, string };
     },
-  },
+    styles: {
+      1: (k) => { // 1: リカーブ（先端が反る） 2: ロングボウ（長い）
+        const { g, grip, gem, wood, string, style } = k;
+        const R = style === 2 ? 1.25 : 0.75, arc = style === 2 ? Math.PI * 0.62 : Math.PI * 0.66;
+        const limb = new THREE.TorusGeometry(R, style === 2 ? 0.04 : 0.05, 6, 28, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+        g.add(mesh(limb, wood));
+        const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+        if (style === 1) for (const s of [-1, 1]) g.add(mesh(new THREE.TorusGeometry(0.12, 0.035, 5, 10, Math.PI * 0.8), wood, [sx + 0.1, s * tip, 0], [0, 0, s > 0 ? 0.3 : Math.PI - 0.3]));
+        string(tip, sx);
+        g.add(mesh(cyl(0.06, 0.06, 0.28, 8), grip));
+        g.add(mesh(sphere(0.05, 8, 6), gem, [0.05, 0, 0]));
+      },
+      2: (k) => model.styles[1](k), // 1 と同じ作り（style で長さが変わる）
+      3: (k) => { // 専用: 三日月と刃の翼
+        const { g, gold, gem, glowM, string } = k;
+        const R = 0.85, arc = Math.PI * 0.8;
+        const limb = new THREE.TorusGeometry(R, 0.05, 6, 32, arc); limb.rotateZ(-arc / 2); limb.translate(-R, 0, 0);
+        g.add(mesh(limb, toon(0xe8e0d0)));
+        const tip = Math.sin(arc / 2) * R, sx = Math.cos(arc / 2) * R - R;
+        for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.18, 0.1 * s], [0.35, 0.45 * s], [0.12, 0.25 * s]], 0.025), glowM(1.3), [0.02, s * 0.2, 0]));
+        string(tip, sx);
+        g.add(mesh(cyl(0.06, 0.06, 0.3, 8), gold));
+        g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0.06, 0, 0]));
+      },
+    },
+  };
+  return model;
 };
 
 // ---------------------------------------------------------------------------
 // 構え・振り（motions/index.js が近接の動きに上書きする）
 // ---------------------------------------------------------------------------
-function applyBowPose(u, s) {
-    const active = s.charging || s.swing >= 0;
-    const draw = s.charging ? clamp(s.charge ?? 1, 0, 1) : s.swing >= 0 ? 1 - clamp(s.swing / .25, 0, 1) : 0;
-    // Turn the torso side-on while the bow and head keep facing the aim direction.
-    // Moving the bow forward alone lets its deep curve/string cut through the chest.
-    const stance = s.bowStance ?? 1.0;
-    u.body.rotation.y = stance;u.head.rotation.y = -stance;
-    const aim = new THREE.Vector3(-Math.sin(stance), 0, Math.cos(stance));
-    const grip = aimHand(u.armL, u.elbowL, new THREE.Vector3(-.10, s.bowHeight ?? (active ? 1.36 : 1.25), .53), new THREE.Vector3(-1, -.7, 0));
-    const details = u.weaponModel.userData.bow;
-    if (active && details) {
-      const pull = .22 * draw;
-      aimHand(u.armR, u.elbowR, grip.clone().addScaledVector(aim, details.sx - pull), new THREE.Vector3(1, 0, -.7));
-      const pos = details.string.geometry.attributes.position;pos.setX(1, details.sx - pull);pos.needsUpdate = true;
-      details.arrow.visible = s.charging || s.swing < .15;
-      details.arrow.position.x = details.sx - pull;
-    } else if (details) {
-      details.string.geometry.attributes.position.setX(1, details.sx);details.string.geometry.attributes.position.needsUpdate = true;
-      details.arrow.visible = false;
-    }
-    // Bow limbs remain vertical; its model's -90 degree yaw puts the string toward the torso.
-    const handOrientation = u.armL.quaternion.clone().multiply(u.elbowL.quaternion);
-    u.weapon.quaternion.copy(handOrientation).invert().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -stance));
-}
+// rig: 構えの道具（THREE・aimHand・orientWeapon・ease・applyMeleePose・spearPose）。motions/index.js が渡す
+const motion = (rig) => {
+  const { THREE, aimHand, ease } = rig;
+  function applyBowPose(u, s) {
+      const active = s.charging || s.swing >= 0;
+      const draw = s.charging ? clamp(s.charge ?? 1, 0, 1) : s.swing >= 0 ? 1 - clamp(s.swing / .25, 0, 1) : 0;
+      // Turn the torso side-on while the bow and head keep facing the aim direction.
+      // Moving the bow forward alone lets its deep curve/string cut through the chest.
+      const stance = s.bowStance ?? 1.0;
+      u.body.rotation.y = stance;u.head.rotation.y = -stance;
+      const aim = new THREE.Vector3(-Math.sin(stance), 0, Math.cos(stance));
+      const grip = aimHand(u.armL, u.elbowL, new THREE.Vector3(-.10, s.bowHeight ?? (active ? 1.36 : 1.25), .53), new THREE.Vector3(-1, -.7, 0));
+      const details = u.weaponModel.userData.bow;
+      if (active && details) {
+        const pull = .22 * draw;
+        aimHand(u.armR, u.elbowR, grip.clone().addScaledVector(aim, details.sx - pull), new THREE.Vector3(1, 0, -.7));
+        const pos = details.string.geometry.attributes.position;pos.setX(1, details.sx - pull);pos.needsUpdate = true;
+        details.arrow.visible = s.charging || s.swing < .15;
+        details.arrow.position.x = details.sx - pull;
+      } else if (details) {
+        details.string.geometry.attributes.position.setX(1, details.sx);details.string.geometry.attributes.position.needsUpdate = true;
+        details.arrow.visible = false;
+      }
+      // Bow limbs remain vertical; its model's -90 degree yaw puts the string toward the torso.
+      const handOrientation = u.armL.quaternion.clone().multiply(u.elbowL.quaternion);
+      u.weapon.quaternion.copy(handOrientation).invert().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -stance));
+  }
 
-function applyBowSwing(u, s, e) {
-  u.armR.rotation.set(-Math.PI / 2, 0, 0.1);u.armR.position.z = 0;
-  u.armL.rotation.set(-Math.PI / 2 + 0.2, 0, -0.6 + e * 0.3);
-  u.body.rotation.y = 0;
-}
+  function applyBowSwing(u, s, e) {
+    u.armR.rotation.set(-Math.PI / 2, 0, 0.1);u.armR.position.z = 0;
+    u.armL.rotation.set(-Math.PI / 2 + 0.2, 0, -0.6 + e * 0.3);
+    u.body.rotation.y = 0;
+  }
 
-// 技（矢の技）の姿勢: 引き具合 p.draw で弓を引き、始めと終わりは構えから溶け込む
-function applyBowTechnique(u, s, t, p) {
-  const time=s.motionT||0,blend=ease(Math.min(1,time/.08))*ease(Math.max(0,Math.min(1,(t.duration-time)/.12)));
-  applyBowPose(u,{...s,charging:true,charge:p.draw,swing:-1,bowStance:1+p.bodyYaw,bowHeight:1.25+.11*blend});
-  const idle=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.25,0,.12));u.armR.quaternion.copy(idle.slerp(u.armR.quaternion.clone(),blend));
-  u.elbowR.quaternion.slerp(new THREE.Quaternion(),1-blend);
-  u.weaponModel.userData.bow.arrow.visible=p.draw>.03;
-  u.body.rotation.x=p.lean;u.body.position.y+=p.lift;
-}
-const motion = {
-    pose: applyBowPose, swing: applyBowSwing, technique: applyBowTechnique,
-    afterSwing(u) { if (u.weapon) u.weapon.rotation.x = Math.PI / 2; },
-    rest(u) { if (u.weapon) u.weapon.rotation.x = 0; },
-  };
+  // 技（矢の技）の姿勢: 引き具合 p.draw で弓を引き、始めと終わりは構えから溶け込む
+  function applyBowTechnique(u, s, t, p) {
+    const time=s.motionT||0,blend=ease(Math.min(1,time/.08))*ease(Math.max(0,Math.min(1,(t.duration-time)/.12)));
+    applyBowPose(u,{...s,charging:true,charge:p.draw,swing:-1,bowStance:1+p.bodyYaw,bowHeight:1.25+.11*blend});
+    const idle=new THREE.Quaternion().setFromEuler(new THREE.Euler(-.25,0,.12));u.armR.quaternion.copy(idle.slerp(u.armR.quaternion.clone(),blend));
+    u.elbowR.quaternion.slerp(new THREE.Quaternion(),1-blend);
+    u.weaponModel.userData.bow.arrow.visible=p.draw>.03;
+    u.body.rotation.x=p.lean;u.body.position.y+=p.lift;
+  }
+  return {
+      pose: applyBowPose, swing: applyBowSwing, technique: applyBowTechnique,
+      afterSwing(u) { if (u.weapon) u.weapon.rotation.x = Math.PI / 2; },
+      rest(u) { if (u.weapon) u.weapon.rotation.x = 0; },
+    };
+};
 
 // ---------------------------------------------------------------------------
 // 武器ツリーの効果。api: 武器の効果に渡す道具（game/weapon-api.js が役目ごとの小さな形で作る）。game/weapons/index.js が呼ぶ
@@ -414,6 +430,6 @@ function effects({ player, field, attack, tree, show, register }) {
 }
 
 // 武器の登録（weapons/index.js が集める）
-//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   kindOrder・stats: サーバーと共通の数値（WEAPONS の並び順と中身） / tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
 //   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
-export default { wk: 'bow', tab: 6, glyph: '弓', tree: BOW, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };
+export default { wk: 'bow', kindOrder: 5, stats, tab: 6, glyph: '弓', tree: BOW, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };

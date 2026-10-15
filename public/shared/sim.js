@@ -11,6 +11,11 @@ import { MESSAGES } from './sim/messages.js';
 // 読み込みが終わるまでの時間（フレーム数）がわずかに変わってしまう（固定の時計の記録テストで見える差）
 import './motion-catalog.js';
 import './techniques.js';
+// 武器のファイル（js/weapons/）は data.js の WEAPONS の中身なので、同じ理由でここから直接読む
+import '../js/weapons/index.js';
+import '../js/weapons/common.js';
+import '../js/game/util.js';
+import './tree-motions.js';
 import { InteractMethods } from './sim/interact.js';
 import { MobsMethods } from './sim/mobs.js';
 import { AreaTickMethods } from './sim/area-tick.js';

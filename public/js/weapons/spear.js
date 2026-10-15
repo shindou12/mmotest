@@ -1,15 +1,9 @@
 // 盾槍のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・構え・武器ツリーの効果。
-// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
-import * as THREE from 'three';
+// 登録は weapons/index.js に1行だけ。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）もここの stats（サーバーも読むので three.js は直接 import しない）
 import { L3, T, at, spOff } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
-import { RARITIES } from '../../shared/data.js';
 import { SPEAR_TIMINGS, repeatHitAt } from '../../shared/skill-timings.js';
-import { aimHand, orientWeapon } from '../pose-rig.js';
-import { cone, cyl, extrude, mesh, sphere } from '../models/kit.js';
 import { now, rnd } from '../game/util.js';
-import { spearPose } from '../spear-motion.js';
-import { toon } from '../toon.js';
 
 // 盾槍: 「盾」「突き」「崩し」。クラスは 竜騎士（槍メイン）/ 間合い / 騎士（受けて返す）
 // 溜め中のガードと、受けてから離すガードカウンターは盾槍の基本の操作（竜騎士だけガードの代わりに跳躍）
@@ -147,6 +141,17 @@ function mods(st, br, mods) {
 const legacy = { prefixes: ['spear_'], slots: ['shieldbash', 'taunt', 'spear_fan', 'spear_sweep', 'spear_press', 'spear_stake', 'spear_intercept'] };
 
 // ---------------------------------------------------------------------------
+// サーバーと共通の数値（shared/data.js の WEAPONS に集まる。サーバーもこのファイルを読む）
+// weight: 装備重量（回避のクールタイムに影響） / stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ / melee: 近接武器（生存本能を持つ）
+// ---------------------------------------------------------------------------
+const stats = {
+  // 盾槍: 強攻撃を溜めている間はガード。ヘイトを集めやすい
+  name: '盾槍', skillPool: ['lance', 'helix', 'piercer', 'whirlspear'], grip: 0.45, range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true, stun: 1.3, melee: true, shield: 'kite', threat: 2,
+  passive: ['強攻撃を溜めている間はガード。ガードで攻撃を受けてから離すと「ガードカウンター」（一回転して周りを大きくなぎ払う）'],
+  skill: { name: 'ライトニング・ランス', cd: 5.5, desc: '直線上を雷光で貫く', mult: 3.0 },
+};
+
+// ---------------------------------------------------------------------------
 // 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
 // ---------------------------------------------------------------------------
 const heavy = {
@@ -226,73 +231,82 @@ const weaponSkills = {
 // ---------------------------------------------------------------------------
 // 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
 // ---------------------------------------------------------------------------
-const model = {
-  base(k) {
-    const { g, steel, gold, gem, edge, rc, rarity } = k;
-    g.add(mesh(cyl(0.035, 0.04, 2.9, 8), toon(0x6a4428), [0, 0.95, 0]));
-    for (const y of [0.1, 0.55, 2.3]) g.add(mesh(new THREE.TorusGeometry(0.045, 0.014, 5, 10), gold, [0, y, 0], [Math.PI / 2, 0, 0]));
-    const pts = [[0, 0], [0.11, 0.18], [0.07, 0.55], [0, 0.78], [-0.07, 0.55], [-0.11, 0.18]];
-    edge(pts.map(([x, y]) => [x, y + 2.42]), 0.04);
-    g.add(mesh(extrude(pts, 0.04), steel, [0, 2.42, 0]));
-    g.add(mesh(sphere(0.06, 10, 8), gem, [0, 2.4, 0]));
-    const tassel = mesh(cone(0.08, 0.35, 8), toon(rarity >= 2 ? rc : 0xb03030), [0, 2.18, 0], [Math.PI, 0, 0]);
-    g.add(tassel);
-  },
-  prep(k) { // 形違いの前に作る道具・材質（形違いのときだけ）
-    const { g } = k;
-    const shaft = (len, col = 0x6a4428) => g.add(mesh(cyl(0.035, 0.04, len, 8), toon(col), [0, len / 2 - 0.5, 0]));
-    return { shaft };
-  },
-  styles: {
-    1: (k) => { // ハルバード: 斧頭と突起
-      const { g, steel, gold, blade, shaft } = k;
-      shaft(2.9);
-      blade([[0, 0], [0.06, 0.25], [0, 0.6], [-0.06, 0.25]].map(([x, y]) => [x, y]), 0.04, 2.4);
-      blade([[0.03, -0.18], [0.42, -0.3], [0.48, 0], [0.42, 0.3], [0.03, 0.18]], 0.05, 2.2);
-      g.add(mesh(cone(0.04, 0.22, 6), steel, [-0.13, 2.2, 0], [0, 0, 1.57]));
-      g.add(mesh(new THREE.TorusGeometry(0.05, 0.016, 5, 10), gold, [0, 2.0, 0], [Math.PI / 2, 0, 0]));
+// kit: 形の道具（THREE・mesh・sphere・cone・cyl・lathe・extrude・bowString・toon）。models/weapon-models.js が渡す
+const model = (kit) => {
+  const { THREE, mesh, sphere, cone, cyl, extrude, toon } = kit;
+  const model = {
+    base(k) {
+      const { g, steel, gold, gem, edge, rc, rarity } = k;
+      g.add(mesh(cyl(0.035, 0.04, 2.9, 8), toon(0x6a4428), [0, 0.95, 0]));
+      for (const y of [0.1, 0.55, 2.3]) g.add(mesh(new THREE.TorusGeometry(0.045, 0.014, 5, 10), gold, [0, y, 0], [Math.PI / 2, 0, 0]));
+      const pts = [[0, 0], [0.11, 0.18], [0.07, 0.55], [0, 0.78], [-0.07, 0.55], [-0.11, 0.18]];
+      edge(pts.map(([x, y]) => [x, y + 2.42]), 0.04);
+      g.add(mesh(extrude(pts, 0.04), steel, [0, 2.42, 0]));
+      g.add(mesh(sphere(0.06, 10, 8), gem, [0, 2.4, 0]));
+      const tassel = mesh(cone(0.08, 0.35, 8), toon(rarity >= 2 ? rc : 0xb03030), [0, 2.18, 0], [Math.PI, 0, 0]);
+      g.add(tassel);
     },
-    2: (k) => { // 三叉槍
-      const { g, gold, gem, blade, shaft } = k;
-      shaft(2.8, 0x4a4a58);
-      for (const s of [-1, 0, 1]) blade([[-0.035, 0], [0.035, 0], [0, s ? 0.45 : 0.6]], 0.03, 2.35 + (s ? 0 : 0.05)).position.x = s * 0.15;
-      g.add(mesh(new THREE.BoxGeometry(0.4, 0.07, 0.07), gold, [0, 2.33, 0]));
-      g.add(mesh(sphere(0.06, 10, 8), gem, [0, 2.26, 0]));
+    prep(k) { // 形違いの前に作る道具・材質（形違いのときだけ）
+      const { g } = k;
+      const shaft = (len, col = 0x6a4428) => g.add(mesh(cyl(0.035, 0.04, len, 8), toon(col), [0, len / 2 - 0.5, 0]));
+      return { shaft };
     },
-    3: (k) => { // 専用: 翼のある光の槍
-      const { g, gold, gem, glowM, blade, shaft } = k;
-      shaft(3.1, 0xe8e0d0);
-      blade([[0, 0], [0.12, 0.25], [0.06, 0.8], [0, 1.0], [-0.06, 0.8], [-0.12, 0.25]], 0.04, 2.45, glowM(1.3));
-      for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.4, 0.3], [0.3, 0.1], [0.45, 0.05], [0.1, -0.1]].map(([x, y]) => [x * s, y]), 0.025), gold, [0, 2.35, 0]));
-      g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0, 2.38, 0]));
+    styles: {
+      1: (k) => { // ハルバード: 斧頭と突起
+        const { g, steel, gold, blade, shaft } = k;
+        shaft(2.9);
+        blade([[0, 0], [0.06, 0.25], [0, 0.6], [-0.06, 0.25]].map(([x, y]) => [x, y]), 0.04, 2.4);
+        blade([[0.03, -0.18], [0.42, -0.3], [0.48, 0], [0.42, 0.3], [0.03, 0.18]], 0.05, 2.2);
+        g.add(mesh(cone(0.04, 0.22, 6), steel, [-0.13, 2.2, 0], [0, 0, 1.57]));
+        g.add(mesh(new THREE.TorusGeometry(0.05, 0.016, 5, 10), gold, [0, 2.0, 0], [Math.PI / 2, 0, 0]));
+      },
+      2: (k) => { // 三叉槍
+        const { g, gold, gem, blade, shaft } = k;
+        shaft(2.8, 0x4a4a58);
+        for (const s of [-1, 0, 1]) blade([[-0.035, 0], [0.035, 0], [0, s ? 0.45 : 0.6]], 0.03, 2.35 + (s ? 0 : 0.05)).position.x = s * 0.15;
+        g.add(mesh(new THREE.BoxGeometry(0.4, 0.07, 0.07), gold, [0, 2.33, 0]));
+        g.add(mesh(sphere(0.06, 10, 8), gem, [0, 2.26, 0]));
+      },
+      3: (k) => { // 専用: 翼のある光の槍
+        const { g, gold, gem, glowM, blade, shaft } = k;
+        shaft(3.1, 0xe8e0d0);
+        blade([[0, 0], [0.12, 0.25], [0.06, 0.8], [0, 1.0], [-0.06, 0.8], [-0.12, 0.25]], 0.04, 2.45, glowM(1.3));
+        for (const s of [-1, 1]) g.add(mesh(extrude([[0, 0], [0.4, 0.3], [0.3, 0.1], [0.45, 0.05], [0.1, -0.1]].map(([x, y]) => [x * s, y]), 0.025), gold, [0, 2.35, 0]));
+        g.add(mesh(new THREE.OctahedronGeometry(0.08), gem, [0, 2.38, 0]));
+      },
     },
-  },
+  };
+  return model;
 };
 
 // ---------------------------------------------------------------------------
 // 構え・振り（motions/index.js が近接の動きに上書きする）
 // ---------------------------------------------------------------------------
-function applySpearPose(u, s) {
-    const p = spearPose(s);
-    u.armR.position.z = 0;
-    u.body.rotation.y = p.yaw;
-    if (!(s.dodge > 0) && !(s.hurt > 0)) u.body.rotation.x = p.lean;
-    const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(p.x, p.y, p.z), new THREE.Vector3(1, -.6, -.3));
-    // Thrust stays on the aiming line while the torso turns; sweeps extend sideways.
-    const yaw = p.lateral ? Math.PI / 2 * (p.side ?? 1) : -p.yaw;
-    orientWeapon(u, yaw, p.pitch);
-    // 竜騎士（盾を背負っている）: 左手も柄の後ろを握って両手で持つ
-    if (s.shieldBack && grip) {
-      const axis = new THREE.Vector3(Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), Math.cos(yaw) * Math.cos(p.pitch));
-      aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, -.3), new THREE.Vector3(-1, -.6, -.2));
-    }
-    if (p.step) { u.legs[0].rotation.x = -p.step;u.legs[1].rotation.x = p.step; }
-}
+// rig: 構えの道具（THREE・aimHand・orientWeapon・ease・applyMeleePose・spearPose）。motions/index.js が渡す
+const motion = (rig) => {
+  const { THREE, aimHand, orientWeapon, spearPose } = rig;
+  function applySpearPose(u, s) {
+      const p = spearPose(s);
+      u.armR.position.z = 0;
+      u.body.rotation.y = p.yaw;
+      if (!(s.dodge > 0) && !(s.hurt > 0)) u.body.rotation.x = p.lean;
+      const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(p.x, p.y, p.z), new THREE.Vector3(1, -.6, -.3));
+      // Thrust stays on the aiming line while the torso turns; sweeps extend sideways.
+      const yaw = p.lateral ? Math.PI / 2 * (p.side ?? 1) : -p.yaw;
+      orientWeapon(u, yaw, p.pitch);
+      // 竜騎士（盾を背負っている）: 左手も柄の後ろを握って両手で持つ
+      if (s.shieldBack && grip) {
+        const axis = new THREE.Vector3(Math.sin(yaw) * Math.cos(p.pitch), Math.sin(p.pitch), Math.cos(yaw) * Math.cos(p.pitch));
+        aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, -.3), new THREE.Vector3(-1, -.6, -.2));
+      }
+      if (p.step) { u.legs[0].rotation.x = -p.step;u.legs[1].rotation.x = p.step; }
+  }
 
-function applySpearSwing(u) {
-  u.armR.position.z = 0;u.body.rotation.y = 0;
-}
-const motion = { pose: applySpearPose, swing: applySpearSwing };
+  function applySpearSwing(u) {
+    u.armR.position.z = 0;u.body.rotation.y = 0;
+  }
+  return { pose: applySpearPose, swing: applySpearSwing };
+};
 
 // ---------------------------------------------------------------------------
 // 武器ツリーの効果。api: 武器の効果に渡す道具（game/weapon-api.js が役目ごとの小さな形で作る）。game/weapons/index.js が呼ぶ
@@ -328,7 +342,7 @@ function effects({ player, field, attack, tree, show, register }) {
     later(JUMP.air, () => {
       if (me.dead) return;
       strikes.circle(me.x, me.z, JUMP.r, JUMP.mult[lv], { type: 'heavy', stun: 10 });
-      fx.ringWave(me.x, me.z, RARITIES[player.S.wr].color, JUMP.r + 0.6, 0.35); fx.flash(me.x, 1, me.z, 0xffffff, 40, 0.25);
+      fx.ringWave(me.x, me.z, player.weaponColor(), JUMP.r + 0.6, 0.35); fx.flash(me.x, 1, me.z, 0xffffff, 40, 0.25);
       fx.parts.burst(me.x, 0.3, me.z, 40, { color: 0xc8b090, speed: 7, size: 0.5, life: 0.6, up: 2 });
       audio.sfx('heavy'); addShake(lv === 2 ? 0.5 : 0.3); setHitStop(0.06);
       if (player.S.wt?.ks2 === 'sp_fang') later(0.08, () => { // 竜の牙: 着地点から衝撃が広がる
@@ -455,6 +469,6 @@ function effects({ player, field, attack, tree, show, register }) {
 }
 
 // 武器の登録（weapons/index.js が集める）
-//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   kindOrder・stats: サーバーと共通の数値（WEAPONS の並び順と中身） / tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
 //   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
-export default { wk: 'spear', tab: 4, glyph: '盾', tree: SPEAR, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };
+export default { wk: 'spear', kindOrder: 2, stats, tab: 4, glyph: '盾', tree: SPEAR, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };

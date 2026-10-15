@@ -1,5 +1,6 @@
 // ゲームデータ定義（サーバー・クライアント共通）
 import { BALANCE } from './balance.js';
+import { WEAPON_DEFS } from '../js/weapons/index.js';
 
 export const MAX_LEVEL = 50;
 export const FIELD_RADIUS = 68;
@@ -47,45 +48,13 @@ export const DROP_GRADES = [
 // melee: 近接武器（生存本能を持つ） / twoHanded: 両手で振る重い武器（構え・振りの動きと音が変わる）
 // skillPool: 武器に付くスキルの候補（js/weapons/<武器>.js の weaponSkills の id。1つ目が最初の武器の基本） / grip: 手で握る位置（モデルの原点からの高さ。見た目だけ） / shield: 左腕に持つ盾の形（models/shield-models.js。クラスによっては背負う） / threat: 与えたダメージに対する敵の注意の集めやすさ（なければ1倍）
 // offHand: 左手で持つ（弓） / skillSpin: ほかのプレイヤーから見て、スキルを使うと回転斬りに見える
-export const WEAPONS = {
-  sword: {
-    name: '片手剣', skillPool: ['vorpal', 'square', 'leap', 'horizon', 'retreat'], grip: -0.15, range: 2.8, arc: 110, speed: 0.4, mult: 1.0, weight: 4, stun: 1.0, melee: true,
-    passive: [], // 片手剣は武器ツリー（熟練度）で決める
-    skill: { name: 'ヴォーパル・ストライク', cd: 5, desc: '前方へ突進しながら貫く', mult: 3.2 },
-  },
-  greatsword: {
-    name: '大剣', skillPool: ['cyclone', 'breaker', 'avalanche', 'meteor'], grip: -0.20, range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true, twoHanded: true, skillSpin: true,
-    passive: [], // 大剣は武器ツリー（熟練度）で決める
-    skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
-  },
-  spear: {
-    // 盾槍: 強攻撃を溜めている間はガード。ヘイトを集めやすい
-    name: '盾槍', skillPool: ['lance', 'helix', 'piercer', 'whirlspear'], grip: 0.45, range: 4.3, arc: 45, speed: 0.5, mult: 1.1, weight: 8, guard: true, stun: 1.3, melee: true, shield: 'kite', threat: 2,
-    passive: ['強攻撃を溜めている間はガード。ガードで攻撃を受けてから離すと「ガードカウンター」（一回転して周りを大きくなぎ払う）'],
-    skill: { name: 'ライトニング・ランス', cd: 5.5, desc: '直線上を雷光で貫く', mult: 3.0 },
-  },
-  dagger: {
-    name: '短剣', skillPool: ['shadow', 'phantom', 'fan', 'venom'], grip: -0.08, range: 2.3, arc: 90, speed: 0.26, mult: 0.68, weight: 2, stun: 0.6, melee: true,
-    passive: [], // 短剣は武器ツリー（熟練度）で決める
-    skill: { name: 'シャドウ・ダンス', cd: 4.5, desc: '目にも止まらぬ五連撃', mult: 1.0 },
-  },
-  axe: {
-    name: '大斧', skillPool: ['rampage', 'tomahawk', 'earthsplit', 'bloodaxe'], grip: 0.15, range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true, twoHanded: true,
-    passive: [], // 大斧は武器ツリー（熟練度）で決める
-  },
-  // 弓: 矢を飛ばす。弓を引くと足元から射程の円が広がり、矢はその円の端まで届く
-  //   baseRange: 引かずに撃つ矢の射程 / range: 最大射程 / draw: 弓を引く速さ（円が広がる速さ m/秒）。最大射程まで引くと最大の溜め撃ち
-  bow: {
-    name: '弓', skillPool: ['multishot', 'arrowrain', 'snipe', 'blast'], grip: 0, range: 22, arc: 0, speed: 0.4, mult: 0.6, weight: 3, stun: 0.3, ranged: true, baseRange: 9, draw: 14, offHand: true,
-    passive: ['弓を引くと足元から射程の円が広がる（引かずに撃つ矢は9m・最大射程22m）', '最大射程まで引くと最大の溜め撃ち（弓を引く速さ 毎秒14m）'],
-  },
-};
+// 中身は js/weapons/<武器>.js の stats（並び順は kindOrder。サーバーもブラウザも同じ）
+export const WEAPONS = Object.fromEntries([...WEAPON_DEFS].sort((a, b) => a.kindOrder - b.kindOrder).map((d) => [d.wk, d.stats]));
 export const WEAPON_KINDS = Object.keys(WEAPONS);
 // 武器を持っていないとき・わからないときの武器の種類
 export const DEFAULT_WEAPON = 'sword';
 // 生存本能（近接武器のパッシブ）: 常に被ダメージを少し軽減する
 export const INSTINCT = { dr: 8 };
-// 武器ごとに付くスキルの候補（ドロップ時に1つ抽選）。内容は js/skills.js
 // 武器に付くスキルの候補（1つ目が最初の武器の基本のスキル）。中身は WEAPONS[kind].skillPool
 export const WEAPON_SKILL_POOL = Object.fromEntries(WEAPON_KINDS.map((k) => [k, WEAPONS[k].skillPool]));
 // 品質を固めるまでは3階層で運用

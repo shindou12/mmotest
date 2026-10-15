@@ -1,12 +1,8 @@
 // 大斧のすべて（ここ1ファイルで1つの武器）: 武器ツリー（段・ノード・Q/Eスキル・能力値）・強攻撃・武器スキル・形・武器ツリーの効果。
-// 登録は weapons/index.js に1行。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）は shared/data.js の WEAPONS
-import * as THREE from 'three';
+// 登録は weapons/index.js に1行だけ。サーバーと共通の数値（射程・速さ・重さ・握る位置・スキルの候補など）もここの stats（サーバーも読むので three.js は直接 import しない）
 import { L3, T, at, spOff, inFront, fwd } from './common.js';
 import { TREE_MOTIONS } from '../../shared/tree-motions.js';
-import { RARITIES } from '../../shared/data.js';
 import { clamp, now, rnd } from '../game/util.js';
-import { cone, cyl, extrude, mesh, sphere } from '../models/kit.js';
-import { toon } from '../toon.js';
 
 // 大斧: 「重さ」「血」「崩し」。クラスは 狂戦士（HPが減るほど強い）/ 破砕（ボスを崩す）/ 投斧（強攻撃で斧を投げる）
 const AXE = {
@@ -138,6 +134,15 @@ function mods(st, br, mods) {
 const legacy = { prefixes: ['axe_'], slots: ['warstomp', 'bloodlust', 'axe_hook', 'axe_execute', 'axe_return', 'axe_blood', 'axe_rush'] };
 
 // ---------------------------------------------------------------------------
+// サーバーと共通の数値（shared/data.js の WEAPONS に集まる。サーバーもこのファイルを読む）
+// weight: 装備重量（回避のクールタイムに影響） / stun: ボスのスタン値の溜まりやすさ / passive: 装備しているだけで効く武器パッシブ / melee: 近接武器（生存本能を持つ）
+// ---------------------------------------------------------------------------
+const stats = {
+  name: '大斧', skillPool: ['rampage', 'tomahawk', 'earthsplit', 'bloodaxe'], grip: 0.15, range: 3.2, arc: 140, speed: 0.74, mult: 1.8, weight: 11, stun: 1.7, melee: true, twoHanded: true,
+  passive: [], // 大斧は武器ツリー（熟練度）で決める
+};
+
+// ---------------------------------------------------------------------------
 // 強攻撃（左クリック長押し → 離す）。lv は溜め段階 1〜2
 // ---------------------------------------------------------------------------
 const heavy = {
@@ -212,50 +217,55 @@ const weaponSkills = {
 // ---------------------------------------------------------------------------
 // 形（models.js の makeWeapon が使う）。base が基本の形、styles が形違い
 // ---------------------------------------------------------------------------
-const model = {
-  base(k) {
-    const { g, steel, gold, gem, edge } = k;
-    g.add(mesh(cyl(0.05, 0.06, 1.9, 8), toon(0x5a3a22), [0, 0.65, 0]));
-    for (const y of [0.0, 1.45]) g.add(mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 10), gold, [0, y, 0], [Math.PI / 2, 0, 0]));
-    // 三日月形の刃（両刃）
-    const blade = [[0, -0.32], [0.18, -0.36], [0.5, -0.55], [0.62, -0.1], [0.62, 0.1], [0.5, 0.55], [0.18, 0.36], [0, 0.32]];
-    edge(blade.map(([x, y]) => [x + 0.04, y + 1.45]), 0.07);
-    g.add(mesh(extrude(blade, 0.07), steel, [0.04, 1.45, 0]));
-    g.add(mesh(extrude(blade.map(([x, y]) => [x * 0.6, y * 0.7]), 0.07), steel, [-0.04, 1.45, 0], [0, Math.PI, 0]));
-    g.add(mesh(new THREE.BoxGeometry(0.16, 0.42, 0.12), gold, [0, 1.45, 0]));
-    g.add(mesh(cone(0.06, 0.3, 6), steel, [0, 1.75, 0]));
-    g.add(mesh(sphere(0.06, 8, 6), gem, [0, 1.45, 0.07]));
-  },
-  prep(k) { // 形違いの前に作る道具・材質（形違いのときだけ）
-    const { g } = k;
-    const haft = (len) => g.add(mesh(cyl(0.05, 0.06, len, 8), toon(0x5a3a22), [0, len / 2 - 0.3, 0]));
-    return { haft };
-  },
-  styles: {
-    1: (k) => { // 髭斧: 片刃で下に伸びる刃
-      const { g, gold, blade, haft } = k;
-      haft(1.9);
-      blade([[0, 0.2], [0.35, 0.3], [0.6, 0.1], [0.55, -0.45], [0.3, -0.6], [0.25, -0.2], [0, -0.1]], 0.07, 1.4);
-      g.add(mesh(new THREE.BoxGeometry(0.14, 0.36, 0.12), gold, [0, 1.42, 0]));
+// kit: 形の道具（THREE・mesh・sphere・cone・cyl・lathe・extrude・bowString・toon）。models/weapon-models.js が渡す
+const model = (kit) => {
+  const { THREE, mesh, sphere, cone, cyl, extrude, toon } = kit;
+  const model = {
+    base(k) {
+      const { g, steel, gold, gem, edge } = k;
+      g.add(mesh(cyl(0.05, 0.06, 1.9, 8), toon(0x5a3a22), [0, 0.65, 0]));
+      for (const y of [0.0, 1.45]) g.add(mesh(new THREE.TorusGeometry(0.06, 0.015, 5, 10), gold, [0, y, 0], [Math.PI / 2, 0, 0]));
+      // 三日月形の刃（両刃）
+      const blade = [[0, -0.32], [0.18, -0.36], [0.5, -0.55], [0.62, -0.1], [0.62, 0.1], [0.5, 0.55], [0.18, 0.36], [0, 0.32]];
+      edge(blade.map(([x, y]) => [x + 0.04, y + 1.45]), 0.07);
+      g.add(mesh(extrude(blade, 0.07), steel, [0.04, 1.45, 0]));
+      g.add(mesh(extrude(blade.map(([x, y]) => [x * 0.6, y * 0.7]), 0.07), steel, [-0.04, 1.45, 0], [0, Math.PI, 0]));
+      g.add(mesh(new THREE.BoxGeometry(0.16, 0.42, 0.12), gold, [0, 1.45, 0]));
+      g.add(mesh(cone(0.06, 0.3, 6), steel, [0, 1.75, 0]));
+      g.add(mesh(sphere(0.06, 8, 6), gem, [0, 1.45, 0.07]));
     },
-    2: (k) => { // 戦鎚
-      const { g, steel, gold, rarity, glowM, haft } = k;
-      haft(1.8);
-      g.add(mesh(new THREE.BoxGeometry(0.62, 0.34, 0.34), steel, [0, 1.45, 0]));
-      for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.4, 0.4), gold, [s * 0.32, 1.45, 0]));
-      g.add(mesh(cone(0.08, 0.3, 6), steel, [0, 1.75, 0]));
-      if (rarity >= 3) g.add(mesh(new THREE.BoxGeometry(0.64, 0.06, 0.36), glowM(1.2), [0, 1.45, 0]));
+    prep(k) { // 形違いの前に作る道具・材質（形違いのときだけ）
+      const { g } = k;
+      const haft = (len) => g.add(mesh(cyl(0.05, 0.06, len, 8), toon(0x5a3a22), [0, len / 2 - 0.3, 0]));
+      return { haft };
     },
-    3: (k) => { // 専用: ルーンの大三日月
-      const { g, gem, glowM, blade, haft } = k;
-      haft(2.0);
-      const b = [[0, -0.42], [0.3, -0.55], [0.75, -0.8], [0.85, 0], [0.75, 0.8], [0.3, 0.55], [0, 0.42]];
-      blade(b, 0.07, 1.45);
-      blade(b.map(([x, y]) => [-x, y]), 0.07, 1.45);
-      for (let i = 0; i < 3; i++) g.add(mesh(new THREE.BoxGeometry(0.05, 0.16, 0.09), glowM(1.5), [0.45, 1.45 + (i - 1) * 0.22, 0]));
-      g.add(mesh(new THREE.OctahedronGeometry(0.1), gem, [0, 1.45, 0.06]));
+    styles: {
+      1: (k) => { // 髭斧: 片刃で下に伸びる刃
+        const { g, gold, blade, haft } = k;
+        haft(1.9);
+        blade([[0, 0.2], [0.35, 0.3], [0.6, 0.1], [0.55, -0.45], [0.3, -0.6], [0.25, -0.2], [0, -0.1]], 0.07, 1.4);
+        g.add(mesh(new THREE.BoxGeometry(0.14, 0.36, 0.12), gold, [0, 1.42, 0]));
+      },
+      2: (k) => { // 戦鎚
+        const { g, steel, gold, rarity, glowM, haft } = k;
+        haft(1.8);
+        g.add(mesh(new THREE.BoxGeometry(0.62, 0.34, 0.34), steel, [0, 1.45, 0]));
+        for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.4, 0.4), gold, [s * 0.32, 1.45, 0]));
+        g.add(mesh(cone(0.08, 0.3, 6), steel, [0, 1.75, 0]));
+        if (rarity >= 3) g.add(mesh(new THREE.BoxGeometry(0.64, 0.06, 0.36), glowM(1.2), [0, 1.45, 0]));
+      },
+      3: (k) => { // 専用: ルーンの大三日月
+        const { g, gem, glowM, blade, haft } = k;
+        haft(2.0);
+        const b = [[0, -0.42], [0.3, -0.55], [0.75, -0.8], [0.85, 0], [0.75, 0.8], [0.3, 0.55], [0, 0.42]];
+        blade(b, 0.07, 1.45);
+        blade(b.map(([x, y]) => [-x, y]), 0.07, 1.45);
+        for (let i = 0; i < 3; i++) g.add(mesh(new THREE.BoxGeometry(0.05, 0.16, 0.09), glowM(1.5), [0.45, 1.45 + (i - 1) * 0.22, 0]));
+        g.add(mesh(new THREE.OctahedronGeometry(0.1), gem, [0, 1.45, 0.06]));
+      },
     },
-  },
+  };
+  return model;
 };
 
 // ---------------------------------------------------------------------------
@@ -282,7 +292,7 @@ function effects({ player, field, attack, tree, show, register }) {
   }
   // 投斧（強攻撃）: 斧を投げる。8m先まで飛んで戻り、往復とも当たる
   function axThrow(lv) {
-    const a = aimAngle(), M = TREE_MOTIONS.ax_throw, m = lv === 2 ? 2.6 : 1.6, W = player.S.wt, col = RARITIES[player.S.wr].color;
+    const a = aimAngle(), M = TREE_MOTIONS.ax_throw, m = lv === 2 ? 2.6 : 1.6, W = player.S.wt, col = player.weaponColor();
     me.a = a; me.swingT = 9; me.motion = M.id; me.motionT = 0; me.skillT = 0; me.skillDuration = M.duration;
     const far = { x: me.x + Math.sin(a) * 8, z: me.z + Math.cos(a) * 8 }, rad = lv === 2 ? 1.6 : 1.2;
     later(M.hits[0], () => strikes.proj({ a, mult: m, type: 'heavy', speed: 20, life: 0.4, rad, shape: 'axe', stun: 6 }));
@@ -370,6 +380,6 @@ function effects({ player, field, attack, tree, show, register }) {
 }
 
 // 武器の登録（weapons/index.js が集める）
-//   tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
+//   kindOrder・stats: サーバーと共通の数値（WEAPONS の並び順と中身） / tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
 //   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
-export default { wk: 'axe', tab: 3, glyph: '斧', tree: AXE, skills, mods, legacy, heavy, weaponSkills, model, effects };
+export default { wk: 'axe', kindOrder: 4, stats, tab: 3, glyph: '斧', tree: AXE, skills, mods, legacy, heavy, weaponSkills, model, effects };
