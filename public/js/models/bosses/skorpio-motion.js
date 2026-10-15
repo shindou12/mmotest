@@ -1,6 +1,6 @@
 // 砂塵の大蠍 スコルピオの技ごとの動き（データだけ）。再生は models/boss-motion.js、書き方は bosses/graz-motion.js と同じ
 // 時刻は秒。サーバーの予兆（sim/bosses/skorpio.js）の発動時刻に、尾を突き出す・鋏を閉じる瞬間を合わせてある。
-// 鋏は 0 が左・1 が右。arm.rotation.y で開く（左は −・右は +）／閉じる。尾は根元（scorpionTail.rotation.x）で振る（+ で前へ突き出す）
+// 鋏は 0 が左・1 が右。arm.rotation.y で開く（左は −・右は +）／閉じる。尾は根元（scorpionTail.rotation.x）で振る（+ で頭の上から前へ突き出す、− で後ろへ引く）
 const N = {
   'body.position.y': 0, 'body.rotation.x': 0, 'scorpionTail.rotation.x': 0,
   'scorpionClaws.0.arm.rotation.y': 0, 'scorpionClaws.1.arm.rotation.y': 0, 'scorpionClaws.0.arm.rotation.x': 0, 'scorpionClaws.1.arm.rotation.x': 0,
@@ -8,7 +8,7 @@ const N = {
 const open = { 'scorpionClaws.0.arm.rotation.y': -0.5, 'scorpionClaws.1.arm.rotation.y': 0.5, 'scorpionClaws.0.arm.rotation.x': -0.25, 'scorpionClaws.1.arm.rotation.x': -0.25 };
 const shut = { 'scorpionClaws.0.arm.rotation.y': 0.25, 'scorpionClaws.1.arm.rotation.y': -0.25, 'scorpionClaws.0.arm.rotation.x': 0.12, 'scorpionClaws.1.arm.rotation.x': 0.12 };
 const tailBack = { 'scorpionTail.rotation.x': -0.5, 'body.rotation.x': -0.08 }; // 尾を後ろへ引く
-const tailStab = { 'scorpionTail.rotation.x': 0.6, 'body.rotation.x': 0.1 }; // 尾を前へ突き出す
+const tailStab = { 'scorpionTail.rotation.x': 0.65, 'body.rotation.x': 0.1 }; // 尾を前へ突き出す
 const SUNK = -1.7; // 潜ったときの深さ（体の大きさの倍率がかかる前の値）
 
 export const SKORPIO_MOTIONS = {
@@ -26,7 +26,7 @@ export const SKORPIO_MOTIONS = {
   // 砂の雨（共通の技）: 尾を振り上げて揺らす
   rain: { dur: 1.3, keys: [[0, N], [0.4, { 'scorpionTail.rotation.x': -0.45 }], [0.6, { 'scorpionTail.rotation.x': -0.2 }], [0.8, { 'scorpionTail.rotation.x': -0.45 }], [1.1, {}], [1.3, N]] },
   // 毒針の刻印: 尾を高く掲げ、狙った人へ毒針を向ける
-  stack: { dur: 1.2, keys: [[0, N], [0.45, { 'scorpionTail.rotation.x': -0.6, 'body.rotation.x': -0.12 }], [0.7, { 'scorpionTail.rotation.x': 0.15, 'body.rotation.x': 0 }], [1.0, {}], [1.2, N]] },
+  stack: { dur: 1.2, keys: [[0, N], [0.45, { 'scorpionTail.rotation.x': -0.45, 'body.rotation.x': -0.12 }], [0.7, { 'scorpionTail.rotation.x': 0.3, 'body.rotation.x': 0 }], [1.0, {}], [1.2, N]] },
   // 潜行（長さはサーバーが決める: 沈む 0.5 秒 → 追う 4 秒 → 飛び出す 0.9 秒 → 立て直す 0.7 秒）
   burrow: {
     dur: 6.1, stretch: true, hide: [[0.45, 5.4, 'sigil'], [0.45, 5.4, 'aura']],
