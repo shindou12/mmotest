@@ -16,8 +16,14 @@ import { clearBossProjs, gainXp, heal, spawnBossProj } from './actions.js';
 import { countClear, grantTitle, questEvent, rollTitleDrop } from './progress.js';
 import { LOOT, spawnDrop, spawnGold } from './loot.js';
 import { salvageTarget, spawnSalvaged } from './items.js';
-import { aimLineMesh } from './meshes.js';
+import { aimLineMesh, stackMarkMesh } from './meshes.js';
 import { makeTelegraph } from '../fx.js';
+// 頭割りの印（スタン・ボスの退却で取り消す。消えるまでの残りは見えなくするだけ）
+let stackMarks = [];
+function clearStackMarks(bossId) {
+  for (const s of stackMarks) if (bossId == null || s.boss === bossId) s.o.visible = false;
+  stackMarks = stackMarks.filter((s) => s.o.visible);
+}
 
 // ======================================================================
 // ネットワーク
@@ -128,8 +134,8 @@ export function onMsg(m) {
       }
       break;
     }
-    case 'bossClear': setTimeout(() => bossCleared(m), BOSS_DEATH.fall * 1000); break; // ボスが崩れ落ちて爆発してから
-    case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); clearBossProjs(); break;
+    case 'bossClear': clearStackMarks(); setTimeout(() => bossCleared(m), BOSS_DEATH.fall * 1000); break; // ボスが崩れ落ちて爆発してから
+    case 'bossReset': toast('ボスが退却した…（全員が離脱）', '#aaa'); clearBossProjs(); clearStackMarks(); break;
     case 'proj': spawnBossProj(m); break;
     case 'pgone': {
       const i = bprojs.findIndex((p) => p.id === m.id);
@@ -140,6 +146,7 @@ export function onMsg(m) {
       // スタン: そのボスが出していた攻撃はすべて取り消される
       for (let i = teles.length - 1; i >= 0; i--) if (teles[i].src === m.id) { teles[i].meshes.forEach((g) => fx.dispose(g)); teles.splice(i, 1); }
       clearBossProjs();
+      clearStackMarks(m.id);
       const b = mobs.get(m.id);
       if (b) b.act = null; // スタンで技の動きも止まる
       banner('', 'STUN!', '#ffd84a', 3);
@@ -193,6 +200,20 @@ export function onMsg(m) {
     case 'castEnd': {
       const b = mobs.get(m.id);
       if (b) { b.cast = null; if (b.act?.fromCast) b.act = null; } // 詠唱が終わった → 構えを解く
+      break;
+    }
+    case 'stack': {
+      // 頭割り（全ボス共通の「集まる」）: 狙われた人の足元に付いてまわる。弾けたときの人数割りはサーバーが行う
+      const tgt = () => (m.tid === me.id ? me : others.get(m.tid));
+      const o = stackMarkMesh(m.r);
+      stackMarks = stackMarks.filter((s) => s.o.parent); // 消えた印は外す
+      stackMarks.push({ o, boss: m.id });
+      fx.add(o, m.d / 1000, (g, k) => {
+        const t = tgt();
+        if (t) g.position.set(t.x, heightAt(t.x, t.z), t.z);
+        g.setProgress(k, now());
+      });
+      audio.sfx('stack');
       break;
     }
     case 'mark': {

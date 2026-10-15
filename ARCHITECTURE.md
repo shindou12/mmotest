@@ -234,10 +234,12 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - `public/shared/data.js` のボスの `patterns` / `p3` に名前を書くと使われる。
 - ボスごとの行動ロジック（brain）: `public/shared/sim/bosses/<名前>.js` を作り、`boss-brains.js` の `BOSS_BRAINS` に登録して、
   `data.js` のボスに `brain: '<名前>'` と `bars`（HPバーの本数）を書く。見本は `bosses/graz.js`（仕様は `docs/design/boss-sheets/graz.md`）。
-  - brain が持つもの: `spawn` / `tick`（true で行動しない）/ `patterns`・`gap`・`chain`（技の選び方）/ `moves`（ボス固有の技）。
+  - brain が持つもの: `spawn` / `tick`（true で行動しない）/ `patterns`・`gap`・`chain`（技の選び方）/ `moves`（ボス固有の技）/ `repeatable`（なくてもよい。同じ技を続けて出してよい技の名前）。
   - brain の無いボスは今までどおり共通ロジック（激昂 65% → 最終形態 35%）で動く。
-  - 共通の部品（`sim/boss.js`）: `startCast`（詠唱バー・中断ゲージ）/ `markTarget`（狙い替えの「！」。挑発で取り返せる）/ `rushTo`（走って近づく）。
-    画面側は `game/net-client.js` の `bossEv` / `cast` / `castP` / `castEnd` / `mark` / `judge` と、`ui/panels/hud.js` のボスの欄。
+  - 共通の部品（`sim/boss.js`）: `startCast`（詠唱バー・中断ゲージ。最後の引数で詠唱中の構えの動きを指定できる）/ `markTarget`（狙い替えの「！」。挑発で取り返せる）/ `rushTo`（走って近づく）/
+    `stackMark`（頭割り: 黄色い円が1人に付いてまわり、弾けた瞬間にサーバーが円の中の人数を数えてダメージを割る）。
+    画面側は `game/net-client.js` の `bossEv` / `cast` / `castP` / `castEnd` / `mark` / `judge` / `stack`（見た目は `game/meshes.js` の `stackMarkMesh`）と、`ui/panels/hud.js` のボスの欄。
+  - ボスに攻撃を当てさせない間（砂塵の大蠍の潜行）は、ボスに `burrow` を持たせる（`messages.js` の `hit` が見る）。
   - `sim.js` から `boss-brains.js` と `bosses/*.js` を直接 import しておく（下の「sim の import の深さ」）。
 - ボスの技ごとの動き: `public/js/models/bosses/<名前>-motion.js` にキーフレームを書き、`boss-models.js` の外観に `motions` として登録する。
   - キーは `'部位.rotation.x'` などの値と、武器の向き `'aim.pitch'` / `'aim.yaw'`。技名はサーバーの `bossAct` の `p`（詠唱は `cast`）。
@@ -245,7 +247,9 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - 配列の部位は `'arms.0.rotation.x'` のように番号で書く。`hold: true` は最後の姿勢のまま取り消されるまで続く（吸い上げの構え）。
 - ボスの手下: `data.js` のボスに `minions: [{ t, name, color, link?, scale? }]` を書き、`spawnMob(A, -1 - 番号, ...)` で出す
   （敵の番号が負の数＝手下。`mobDef` が引き分ける）。見た目は `MOB_MODELS[t]`、動き方は `sim/common.js` の `ARCH[t]`。
-- ボス部屋の形: `areas.js` の迷宮区のマップの先頭（`ARENA` / `ARENA_CROSS`）。ボスごとに別の形にできる。
+- ボス部屋の形: `areas.js` の迷宮区のマップの先頭（`ARENA` / `ARENA_CROSS` / `ARENA_LONG`）。ボスごとに別の形にできる。
+  - 部屋の中にいるか・ボスが外に出ないかは、ふつうは中心から半径 `lair.r` の円で見る。細長い部屋（砂の回廊）は、エリアに `longArena: true` を書くと
+    `lairOf` が床の続く範囲を長方形（`lair.box`）にし、判定はその長方形になる。判定は必ず `areas.js` の `inLair(lair, x, z, 余裕)` と `clampArena` を使う。
 - プレイヤーからのメッセージ: `public/shared/sim/messages.js` の `MESSAGES[t]` に関数を足す。
   - 送る側は `net.send({ t, ... })`。
 

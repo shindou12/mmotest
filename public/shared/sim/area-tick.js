@@ -1,7 +1,7 @@
 // World のメソッド: エリアの毎フレーム（敵・罠・宝箱・復活・ボス部屋）。sim.js が World.prototype に足す
 import { REVIVE, enemyScale, floorPressure } from '../balance.js';
 import { floorLevel, mobHp, mobDmg, ELITE_BASE } from '../data.js';
-import { PLATE_WINDOW, grid, collide, exitsOf, obstaclesOf, hazardsOf, namedSpot, insideOpen, boundR, dirOf } from '../areas.js';
+import { PLATE_WINDOW, grid, collide, exitsOf, obstaclesOf, hazardsOf, namedSpot, insideOpen, boundR, dirOf, inLair } from '../areas.js';
 
 import { rnd, pick, dist, r2 } from './common.js';
 import { NAMED } from './tuning.js';
@@ -123,7 +123,7 @@ export const AreaTickMethods = {
         A.bossCd -= dt;
         if (A.bossCd <= 0) A.bossState = 'idle';
       }
-      if (A.bossState === 'idle' && alive.some((p) => dist(p, A.lair) < A.lair.r - 3)) {
+      if (A.bossState === 'idle' && alive.some((p) => inLair(A.lair, p.x, p.z, -3))) {
         A.bossState = 'fight';
         const b = this.spawnBoss(A);
         this.broadcastArea(A.id, { t: 'bossStart', n: A.n, name: A.fdef.boss.name, id: b.id });

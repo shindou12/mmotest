@@ -1,7 +1,7 @@
 // 画面: HUD（クエスト・パーティ・自分の枠・ボス・ホットバー）。Presenter（描画パラメータを計算して View に set する）を P に足す。createUI（ui/app.js）が呼ぶ
 // ui: 画面の部品と Presenter の入れ物（app.js が作る）。ほかの画面と共有する値は ui.〜 で読み書きする
 import { MAX_LEVEL, xpToNext } from '../../../shared/data.js';
-import { HAZARDS } from '../../../shared/areas.js';
+import { HAZARDS, inLair } from '../../../shared/areas.js';
 import { HEAVY, TREE_SKILLS, spTotal, spSpent } from '../../skills.js';
 import { hasWTree, wtLeft } from '../../weapon-tree.js';
 import { QUESTS, questState } from '../../quests.js';
@@ -130,7 +130,7 @@ export function installHud(ui) {
     // 調べる・ボス部屋の案内
     const it = game.nearestInteract();
     const lair = game.env()?.lair, world = game.world;
-    const nearLair = lair && !boss && world.bossState !== 'fight' && Math.hypot(me.x - lair.x, me.z - lair.z) < lair.r + 4;
+    const nearLair = lair && !boss && world.bossState !== 'fight' && inLair(lair, me.x, me.z, 4);
     if (it) H.prompt.set({ visible: true, html: it.label });
     else if (nearLair && world.bossState === 'cleared') H.prompt.set({ visible: true, text: 'ボスは討伐済み。しばらくすると再挑戦できます' });
     else if (nearLair) H.prompt.set({ visible: true, text: '⚠ ボス部屋：魔法陣の中に入ると戦闘開始' });

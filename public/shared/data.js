@@ -376,7 +376,7 @@ export const FLOORS = [
       { t: 'scorpion', name: 'ジャイアントスコーピオン', color: 0x8a3a2a }, { t: 'mage', name: '砂漠の呪術師', color: 0xa0702a },
     ],
     elites: [{ t: 'knight', ai: 'sentinel', look: 'player', weapon: 'spear', armor: 6, scale: 1.35, name: '砂塵の処刑騎士', color: 0x8a6a3a, accent: 0xff6a2a }],
-    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', appearance: 'skorpio', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo', 'shot', 'charge', 'fissure', 'checker'], p3: ['spiral', 'cross', 'cage'] },
+    boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', appearance: 'skorpio', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, brain: 'skorpio', bars: 3 },
   },
   {
     n: 4, name: '水晶洞窟', ground: 0x2a2a44, ground2: 0x3a3a60, fog: 0x1a1a38, skyTop: 0x0a0a1a, skyBot: 0x202048,

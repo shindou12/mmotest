@@ -1,6 +1,7 @@
 // World のメソッド: ボスの出現・スタン・行動の選択（技の中身は boss-patterns.js）。sim.js が World.prototype に足す
 import { BALANCE, partySize, enemyScale, floorPressure, attackPressure } from '../balance.js';
 import { bossLevel, mobHp, mobDmg } from '../data.js';
+import { inLair } from '../areas.js';
 
 import { rnd, pick, dist, r2, HATE_RESET, HATE_ABSORB, angDiff } from './common.js';
 import { STUN_TIME } from './tuning.js';
@@ -47,7 +48,7 @@ export const BossMethods = {
   // ---- ボス ----
   tickBoss(A, b, alive, dt) {
     const L = A.lair;
-    const inArena = alive.filter((p) => dist(p, L) < L.r + 4);
+    const inArena = alive.filter((p) => inLair(L, p.x, p.z, 4));
     if (!inArena.length) {
       A.noTargetT += dt;
       if (A.noTargetT > 8) { this.resetBoss(A); return; }
@@ -97,7 +98,7 @@ export const BossMethods = {
     if (b.busyT > 0) { b.st = 2; return; }
 
     // 狙う相手はヘイト順（たまに気まぐれで別の人）
-    let target = this.threatTarget(b, inArena, L.r + 6) || alive.find((p) => p.id === b.target && dist(p, L) < L.r + 4);
+    let target = this.threatTarget(b, inArena, L.box ? 100 : L.r + 6) || alive.find((p) => p.id === b.target && inLair(L, p.x, p.z, 4));
     if (!target) target = inArena.length ? pick(inArena) : null;
     b.target = target ? target.id : null;
     if (!target) { b.st = 0; return; }
@@ -117,7 +118,7 @@ export const BossMethods = {
       const forced = b.forced;
       let pat = forced || pick(pats);
       b.forced = null;
-      if (!forced && pat === b.last && pats.length > 1) pat = pick(pats.filter((p) => p !== b.last));
+      if (!forced && pat === b.last && pats.length > 1 && !brain?.repeatable?.includes(pat)) pat = pick(pats.filter((p) => p !== b.last)); // repeatable: 続けて出してよい技
       b.last = pat;
       // brain のあるボスは狙いを気まぐれに変えない（狙い方を読めるように）
       const victim = !brain && Math.random() < 0.2 && inArena.length > 1 ? pick(inArena) : target;
@@ -135,10 +136,11 @@ export const BossMethods = {
   // 技の基本の威力（各技はこれに倍率を掛ける）
   bossBaseDamage(A, b) { return mobDmg(b.lv) * 3.3 * BALANCE.bossDamage * floorPressure(A.n) * attackPressure(b.scaleN); },
   // 詠唱: 名前とバーを出す。need > 0 なら、詠唱中に need 以上のダメージで中断してスタン。終われば done() を呼ぶ
-  startCast(A, b, name, sec, need, done) {
+  // act: 詠唱中の構え（ボスの動きの名前。なければ共通の 'cast'）
+  startCast(A, b, name, sec, need, done, act) {
     b.cast = { name, t: sec, need, dealt: 0, done };
     b.busyT = 0.3; b.dash = null; // 詠唱中は tickCast が行動を止める
-    this.broadcastArea(A.id, { t: 'cast', id: b.id, name, d: Math.round(sec * 1000), need: need > 0 ? 1 : 0 });
+    this.broadcastArea(A.id, { t: 'cast', id: b.id, name, d: Math.round(sec * 1000), need: need > 0 ? 1 : 0, ...(act ? { act } : {}) });
   },
   tickCast(A, b, dt) {
     const c = b.cast;
@@ -163,6 +165,19 @@ export const BossMethods = {
     b.tauntBy = p.id; b.tauntT = sec; b.target = p.id;
     this.broadcastArea(A.id, { t: 'mark', id: b.id, tid: p.id });
   },
+  // 頭割り（全ボス共通の「集まる」）: p の足元に黄色い円が付いてまわり、sec 秒で弾ける。
+  // 弾けた瞬間に円の中の人数を数え、合計ダメージ dmg を人数で割って配る（数えるのはサーバー。画面ごとに数えると食い違うため）
+  // 半径 r は全ボス共通の予兆の倍率（BALANCE.bossRange）で広げる
+  stackMark(A, b, p, sec, r, dmg) {
+    const R = r2(r * BALANCE.bossRange);
+    this.broadcastArea(A.id, { t: 'stack', id: b.id, tid: p.id, r: R, d: Math.round(sec * 1000) });
+    this.later(A, sec, () => {
+      if (A.boss !== b) return;
+      const q = this.livePlayer(A, p.id) || p; // 倒れた人は、倒れた場所で弾ける
+      const n = Math.max(1, this.areaPlayers(A.id).filter((o) => !o.dead && !o.down && Math.hypot(o.x - q.x, o.z - q.z) <= R).length);
+      this.broadcastArea(A.id, { t: 'tele', id: this.seq++, src: 0, boss: b.id, sh: [{ k: 'circle', x: r2(q.x), z: r2(q.z), r: R }], d: 120, dmg: Math.round(dmg / n), c: '#ffd84a', n });
+    });
+  },
   // 走って近づく（ダメージなし）。dash と同じ動きなので、正面でガードしている盾槍に止められる
   rushTo(A, b, p, speed = 16, stop = 3.5) {
     const d = Math.hypot(p.x - b.x, p.z - b.z);
@@ -178,6 +193,11 @@ export const BossMethods = {
 
   clampArena(A, o) {
     const L = A.lair;
+    if (L.box) { // 細長い部屋: 長方形の内側へ
+      o.x = Math.max(L.box.x0 + 1.5, Math.min(L.box.x1 - 1.5, o.x));
+      o.z = Math.max(L.box.z0 + 1.5, Math.min(L.box.z1 - 1.5, o.z));
+      return;
+    }
     const dx = o.x - L.x, dz = o.z - L.z, d = Math.hypot(dx, dz);
     const max = L.r - 1.5;
     if (d > max) { o.x = L.x + dx / d * max; o.z = L.z + dz / d * max; }

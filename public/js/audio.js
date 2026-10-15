@@ -567,6 +567,10 @@ export class AudioEngine {
       }
       case 'ui': tone('sine', 1000, 0, 0.05, 0.05); break;
       // ---- スタン（全ボス共通） ----
+      case 'stack': { // 頭割りの印: 集まる＝鐘（2つの音を重ねて長く響かせる）
+        for (const [f, at, v] of [[784, 0, 0.16], [1175, 0.0, 0.08], [784, 0.42, 0.12], [1175, 0.42, 0.06]]) tone('sine', f, f * 0.995, 1.1, v, at).connect(this.revSend);
+        break;
+      }
       case 'stunBreak': {
         // 入った瞬間: 鎧が砕ける金属音（不協和な倍音）＋重い低音＋ガラスが散る音＋きらめく上昇音
         [2093, 2793, 3520, 4186].forEach((f, i) => tone('triangle', f, f * 0.96, 0.9, 0.09, i * 0.012).connect(this.revSend));

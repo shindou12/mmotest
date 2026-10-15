@@ -22,6 +22,7 @@ import { AreaTickMethods } from './sim/area-tick.js';
 import './sim/boss-brains.js';
 import './sim/bosses/graz.js';
 import './sim/bosses/yugdra.js';
+import './sim/bosses/skorpio.js';
 import { BossMethods } from './sim/boss.js';
 
 export class World {

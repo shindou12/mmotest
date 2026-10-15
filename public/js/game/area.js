@@ -1,5 +1,5 @@
 import { FLOORS } from '../../shared/data.js';
-import { AREAS, AREA_TYPES, WEATHERS } from '../../shared/areas.js';
+import { AREAS, AREA_TYPES, WEATHERS, inLair } from '../../shared/areas.js';
 import { buildArea, textSprite } from '../env.js';
 import { QUESTS, questAvailable, questState } from '../quests.js';
 import { now } from './util.js';
@@ -113,7 +113,7 @@ export function waypointWarp(id) {
   if (!waypointOk(id) || AREAS[id].floor > (world.unlocked || 1)) { toast('まだ解放されていないワープポイントだ', '#ff9a8a'); return false; }
   if (me.dead || me.crawl) return false;
   const lair = env?.lair;
-  if (world.bossState === 'fight' && lair && Math.hypot(me.x - lair.x, me.z - lair.z) < lair.r + 2) { toast('ボス戦の最中はワープできない', '#ff9a8a'); return false; }
+  if (world.bossState === 'fight' && lair && inLair(lair, me.x, me.z, 2)) { toast('ボス戦の最中はワープできない', '#ff9a8a'); return false; }
   if (id === world.area) return false;
   me.transit = true;
   fx.beam(me.x, me.z, 0x6ad8ff, 12, 1.2, 0.8);

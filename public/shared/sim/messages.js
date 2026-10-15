@@ -4,7 +4,7 @@ import { normalizeWeaponStyle } from '../weapon-appearances.js';
 import { MOTION_DURATIONS } from '../motion-catalog.js';
 import { REVIVE, reviveStep } from '../balance.js';
 import { WEAPONS, MAX_FLOOR } from '../data.js';
-import { AREAS, FLOOR_HUB, arrival, spawnPoint, waypointOf } from '../areas.js';
+import { AREAS, FLOOR_HUB, arrival, spawnPoint, waypointOf, inLair } from '../areas.js';
 
 import { dist, HATE_ABSORB } from './common.js';
 
@@ -35,6 +35,7 @@ export const MESSAGES = {
   hit(world, p, m, A, id) {
     const mob = A.mobs.get(m.id);
     if (!mob || mob.hp <= 0) return;
+    if (mob.burrow) return; // 砂に潜っている間は当たらない（砂塵の大蠍の潜行）
     const dmg = Math.max(0, Math.min(Number(m.dmg) || 0, 1e9));
     mob.hp -= dmg;
     if (mob.cast) world.castDamage(A, mob, dmg);
@@ -108,7 +109,7 @@ export const MESSAGES = {
     // ワープポイントへ飛ぶ（解放済みかどうかはキャラデータを持つクライアントが確かめる）
     const to = String(m.to || ''), def = AREAS[to];
     if (!def || def.floor > world.unlocked || p.dead) return;
-    if (A.bossState === 'fight' && A.lair && dist(p, A.lair) < A.lair.r + 2) return; // ボス戦の最中は飛べない
+    if (A.bossState === 'fight' && A.lair && inLair(A.lair, p.x, p.z, 2)) return; // ボス戦の最中は飛べない
     const w = waypointOf(def);
     world.movePlayer(p, to, { x: w.x, z: w.z + (def.shape === 'grid' ? 0 : 2.5) });
   },

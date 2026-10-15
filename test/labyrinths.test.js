@@ -25,14 +25,16 @@ function reach(g, from) {
 for (const [lab, gimmick] of [['f1_lab', 'L'], ['f2_lab', 'G'], ['f3_lab', 'P']]) {
   test(`${lab}: bigger rooms-and-corridors map; door, boss, gimmick, chests and spawns are all reachable from the entrance`, () => {
     const w = new World({ unlocked: 3 }), g = grid(w.area(lab).def);
-    assert.equal(g.W, 31); assert.equal(g.H, 51);
+    // 迷路部分は 40 マス。上にボス部屋（3層は細長い砂の回廊で 20 マス、他は 11 マス）
+    const top = lab === 'f3_lab' ? 20 : 11;
+    assert.equal(g.W, 31); assert.equal(g.H, top + 40);
     const ok = reach(g, g.pts.E[0]);
     for (const ch of ['D', 'B', gimmick, 'K', 'M', 'w', 'C']) for (const p of g.pts[ch] || []) assert.ok(ok.has(p.c + ',' + p.r), `${lab} ${ch} at ${p.c},${p.r}`);
     assert.ok((g.pts.K || []).length >= 3, 'sentinels');
     assert.ok((g.pts.w || []).length >= 3, 'swarms');
     // 通路は太い: 歩けるマスのうち、両隣（左右または上下）の片方しか開いていない「幅1マス」の場所はほとんどない
     let narrow = 0, open = 0;
-    for (let r = 11; r < g.H - 1; r++) for (let c = 1; c < g.W - 1; c++) {
+    for (let r = top; r < g.H - 1; r++) for (let c = 1; c < g.W - 1; c++) {
       if (g.rows[r][c] === '#') continue;
       open++;
       const o = (dc, dr) => g.rows[r + dr][c + dc] !== '#';

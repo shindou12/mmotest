@@ -66,7 +66,10 @@ test('ordinary attacks keep readable windups and bosses enter late phases earlie
   const m = w.spawnMob(A, 2, 0, 0, 4);w.mobAttack(A, m, w.players.get(1), 0);
   const attack = messages.get(1).find(m => m.t === 'tele');
   assert.ok(attack.d >= 420);assert.ok(attack.dmg > 0);
-  const B = w.area('f3_lab'), b = w.spawnBoss(B); // 1・2層は HPバー3本の専用ロジックなので、共通ロジックの3層で確かめる
+  // 1〜3層のボスはどれも HPバー3本の専用ロジック（brain）なので、brain を外した3層のボスで共通ロジックを確かめる
+  const B = w.area('f3_lab');
+  B.fdef = { ...B.fdef, boss: { ...B.fdef.boss, brain: undefined, patterns: ['rain', 'charge'] } };
+  const b = w.spawnBoss(B);
   const p = w.players.get(1);p.area = B.id;p.x = B.lair.x;p.z = B.lair.z;
   b.hp = b.mhp * .64;w.tickBoss(B, b, [p], .01);assert.equal(b.phase, 2);
   b.hp = b.mhp * .34;w.tickBoss(B, b, [p], .01);assert.equal(b.phase, 3);

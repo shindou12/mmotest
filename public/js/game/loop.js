@@ -1,7 +1,7 @@
 import { MOTION_DURATIONS } from '../../shared/motion-catalog.js';
 import { REVIVE } from '../../shared/balance.js';
 import { FLOORS, RARITIES, WEAPONS } from '../../shared/data.js';
-import { AREAS, HAZARDS, collide, hazardsOf, insideOpen } from '../../shared/areas.js';
+import { AREAS, HAZARDS, collide, hazardsOf, insideOpen, inLair } from '../../shared/areas.js';
 import { angDiff, clamp, now, rnd, lerp } from './util.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 import { isSpinMotion } from '../../shared/skill-timings.js';
@@ -313,6 +313,11 @@ export function update(dt) {
     if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
     // きらめくトカゲ: いつもきらめき、走ると金色の粒を残す
     if (mb.t === 'lizard') view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 1.4), mb.z + rnd(-0.6, 0.6), { color: Math.random() < 0.5 ? 0xffd84a : 0xffffff, size: 0.35, life: 0.6, speed: 0.6, gravity: -0.5 });
+    // 砂に潜って追ってくる（潜行）: 盛り上がりの砂ぼこり
+    if (mb.act?.p === 'burrow' && mb.act.age > 0.4 && mb.act.age < mb.act.d - 1.2) {
+      const sand = FLOORS[state.world.floor - 1].ground2 ?? 0xc8a070;
+      for (let i = 0; i < 3; i++) view.fx.parts.emit(mb.x + rnd(-1.6, 1.6), rnd(0.1, 0.8), mb.z + rnd(-1.6, 1.6), { color: sand, size: 0.7, life: 0.7, speed: 2.2, gravity: 4, up: 3 });
+    }
     // ボスとつながる手下（吸い上げの根瘤）: 手下から大樹へ光の粒が流れ込む
     if (mb.link) {
       const boss = [...state.mobs.values()].find((o) => o.kind === 2);
@@ -370,7 +375,7 @@ export function update(dt) {
   // BGM 切り替え（ボス戦中で部屋の近くならボス曲）
   const fdef = FLOORS[state.world.floor - 1];
   const lair = field.env.lair;
-  const bossNear = state.world.bossState === 'fight' && lair && Math.hypot(state.me.x - lair.x, state.me.z - lair.z) < lair.r + 20;
+  const bossNear = state.world.bossState === 'fight' && lair && inLair(lair, state.me.x, state.me.z, 20);
   view.audio.setMusic(fdef.music, !!bossNear);
 
   // カメラ: 注視点（自キャラ）を滑らかに追い、ズームは目標値へ指数的に近づける。

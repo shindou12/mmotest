@@ -55,6 +55,7 @@ export function stunValue(o) {
 export function dealDamage(mb, mult, o = {}) {
   if (state.characterStore.lost) return;
   if (!mb || mb.hp <= 0) return;
+  if (mb.act?.p === 'burrow' && mb.act.age > 0.45 && mb.act.age < (mb.act.d || 0) - 0.7) return; // 砂に潜っている間は当たらない（サーバーも受け付けない）
   const skill = o.type === 'wskill' || o.type === 'tskill';
   const tough = mb.kind === 2 || !!mb.elite;
   let crit = o.crit || (stats.S.wt && fxSome('critAlways', o)) || o.sv?.key === 'sv_heavy' || Math.random() * 100 < stats.S.crit + stats.buffMod('crit') + rules.wtCritAdd(o) + (tough && rules.tf('t_shark') ? 15 : 0) + (rules.tf('t_night') && rules.indoorNow() ? 10 : 0) + (rules.tf('t_lucky') ? 8 : 0) || (skill && stats.S.fx.has('skillcrit'));

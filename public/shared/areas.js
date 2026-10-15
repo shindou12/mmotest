@@ -64,6 +64,30 @@ const ARENA_CROSS = [
   '###########D###########',
 ];
 
+// 砂の回廊（第3層・砂塵の大蠍）: 幅7マス（28m）・長さ18マスの細長い部屋。扉は南の端。部屋の判定は円ではなく長方形（longArena）
+const ARENA_LONG = [
+  '#######################',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########...B...########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '########.......########',
+  '###########D###########',
+];
+
 // 迷宮区の迷路部分（31 × 40 マス）: 6〜12マス四方の部屋を、幅3〜4マスの通路でつなぐ。入口（下）から扉（ボス部屋の下）まで長めの道のり
 //   K: 番兵（強い精鋭） / w: 群れ（足の速い弱い雑魚が3体） / M: 雑魚
 // ボス部屋（幅23マス）を、迷宮区の幅（31マス）に合わせて両脇を壁で埋める
@@ -160,7 +184,7 @@ const MAPS = {
   ],
   // 第3層 迷宮区: 入口 → 中央の大広間 → 左右の翼の感圧板（2つを50秒以内に踏むと扉が開く。手分けすると楽）→ 北の通路 → 扉前の広間
   lab3: [
-    ...wide(ARENA),
+    ...wide(ARENA_LONG),
     '##############...##############',
     '##############...##############',
     '##############...##############',
@@ -368,7 +392,7 @@ export const AREAS = {
   },
   f3_lab: {
     floor: 3, type: 'labyrinth', name: '第3層 迷宮区', shape: 'grid', map: MAPS.lab3, mapPos: [16, 20],
-    exits: [{ to: 'f3_canyon' }], gimmick: 'plates',
+    exits: [{ to: 'f3_canyon' }], gimmick: 'plates', longArena: true,
     mobs: { lv: [4, 6], hp: 1.3, respawnSec: 60, swarm: 2 }, // 迷宮区の敵は強め。swarm: 群れ（w）に使う足の速い敵
   },
 };
@@ -708,7 +732,22 @@ export function waypointOf(def) {
 }
 export function lairOf(def) {
   if (def.type !== 'labyrinth') return null;
-  const b = grid(def).pts.B[0];
-  return { x: b.x, z: b.z, r: 20 };
+  const g = grid(def), b = g.pts.B[0];
+  if (!def.longArena) return { x: b.x, z: b.z, r: 20 };
+  // 細長い部屋: B のある列から左右・上下に床が続く範囲を長方形にする（扉の手前まで）
+  const open = (c, r) => r >= 0 && r < g.H && c >= 0 && c < g.W && (g.rows[r][c] === '.' || g.rows[r][c] === 'B');
+  let c0 = b.c, c1 = b.c, r0 = b.r, r1 = b.r;
+  while (open(c0 - 1, b.r)) c0--;
+  while (open(c1 + 1, b.r)) c1++;
+  while (open(b.c, r0 - 1)) r0--;
+  while (open(b.c, r1 + 1)) r1++;
+  const lo = cellToWorld(g, c0, r0), hi = cellToWorld(g, c1, r1), h = CELL / 2;
+  const box = { x0: lo.x - h, x1: hi.x + h, z0: lo.z - h, z1: hi.z + h };
+  return { x: b.x, z: b.z, r: (box.x1 - box.x0) / 2, box };
+}
+// ボス部屋の中か（pad: 外側への余裕。負なら内側へ狭める）。細長い部屋は長方形、それ以外は円
+export function inLair(L, x, z, pad = 0) {
+  if (L.box) return x > L.box.x0 - pad && x < L.box.x1 + pad && z > L.box.z0 - pad && z < L.box.z1 + pad;
+  return Math.hypot(x - L.x, z - L.z) < L.r + pad;
 }
 
