@@ -149,12 +149,9 @@ export function onMsg(m) {
       break;
     }
     case 'guardStop': {
-      const who = m.pid === me.id ? 'あなた' : others.get(m.pid)?.name || '仲間';
-      toast(`${who}が突進を受け止めた！`, '#bfe0ff');
       fx.ringWave(m.x, m.z, 0xbfe0ff, 5, 0.4);
       fx.parts.burst(m.x, 1.5, m.z, 40, { color: 0xbfe0ff, speed: 9, size: 0.5, life: 0.5 });
       audio.sfx('block'); audio.sfx('impact'); addShake(0.6);
-      if (m.pid === me.id) floatText(me.x, 2.8, me.z, 'GUARD BREAK!', 'just');
       break;
     }
     case 'hateReset': {
