@@ -49,12 +49,14 @@ export const GRAZ_MOTIONS = {
     keys: [[0, N], [0.8, { 'body.rotation.x': -0.35, 'head.rotation.x': -0.6, 'arm.rotation.x': -0.6, 'guardArm.rotation.x': -0.3, 'aim.pitch': 1.9, 'aim.yaw': 0.8 }], [0.95, {}],
       [1.05, { 'body.rotation.x': 0.35, 'head.rotation.x': 0.4 }], [1.4, {}], [1.6, N]],
   }),
-  // 王の裁き（向きを合わせる 2.0 秒 + 固定 0.75 秒 → 発動）: 大剣を天へ掲げて溜め、一気に振り下ろす
+  // 王の裁き（向きを合わせる 2.0 秒 + 固定 0.75 秒 → 発動 → 通り道から横へ亀裂が順に弾ける）:
+  // 大剣を天へ掲げて溜め、一気に振り下ろし、刺した剣をさらに押し込む
   judge: m({
-    dur: 3.65,
+    dur: 4.25,
     keys: [[0, N], [0.6, { 'arm.rotation.x': -3.1, 'arm.rotation.z': 0.2, 'body.rotation.x': -0.3, 'head.rotation.x': -0.45, 'guardArm.rotation.x': -0.8, 'guardArm.rotation.z': -0.4, 'aim.pitch': 0.05, 'aim.yaw': 0 }],
       [2.6, { 'body.rotation.x': -0.38 }], [2.8, { ...down, 'arm.rotation.x': 0.8, 'body.rotation.x': 0.5, 'body.position.y': -0.25, 'guardArm.rotation.x': 0, 'guardArm.rotation.z': 0, 'aim.pitch': 2.3 }],
-      [3.3, {}], [3.65, N]],
+      [3.1, { 'body.position.y': -0.18, 'body.rotation.x': 0.4 }], [3.35, { 'body.position.y': -0.35, 'body.rotation.x': 0.6, 'head.rotation.x': 0.45, 'aim.pitch': 2.5 }],
+      [3.9, {}], [4.25, N]],
   }),
   // 暴走・回転斬り（1.1 秒）→ 大きな隙（剣先を地面に落としてうなだれる）。一周して終わるので体の向きは -2π で止める
   spin: m({

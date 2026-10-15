@@ -6,7 +6,8 @@ import { rnd, r2, angDiff } from '../common.js';
 const LOW_HP = 0.3; // 狙いを替えるHPの割合
 const MARK_CD = 10; // 狙いを替える間隔（秒）
 const SUMMON = { name: '近衛兵召集', sec: 4, need: 0.06, adds: 3, mob: 1 }; // need: 中断に必要なダメージ（最大HPの割合）
-const JUDGE = { name: '王の裁き', track: 2.0, turn: 0.9, lock: 0.75, len: 34, w: 6 }; // turn: 向きを合わせる速さ（rad/秒）
+const JUDGE = { name: '王の裁き', track: 2.0, turn: 0.9, lock: 0.75, len: 34, w: 6, cracks: { n: 4, step: 7, half: 8, w: 2.6, gap: 0.12, delay: 0.55 } }; // turn: 向きを合わせる速さ（rad/秒）。
+// cracks: 衝撃波が進みながら横へ生む亀裂（step m おきに n 本、本線と直角に左右 half m。手元から gap 秒ずつずれて生まれ、delay 秒後に弾ける）
 
 // 一番HPの割合が低い人（倒れている人は除く）
 const weakest = (inArena) => inArena.filter((p) => !p.down).sort((p, q) => p.hp / p.mhp - q.hp / q.mhp)[0];
@@ -52,6 +53,15 @@ export const graz = {
         b.track = null;
         world.later(A, JUDGE.lock, () => world.broadcastArea(A.id, { t: 'castEnd', id: b.id, ok: 1 }));
         world.tele(A, b, [{ k: 'line', x: r2(b.x), z: r2(b.z), a: r2(b.a), len: JUDGE.len, w: JUDGE.w }], JUDGE.lock, T.dmg, '#ff2a2a', 1);
+        // 衝撃波が走ると、通り道から横へ亀裂が手元から順に生まれて弾ける（魚の骨の形）
+        const C = JUDGE.cracks, a = b.a, ox = b.x, oz = b.z, pa = a + Math.PI / 2;
+        for (let i = 1; i <= C.n; i++) {
+          const cx = ox + Math.sin(a) * C.step * i, cz = oz + Math.cos(a) * C.step * i;
+          world.later(A, JUDGE.lock + C.gap * (i - 1), () => {
+            if (A.boss !== b) return;
+            world.tele(A, b, [{ k: 'line', x: r2(cx - Math.sin(pa) * C.half), z: r2(cz - Math.cos(pa) * C.half), a: r2(pa), len: C.half * 2, w: C.w }], C.delay, T.dmg * 0.6, '#ff2a2a');
+          });
+        }
       }
       b.st = 2;
       return true;
@@ -125,7 +135,8 @@ export const graz = {
       b.track = { tid: p.id, t: JUDGE.track, dmg: base * 2.2 };
       world.broadcastArea(A.id, { t: 'cast', id: b.id, name: JUDGE.name, d: Math.round((JUDGE.track + JUDGE.lock) * 1000), need: 0 });
       world.broadcastArea(A.id, { t: 'judge', id: b.id, tid: p.id, d: Math.round(JUDGE.track * 1000), len: JUDGE.len, w: JUDGE.w });
-      return JUDGE.lock + 0.9; // 溜め（track）の間は tick が行動を止めているので、その後の分だけ
+      const C = JUDGE.cracks;
+      return JUDGE.lock + C.gap * (C.n - 1) + C.delay + 0.9; // 溜め（track）の間は tick が行動を止めているので、その後の分だけ
     },
     spin(world, A, b, target, { base }) {
       // 暴走・回転斬り: 自分の周りを一周 → 大きな隙
