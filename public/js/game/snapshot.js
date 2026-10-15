@@ -1,4 +1,5 @@
 import { FLOORS, RARITIES, WEAPONS, mobDef } from '../../shared/data.js';
+import * as THREE from 'three';
 import { makeMob, makePlayer, setPlayerArmor, setPlayerWeapon } from '../models.js';
 import { now } from './util.js';
 import { audio, fx, scene } from './render.js';
@@ -47,7 +48,7 @@ export function onSnap(m) {
   const seenM = new Set();
   const fdef = FLOORS[world.floor - 1];
   for (const r of m.m) {
-    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr, elite, target, hateT, stunPct, stunT] = r;
+    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr, elite, target, hateT, stunPct, stunT, guard] = r;
     seenM.add(id);
     let mb = mobs.get(id);
     if (!mb) {
@@ -59,12 +60,13 @@ export function onSnap(m) {
       } else {
         const md = mobDef(fdef, d);
         // elite: 1 精鋭 / 2 門番 / 3 ネームド（秘境の主）
-        const sc = md.scale ?? (kind === 1 ? 0.8 : elite === 3 ? 1.9 : elite ? 1.3 : 1); // md.scale: ボスの手下の大きさ
-        model = makeMob(md.t, md.color, sc, elite === 3 ? 0xff60d0 : elite ? 0xffb030 : null);
-        name = elite === 3 ? `★ ${world.def.named?.name || md.name}` : elite === 2 ? '門番' : (elite ? '精鋭 ' : '') + md.name;
+        const sc = md.scale ?? (kind === 1 ? 0.8 : elite === 3 ? 1.9 : elite ? 1.3 : 1); // md.scale: ボスの手下・番兵の大きさ
+        model = md.look === 'player' ? makeDarkAdventurer(md, sc) : makeMob(md.t, md.color, sc, elite === 3 ? 0xff60d0 : elite ? 0xffb030 : null);
+        name = elite === 3 ? `★ ${world.def.named?.name || md.name}` : elite === 2 ? '門番' : md.look === 'player' ? md.name : (elite ? '精鋭 ' : '') + md.name;
         rad = 0.75 * sc;
       }
       mb = { id, model, name, rad, kind, elite, x, z, a, hp, mhp, lv, st, flash: 0, label: null, localT: 0, poisonUntil: 0, poisonT: 0 };
+      if (kind !== 2 && mobDef(fdef, d)?.look === 'player') Object.assign(mb, { look: 'player', weapon: mobDef(fdef, d).weapon, accent: mobDef(fdef, d).accent, walkT: 0, atkT: -1 });
       if (kind === 2) mb.bars = fdef.boss.bars || 1;
       if (kind !== 2) mb.label = makeMobLabel(mb);
       if (kind !== 2 && mobDef(fdef, d)?.link) mb.link = true; // ボスとつながる手下（光る線を引く）
@@ -77,7 +79,8 @@ export function onSnap(m) {
         fx.flash(x, 4, z, fdef.boss.accent, 80, 0.6, 30);
       }
     }
-    Object.assign(mb, { tx: x, tz: z, ta: a, mhp, lv, st, enraged: !!enr, target, hateT, stunPct, stunT });
+    if (mb.look && st === 2 && mb.st !== 2) mb.atkT = 0; // 番兵: 攻撃の始まり（振りの動きを合わせる）
+    Object.assign(mb, { tx: x, tz: z, ta: a, mhp, lv, st, enraged: !!enr, target, hateT, stunPct, stunT, guard: !!guard });
     // ローカル予測ダメージを少しの間優先
     if (now() - mb.localT > 0.4) mb.hp = hp; else mb.hp = Math.min(mb.hp, hp);
   }
@@ -105,6 +108,22 @@ function bossDeath(mb, accent) {
       audio.sfx('mobdie'); audio.sfx('impact'); audio.sfx('thunder'); addShake(2.2);
     }
   });
+}
+
+// 番兵の見た目: プレイヤーの姿を、暗い鎧の色に染めて目だけ光らせ、大きくしたもの（武器と防具の見た目は md.weapon / md.armor）
+function makeDarkAdventurer(md, sc) {
+  const model = makePlayer(md.color);
+  setPlayerWeapon(model, md.weapon, 4, 0);
+  setPlayerArmor(model, md.armor);
+  const dark = new THREE.Color(md.color), glowC = new THREE.Color(md.accent);
+  model.traverse((o) => {
+    if (!o.isMesh || !o.material?.color) return;
+    o.material = o.material.clone();
+    o.material.color.lerp(dark, 0.35).multiplyScalar(0.85);
+    if (o.material.emissive) { o.material.emissive.copy(glowC).multiplyScalar(0.12); o.material.emissiveIntensity = 1; }
+  });
+  model.scale.setScalar(sc);
+  return model;
 }
 
 export function removeMob(id) {

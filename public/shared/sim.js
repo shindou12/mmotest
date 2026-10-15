@@ -48,7 +48,7 @@ export class World {
       };
       if (def.shape === 'grid') {
         const g = grid(def);
-        for (const ch of ['M', 'G']) for (const p of g.pts[ch] || []) A.points.push({ ...p, ch, mobId: null, t: rnd(0, 2) });
+        for (const ch of ['M', 'G', 'K', 'w']) for (const p of g.pts[ch] || []) A.points.push({ ...p, ch, mobId: null, t: rnd(0, 2) });
         A.plates = (g.pts.P || []).map(() => -999);
       }
       this.areas.set(id, A);
@@ -150,6 +150,7 @@ export class World {
       m.id, m.d, r2(m.x), r2(m.z), r2(m.a), Math.max(0, Math.round(m.hp)), m.mhp, m.lv, m.st,
       m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.named ? 3 : m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,
       Math.round(m.hateT * 10) / 10, m.kind === 'boss' ? Math.round(m.stun / m.stunMax * 100) : 0, m.stunT > 0 ? Math.round(m.stunT * 10) / 10 : 0,
+      m.guard ? 1 : 0, // 盾を構えている（番兵）
     ]);
     const plates = A.plates.map((t) => this.time - t <= PLATE_WINDOW ? 1 : 0);
     this.broadcastArea(A.id, { t: 'snap', ar: A.id, p: ps, m: ms, bs: A.bossState, door: A.door ? 1 : 0, pl: plates });

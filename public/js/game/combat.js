@@ -71,6 +71,9 @@ export function dealDamage(mb, mult, o = {}) {
     * (1 + stats.buffMod('dmgp') / 100) * (o.falloff ?? 1) * rnd(0.92, 1.08) * (crit ? stats.S.critd / 100 : 1) * rules.wtDmgMult(o, mb, crit) * fxReduce('ambushMult', 1, ambushed);
   dmg = Math.max(1, Math.round(dmg));
   dmg = fxReduce('finisher', dmg, mb, crit, o); // 必殺 など
+  // 番兵の盾: 正面からの攻撃は 3 割しか通らない（攻撃の後の隙と背後は盾が効かない）
+  const blocked = mb.guard && o.type !== 'dot' && Math.abs(angDiff(Math.atan2(state.me.x - mb.x, state.me.z - mb.z), mb.a)) < GUARD_ARC;
+  if (blocked) dmg = Math.max(1, Math.round(dmg * GUARD_PASS));
   mb.hp -= dmg; mb.localT = now(); mb.flash = 1;
   // スタン値: 強攻撃で大きく溜まる。近接武器ほど溜めやすい
   const st = mb.kind === 2 && !(mb.stunT > 0) ? stunValue(o) : 0;
@@ -86,7 +89,8 @@ export function dealDamage(mb, mult, o = {}) {
   if (o.type !== 'dot') {
     const wc = RARITIES[stats.S.wr].color;
     view.fx.parts.burst(mb.x, 1.2, mb.z, crit ? 18 : 8, { color: crit ? 0xffd84a : wc, speed: crit ? 9 : 6, size: crit ? 0.5 : 0.35, life: 0.4 });
-    view.audio.sfx('hit', { crit });
+    view.audio.sfx(blocked ? 'block' : 'hit', { crit });
+    if (blocked) { view.fx.parts.burst(mb.x + Math.sin(mb.a) * 0.9, 1.6, mb.z + Math.cos(mb.a) * 0.9, 16, { color: 0xbfe0ff, speed: 9, size: 0.35, life: 0.3 }); view.audio.sfx('impact'); }
     // 被弾の揺れ（小さく短く）。スタン中のボスは重い音・黄色い火花・ほんの一瞬の止めで「今が攻め時」の手応え
     jolt(mb, stunned > 1 ? 0.12 : 0.08, stunned > 1 ? 0.22 : crit ? 0.1 : 0.06);
     if (stunned > 1) { view.audio.sfx('stunHit'); view.fx.parts.burst(mb.x, 2.2, mb.z, 14, { color: 0xffe060, speed: 11, size: 0.55, life: 0.35 }); rules.setHitStop(Math.max(rules.hitStop, 0.035)); }
@@ -124,6 +128,8 @@ export function later(sec, fn) { state.pending.push({ at: now() + sec, fn }); }
 export function setShake(v) { shake = v; }
 
 // 敵をビクッと揺らす（sec 秒で収まる。amp はずれの大きさ m）
+const GUARD_ARC = 1.0, GUARD_PASS = 0.3; // 番兵の盾: 正面 ±57° からの攻撃を 3 割に
+
 export function jolt(mb, sec, amp) {
   if (mb.jolt > 0 && mb.joltAmp > amp) return; // 大きい揺れの最中は上書きしない
   mb.jolt = sec; mb.joltMax = sec; mb.joltAmp = amp;

@@ -17,7 +17,7 @@
   }
  },
  "03 to field": {
-  "hash": "4eacb8948ebae6a5be89f93b",
+  "hash": "3cb6e85428f516bb13ab41c5",
   "types": {
    "warped": 3,
    "snap": 30,
@@ -25,7 +25,7 @@
   }
  },
  "04 field fight": {
-  "hash": "851f212f968ac049b6c42e1c",
+  "hash": "4092d499ceb9dda81c241cea",
   "types": {
    "snap": 600,
    "tele": 63,
@@ -37,7 +37,7 @@
   }
  },
  "05 to labyrinth": {
-  "hash": "de557b26d03a5b92008b422f",
+  "hash": "751f299c100752f17c2e4576",
   "types": {
    "warped": 3,
    "snap": 30,
@@ -45,13 +45,13 @@
   }
  },
  "06 lever": {
-  "hash": "49f88e1901d747bd2dfcb244",
+  "hash": "0260d7ddce1f9862618b90b4",
   "types": {
    "snap": 15
   }
  },
  "07 enter lair": {
-  "hash": "dc1cee58495755085bcb1ee3",
+  "hash": "6b32fbed78406e3f00c84bd5",
   "types": {
    "bossStart": 3,
    "snap": 90,
@@ -61,18 +61,17 @@
   }
  },
  "08 boss fight": {
-  "hash": "67605c91d6c2dfc32e913bad",
+  "hash": "ead18d2f71716c1fc55efa24",
   "types": {
    "snap": 900,
    "roster": 90,
-   "bossAct": 9,
-   "tele": 6,
+   "bossAct": 12,
+   "tele": 15,
    "stun": 12,
    "hateReset": 6,
+   "aim": 3,
    "pdown": 3,
    "prev": 3,
-   "aim": 3,
-   "proj": 21,
    "bossEv": 3,
    "cast": 3,
    "castP": 57,
@@ -89,16 +88,16 @@
   }
  },
  "10 floor 2 field": {
-  "hash": "72eae7bcf3cc4052df89ed0c",
+  "hash": "53a72c12cb523efd80b803bc",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 21,
+   "tele": 57,
    "die": 9,
    "xp": 9,
-   "loot": 5,
-   "gold": 4
+   "gold": 9,
+   "loot": 4
   }
  },
  "11 warp floor 3": {
@@ -110,30 +109,26 @@
   }
  },
  "12 floor 3 field": {
-  "hash": "3ad324588ca264b1c5cd68d7",
+  "hash": "1cd2969e52f630dad9118b17",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 15,
-   "die": 3,
-   "xp": 3,
-   "gold": 2,
-   "loot": 2
+   "tele": 42
   }
  },
  "13 wipe": {
-  "hash": "ac218decd4556064e88021ba",
+  "hash": "f907306cc17fe838c3c1afdc",
   "types": {
    "pdown": 9,
    "bleed": 3,
    "snap": 60,
    "roster": 6,
-   "tele": 6
+   "tele": 12
   }
  },
  "14 leave": {
-  "hash": "791a1d3b53d9701d4e0d79f8",
+  "hash": "8a8ebcbec11e5451c5a4c4aa",
   "types": {
    "chat": 2,
    "leave": 2,

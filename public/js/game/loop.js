@@ -300,7 +300,15 @@ export function update(dt) {
     if (mb.jolt > 0) { mb.jolt -= dt; const k = Math.max(0, mb.jolt / mb.joltMax) * mb.joltAmp; mb.model.position.x += Math.sin(t * 95) * k; mb.model.position.z += Math.cos(t * 83) * k * 0.6; }
     mb.model.rotation.y = mb.a;
     if (mb.act) { mb.act.age = now() - mb.act.start; if (mb.act.done) mb.act = null; }
-    view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, act: mb.act, stun: mb.stunT > 0 });
+    if (mb.look === 'player') {
+      // 番兵（プレイヤーの姿）: 盾を構える／攻撃中は振りをくり返す（連撃 0.45 秒ごと）
+      const moving = mb.st === 1;
+      if (moving) mb.walkT += dt;
+      if (mb.atkT >= 0) mb.atkT += dt;
+      const swing = mb.st >= 2 && mb.atkT >= 0 ? (mb.atkT % 0.45) / 0.45 : -1;
+      view.animatePlayer(mb.model, { t, moving, walkT: mb.walkT, kind: mb.weapon, guard: mb.guard, swing, spin: -1, dodge: 0, down: 0, hurt: mb.flash > 0.5 ? 0.4 : 0, combo: Math.floor((mb.atkT || 0) / 0.45) % 2 });
+      if (Math.random() < 0.35) view.fx.parts.emit(mb.x + rnd(-0.7, 0.7), rnd(0.4, 3.2), mb.z + rnd(-0.7, 0.7), { color: mb.accent, size: 0.35, life: 0.8, speed: 0.3, gravity: -0.6 }); // 暗いオーラ
+    } else view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, act: mb.act, stun: mb.stunT > 0 });
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) view.fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[state.world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
     if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
     // ボスとつながる手下（吸い上げの根瘤）: 手下から大樹へ光の粒が流れ込む

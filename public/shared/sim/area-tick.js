@@ -1,10 +1,12 @@
 // World のメソッド: エリアの毎フレーム（敵・罠・宝箱・復活・ボス部屋）。sim.js が World.prototype に足す
 import { REVIVE, enemyScale, floorPressure } from '../balance.js';
-import { floorLevel, mobHp, mobDmg } from '../data.js';
+import { floorLevel, mobHp, mobDmg, ELITE_BASE } from '../data.js';
 import { PLATE_WINDOW, grid, collide, exitsOf, obstaclesOf, hazardsOf, namedSpot, insideOpen, boundR, dirOf } from '../areas.js';
 
 import { rnd, pick, dist, r2 } from './common.js';
 import { NAMED } from './tuning.js';
+
+const SWARM_HP = 0.4; // 群れの雑魚の体力の倍率
 
 export const AreaTickMethods = {
   tickArea(A, dt) {
@@ -46,7 +48,9 @@ export const AreaTickMethods = {
         }
       }
     } else if (def.mobs && def.shape === 'grid') {
+      // M: 雑魚 / G: 門番 / K: 番兵（迷宮区の精鋭） / w: 群れ（足の速い弱い雑魚が3体）
       for (const pt of A.points) {
+        if (pt.mobIds) { if (pt.mobIds.some((id) => A.mobs.has(id))) continue; pt.mobIds = null; }
         if (pt.mobId && A.mobs.has(pt.mobId)) continue;
         if (pt.ch === 'G' && A.door) continue;
         pt.mobId = null;
@@ -54,9 +58,13 @@ export const AreaTickMethods = {
         if (pt.t > 0) continue;
         pt.t = def.mobs.respawnSec ?? 40;
         if (players.some((p) => dist(p, pt) < 8)) { pt.t = 3; continue; }
-        const lv = floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1)) + (pt.ch === 'G' ? 2 : 0);
-        const elite = !!def.mobs.elite || pt.ch === 'G';
-        const mob = this.spawnMob(A, pt.ch === 'G' ? 1 : pick(def.mobs.pool || [0, 1]), pt.x, pt.z, lv, 'mob', elite);
+        const lv = floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1)) + (pt.ch === 'G' || pt.ch === 'K' ? 2 : 0);
+        if (pt.ch === 'w') {
+          pt.mobIds = [0, 1, 2].map((i) => this.spawnMob(A, def.mobs.swarm ?? 0, pt.x + Math.sin(i * 2.1) * 1.5, pt.z + Math.cos(i * 2.1) * 1.5, lv - 1, 'mob', false, SWARM_HP).id);
+          continue;
+        }
+        const elite = !!def.mobs.elite || pt.ch === 'G' || pt.ch === 'K';
+        const mob = this.spawnMob(A, pt.ch === 'K' ? ELITE_BASE : pt.ch === 'G' ? 1 : pick(def.mobs.pool || [0, 1]), pt.x, pt.z, lv, 'mob', elite);
         if (pt.ch === 'G') { mob.gatekeeper = true; mob.name = '門番'; }
         pt.mobId = mob.id;
       }

@@ -322,8 +322,10 @@ export const UNIQUES = [
 
 // --- 階層データ ------------------------------------------------------------
 // props: [種類, 数, 色1, 色2]
-// 敵の定義: 0 以上は階層の敵（FLOORS[].mobs）、負の数はボスの手下（FLOORS[].boss.minions[-1 - i]）
-export const mobDef = (fdef, i) => (i < 0 ? fdef.boss.minions[-1 - i] : fdef.mobs[i]);
+// 敵の定義: 0〜99 は階層の敵（FLOORS[].mobs）、100 以上は迷宮区の番兵（FLOORS[].elites[i - 100]）、
+// 負の数はボスの手下（FLOORS[].boss.minions[-1 - i]）
+export const ELITE_BASE = 100;
+export const mobDef = (fdef, i) => (i < 0 ? fdef.boss.minions[-1 - i] : i >= ELITE_BASE ? fdef.elites[i - ELITE_BASE] : fdef.mobs[i]);
 
 export const FLOORS = [
   {
@@ -336,6 +338,8 @@ export const FLOORS = [
       { t: 'slime', name: 'グリーンスライム', color: 0x66dd55 }, { t: 'beast', name: 'フレンジーボア', color: 0x9a6a44 },
       { t: 'bat', name: 'ケイブバット', color: 0x5a4a6a }, { t: 'mushroom', name: 'ドクキノコ', color: 0xc84a6a },
     ],
+    // 迷宮区の番兵（ai: 動き方。look: 'player' はプレイヤーの姿を暗く染めて大きくしたもの。weapon / armor はその装備の見た目）
+    elites: [{ t: 'knight', ai: 'sentinel', look: 'player', weapon: 'spear', armor: 5, scale: 1.35, name: '迷宮の近衛騎士', color: 0x6a4a2a, accent: 0xffb030 }],
     boss: { name: 'コボルド王 グラズ', t: 'knight', appearance: 'graz', color: 0x8a6a40, accent: 0xffcc33, scale: 2.8, brain: 'graz', bars: 3, patterns: ['slam', 'cone', 'charge', 'combo', 'breath'] },
   },
   {
@@ -348,6 +352,7 @@ export const FLOORS = [
       { t: 'wisp', name: 'フォレストウィスプ', color: 0x8cffb0 }, { t: 'beast', name: 'ミストウルフ', color: 0x8a9a9a },
       { t: 'mushroom', name: 'ミストマタンゴ', color: 0x7a8ad0 }, { t: 'mage', name: 'ゴブリンシャーマン', color: 0x4a7a3a },
     ],
+    elites: [{ t: 'knight', ai: 'sentinel', look: 'player', weapon: 'spear', armor: 3, scale: 1.35, name: '苔むした守り手', color: 0x3a5a34, accent: 0x9cff7a }],
     boss: { name: '霧の大樹 ユグドラ', t: 'golem', appearance: 'yugdra', color: 0x4a6a3a, accent: 0x9cff7a, scale: 3.0, brain: 'yugdra', bars: 3, patterns: ['torrent', 'torrent', 'nova', 'rain'],
       minions: [{ t: 'rootknot', name: '吸い上げの根瘤', color: 0x6a8a3a, link: true, scale: 1.6 }] }, // minions: ボスの手下（link: 大樹へ光の線、scale: 大きさ）
   },
@@ -361,6 +366,7 @@ export const FLOORS = [
       { t: 'beast', name: 'デザートスコーピオン', color: 0xc08040 }, { t: 'golem', name: 'サンドゴーレム', color: 0xd0aa70 },
       { t: 'scorpion', name: 'ジャイアントスコーピオン', color: 0x8a3a2a }, { t: 'mage', name: '砂漠の呪術師', color: 0xa0702a },
     ],
+    elites: [{ t: 'knight', ai: 'sentinel', look: 'player', weapon: 'spear', armor: 6, scale: 1.35, name: '砂塵の処刑騎士', color: 0x8a6a3a, accent: 0xff6a2a }],
     boss: { name: '砂塵の大蠍 スコルピオ', t: 'beast', appearance: 'skorpio', color: 0xa0522d, accent: 0xff6a2a, scale: 3.2, patterns: ['chase', 'sweep', 'cone', 'ring', 'rain', 'combo', 'shot', 'charge', 'fissure', 'checker'], p3: ['spiral', 'cross', 'cage'] },
   },
   {
