@@ -2,6 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { World } from '../public/shared/sim.js';
+import { BALANCE } from '../public/shared/balance.js';
+const K = (v) => Math.round(v * BALANCE.bossRange * 100) / 100; // ボスの予兆は全体に広がる
 
 // 乱数を固定（技の選び方が毎回同じになる）
 let seed = 7;
@@ -82,12 +84,12 @@ test('the judgement tracks the weakest player slowly, then fires a wide knockbac
   assert.ok(Math.abs(b.a - ang0) <= 0.9 * 0.55 + 1e-6); // ゆっくり向きを合わせる
   tick(1.6);
   const t = sent('tele').at(-1);
-  assert.equal(t.sh[0].k, 'line'); assert.equal(t.sh[0].w, 6); assert.equal(t.kd, 1);
+  assert.equal(t.sh[0].k, 'line'); assert.equal(t.sh[0].w, K(6)); assert.equal(t.kd, 1);
   // 通り道に横向きの帯が4本並び、それぞれ中心から左右へ4段ずつ広がる（本線と直角）
   const before = sent('tele').length;
   tick(2);
   const waves = sent('tele').slice(before).filter((m) => m.sh.length === 2);
   assert.equal(waves.length, 4 * 4 * 3); // 帯4本 × 4段 × 3人
   for (const v of waves) for (const s of v.sh) assert.ok(Math.abs(Math.cos(s.a - t.sh[0].a)) < 0.01); // 直角
-  assert.ok(waves.every((v) => v.sh[0].w === 8.5));
+  assert.ok(waves.every((v) => v.sh[0].w === K(8.5)));
 });

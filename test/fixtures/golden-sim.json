@@ -51,7 +51,7 @@
   }
  },
  "07 enter lair": {
-  "hash": "b6855c9037ba462a27189578",
+  "hash": "49e9d853b06daa1710964244",
   "types": {
    "bossStart": 3,
    "snap": 90,
@@ -61,12 +61,12 @@
   }
  },
  "08 boss fight": {
-  "hash": "5954ae21fc010ce3827cb761",
+  "hash": "2f02e9162f6a8bf4bdd8eb1b",
   "types": {
    "snap": 900,
    "roster": 90,
-   "bossAct": 9,
-   "tele": 9,
+   "bossAct": 12,
+   "tele": 12,
    "stun": 12,
    "hateReset": 6,
    "pdown": 3,
@@ -87,15 +87,16 @@
   }
  },
  "10 floor 2 field": {
-  "hash": "b1cafc53cae6147e1b5999e5",
+  "hash": "5a53dc72e511b35d08945d20",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 51,
-   "die": 9,
-   "xp": 9,
-   "gold": 7
+   "tele": 27,
+   "die": 12,
+   "xp": 12,
+   "gold": 7,
+   "loot": 3
   }
  },
  "11 warp floor 3": {
@@ -107,35 +108,36 @@
   }
  },
  "12 floor 3 field": {
-  "hash": "4ea5b7e8d879a5cfd4871e68",
+  "hash": "e3bfd310a22f248cc7b55abe",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 30,
+   "tele": 21,
    "die": 3,
    "xp": 3,
-   "gold": 1
+   "gold": 3,
+   "loot": 2
   }
  },
  "13 wipe": {
-  "hash": "f0c7e026dea5430f8f1079f1",
+  "hash": "fa2e051a5c943cf325594c59",
   "types": {
    "pdown": 9,
    "bleed": 3,
    "snap": 60,
    "roster": 6,
-   "tele": 9
+   "tele": 6
   }
  },
  "14 leave": {
-  "hash": "7dce384b639f6bb7b80ed603",
+  "hash": "73a701ba0ecbad581f74694a",
   "types": {
    "chat": 2,
    "leave": 2,
    "snap": 20,
    "roster": 2,
-   "tele": 4
+   "tele": 2
   }
  },
  "saves": "4f53cda18c2baa0c0354bb5f"

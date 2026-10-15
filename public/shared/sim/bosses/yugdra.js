@@ -3,6 +3,7 @@
 // 2本目が割れると「森の怒り」（根の奔流が通路を1本ずつ回って襲う）。
 import { rnd, r2 } from '../common.js';
 import { CELL } from '../../areas.js';
+import { BALANCE } from '../../balance.js';
 
 const ARM = { reach: 4.5 * CELL + 1, width: 3 * CELL, end: 4 * CELL }; // 通路: 中心から端まで・幅・根瘤を置く距離
 const ARMS = [Math.PI, Math.PI / 2, 0, -Math.PI / 2]; // 通路の向き（北・東・南・西。この順に回る）
@@ -92,7 +93,7 @@ export const yugdra = {
       for (let tries = 0; pts.length < S.n && tries < 600; tries++) {
         const x = rnd(-ARM.end - 1, ARM.end + 1), z = rnd(-ARM.end - 1, ARM.end + 1);
         if (!inCross(x, z) || Math.hypot(x, z) < S.keep) continue; // 大樹の足元は空ける
-        if (pts.some((p) => Math.hypot(p.x - x, p.z - z) < S.gap)) continue;
+        if (pts.some((p) => Math.hypot(p.x - x, p.z - z) < S.gap * BALANCE.bossRange)) continue; // 円が広がっても、すき間は残す
         pts.push({ x, z });
       }
       b.sporeCd = S.cd;

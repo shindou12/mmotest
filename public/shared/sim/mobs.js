@@ -13,10 +13,21 @@ const SENTINEL_REWARD = { xp: 4, gold: 6, rarity: 0.4 }; // 番兵の報酬（�
 // きらめくトカゲ: 寿命・走る秒数・止まる秒数・逃げ出す距離・1回にまくコインの量の基準・報酬
 const TREASURE = { life: 45, run: 2.2, rest: 0.9, scare: 18, coin: 2, xp: 5, gold: 20 };
 
+// ボスの予兆を全体に広げる（BALANCE.bossRange）。輪は内側の安全地帯を保ったまま外へ、線は幅だけ広げる
+const widen = (sh) => {
+  const k = BALANCE.bossRange;
+  if (sh.k === 'circle') return { ...sh, r: r2(sh.r * k) };
+  if (sh.k === 'cone') return { ...sh, len: r2(sh.len * k) };
+  if (sh.k === 'line') return { ...sh, w: r2(sh.w * k) };
+  if (sh.k === 'ring') return { ...sh, r1: r2(sh.r0 + (sh.r1 - sh.r0) * k) };
+  return sh;
+};
+
 export const MobsMethods = {
   // ---- テレグラフ（予兆） ----
   // kd: 当たると吹き飛ばされる大技（ボスの突進・爆発など）
   tele(A, src, shapes, delay, dmg, color, kd = 0) {
+    if (src?.kind === 'boss') shapes = shapes.map(widen);
     this.broadcastArea(A.id, { t: 'tele', id: this.seq++, src: src ? src.id : 0, sh: shapes, d: Math.round(delay * 1000), dmg: Math.round(dmg), c: color, ...(kd ? { kd: 1 } : {}) });
   },
 

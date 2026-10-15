@@ -3,6 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { World } from '../public/shared/sim.js';
 import { collide } from '../public/shared/areas.js';
+import { BALANCE } from '../public/shared/balance.js';
+const K = (v) => Math.round(v * BALANCE.bossRange * 100) / 100; // ボスの予兆は全体に広がる
 
 let seed = 11;
 Math.random = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
@@ -43,7 +45,7 @@ test('the root torrent fills the arm the target stands in, from the centre to th
   const { w, A, L, b, sent } = fight();
   w.bossPattern(A, b, 'torrent', w.players.get(1), [...w.players.values()]);
   const t = sent('tele').at(-1);
-  assert.equal(t.sh[0].k, 'line'); assert.equal(t.sh[0].w, 12); assert.equal(t.kd, 1);
+  assert.equal(t.sh[0].k, 'line'); assert.equal(t.sh[0].w, K(12)); assert.equal(t.kd, 1);
   assert.ok(angDist(t.sh[0].a, 0) < 0.01); // 南の通路
   assert.ok(Math.hypot(t.sh[0].x - L.x, t.sh[0].z - L.z) < 0.01);
 });
@@ -70,7 +72,7 @@ test('the wrath (third bar) sweeps the arms one by one in a fixed turn, each war
   const before = sent('tele').length;
   w.bossPattern(A, b, 'wheel', w.players.get(1), [...w.players.values()]);
   tick(3);
-  const lines = sent('tele').slice(before).filter((m) => m.sh[0].w === 12);
+  const lines = sent('tele').slice(before).filter((m) => m.sh[0].w === K(12));
   const order = [...new Set(lines.map((m) => m.sh[0].a))];
   assert.equal(order.length, 4);
   for (let i = 1; i < 4; i++) assert.ok(angDist(order[i], order[i - 1] - Math.PI / 2) < 0.01); // 毎回 90° ずつ同じ向きに回る
@@ -83,7 +85,7 @@ test('the root ripple is a thin line spanning the whole room that sweeps across 
   tick(5);
   const lines = sent('tele').slice(before).filter((m) => m.sh[0].len === 40);
   assert.equal(lines.length, 25);
-  for (const m of lines) { assert.ok(m.sh[0].w <= 1.6); assert.equal(m.kd, undefined); }
+  for (const m of lines) { assert.ok(m.sh[0].w <= K(1.6)); assert.equal(m.kd, undefined); }
   // 線の真ん中が、一方向へ 1.5m ずつ進む（部屋の端から端まで 36m）
   const mids = lines.map((m) => ({ x: m.sh[0].x + Math.sin(m.sh[0].a) * 20 - L.x, z: m.sh[0].z + Math.cos(m.sh[0].a) * 20 - L.z }));
   for (let i = 1; i < mids.length; i++) assert.ok(Math.abs(Math.hypot(mids[i].x - mids[i - 1].x, mids[i].z - mids[i - 1].z) - 1.5) < 0.05);
@@ -97,14 +99,14 @@ test('the spore field scatters small slow blasts over the cross with gaps left b
   assert.ok(busy <= 1.0); // すぐ次の技へ
   assert.equal(sent('cast').at(-1).name, '胞子の野');
   tick(1.5);
-  const s = sent('tele').slice(before).filter((m) => m.sh[0].k === 'circle' && m.sh[0].r === 1.8);
-  assert.ok(s.length >= 18 && s.length <= 22, String(s.length));
+  const s = sent('tele').slice(before).filter((m) => m.sh[0].k === 'circle' && m.sh[0].r === K(1.8));
+  assert.ok(s.length >= 14 && s.length <= 22, String(s.length)); // 円が広がると数は減る（覆う広さはほぼ同じ）
   for (const m of s) {
     assert.ok(m.d >= 2600 && m.d <= 3400); // 起動が遅い
     assert.equal(m.kd, undefined);
     assert.ok(free(A.def, m.sh[0].x, m.sh[0].z)); // 十字の床の上
   }
-  for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) assert.ok(Math.hypot(s[i].sh[0].x - s[j].sh[0].x, s[i].sh[0].z - s[j].sh[0].z) >= 4.2); // すき間がある
+  for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) assert.ok(Math.hypot(s[i].sh[0].x - s[j].sh[0].x, s[i].sh[0].z - s[j].sh[0].z) >= 4.2 * BALANCE.bossRange - 0.01); // すき間がある
   // ダメージは小さめ（根の奔流の 1/4 未満）
   w.bossPattern(A, b, 'torrent', w.players.get(1), [...w.players.values()]);
   assert.ok(s[0].dmg * 4 < sent('tele').at(-1).dmg);

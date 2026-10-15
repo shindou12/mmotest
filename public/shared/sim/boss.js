@@ -125,8 +125,8 @@ export const BossMethods = {
       b.busyT = busy;
       // 攻撃の間隔は短め。フェーズが進むほど詰めてきて、連続攻撃も増える
       const gap = brain ? brain.gap(b) : [0, rnd(0.6, 1.1), rnd(0.35, 0.7), rnd(0.15, 0.45)][b.phase || 1];
-      b.actT = busy + gap * 0.8;
-      const chain = brain ? brain.chain(b) : [0, 0.25, 0.5, 0.7][b.phase || 1];
+      b.actT = busy + gap * 0.8 * BALANCE.bossGap;
+      const chain = (brain ? brain.chain(b) : [0, 0.25, 0.5, 0.7][b.phase || 1]) + BALANCE.bossChain;
       if (Math.random() < chain) b.actT = busy + 0.05;
     }
   },

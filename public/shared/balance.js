@@ -10,6 +10,8 @@ export const BALANCE = Object.freeze({
   potionHeal: 0.30, potionCooldown: 8, lifestealEfficiency: 0.55,
   deathSeconds: 5,
   questXp: 0.60,
+  // ボスの攻撃の圧（全ボス共通）: range は予兆の範囲の倍率、gap は技と技の間の倍率、chain は連続で出す確率の上乗せ
+  bossRange: 1.15, bossGap: 0.75, bossChain: 0.1,
   weaponDef: 0.02, // 武器の重さ×レベルあたりの被ダメ軽減（%）。重い武器ほどレベルとともに固くなる
 });
 
