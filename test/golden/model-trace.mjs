@@ -58,3 +58,4 @@ export function modelTraces() {
   } finally { Math.random = random; }
   return out;
 }
+export const shapeOf = shape;
