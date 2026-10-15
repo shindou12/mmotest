@@ -11,6 +11,7 @@ import { MOB_MODELS } from './models/mob-models.js';
 import { BOSS_MODELS } from './models/boss-models.js';
 import { ARMOR_LOOKS } from './models/armor-looks.js';
 import { SHIELD_MODELS } from './models/shield-models.js';
+import { setGripHand } from './models/grip-hands.js';
 
 // 共通の道具（mesh・sphere・extrude・finish・bowString など）は models/kit.js
 
@@ -237,6 +238,7 @@ export function setPlayerWeapon(model, kind, rarity, style = 0) {
   w.rotation.y = offHand ? -Math.PI / 2 : 0;
   u.wKind = kind;
   (offHand ? u.handL : u.hand).add(u.weapon);
+  setGripHand(u,WEAPON_MODELS[kind]?.gripHand);
   u.elbowL.rotation.set(0, 0, 0);u.elbowR.rotation.set(0, 0, 0);
   animatePlayer(model, { t: 0, moving: false, walkT: 0, kind, combo: 0, swing: -1, spin: -1, sweep: -1, dodge: 0, down: 0, hurt: 0 });
 

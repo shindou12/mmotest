@@ -242,17 +242,39 @@ const weaponSkills = {
 const model = (kit) => {
   const { THREE, mesh, sphere, cyl, extrude, toon } = kit;
   const model = {
+    gripHand: kit.makeSwordHand,
     base(k) {
-      const { g, steel, gold, gem, edge, handle } = k;
-      const w = 0.075, L = 1.3;
-      const pts = [[-w, 0], [w, 0], [w, L - 0.22], [0, L], [-w, L - 0.22]];
-      edge(pts, 0.035);
-      g.add(mesh(extrude(pts, 0.035), steel, [0, 0.12, 0]));
-      g.add(mesh(new THREE.BoxGeometry(0.022, L * 0.7, 0.05), toon(0x9aa4b4), [0, 0.12 + L * 0.4, 0]));
-      const guard = mesh(new THREE.TorusGeometry(0.26, 0.03, 6, 16, Math.PI * 0.7), gold, [0, -0.05, 0], [0, 0, Math.PI * 0.15]);
-      g.add(guard);
-      g.add(mesh(sphere(0.05, 10, 8), gem, [0, 0.1, 0.04]));
-      handle(0.42);
+      const {g,steel,gold,grip,gem,rarity,edge}=k;
+      const width=.079,length=1.30,shoulder=1.04,depth=.028;
+      const cross=(y,w,d)=>[[-w,y,0],[0,y,-d],[w,y,0],[0,y,d]];
+      const low=cross(.12,width,depth),high=cross(.12+shoulder,width*.76,depth*.78),tip=[0,.12+length,0],faces=[[],[],[]];
+      const tri=(a,b,c,index)=>{
+        const A=new THREE.Vector3(...a),B=new THREE.Vector3(...b),C=new THREE.Vector3(...c);
+        const n=B.clone().sub(A).cross(C.clone().sub(A)),center=A.clone().add(B).add(C);
+        if(n.x*center.x+n.z*center.z<0)[b,c]=[c,b];faces[index].push(...a,...b,...c);
+      };
+      for(let i=0;i<4;i++){
+        const j=(i+1)%4,index=[0,1,1,2][i];
+        tri(low[i],low[j],high[j],index);tri(low[i],high[j],high[i],index);tri(high[i],high[j],tip,index);
+      }
+      faces[0].push(...low[0],...low[1],...low[2],...low[0],...low[2],...low[3]);
+      const neutral=new THREE.Color(0xdfe7f0),palette=[0xdfe7f0,0xeaf0f6,0xb6c3d2].map(hex=>{
+        const color=new THREE.Color(hex);color.r*=steel.color.r/neutral.r;color.g*=steel.color.g/neutral.g;color.b*=steel.color.b/neutral.b;return color;
+      }),colors=[];
+      faces.forEach((vertices,index)=>{for(let i=0;i<vertices.length/3;i++)colors.push(...palette[index].toArray());});
+      const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(faces.flat(),3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geometry.computeVertexNormals();
+      g.add(mesh(geometry,toon(0xffffff,{vertexColors:true,emissive:steel.emissive,emissiveIntensity:steel.emissiveIntensity})));
+      edge([[-width,.12],[width,.12],[width*.76,.12+shoulder],[0,.12+length],[-width*.76,.12+shoulder]],.028);
+      const half=.47/2;
+      g.add(mesh(extrude([[-half,.13],[-half+.016,.063],[-.10,.08],[0,.095],[.10,.08],[half-.016,.063],[half,.13],[.10,.139],[0,.15],[-.10,.139]],.062,.004),gold));
+      g.add(mesh(cyl(.039*.85,.039*.95,.09,8),gold,[0,.085,0]));
+      g.add(mesh(cyl(.039,.039*1.08,.38,8),grip,[0,-.14,0]));
+      const wrap=toon(0x553a26);
+      for(let i=0;i<3;i++)g.add(mesh(new THREE.TorusGeometry(.039*1.04,.007,4,10),wrap,[0,-.06-i*.09,0],[Math.PI/2,0,0]));
+      for(const y of [.038,-.332])g.add(mesh(cyl(.039*1.25,.039*1.25,.025,8),gold,[0,y,0]));
+      g.add(mesh(sphere(.064,8,6),gold,[0,-.382,0]));
+      if(rarity>=2)g.add(mesh(sphere(.027,8,6),gem,[0,.095,.043]));
+      g.userData.appearance='refined-straight-sword';
     },
     styles: {
       1: (k) => { // 刀: 反りのある片刃
@@ -290,7 +312,7 @@ const model = (kit) => {
 // rig: 構えの道具（THREE・aimHand・orientWeapon・ease・applyMeleePose・spearPose）。motions/index.js が渡す
 const motion = (rig) => {
   const { THREE, aimHand, orientWeapon, applyMeleePose } = rig;
-  // 片手剣の構え: ガード中（守護騎士）だけ独自。ほかは近接の構え
+  // 片手剣の構え: 片手の握りを保ち、通常斬りの軌道と技のタイミングを引き継ぐ
   function applySwordPose(u, s) {
     if (s.guard) {
       // 片手剣のガード（守護騎士）: 剣を横に倒して胸の前で受ける。左手は刃の腹に添える
@@ -300,6 +322,26 @@ const motion = (rig) => {
       const axis = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
       aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, .5), new THREE.Vector3(-1, -.6, -.2));
       orientWeapon(u, yaw, pitch);
+      return;
+    }
+    if (s.charging && !(s.down>0) && !(s.dodge>0) && !(s.hurt>0)) {
+      u.armR.position.z=0;
+      aimHand(u.armR,u.elbowR,new THREE.Vector3(.49,1.15,.23),new THREE.Vector3(1,-.3,-.35));
+      orientWeapon(u,.85,1.10);
+      return;
+    }
+    if (s.swing>=0 && !(s.down>0) && !(s.dodge>0) && !(s.hurt>0)) {
+      // Keep the existing slash path and timing; a slightly bent elbow makes the wrist readable.
+      const goal=new THREE.Vector3(0,-.54,0).applyQuaternion(u.armR.quaternion).add(u.armR.position);
+      aimHand(u.armR,u.elbowR,goal,new THREE.Vector3(1,-.3,-.4));
+      applyMeleePose(u,s);
+      return;
+    }
+    if (!(s.down>0) && !(s.dodge>0) && !(s.hurt>0) && !(s.spin>=0) && !(s.sweep>=0)) {
+      const walk=s.moving?Math.sin(s.walkT*10):0;
+      u.armR.position.z=0;
+      aimHand(u.armR,u.elbowR,new THREE.Vector3(.38,1.04+walk*.025,.30),new THREE.Vector3(1,-.5,-.25));
+      orientWeapon(u,-.18,s.moving?.62:.80);
       return;
     }
     applyMeleePose(u, s);

@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { WEAPON_DEFS } from '../weapons/index.js';
 import { mesh, sphere, cone, cyl, lathe, extrude, bowString } from './kit.js';
 import { toon } from '../toon.js';
+import { makeSwordHand } from './grip-hands.js';
 
 // 武器のファイルの形の関数に渡す道具（武器のファイルは three.js を直接読まない。サーバーも同じファイルを読むため）
-const KIT = { THREE, mesh, sphere, cone, cyl, lathe, extrude, bowString, toon };
+const KIT = { THREE, mesh, sphere, cone, cyl, lathe, extrude, bowString, toon, makeSwordHand };
 export const WEAPON_MODELS = Object.fromEntries(WEAPON_DEFS.map((d) => [d.wk, d.model(KIT)]));
