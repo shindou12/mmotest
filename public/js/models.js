@@ -8,6 +8,7 @@ import { toon, glow, outline, gradientMap } from './toon.js';
 import { mesh, sphere, capsule, cyl, lathe, extrude, finish } from './models/kit.js';
 import { WEAPON_MODELS } from './models/weapon-models.js';
 import { MOB_MODELS } from './models/mob-models.js';
+import { BOSS_MODELS } from './models/boss-models.js';
 import { ARMOR_LOOKS } from './models/armor-looks.js';
 import { SHIELD_MODELS } from './models/shield-models.js';
 
@@ -254,7 +255,7 @@ function makeShield(rarityIn, armL, shape) {
 // ---------------------------------------------------------------------------
 // モンスター
 // ---------------------------------------------------------------------------
-export function makeMob(t, color, scale = 1, accent = null, boss = false) {
+export function makeMob(t, color, scale = 1, accent = null, boss = false, appearance = null) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
   const c = new THREE.Color(color);
@@ -263,8 +264,10 @@ export function makeMob(t, color, scale = 1, accent = null, boss = false) {
   const eyeM = glow(ac.clone().multiplyScalar(1.6));
   const horn = toon(0xf0e6d0);
   const parts = { body, root };
-  // 形は models/mob-models.js の登録表（t ごと。知らない t は騎士）
-  (MOB_MODELS[t] ?? MOB_MODELS.knight)({ root, body, parts, c, ac, m, mD, mL, eyeM, horn, boss, scale, color, accent });
+  // 専用ボスは外観の登録表、それ以外は通常の敵の登録表を使う。
+  const dedicated = boss && Object.hasOwn(BOSS_MODELS, appearance) ? BOSS_MODELS[appearance] : null;
+  if (dedicated) Object.assign(parts, dedicated.build(body, ac));
+  else (MOB_MODELS[t] ?? MOB_MODELS.knight)({ root, body, parts, c, ac, m, mD, mL, eyeM, horn, boss, scale, color, accent });
   if (boss) {
     const aura = new THREE.PointLight(ac, 3, 12); aura.position.y = 2; root.add(aura);
     parts.aura = aura;
@@ -303,6 +306,7 @@ export function animateMob(model, s) {
   if (u.float) { u.body.position.y = Math.sin(t * 2.5) * 0.3; if (u.shell) { u.shell.rotation.y = t * 2; u.shell.rotation.x = Math.sin(t) * 0.4; } }
   if (u.sigil) { u.sigil.rotation.z = t; u.sigil.scale.setScalar(s.enraged ? 2.2 + Math.sin(t * 8) * 0.2 : 1.8); }
   u.body.rotation.x = wind ? -0.2 : atk ? 0.22 : 0;
+  if (Object.hasOwn(BOSS_MODELS, u.identity)) BOSS_MODELS[u.identity].animate?.(u, s);
   const flash = s.flash || 0, warn = wind ? (Math.sin(t * 30) * 0.5 + 0.5) : 0;
   for (const mm of u.mats) {
     if (flash > 0) { mm.m.emissive.setRGB(1, 1, 1); mm.m.emissiveIntensity = flash * 1.5; }

@@ -52,6 +52,7 @@ public/js/main.js（ログイン・ゲームの API・window.__game）
    │   ├─ weapon-models.js ★ 武器の形の登録表（kind → base と styles）
    │   ├─ armor-looks.js  ★ 防具の見た目の登録表（look → 関数）
    │   ├─ mob-models.js   ★ 敵の形の登録表（t → 関数。知らない t は knight）
+   │   ├─ boss-models.js  ★ 専用ボスの登録表（appearance → build / animate）。造形は bosses/ に置く
    │   ├─ shield-models.js ★ 盾の形の登録表（WEAPONS[kind].shield の名前 → 関数）
    │   └─ npc-models.js   ★ NPC の見た目の登録表（エリアの npcs[].model → 関数。なければ villager）
    │
@@ -201,6 +202,9 @@ actions・loop など）は、武器の名前やノードの id を知らず、`
   - 名前は `models.js` の `ARMOR_LOOK_NAMES` に足す。
 - 敵の形: `models/mob-models.js` の `MOB_MODELS[t](k)`。
   - 動かす部位は `k.parts` に入れる（動きは `animateMob`）。
+- 専用ボスの形: `models/boss-models.js` の `BOSS_MODELS[appearance]`。`build(body, accent)` と必要な `animate(parts, state)` を登録する。
+  - 階層のボス定義の `appearance` を `game/snapshot.js` が渡す。通常の敵の `t` と戦闘処理は変えない。
+  - 統合範囲は `docs/boss-models.md`、次の武器の棚卸しと制作順は `docs/weapon-model-roadmap.md`。
 - 盾の形: `models/shield-models.js` の `SHIELD_MODELS[形]`。武器の表の `shield` にその名前を書く。
 - NPC の見た目: `models/npc-models.js` の `NPC_MODELS[名前](d)`。エリアの `npcs` に `model: '名前'` を書く（なければ villager）。
 - 形の道具（`mesh`・`sphere`・`capsule`・`cone`・`cyl`・`lathe`・`extrude`・`finish`・`bowString`）は `models/kit.js`。

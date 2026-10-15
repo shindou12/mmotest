@@ -48,7 +48,7 @@ export function modelTraces() {
         const m = makeMob(md.t, md.color, sc, accent); out[key] = shape(m);
         for (const [i, s] of [{ st: 0 }, { st: 1 }, { st: 2, enraged: true }, { st: 3, flash: 1 }].entries()) { animateMob(m, { t: 1.3 + i, ...s }); out[`${key}/anim${i}`] = shape(m); }
       }
-      if (f.boss) { const m = makeMob(f.boss.t, f.boss.color, f.boss.scale, f.boss.accent, true); out[`boss/${f.boss.name}`] = shape(m); animateMob(m, { t: 2, st: 2, enraged: true }); out[`boss/${f.boss.name}/anim`] = shape(m); }
+      if (f.boss) { const m = makeMob(f.boss.t, f.boss.color, f.boss.scale, f.boss.accent, true, f.boss.appearance); out[`boss/${f.boss.name}`] = shape(m); animateMob(m, { t: 2, st: 2, enraged: true }); out[`boss/${f.boss.name}/anim`] = shape(m); }
     }
     out.coin = shape(makeCoin()); out.shard = shape(makeShard()); out.goldbag = shape(makeGoldBag());
     for (let rarity = 0; rarity < RARITIES.length; rarity++) out[`orb/${rarity}`] = shape(makeLootOrb(rarity));

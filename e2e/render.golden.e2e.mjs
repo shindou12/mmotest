@@ -53,7 +53,7 @@ test('weapons, outfits, monsters and bosses render the same as recorded', { time
       const seen = new Set();
       for (const f of D.FLOORS) {
         for (const md of f.mobs) { if (seen.has(md.t + md.color)) continue; seen.add(md.t + md.color); const m = M.makeMob(md.t, md.color, 1, null); M.animateMob(m, { t: 1.3, st: 1 }); shoot(`mob/${md.t}/${md.color}`, m, 6, 1); }
-        if (f.boss) { const m = M.makeMob(f.boss.t, f.boss.color, f.boss.scale, f.boss.accent, true); M.animateMob(m, { t: 2, st: 2, enraged: true }); shoot(`boss/${f.boss.name}`, m, 6 * f.boss.scale, 2 * f.boss.scale); }
+        if (f.boss) { const m = M.makeMob(f.boss.t, f.boss.color, f.boss.scale, f.boss.accent, true, f.boss.appearance); M.animateMob(m, { t: 2, st: 2, enraged: true }); shoot(`boss/${f.boss.name}`, m, 6 * f.boss.scale, 2 * f.boss.scale); }
       }
       return { out, pngs };
     }, !!OUT);
