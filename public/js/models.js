@@ -30,6 +30,17 @@ export function weaponStyle(it) {
 const visTier = (r) => (r >= 6 ? r - 2 : Math.max(0, r - 1));
 
 export function makeWeapon(kind, rarityIn = 0, style = 0) {
+  return makeWeaponShape(kind, rarityIn, style);
+}
+
+// Preview candidates use exactly the gameplay rarity materials, batching and outline.
+// The gameplay registry and item appearance selection remain the default path.
+export function makeWeaponPreview(kind, rarityIn, style, builder) {
+  if (typeof builder !== 'function') throw new TypeError('A preview shape builder is required');
+  return makeWeaponShape(kind, rarityIn, style, builder);
+}
+
+function makeWeaponShape(kind, rarityIn, style, builder) {
   const g = new THREE.Group();
   const rc = new THREE.Color(RARITIES[rarityIn].color);
   const rarity = visTier(rarityIn);
@@ -54,8 +65,9 @@ export function makeWeapon(kind, rarityIn = 0, style = 0) {
   const blade = (pts, depth, y = 0.12, mat = steel) => { edge(pts.map(([x, yy]) => [x, yy]), depth); const m = mesh(extrude(pts, depth), mat, [0, y, 0]); g.add(m); return m; };
   const k = { g, steel, gold, grip, gem, edge, handle, rc, rarity, glowM, blade, style };
   const V = WEAPON_MODELS[kind];
-  if (style && V?.styles[style]) { V.styles[style](V.prep ? { ...k, ...V.prep(k) } : k); return finish(g, 0.8); }
-  M.base(k);
+  if (builder) builder(k);
+  else if (style && V?.styles[style]) V.styles[style](V.prep ? { ...k, ...V.prep(k) } : k);
+  else M.base(k);
   return finish(g, 0.8);
 }
 
