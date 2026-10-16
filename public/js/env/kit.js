@@ -1,6 +1,7 @@
 // エリアの見た目: 地形づくりの共通の道具（決まった乱数・高さ・行列・文字の札）
 import * as THREE from 'three';
 import { exitsOf, boundR, angOf, obstaclesOf, hazardsOf } from '../../shared/areas.js';
+import { scapeLift } from './scape.js';
 
 export function seeded(seed) {
   let s = seed >>> 0;
@@ -13,9 +14,10 @@ export function noise2(x, z) {
   return Math.sin(x * 0.11) * Math.cos(z * 0.13) + Math.sin(x * 0.037 + z * 0.05) * 1.6 + Math.sin(x * 0.31 - z * 0.27) * 0.3;
 }
 
-// エリアごとの地面の高さ関数（屋内は平ら）
-export function makeHeight(def) {
+// エリアごとの地面の高さ関数（屋内は平ら）。q: 見た目の段階（2以上で丘などの起伏を足す。エリアの scape があるときだけ）
+export function makeHeight(def, q = 1) {
   if (def.shape === 'grid') return () => 0;
+  const lift = scapeLift(def, q);
   const exits = exitsOf(def);
   const flat = def.type === 'town' ? 0.15 : def.type === 'camp' ? 0.4 : 1;
   // 池はくぼみ、毒沼・流砂は平らにならす
@@ -28,6 +30,7 @@ export function makeHeight(def) {
     let h = noise2(x, z) * 0.35 * flat;
     if (def.gate) h *= Math.min(1, Math.hypot(x - def.gate.x, z - def.gate.z) / 12);
     for (const e of exits) h *= Math.min(1, Math.hypot(x - e.x, z - e.z) / 6);
+    if (lift) h += lift(x, z);
     for (const s of sinks) {
       const d = Math.hypot(x - s.x, z - s.z);
       if (d < s.r + 1.5) { const k = Math.min(1, (s.r + 1.5 - d) / 2); h = h * (1 - k) + s.y * k; }

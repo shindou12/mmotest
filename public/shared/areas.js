@@ -299,6 +299,14 @@ export const AREAS = {
     exits: [{ to: 'f1_town', ang: 180 }, { to: 'f1_hunt', ang: 70 }, { to: 'f1_dun', ang: 280 }, { to: 'f1_lab', ang: 5 }],
     obst: { n: 12, kinds: ['rock', 'tree', 'tree', 'pond'] }, chests: 2,
     mobs: { count: 9, perPlayer: 3, lv: [0, 3] },
+    // 見た目の作り込み（段階 mapq 2〜4。env/scape.js）。hills: [x, z, 半径, 高さ] / groves・rocks・beds: 群れの数 / singles: 広場のまばらな単体
+    // zones: 区画の目印（段階3） / road: 石灯籠の古道になる出口 / tower: 遠景の塔（段階4。ang 方向に dist 先）
+    scape: {
+      hills: [[44, 14, 15, 2.6], [-34, 22, 12, 1.8], [-34, -24, 12, 1.3], [28, -32, 9, 1.2]],
+      groves: 9, rocks: 5, beds: 5, singles: 7,
+      zones: [{ kind: 'stones', x: 44, z: 14, r: 7 }, { kind: 'shrine', x: -34, z: -24, r: 5, rot: 0.6 }, { kind: 'bigtree', x: -34, z: 22, r: 4 }],
+      road: 'f1_lab', tower: { ang: 4, dist: 150, h: 70 },
+    },
   },
   f1_hunt: {
     floor: 1, type: 'hunt', name: 'イノシシの丘', shape: 'open', R: 32, ell: [1, 1.35], wob: 0.22, mapPos: [84, 34],

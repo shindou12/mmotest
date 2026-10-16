@@ -6,11 +6,14 @@ import { seeded, hashStr, makeHeight, local, I } from './kit.js';
 import { makeSky, makeGate, makePortal, makeGrass, makeFar } from './landmarks.js';
 import { makeProp } from './props.js';
 import { makeObstacle, makeHazard, makeChest, makeBox } from './obstacles.js';
+import { planScape, scapeTint, buildScape } from './scape.js';
 
 export function buildOpen(def, fdef, opts) {
   const group = new THREE.Group();
   const R = seeded(hashStr(def.id));
-  const heightAt = makeHeight(def);
+  // 見た目の段階（エリアに scape があるときだけ。1 = いまの形）
+  const q = def.scape ? (opts.mapq ?? 1) : 1;
+  const heightAt = makeHeight(def, q);
   const anims = [];
   group.add(makeSky(fdef, false));
 
@@ -35,6 +38,9 @@ export function buildOpen(def, fdef, opts) {
     const along = x * ux + z * uz, side = Math.abs(x * uz - z * ux + Math.sin(along * 0.12) * 2.5);
     return along > 0 && along < L && side < w;
   });
+  const avoid = (x, z, pad = 3) => Math.hypot(x, z) < plaza + pad || !insideOpen(def, x, z, 2) || nearBlock(x, z, 1.5) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
+  const plan = planScape(def, q, avoid);
+  const tintC = plan && { forest: c1.clone().multiplyScalar(0.62).lerp(new THREE.Color(0x5a4a30), 0.25), dirt: pathC, bloom: c2.clone().lerp(new THREE.Color(0xfff0a0), 0.2), sunny: c2.clone().lerp(new THREE.Color(0xe8e080), 0.35) };
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i);
     pos.setY(i, heightAt(x, z));
@@ -48,6 +54,7 @@ export function buildOpen(def, fdef, opts) {
       if (d < h.r + 1.2) tmp.lerp(hazC[h.kind], Math.min(1, (h.r + 1.2 - d) / 1.5) * 0.8);
     }
     for (const o of obst) if (o.kind === 'pond' && Math.hypot(x - o.x, z - o.z) < o.r + 1.4) tmp.lerp(new THREE.Color(0x8a7a5a), 0.5);
+    if (plan && r >= plaza && !onPath(x, z, 1.7)) scapeTint(plan, x, z, pos.getY(i), tmp, tintC);
     cols[i * 3] = tmp.r; cols[i * 3 + 1] = tmp.g; cols[i * 3 + 2] = tmp.b;
   }
   ground.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -68,13 +75,15 @@ export function buildOpen(def, fdef, opts) {
       const r = boundR(def, a) + w + (ring ? 6 : 1.2) + R() * 1.5;
       const x = Math.sin(a) * r, z = -Math.cos(a) * r;
       if (exits.some((e) => Math.hypot(e.x - x, e.z - z) < w + 4)) continue;
+      if (plan && (ring === 0 ? i % 3 : i % 2)) continue; // 段階2以上: 外周は林が主役なので岩は間引く
       B.add(new THREE.DodecahedronGeometry(1, 1), wallC.clone().offsetHSL(0, 0, (R() - 0.5) * 0.06 + (ring ? -0.03 : 0)), local(I, x, heightAt(x, z) + h * 0.25, z, R() * 0.3, R() * 6, R() * 0.3, w, h, w), { flat: true });
     }
   }
-  const avoid = (x, z, pad = 3) => Math.hypot(x, z) < plaza + pad || !insideOpen(def, x, z, 2) || nearBlock(x, z, 1.5) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
   const sx = def.ell?.[0] ?? 1, sz = def.ell?.[1] ?? 1;
   const scale = (def.R / 68) ** 2 * sx * sz * (def.type === 'hunt' ? 0.6 : def.type === 'field' ? 1.1 : def.type === 'secret' ? 0.9 : 0.7);
-  for (const [type, count, col1, col2] of fdef.props) {
+  // 段階2以上: 一様にばらまかず、群れ・外周の林・区画で置く（scape.js）
+  if (plan) buildScape(B, group, anims, { def, fdef, q, plan, heightAt, avoid });
+  else for (const [type, count, col1, col2] of fdef.props) {
     for (let i = 0; i < Math.round(count * scale); i++) {
       const a = R() * Math.PI * 2, r = 4 + Math.sqrt(R()) * (boundR(def, a) - 3);
       const x = Math.sin(a) * r, z = -Math.cos(a) * r;
@@ -83,7 +92,7 @@ export function buildOpen(def, fdef, opts) {
     }
   }
   // 障害物・ハザード・宝箱・共有ボックス
-  for (const o of obst) makeObstacle(B, o, fdef, heightAt, R, group, anims);
+  for (const o of obst) makeObstacle(B, o, fdef, heightAt, R, group, anims, q);
   for (const h of haz) { const m = makeHazard(h, heightAt); group.add(m); anims.push(m.userData.anim); }
   const chests = chestDefs.map((c) => {
     const obj = makeChest(false);

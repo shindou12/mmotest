@@ -20,11 +20,13 @@ import { makeNpc } from '../models/npc-models.js';
 // エリア
 // ======================================================================
 export let env = null;
+// マップの見た目の段階（試作中。URL の ?mapq=2〜4 で切り替え。なければいまの形）
+const MAPQ = +(globalThis.location?.search.match(/[?&]mapq=(\d)/)?.[1] || 1);
 export const heightAt = (x, z) => (env ? env.heightAt(x, z) : 0);
 export function buildEnv(id) {
   if (env) fx.dispose(env.group);
   const def = AREAS[id];
-  env = buildArea(def, FLOORS[def.floor - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1, weather: WEATHERS[def.weather] });
+  env = buildArea(def, FLOORS[def.floor - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1, weather: WEATHERS[def.weather], mapq: MAPQ });
   scene.add(env.group);
   const L = env.light;
   setFog(L.fog, L.fogNear, L.fogFar);
