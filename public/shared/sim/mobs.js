@@ -2,7 +2,7 @@
 import { TECHNIQUES } from '../techniques.js';
 import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from '../balance.js';
 import { FLOORS, RARITIES, MAX_FLOOR, mobHp, mobDmg, mobXp, makeItem, rollRarity, mobDef, floorLevel, TREASURE_ID } from '../data.js';
-import { collide, pathStep, obstaclesOf, insideOpen } from '../areas.js';
+import { collide, pathStep, obstaclesOf, insideOpen, waypointOf } from '../areas.js';
 
 import { MOB_ATTACKS } from './mob-attacks.js';
 import { rnd, dist, r2, ARCH, HATE_RESET } from './common.js';
@@ -230,7 +230,7 @@ export const MobsMethods = {
     else ang = m.a + Math.sin(this.time * 1.1 + m.id) * 0.04;
     // 外周に近づいたら内側へ曲がる
     const nx = m.x + Math.sin(ang) * 3, nz = m.z + Math.cos(ang) * 3;
-    if (A.def.shape === 'open' && !insideOpen(A.def, nx, nz, 4)) ang = Math.atan2(-m.x, -m.z) + (Math.random() - 0.5);
+    if (A.def.shape !== 'grid' && !insideOpen(A.def, nx, nz, 4)) { const c = A.def.shape === 'terrain' ? waypointOf(A.def) : { x: 0, z: 0 }; ang = Math.atan2(c.x - m.x, c.z - m.z) + (Math.random() - 0.5); }
     m.a = ang;
     this.moveMob(A, m, ang, m.arch.speed * (near && nd < TREASURE.scare ? 1 : 0.45), dt);
   },
@@ -242,7 +242,7 @@ export const MobsMethods = {
 
   // 迷路では経路探索しながら近づく
   moveMobToward(A, m, t, speed, dt) {
-    if (A.def.shape === 'grid') {
+    if (A.def.shape === 'grid' || A.def.shape === 'terrain') { // 迷路・地形（崖や川をはさむときは回り込む）
       m.pathT -= dt;
       if (m.pathT <= 0 || !m.wp) { m.pathT = 0.4; m.wp = pathStep(A.def, m.x, m.z, t.x, t.z, A.door); }
       this.moveMob(A, m, Math.atan2(m.wp.x - m.x, m.wp.z - m.z), speed, dt);

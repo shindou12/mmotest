@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { exitsOf, boundR, angOf, obstaclesOf, hazardsOf } from '../../shared/areas.js';
 import { scapeLift } from './scape.js';
+import { terrainOf } from '../../shared/terrain/index.js';
 
 export function seeded(seed) {
   let s = seed >>> 0;
@@ -17,6 +18,7 @@ export function noise2(x, z) {
 // エリアごとの地面の高さ関数（屋内は平ら）。q: 見た目の段階（2以上で丘などの起伏を足す。エリアの scape があるときだけ）
 export function makeHeight(def, q = 1) {
   if (def.shape === 'grid') return () => 0;
+  if (def.shape === 'terrain') return terrainOf(def).heightAt;
   const lift = scapeLift(def, q);
   const exits = exitsOf(def);
   const flat = def.type === 'town' ? 0.15 : def.type === 'camp' ? 0.4 : 1;

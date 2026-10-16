@@ -1,12 +1,16 @@
 // 階層ごとのエリア定義（サーバー・クライアント共通）
 //
-// エリアの形は2種類:
+// エリアの形は3種類（terrain は下）:
 //   open … 屋外。半径 R を基準に、ell（横・縦の伸び）と wob（輪郭のゆらぎ）でいびつな形にする。
 //          obst（障害物）、hazard（毒沼・流砂）、chests（小さな宝箱）、named（ネームド）を種から決定的に配置。
 //          出口は ang（北=0°、東=90°）で輪郭上に置く
 //   grid … 屋内のマス目（ダンジョン・迷宮区）。map の文字:
 //     # 壁  . 床  E 入口（出口）  M 敵の湧き  G 門番（精鋭）  B ボス部屋の中心  C 宝箱
 //     L レバー  D 扉  P 感圧板  T / t 罠床（2グループが交互に作動）
+//   terrain … 起伏のある自由な形の屋外（shared/terrain/）。terrain: 地形の名前。崖・深い水・山は歩けない（ナビ格子）。
+//          出口・敵の出る場所・宝箱・ワープ地点は地形のファイルが座標で持つ
+
+import { terrainOf, navOf, navWalkable, collideTerrain, terrainStep } from './terrain/index.js';
 
 export const CELL = 4;
 
@@ -295,18 +299,10 @@ export const AREAS = {
     ],
   },
   f1_field: {
-    floor: 1, type: 'field', name: 'ひだまりの草原', shape: 'open', R: 48, ell: [1.4, 0.85], wob: 0.14, mapPos: [50, 52],
-    exits: [{ to: 'f1_town', ang: 180 }, { to: 'f1_hunt', ang: 70 }, { to: 'f1_dun', ang: 280 }, { to: 'f1_lab', ang: 5 }],
-    obst: { n: 12, kinds: ['rock', 'tree', 'tree', 'pond'] }, chests: 2,
-    mobs: { count: 9, perPlayer: 3, lv: [0, 3] },
-    // 見た目の作り込み（段階 mapq 2〜4。env/scape.js）。hills: [x, z, 半径, 高さ] / groves・rocks・beds: 群れの数 / singles: 広場のまばらな単体
-    // zones: 区画の目印（段階3） / road: 石灯籠の古道になる出口 / tower: 遠景の塔（段階4。ang 方向に dist 先）
-    scape: {
-      hills: [[44, 14, 15, 2.6], [-34, 22, 12, 1.8], [-34, -24, 12, 1.3], [28, -32, 9, 1.2]],
-      groves: 9, rocks: 5, beds: 5, singles: 7,
-      zones: [{ kind: 'stones', x: 44, z: 14, r: 7 }, { kind: 'shrine', x: -34, z: -24, r: 5, rot: 0.6 }, { kind: 'bigtree', x: -34, z: 22, r: 4 }],
-      road: 'f1_lab', tower: { ang: 4, dist: 150, h: 70 },
-    },
+    // 起伏のある谷（shared/terrain/meadow.js）。出口は谷を囲む山の切り通し
+    floor: 1, type: 'field', name: 'ひだまりの谷', shape: 'terrain', terrain: 'meadow', mapPos: [50, 52],
+    exits: [{ to: 'f1_town' }, { to: 'f1_hunt' }, { to: 'f1_dun' }, { to: 'f1_lab' }],
+    mobs: { count: 12, perPlayer: 3, lv: [0, 3] },
   },
   f1_hunt: {
     floor: 1, type: 'hunt', name: 'イノシシの丘', shape: 'open', R: 32, ell: [1, 1.35], wob: 0.22, mapPos: [84, 34],
@@ -489,11 +485,15 @@ export function boundR(def, a) {
 }
 export function maxR(def) {
   if (def.shape === 'grid') { const g = grid(def); return Math.max(g.W, g.H) * CELL / 2; }
+  if (def.shape === 'terrain') { const T = terrainOf(def); return Math.max(T.W, T.D) / 2; }
   let m = 0;
   for (let i = 0; i < 64; i++) m = Math.max(m, boundR(def, i / 64 * Math.PI * 2));
   return m;
 }
-export const insideOpen = (def, x, z, pad = 0) => Math.hypot(x, z) < boundR(def, angOf(x, z)) - pad;
+export const insideOpen = (def, x, z, pad = 0) => {
+  if (def.shape === 'terrain') { const n = navOf(def); return navWalkable(n, x, z) && (!pad || [[pad, 0], [-pad, 0], [0, pad], [0, -pad]].every(([dx, dz]) => navWalkable(n, x + dx, z + dz))); }
+  return Math.hypot(x, z) < boundR(def, angOf(x, z)) - pad;
+};
 
 // 中心から出口までの道（障害物を置かない）
 function nearPath(def, x, z, w) {
@@ -565,7 +565,9 @@ const chestCache = new Map();
 export function chestsOf(def) {
   if (chestCache.has(def.id)) return chestCache.get(def.id);
   let list = [];
-  if (def.shape === 'grid') {
+  if (def.shape === 'terrain') {
+    list = terrainOf(def).CHESTS.map(([x, z], i) => ({ id: `${def.id}_c${i}`, x, z, big: false }));
+  } else if (def.shape === 'grid') {
     list = (grid(def).pts.C || []).map((p, i) => ({ id: `${def.id}_C${i}`, x: p.x, z: p.z, big: true }));
   } else if (def.chests) {
     const R = seeded(hashStr(def.id) ^ 0x3c);
@@ -623,6 +625,7 @@ export function solidAt(g, c, r, doorOpen) {
 
 // 壁・輪郭・障害物との当たり判定
 export function collide(def, x, z, rad = 0.5, doorOpen = false) {
+  if (def.shape === 'terrain') return collideTerrain(def, x, z, rad);
   if (def.shape === 'open') {
     for (const o of obstaclesOf(def)) {
       if (!o.solid) continue;
@@ -656,6 +659,7 @@ export function collide(def, x, z, rad = 0.5, doorOpen = false) {
 // 迷路の中で目標へ向かう次の地点（幅優先探索）
 export function pathStep(def, x, z, tx, tz, doorOpen) {
   if (def.shape === 'open') return { x: tx, z: tz };
+  if (def.shape === 'terrain') return terrainStep(def, x, z, tx, tz);
   const g = grid(def);
   const s = worldToCell(g, x, z), t = worldToCell(g, tx, tz);
   if (s.c === t.c && s.r === t.r) return { x: tx, z: tz };
@@ -691,7 +695,9 @@ const exitCache = new Map();
 export function exitsOf(def) {
   if (exitCache.has(def.id)) return exitCache.get(def.id);
   let list;
-  if (def.shape === 'open') {
+  if (def.shape === 'terrain') {
+    list = terrainOf(def).EXITS.map((e) => ({ to: e.to, x: e.x, z: e.z, r: 3, in: e.in }));
+  } else if (def.shape === 'open') {
     list = def.exits.map((e) => {
       const a = rad(e.ang), [dx, dz] = dirOf(a), r = boundR(def, a) - 4;
       return { to: e.to, x: dx * r, z: dz * r, r: 3 };
@@ -707,6 +713,7 @@ export function exitsOf(def) {
 export function arrival(def, from) {
   const ex = exitsOf(def).find((e) => e.to === from);
   if (!ex) return spawnPoint(def);
+  if (def.shape === 'terrain') return { x: ex.in[0], z: ex.in[1] };
   if (def.shape === 'open') {
     const d = Math.hypot(ex.x, ex.z) || 1;
     return collide(def, ex.x - ex.x / d * 6, ex.z - ex.z / d * 6, 0.6);
@@ -726,6 +733,7 @@ export function spawnPoint(def) {
 export function waypointOf(def) {
   if (def.gate) return { ...spawnPoint(def), hub: true };
   if (def.shape === 'grid') return spawnPoint(def);
+  if (def.shape === 'terrain') { const [x, z] = terrainOf(def).WAYPOINT; return { x, z }; }
   // 屋外: 中央付近で、障害物・毒沼・流砂・出口から離れた所
   const obs = obstaclesOf(def), haz = hazardsOf(def), ex = exitsOf(def);
   for (let k = 0; k < 40; k++) {

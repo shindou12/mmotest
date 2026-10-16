@@ -27,6 +27,7 @@ export class CanvasView extends View {
         continue;
       }
       if (s.t === 'rect') { g.fillRect(s.x, s.y, s.w, s.h); continue; }
+      if (s.t === 'img') { g.drawImage(s.img, s.x, s.y, s.w, s.h); continue; }
       if (s.t === 'circle') g.arc(s.x, s.y, s.r, 0, Math.PI * 2);
       if (s.t === 'poly') s.pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
       if (s.t === 'arrow') {

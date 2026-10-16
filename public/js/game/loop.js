@@ -424,6 +424,8 @@ export function update(dt) {
   }
   view.cam.back = view.cam.back == null ? back : view.cam.back + (back - view.cam.back) * (1 - Math.exp(-6 * dt));
   view.camera.position.set(view.cam.focus.x, view.cam.focus.y + Math.sqrt(Math.max(0, dist * dist - view.cam.back * view.cam.back)), view.cam.focus.z + view.cam.back);
+  // 地形エリア: カメラが山や丘に埋まらないよう、地面より上に保つ
+  if (state.world.def.shape === 'terrain') view.camera.position.y = Math.max(view.camera.position.y, field.heightAt(view.camera.position.x, view.camera.position.z) + 3);
   if (rules.shake > 0) view.camera.position.add(view.tmpV.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(rules.shake * 0.35));
   view.camera.lookAt(view.cam.focus);
   // 近景の透過（カメラと自キャラの間のもの・カメラに近すぎるもの）

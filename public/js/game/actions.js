@@ -7,7 +7,7 @@ import { collide } from '../../shared/areas.js';
 import { HEAVY, TREE_SKILLS } from '../skills.js';
 import { angDiff, now, degToRad } from './util.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
-import { link, rules, screen, state, stats, view } from './ports.js';
+import { field, link, rules, screen, state, stats, view } from './ports.js';
 
 // スキル（skills.js の c）と武器の効果に渡す戦闘コンテキスト。役目ごとの小さな形に分けてある
 // 使う側は必要な形だけを読む（例: 武器の効果は strikes で当て、feedback で見せる）
@@ -297,9 +297,10 @@ export function updateProjs(dt) {
       if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fxCall('arrowGone', w); view.fx.dispose(w.mesh); state.projs.splice(i, 1); }
       continue;
     }
-    w.mesh.position.set(w.x, 1, w.z);
+    const wy = field.heightAt(w.x, w.z) + 1; // 地面から1m（起伏のあるエリアでも埋まらない）
+    w.mesh.position.set(w.x, wy, w.z);
     view.projShape(w.shape).tick(w, dt);
-    view.fx.parts.emit(w.x, 1, w.z, { color: w.color ?? w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
+    view.fx.parts.emit(w.x, wy, w.z, { color: w.color ?? w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
     for (const mb of [...state.mobs.values()]) {
       if (w.hit.has(mb.id)) continue;
       if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); rules.dealDamage(mb, w.mult, { type: w.type, tech: w.tech, noProc: true, sv: w.sv, cast: w.cast, wave: w.wave, proj: w, wtNo: w.wtNo, stun: w.stun }); }

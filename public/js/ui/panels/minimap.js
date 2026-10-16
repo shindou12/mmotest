@@ -3,6 +3,29 @@
 import { FLOORS, RARITIES } from '../../../shared/data.js';
 import { AREAS, CELL, grid, boundR, obstaclesOf, hazardsOf, chestsOf } from '../../../shared/areas.js';
 import { hex } from '../helpers.js';
+import { terrainOf, navOf } from '../../../shared/terrain/index.js';
+
+// 地形エリアの地図の絵（1m = 1px。歩ける所は高さで濃淡、水・崖・山・道を色分け）。エリアごとに一度だけ描く
+const terrainImgs = new Map();
+function terrainImage(def) {
+  if (terrainImgs.has(def.id)) return terrainImgs.get(def.id);
+  const T = terrainOf(def), nav = navOf(def), cv = document.createElement('canvas');
+  cv.width = nav.W; cv.height = nav.H;
+  const g = cv.getContext('2d'), im = g.createImageData(nav.W, nav.H);
+  for (let r = 0; r < nav.H; r++) for (let c = 0; c < nav.W; c++) {
+    const x = nav.x0 + c + 0.5, z = nav.z0 + r + 0.5, h = T.groundAt(x, z), i = (r * nav.W + c) * 4;
+    let col;
+    if (T.deckAt(x, z) > -Infinity) col = [196, 180, 140];
+    else if (h < T.WATER - 0.3) col = [58, 120, 190];
+    else if (nav.solid[r * nav.W + c]) col = [60, 58, 66];
+    else if (T.pathDist(x, z) < 1.8) col = [176, 150, 104];
+    else { const k = Math.max(0, Math.min(1, (h + 1) / 12)); col = [72 + k * 60, 128 + k * 50, 66 + k * 30]; }
+    im.data[i] = col[0]; im.data[i + 1] = col[1]; im.data[i + 2] = col[2]; im.data[i + 3] = 235;
+  }
+  g.putImageData(im, 0, 0);
+  terrainImgs.set(def.id, cv);
+  return cv;
+}
 
 export function installMinimap(ui) {
   const { game, H, MAP, P } = ui;
@@ -17,9 +40,11 @@ export function installMinimap(ui) {
       const c = Math.floor(x / CELL + g.W / 2), r = Math.floor(z / CELL + g.H / 2);
       return c >= 0 && r >= 0 && c < g.W && r < g.H && !!seen[r * g.W + c];
     };
-    const outR = indoor ? 0 : Math.max(...Array.from({ length: 32 }, (_, i) => boundR(def, i / 32 * Math.PI * 2))) + 4;
+    const terrain = def.shape === 'terrain';
+    const outR = indoor ? 0 : terrain ? 0 : Math.max(...Array.from({ length: 32 }, (_, i) => boundR(def, i / 32 * Math.PI * 2))) + 4;
     let sc, cx = 0, cz = 0;
-    if (v.full && indoor) sc = Math.min(v.W / (g.W * CELL + 8), v.H / (g.H * CELL + 8));
+    if (terrain) { const n = navOf(def); if (v.full) sc = Math.min(v.W / (n.W + 8), v.H / (n.H + 8)); else { sc = v.W / 2 / 40; cx = me.x; cz = me.z; } } // 地形エリアは広いので、ミニマップは自分の周り
+    else if (v.full && indoor) sc = Math.min(v.W / (g.W * CELL + 8), v.H / (g.H * CELL + 8));
     else if (v.full) {
       // 屋外は輪郭の外接矩形に合わせて拡大する
       const bx = [], bz = [];
@@ -46,6 +71,9 @@ export function installMinimap(ui) {
           label(q.x, q.z, nm, col);
         }
       }
+    } else if (terrain) {
+      const n = navOf(def), [x, y] = p(n.x0, n.z0);
+      sh.push({ t: 'img', img: terrainImage(def), x, y, w: n.W * sc, h: n.H * sc });
     } else {
       // 輪郭（いびつな形）
       const pts = Array.from({ length: 64 }, (_, i) => { const a = i / 64 * Math.PI * 2, r = boundR(def, a); return p(Math.sin(a) * r, -Math.cos(a) * r); });
