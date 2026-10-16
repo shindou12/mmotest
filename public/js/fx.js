@@ -154,6 +154,19 @@ export class FX {
 
   add(obj, life, update) { this.scene.add(obj); this.items.push({ obj, life, max: life, update }); return obj; }
 
+  // 残像: model のその瞬間の姿勢を写した、半透明の光の像（形は共有。輪郭線・光源は写さない）
+  ghost(model, color, life = 0.28, opacity = 0.35) {
+    model.updateMatrixWorld();
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
+    const g = model.clone(true);
+    g.traverse((o) => {
+      if (o.isLight || (o.isMesh && (o.userData.noOutline || o.material?.side === THREE.BackSide)) || o.isPoints || o.isSprite || o.isLine) { o.visible = false; return; }
+      if (o.isMesh) { o.material = mat; o.castShadow = false; o.raycast = () => {}; }
+    });
+    g.userData.ghost = mat;
+    return this.add(g, life, (o, k) => { mat.opacity = opacity * (1 - k); });
+  }
+
   // 武器の振りの軌跡。毎フレーム呼ぶ（active: 振っている間）。武器の持ち主のワールド行列は呼ぶ前に更新しておく
   swordTrail(weapon, active, color, dt) {
     let tr = this.trails.get(weapon);
@@ -178,7 +191,8 @@ export class FX {
       if (it.update) it.update(it.obj, k, dt);
       if (it.life <= 0) {
         this.scene.remove(it.obj);
-        it.obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+        if (it.obj.userData.ghost) it.obj.userData.ghost.dispose(); // 残像: 形は本物のモデルと共有なので、残像の材質だけ捨てる
+        else it.obj.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
         this.items.splice(i, 1);
       }
     }

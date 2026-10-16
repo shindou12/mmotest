@@ -17,6 +17,17 @@ export let saveT = 0;
 export let bowGuide = null;
 // 振りの軌跡の色: 武器の出来（レア度）の色。粗悪・普通は白っぽい青
 const trailColor = (r) => (r >= 2 ? RARITIES[r].color : 0xcfe8ff);
+// 残像: すばやく動いた瞬間（回避・すり抜け・跳び退きなど）に、0.04秒ごとに体の像を残す。ワープのような大移動は除く
+const GHOST = { speed: 11, every: 0.04, jump: 6 };
+function afterimage(who, model, x, z, color, dt) {
+  const d = who.ghostP ? Math.hypot(x - who.ghostP.x, z - who.ghostP.z) : 0;
+  who.ghostP = { x, z };
+  if (state.settings.quality === 'low' || dt <= 0 || d > GHOST.jump || d / dt < GHOST.speed) { who.ghostT = 0; return; }
+  who.ghostT = (who.ghostT || 0) - dt;
+  if (who.ghostT > 0) return;
+  who.ghostT = GHOST.every;
+  view.fx.ghost(model, color);
+}
 
 export function updateBowGuide(t) {
   if (!bowGuide) return;
@@ -261,6 +272,7 @@ export function update(dt) {
     gg: state.me.gg / rules.GUARD.max, // 盾の縁の光（ガードゲージの残り）
     sweep: state.me.sweepT > 0 ? rules.sweepAngle(state.me.sweepT) : -1, // ガードカウンターの回転なぎ払い（回った角度）
   });
+  afterimage(state.me, state.me.model, state.me.x, state.me.z, trailColor(stats.S.wr), dt);
   // 振りの軌跡（近接武器。画質「低」では出さない）
   if (state.settings.quality !== 'low' && !WEAPONS[stats.S.wk]?.ranged && state.me.model.userData.weaponModel) {
     state.me.model.updateMatrixWorld();
@@ -295,6 +307,7 @@ export function update(dt) {
     o.model.position.set(o.x, field.heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
     view.animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, shieldBack: !!WEAPONS[o.wk]?.shield && (o.cl & 1) > 0, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (WEAPONS[o.wk]?.skillSpin || isSpinMotion(o.motion)) ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
+    afterimage(o, o.model, o.x, o.z, trailColor(o.wr ?? 0), dt);
     if (state.settings.quality !== 'low' && !WEAPONS[o.wk]?.ranged && o.model.userData.weaponModel) {
       o.model.updateMatrixWorld();
       view.fx.swordTrail(o.model.userData.weaponModel, o.swingT < 0.35 || o.spinT >= 0, trailColor(o.wr ?? 0), dt);
