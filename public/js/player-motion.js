@@ -56,6 +56,9 @@ export function animatePlayer(model, s) {
     // Shield faces forward in body space, regardless of forearm bending.
     u.shield.quaternion.copy(u.armL.quaternion).multiply(u.elbowL.quaternion).invert();
   }
+  // 這いずり中は武器と盾を見せない
+  if (u.weapon) u.weapon.visible = !s.crawl;
+  if (u.shield) u.shield.visible = !s.crawl;
   model.visible = !s.dead;
 }
 
