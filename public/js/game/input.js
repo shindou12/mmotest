@@ -1,5 +1,5 @@
 import { clamp, now } from './util.js';
-import { fxReduce, fxSome } from './weapon-fx.js';
+import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 import { rules, screen, state, stats, view } from './ports.js';
 
 // ======================================================================
@@ -8,18 +8,32 @@ import { rules, screen, state, stats, view } from './ports.js';
 // 盾槍のガード（強攻撃の溜め中に自動で構える。スマホはガードボタンでも。ダウン中はできない）
 // ガードカウンター: ガードで攻撃を受けてから離すと、強攻撃の代わりに回転なぎ払い（sweepTick）
 export function startGuard() {
-  if (!stats.S?.guard || state.me.dead || state.me.crawl || state.me.downT > 0 || state.me.guarding || state.me.gg <= 0 || state.me.staggerT > 0) return;
+  if (!canGuard()) return;
   state.me.guarding = true; state.me.guardStart = now(); state.me.charging = false; state.me.counter = false; view.audio.sfx('equip');
+}
+// 構えられるか（ガードを解いた直後・カウンターの直後は少しのあいだ構え直せない）
+export function canGuard() {
+  return !!stats.S?.guard && !state.me.dead && !state.me.crawl && !(state.me.downT > 0) && !state.me.guarding && state.me.gg > 0 && !(state.me.staggerT > 0) && now() >= (state.me.guardLockT || 0);
 }
 // ガードゲージ: ガードで受けるたびに減り（受ける前のダメージに比例）、尽きるとガードブレイクで大きな隙。
 // ガードしていない間、少したつと回復する。数値は最大HPに対する割合で決める（雑魚は何度か受けられ、ボスの大技は2〜3回で割れる）
-export const GUARD = { max: 100, perHp: 120, kdExtra: 20, regenDelay: 1.0, regen: 34, breakT: 1.5, breakDmg: 1.5 };
+export const GUARD = { max: 100, perHp: 120, kdExtra: 20, breakT: 1.5, breakDmg: 1.5 };
+// 武器ごとのガードの性能。盾槍が本職で、守護騎士（片手剣）はゲージの減り・戻りと構え直しが一段遅い（受けたときの軽減は同じ）
+//   cut: 受けたダメージの倍率 / loss: ゲージの減りの倍率 / regenDelay: 最後に受けて（または解いて）から回復が始まるまで /
+//   regen: 毎秒の回復 / up: 構えてから効き始めるまで / lock: 解いてから構え直せるまで / ctrLock: カウンターのあと構え直せるまで
+export const GUARD_BY = {
+  spear: { cut: 0.25, loss: 1, regenDelay: 1.6, regen: 20, up: 0.06, lock: 0.3, ctrLock: 0.7 },
+  sword: { cut: 0.25, loss: 1.3, regenDelay: 2.2, regen: 13, up: 0.12, lock: 0.55, ctrLock: 1.0 },
+};
+export const guardProfile = () => GUARD_BY[stats.S?.wk] || GUARD_BY.sword;
+// 構えてから効き始めているか（構えた瞬間はまだ受けられない）
+export const guardUp = () => state.me.guarding && now() - (state.me.guardStart || 0) >= guardProfile().up;
 // ガードゲージを満タンにしておく（組み立て役 wiring.js が起動のときに呼ぶ）
 export function initGuard() { state.me.gg = GUARD.max; }
 export function guardDamage(rawBefore, kd) {
   // 盾の心得: 減りが少ない / 挑発A「威圧」: 効果中は減らない（盾槍のファイル）
   const keep = fxReduce('guardKeep', 1);
-  state.me.gg -= (rawBefore / stats.S.mhp * GUARD.perHp + (kd ? GUARD.kdExtra : 0)) * keep;
+  state.me.gg -= (rawBefore / stats.S.mhp * GUARD.perHp + (kd ? GUARD.kdExtra : 0)) * keep * guardProfile().loss;
   state.me.ggHitT = now();
   if (state.me.gg <= 0) { guardBreak(); return true; }
   if (state.me.gg < GUARD.max * 0.3) { view.audio.sfx('impact'); screen.floatText(state.me.x, 2.4, state.me.z, '盾がきしむ…', 'info'); }
@@ -36,8 +50,10 @@ export function guardBreak() {
   rules.addShake(0.5); rules.setHitStop(0.1);
 }
 export function guardRegen(dt) {
-  if (state.me.guarding || state.me.gg >= GUARD.max || now() - (state.me.ggHitT || 0) < GUARD.regenDelay || state.me.staggerT > 0) return;
-  state.me.gg = Math.min(GUARD.max, state.me.gg + GUARD.regen * dt * fxReduce('guardRegen', 1));
+  // 回復は「最後に受けた」か「ガードを解いた」ときから数える（細かく構え直しても回復は進まない）。盾の心得A は待ちを短く・回復を速く
+  const P = guardProfile(), delay = P.regenDelay * fxReduce('guardRegenDelay', 1);
+  if (state.me.guarding || state.me.gg >= GUARD.max || now() - Math.max(state.me.ggHitT || 0, state.me.guardEndT || 0) < delay || state.me.staggerT > 0) return;
+  state.me.gg = Math.min(GUARD.max, state.me.gg + P.regen * dt * fxReduce('guardRegen', 1));
 }
 // ガードで攻撃を受けた → カウンター準備
 export function armCounter() {
@@ -50,9 +66,16 @@ export function armCounter() {
 // fire: スマホのガードボタンを離したとき（溜めていないので、ここでカウンターを出す）
 export function endGuard(fire = false) {
   const counter = state.me.guarding && state.me.counter;
+  if (state.me.guarding) {
+    // 構え直せるまでの隙（鉄壁A・反撃の心得A などで短くなる）
+    const P = guardProfile();
+    state.me.guardEndT = now();
+    state.me.guardLockT = now() + (counter ? fxReduce('guardCtrLock', P.ctrLock, P) : fxReduce('guardLock', P.lock));
+  }
   state.me.guarding = false; state.me.counter = false;
   if (!counter) return;
   state.me.counterFire = true;
+  fxCall('counterGauge', GUARD.max); // 騎士: カウンターでゲージが戻る
   if (fire) rules.doHeavy(2);
 }
 

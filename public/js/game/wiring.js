@@ -7,7 +7,7 @@ import { canAct, combat, doHeavy, doSwing, gainXp, heal, strikes, sweepAngle, sw
 import { buildEnv, env, heightAt, pinTick, refreshNpcMarks, waypointTick } from './area.js';
 import { addShake, aimAngle, aimPoint, autoTarget, dealDamage, later, setShake, shake, stunValue, touch } from './combat.js';
 import { REACT, crawlTick, downedAllies, fall, getUp, hitStop, onJustDodge, reviveHit, setHitStop, takeDamage, tryTech, updateTeles } from './hurt.js';
-import { GUARD, armCounter, guardDamage, guardRegen, updateMouseWorld, initGuard } from './input.js';
+import { GUARD, armCounter, canGuard, guardDamage, guardProfile, guardRegen, guardUp, updateMouseWorld, initGuard } from './input.js';
 import { updateMobLabels } from './labels.js';
 import { moveMe } from './loop.js';
 import { addGold, coins, lootWalk, spawnDrop, spawnGold, updateCoins, updateDrops } from './loot.js';
@@ -31,7 +31,7 @@ wirePorts({
   screen: { banner, floatText, renderQuests, toast, get ui() { return ui; } },
   link: { net },
   field: { buildEnv, get env() { return env; }, heightAt, pinTick, refreshNpcMarks, waypointTick },
-  rules: { GUARD, REACT, addGold, addShake, aimAngle, aimPoint, armCounter, autoTarget, canAct, castWeaponSkill, chestOpen, coins, combat, crawlTick, dealDamage, desperate, doHeavy, doSwing, downedAllies, exploreTick, fall, gainWeaponProf, gainXp, getUp, guardDamage, guardRegen, heal, get hitStop() { return hitStop; }, indoorNow, later, lootWalk, moveMe, onJustDodge, onVariantHit, phantomReady, reviveHit, setHitStop, setShake, get shake() { return shake; }, skillCd, spawnDrop, spawnGold, strikes, stunValue, sweepAngle, sweepTick, takeDamage, tf, titleAspd, titleDmg, titleMove, touch, tryDodge, tryTech, tryTreeSkill, tryWeaponSkill, updateBossProjs, updateCoins, updateDrops, updateMouseWorld, updateProjs, updateTeles, usePotion, variantParams, wtAfterCast, wtAura, wtChargeStart, wtCritAdd, wtDmgMult, wtDr, wtHeavy, wtOnGuard, wtOnHit, wtOnHurt },
+  rules: { GUARD, REACT, addGold, addShake, aimAngle, aimPoint, armCounter, autoTarget, canAct, canGuard, guardProfile, guardUp, castWeaponSkill, chestOpen, coins, combat, crawlTick, dealDamage, desperate, doHeavy, doSwing, downedAllies, exploreTick, fall, gainWeaponProf, gainXp, getUp, guardDamage, guardRegen, heal, get hitStop() { return hitStop; }, indoorNow, later, lootWalk, moveMe, onJustDodge, onVariantHit, phantomReady, reviveHit, setHitStop, setShake, get shake() { return shake; }, skillCd, spawnDrop, spawnGold, strikes, stunValue, sweepAngle, sweepTick, takeDamage, tf, titleAspd, titleDmg, titleMove, touch, tryDodge, tryTech, tryTreeSkill, tryWeaponSkill, updateBossProjs, updateCoins, updateDrops, updateMouseWorld, updateProjs, updateTeles, usePotion, variantParams, wtAfterCast, wtAura, wtChargeStart, wtCritAdd, wtDmgMult, wtDr, wtHeavy, wtOnGuard, wtOnHit, wtOnHurt },
 });
 // ポートが埋まったあとに作るもの: スキルに渡す道具（actions.js）と、ガードゲージの初期値（input.js）
 buildCombat();

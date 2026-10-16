@@ -67,7 +67,7 @@ export function resolveTele(te) {
     else if (off > degToRad(120)) raw *= 0.7;
   }
   // 盾槍のガード（攻撃してきた方向が正面なら軽減）
-  if (state.me.guarding && stats.S.guard) {
+  if (rules.guardUp() && stats.S.guard) {
     const src = state.mobs.get(te.src) || { x: te.sh[0].x, z: te.sh[0].z };
     const dirTo = Math.atan2(src.x - state.me.x, src.z - state.me.z);
     const centered = Math.hypot(src.x - state.me.x, src.z - state.me.z) < 0.5;
@@ -75,7 +75,7 @@ export function resolveTele(te) {
       if (te.src) link.net.send({ t: 'threat', id: te.src, n: Math.round(te.dmg * 3) });
       // ガードゲージが尽きたらガードブレイク（そのまま全部のダメージを受ける）
       if (rules.guardDamage(raw, te.kd)) { takeDamage(raw, src, false, true); return; }
-      raw *= stats.S.flags.has('bulwark') ? 0 : 0.25;
+      raw *= stats.S.flags.has('bulwark') ? 0 : rules.guardProfile().cut;
       view.audio.sfx('block');
       view.fx.parts.burst(state.me.x + Math.sin(state.me.a) * 0.8, 1.2, state.me.z + Math.cos(state.me.a) * 0.8, 14, { color: 0xbfe0ff, speed: 5, size: 0.4, life: 0.35 });
       rules.armCounter(); rules.wtOnGuard(te.dmg, srcMob);

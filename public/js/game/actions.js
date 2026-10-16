@@ -328,7 +328,7 @@ export function updateBossProjs(dt) {
     const d = Math.hypot(p.x - state.me.x, p.z - state.me.z);
     if (!gone && !state.me.dead && !state.me.crawl && d < p.r + 0.6) {
       const facing = Math.abs(angDiff(Math.atan2(p.x - state.me.x, p.z - state.me.z), state.me.a)) < degToRad(80);
-      if (state.me.guarding && stats.S.guard && facing) {
+      if (rules.guardUp() && stats.S.guard && facing) {
         // ガードで弾を消す
         link.net.send({ t: 'pblock', id: p.id });
         if (!rules.guardDamage(p.dmg, false)) { screen.floatText(state.me.x, 2.6, state.me.z, '防御', 'info'); rules.armCounter(); rules.wtOnGuard(p.dmg, state.mobs.get(p.src)); }

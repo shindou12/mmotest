@@ -177,7 +177,7 @@ export function update(dt) {
       if (state.me.stepT <= 0) { state.me.stepT = 0.32; view.audio.sfx('step'); }
     }
     // 盾槍: 強攻撃を溜めている間はガードを構える
-    if (state.me.charging && stats.S.guard && state.me.chargeT >= state.CHARGE_MIN && !state.me.guarding && state.me.gg > 0) { state.me.guarding = true; state.me.guardStart = now(); state.me.counter = false; view.audio.sfx('equip'); }
+    if (state.me.charging && state.me.chargeT >= state.CHARGE_MIN && rules.canGuard()) { state.me.guarding = true; state.me.guardStart = now(); state.me.counter = false; view.audio.sfx('equip'); }
     if (state.me.guarding) state.me.a = rules.aimAngle();
 
     // 出口

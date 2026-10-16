@@ -20,22 +20,22 @@ const SPEAR = {
     ] },
     { kind: 'passive', nodes: [
       { id: 'sp_iron', icon: '⛨', name: '鉄壁の心得', base: '被ダメージ', lv: ['-6%', '-10%', L3], tags: ['shield'], mods: [{ def: 6 }, { def: 10 }],
-        A: { name: '不動', desc: 'ガードで受けても押し戻されない' }, B: { name: '頑健', desc: '最大HP +10%' } },
+        A: { name: '不動', desc: 'ガードで受けても押し戻されない。ガードを解いてから構え直せるまでが半分' }, B: { name: '頑健', desc: '最大HP +10%' } },
       { id: 'sp_shield', icon: '◈', name: '盾の心得', base: 'ガードで受けたときのガードゲージの減り', lv: ['-20%', '-35%', L3], tags: ['shield'], gauge: [20, 35],
-        A: { name: '立て直し', desc: 'ガードゲージの回復が2倍速い' }, B: { name: '盾の重み', desc: 'ガードで受けると、その敵を崩す', tags: ['break'] } },
+        A: { name: '立て直し', desc: 'ガードゲージの回復が60%速く、回復が始まるまでが半分' }, B: { name: '盾の重み', desc: 'ガードで受けると、その敵を崩す', tags: ['break'] } },
       { id: 'sp_spear', icon: '➹', name: '槍の心得', base: '通常攻撃・強攻撃のダメージ', lv: ['+10%', '+18%', L3], tags: ['thrust'], mods: [{ normp: 10, heavyp: 10 }, { normp: 18, heavyp: 18 }],
         A: { name: '長柄', desc: '通常攻撃の届く距離 +20%' }, B: { name: '連突き', desc: '通常攻撃の3段目でもう一度突く（60%）' } },
     ] },
     { kind: 'ks1', nodes: [
       { id: 'sp_dragoon', icon: '⇑', name: '竜騎士', desc: '盾を背負い、槍を両手で持つ。ガードはできないが攻撃の速さ +30%。強攻撃は高く跳んで、狙った場所へ突き降りる（空中は無敵・750%）', tags: ['thrust'] },
       { id: 'sp_reach', icon: '↦', name: '間合い', desc: '槍の先端（届くぎりぎりの距離）で当てた攻撃は必ず会心・ダメージ +25%。近すぎると -20%', tags: ['thrust'] },
-      { id: 'sp_knight', icon: '♞', name: '騎士', desc: 'ガードカウンターのあと3秒間、突きが雷をまとう（ダメージ +20%・届く距離 +50%）', tags: ['shield', 'thrust'] },
+      { id: 'sp_knight', icon: '♞', name: '騎士', desc: 'ガードカウンターのあと3秒間、突きが雷をまとう（ダメージ +20%・届く距離 +50%）。カウンターでガードゲージが20戻る', tags: ['shield', 'thrust'] },
     ] },
     { kind: 'passive', nodes: [
       { id: 'sp_brk', icon: '✸', name: '崩しの心得', base: 'ボスを崩す力（スタン値）', lv: ['+20%', '+35%', L3], tags: ['break'], mods: [{ stunp: 20 }, { stunp: 35 }],
         A: { name: '崩れ突き', desc: 'スタン中の敵へのダメージがさらに +20%' }, B: { name: '盾の一撃', desc: 'ガードカウンターでボスを崩す力が2倍', tags: ['shield'] } },
       { id: 'sp_ctr', icon: '↺', name: '反撃の心得', base: 'ガードカウンターの威力', lv: ['+20%', '+35%', L3], tags: ['shield'], ctr: [20, 35],
-        A: { name: '反撃の守り', desc: 'ガードカウンターの間は無敵' }, B: { name: '二段反撃', desc: 'ガードカウンターのあと、もう一度突く（150%）', tags: ['thrust'] } },
+        A: { name: '反撃の守り', desc: 'ガードカウンターの間は無敵。カウンターのあとすぐ構え直せる' }, B: { name: '二段反撃', desc: 'ガードカウンターのあと、もう一度突く（150%）', tags: ['thrust'] } },
     ] },
     { kind: 'skill', nodes: [
       { id: 'sp_stake', icon: '⚡', name: '杭打ち', base: '狙った地点（6m以内）に雷の杭を打つ', lv: ['威力380%', '威力480%', L3], tags: ['break'],
@@ -422,7 +422,13 @@ function effects({ player, field, attack, tree, show, register }) {
     steadyGuard: () => player.S.wt?.br('sp_iron') === 'A',
     // 盾の心得: ガードゲージの減りが少ない / 挑発A「威圧」: 効果中は減らない / 盾の心得A: 回復が2倍
     guardKeep: () => (player.S.wt?.br('sp_taunt') === 'A' && hasBuff('sp_taunt') ? 0 : 1 - (player.S.wt?.v('sp_shield', 'gauge') || 0) / 100),
-    guardRegen: (k) => k * (player.S.wt?.br('sp_shield') === 'A' ? 2 : 1),
+    guardRegen: (k) => k * (player.S.wt?.br('sp_shield') === 'A' ? 1.6 : 1),
+    guardRegenDelay: (k) => k * (player.S.wt?.br('sp_shield') === 'A' ? 0.5 : 1),
+    // 構え直しの隙: 鉄壁A「不動」は半分 / 反撃の心得A「反撃の守り」はカウンターのあとも普通に解いたときと同じ
+    guardLock: (k) => k * (player.S.wt?.br('sp_iron') === 'A' ? 0.5 : 1),
+    guardCtrLock: (k, P) => (player.S.wt?.br('sp_ctr') === 'A' ? P.lock : k) * (player.S.wt?.br('sp_iron') === 'A' ? 0.5 : 1),
+    // 騎士: ガードカウンターでガードゲージが20戻る
+    counterGauge(max) { if (player.S.wk === 'spear' && player.S.wt?.ks1 === 'sp_knight') me.gg = Math.min(max, me.gg + 20); },
     // 竜翔: 溜めなしでもう一度跳ぶ
     chargeStart() {
       if (!(me.soarReady && now() < me.soarReady && !me.dead && me.downT <= 0 && me.staggerT <= 0)) return false;
