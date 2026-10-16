@@ -2,6 +2,7 @@
 // Each entry owns its geometry and any gait required by that geometry.
 import { buildGraz } from './bosses/graz-model.js';
 import { GRAZ_MOTIONS } from './bosses/graz-motion.js';
+import { buildGraz3, animateGraz3 } from './bosses/graz-fx.js';
 import { buildYugdra, animateYugdra } from './bosses/yugdra-model.js';
 import { YUGDRA_MOTIONS } from './bosses/yugdra-motion.js';
 import { buildSkorpio, animateSkorpio } from './bosses/skorpio-model.js';
@@ -10,6 +11,7 @@ import { buildCrystalos, buildCrystalos2, buildCrystalos3, animateCrystalos } fr
 
 export const BOSS_MODELS = {
   graz: { build: buildGraz, motions: GRAZ_MOTIONS }, // motions: 技ごとの動き（再生は models/boss-motion.js）
+  graz3: { build: buildGraz3, animate: animateGraz3, motions: GRAZ_MOTIONS }, // 作り込みの段階 3（比較用。形は graz と同じ）
   yugdra: { build: buildYugdra, animate: animateYugdra, motions: YUGDRA_MOTIONS },
   skorpio: { build: buildSkorpio, animate: animateSkorpio, motions: SKORPIO_MOTIONS },
   crystalos: { build: buildCrystalos, animate: animateCrystalos }, // 4層（まだ遊べない層）のボス
