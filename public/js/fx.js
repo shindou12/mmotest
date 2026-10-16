@@ -74,11 +74,76 @@ export class Particles {
 }
 
 // 一時的なメッシュエフェクト管理
+// 武器の振りの軌跡（トレイル）: 刃の根元と先端の位置を毎フレーム記録し、新しい順に帯でつなぐ。古いほど薄く、刃先ほど明るい
+const TRAIL = { n: 24, life: 0.16, sub: 3, opacity: 0.6 }; // sub: 1フレームの間を補う点の数（速い振りでも角ばらない）
+class WeaponTrail {
+  constructor(scene, color) {
+    const N = TRAIL.n, g = new THREE.BufferGeometry();
+    this.pos = new Float32Array(N * 2 * 3); this.alpha = new Float32Array(N * 2);
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    g.setAttribute('alpha', new THREE.BufferAttribute(this.alpha, 1));
+    const idx = []; for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    g.setIndex(idx);
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(color) } },
+      vertexShader: 'attribute float alpha; varying float vA; void main() { vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform vec3 uColor; varying float vA; void main() { gl_FragColor = vec4(uColor * (1.0 + vA), vA); }',
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    });
+    this.mesh = new THREE.Mesh(g, this.mat); this.mesh.frustumCulled = false; this.mesh.renderOrder = 7;
+    scene.add(this.mesh);
+    this.s = []; // { b: 根元, t: 先端, age }
+  }
+  update(base, tip, active, dt) {
+    for (const p of this.s) p.age += dt;
+    while (this.s.length && this.s[this.s.length - 1].age > TRAIL.life) this.s.pop();
+    if (active) {
+      const prev = this.s[0];
+      if (prev) for (let k = 1; k < TRAIL.sub; k++) { // 前の点との間を補う
+        const f = k / TRAIL.sub;
+        this.s.unshift({ b: prev.b.clone().lerp(base, f), t: prev.t.clone().lerp(tip, f), age: dt * (1 - f) });
+      }
+      this.s.unshift({ b: base.clone(), t: tip.clone(), age: 0 });
+      if (this.s.length > TRAIL.n) this.s.length = TRAIL.n;
+    }
+    const n = this.s.length;
+    this.mesh.visible = n > 1;
+    this.s.forEach((p, i) => {
+      const fade = Math.max(0, 1 - p.age / TRAIL.life) * TRAIL.opacity;
+      this.pos.set([p.b.x, p.b.y, p.b.z, p.t.x, p.t.y, p.t.z], i * 6);
+      this.alpha[i * 2] = fade * 0.15; this.alpha[i * 2 + 1] = fade;
+    });
+    const g = this.mesh.geometry;
+    g.attributes.position.needsUpdate = true; g.attributes.alpha.needsUpdate = true;
+    g.setDrawRange(0, Math.max(0, n - 1) * 6);
+    return n > 0;
+  }
+  dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mat.dispose(); }
+}
+// 武器の刃の範囲（武器の中の座標で、根元と先端）。刃は +Y 向きに作ってある
+const span = new WeakMap(), tmpM = new THREE.Matrix4(), tmpB = new THREE.Box3();
+function bladeSpan(weapon) {
+  let s = span.get(weapon);
+  if (s) return s;
+  weapon.updateWorldMatrix(true, true);
+  const inv = weapon.matrixWorld.clone().invert(), box = new THREE.Box3();
+  weapon.traverse((o) => {
+    if (!o.isMesh || !o.geometry || o.userData.noOutline) return;
+    o.geometry.computeBoundingBox();
+    box.union(tmpB.copy(o.geometry.boundingBox).applyMatrix4(tmpM.multiplyMatrices(inv, o.matrixWorld)));
+  });
+  const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2, len = box.max.y - box.min.y;
+  s = { b: new THREE.Vector3(cx, box.min.y + len * 0.42, cz), t: new THREE.Vector3(cx, box.max.y, cz) };
+  span.set(weapon, s);
+  return s;
+}
+
 export class FX {
   constructor(scene) {
     this.scene = scene;
     this.parts = new Particles(scene);
     this.items = [];
+    this.trails = new Map(); // 武器 → 振りの軌跡
     this.lights = [];
     // 動的ポイントライトのプール（シェーダー再コンパイルを防ぐため固定数）
     for (let i = 0; i < 4; i++) {
@@ -88,6 +153,16 @@ export class FX {
   }
 
   add(obj, life, update) { this.scene.add(obj); this.items.push({ obj, life, max: life, update }); return obj; }
+
+  // 武器の振りの軌跡。毎フレーム呼ぶ（active: 振っている間）。武器の持ち主のワールド行列は呼ぶ前に更新しておく
+  swordTrail(weapon, active, color, dt) {
+    let tr = this.trails.get(weapon);
+    if (!tr) { if (!active) return; tr = new WeaponTrail(this.scene, color); this.trails.set(weapon, tr); }
+    const S = bladeSpan(weapon);
+    tr.mat.uniforms.uColor.value.set(color);
+    const alive = tr.update(weapon.localToWorld(S.b.clone()), weapon.localToWorld(S.t.clone()), active, dt);
+    if (!alive && !weapon.parent) { tr.dispose(); this.trails.delete(weapon); } // 持ち替えた武器の軌跡は消えたら片付ける
+  }
 
   flash(x, y, z, color, intensity = 30, life = 0.25, dist = 12) {
     const L = this.lights.reduce((a, b) => (a.t < b.t ? a : b));
