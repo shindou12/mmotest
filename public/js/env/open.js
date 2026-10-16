@@ -7,8 +7,10 @@ import { makeSky, makeGate, makePortal, makeGrass, makeFar } from './landmarks.j
 import { makeProp } from './props.js';
 import { makeObstacle, makeHazard, makeChest, makeBox } from './obstacles.js';
 import { planScape, scapeTint, buildScape } from './scape.js';
+import { buildValley } from './valley.js';
 
 export function buildOpen(def, fdef, opts) {
+  if (def.id === 'f1_field' && !opts.legacy) return buildValley(def, opts);
   const group = new THREE.Group();
   const R = seeded(hashStr(def.id));
   // 見た目の段階（エリアに scape があるときだけ。1 = いまの形）

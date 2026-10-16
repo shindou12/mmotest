@@ -24,7 +24,7 @@ export let env = null;
 const MAPQ = +(globalThis.location?.search.match(/[?&]mapq=(\d)/)?.[1] || 1);
 export const heightAt = (x, z) => (env ? env.heightAt(x, z) : 0);
 export function buildEnv(id) {
-  if (env) fx.dispose(env.group);
+  if (env) { env.dispose?.(); fx.dispose(env.group); }
   const def = AREAS[id];
   env = buildArea(def, FLOORS[def.floor - 1], { grass: GRASS_BY_Q[settings.quality] ?? 1, weather: WEATHERS[def.weather], mapq: MAPQ });
   scene.add(env.group);
@@ -40,10 +40,10 @@ export function enterArea(id, x, z) {
   world.door = false; world.plates = []; world.bossState = 'idle';
   const fdef = FLOORS[def.floor - 1];
   buildEnv(id);
-  hemi.color.set(fdef.hemi[0]); hemi.groundColor.set(fdef.hemi[1]);
+  hemi.color.set(env.atmosphere?.sky ?? fdef.hemi[0]); hemi.groundColor.set(env.atmosphere?.ground ?? fdef.hemi[1]);
   const indoor = def.shape === 'grid';
   const W = indoor ? null : WEATHERS[def.weather];
-  sun.color.set(fdef.sun);
+  sun.color.set(env.atmosphere?.sun ?? fdef.sun);
   if (W) tintSun(W.tint, W.mix * 0.5);
   ambient.setKind(indoor ? 'dust' : fdef.particles);
   weatherParts.setKind(W ? W.particles : null);
