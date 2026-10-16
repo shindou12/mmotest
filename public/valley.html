@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#172622" />
+    <link rel="icon" href="/assets/valley/sigil.svg" type="image/svg+xml" />
+    <title>暁の環谷 — エテルナ</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three/build/three.module.js",
+          "three/addons/": "/vendor/three/examples/jsm/"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="/valley.css" />
+  </head>
+  <body>
+    <canvas
+      id="world"
+      aria-label="暁の環谷の3Dプレビュー。ドラッグで視点を回転、ホイールで拡大縮小できます。"
+    ></canvas>
+    <div id="loading" role="status">
+      <span class="sigil">Ⅰ</span><span>谷が、目を覚ます。</span
+      ><small>地形と森を生成しています</small>
+    </div>
+    <div class="frame" aria-hidden="true"></div>
+    <header>
+      <a class="brand" href="/">E T E R N A<span>WORLD EXPLORATION</span></a>
+      <div class="chapter"><span class="live-dot"></span>第 Ⅰ 層 <i></i> AM 06:42</div>
+      <button
+        id="hide-ui"
+        class="icon-button"
+        title="画面表示を隠す（H）"
+        aria-label="画面表示を隠す"
+      >
+        ◩
+      </button>
+    </header>
+    <main id="journal">
+      <div class="eyebrow"><span>01</span> THE FIRST STRATUM</div>
+      <h1>暁の環谷</h1>
+      <p class="english">THE DAWNRING VALE</p>
+      <div class="gold-line"></div>
+      <p class="description">
+        名もなき巡礼者たちの古道。<br />朝霧の向こうで、失われた時代の環が<br />いまも、最初の光を待っている。
+      </p>
+      <button id="walk" class="primary">この世界を歩く <span>↗</span></button>
+      <p class="walk-note" id="walk-note">ドラッグで見渡す · スクロールで近づく</p>
+    </main>
+    <aside class="compass" aria-label="現在地">
+      <div class="compass-heading">N</div>
+      <svg viewBox="0 0 160 160" aria-hidden="true">
+        <circle cx="80" cy="80" r="69" />
+        <circle cx="80" cy="80" r="64" class="inner" />
+        <path
+          class="contour"
+          d="M25 77Q40 20 94 30T137 93Q124 144 65 132T25 77ZM35 78Q49 36 90 43T126 95Q112 129 65 119T35 78ZM46 79Q58 50 87 55T113 94Q103 115 67 106T46 79Z"
+        />
+        <path class="route" d="M80 126Q70 90 80 80T83 29M80 80L132 61M80 80L26 67" />
+        <path class="north" d="M80 59L86 82L80 78L74 82Z" />
+        <circle class="position" id="map-position" cx="80" cy="80" r="3" /></svg
+      ><span>ひだまりの草原</span>
+    </aside>
+    <nav id="views" aria-label="眺める場所">
+      <button data-view="0" class="active"><span>01</span>巡礼の古道</button
+      ><button data-view="1"><span>02</span>水鏡の岸</button
+      ><button data-view="2"><span>03</span>暁の環</button
+      ><button data-view="3"><span>04</span>谷の全景</button>
+    </nav>
+    <footer>
+      <span id="location-label">THE PILGRIM’S WAY</span>
+      <div>
+        <label class="quality-label"
+          >描画
+          <select id="quality" aria-label="描画品質">
+            <option value="high">高品質</option>
+            <option value="low">軽量</option>
+          </select></label
+        ><button id="sound" aria-pressed="false">環境音 OFF</button
+        ><button id="photo">UIを隠す <kbd>H</kbd></button>
+      </div>
+    </footer>
+    <div id="walk-help" class="hidden">
+      移動 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <i></i> 走る <kbd>Shift</kbd>
+      <i></i> 視点 ドラッグ <i></i> 戻る <kbd>Esc</kbd>
+    </div>
+    <div id="touch-pad" aria-label="移動">
+      <button data-key="KeyW" aria-label="前へ">↑</button>
+      <div>
+        <button data-key="KeyA" aria-label="左へ">←</button
+        ><button data-key="KeyS" aria-label="後ろへ">↓</button
+        ><button data-key="KeyD" aria-label="右へ">→</button>
+      </div>
+    </div>
+    <button id="restore-ui" class="hidden">表示を戻す <kbd>H</kbd></button>
+    <script type="module" src="/js/valley-preview.js"></script>
+  </body>
+</html>

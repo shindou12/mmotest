@@ -1,0 +1,588 @@
+:root {
+  color-scheme: dark;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, serif;
+  color: #f0eee1;
+  background: #869a93;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+}
+button,
+a,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible,
+select:focus-visible {
+  outline: 2px solid #dac58e;
+  outline-offset: 5px;
+}
+#world {
+  display: block;
+  width: 100vw;
+  height: 100dvh;
+  touch-action: none;
+}
+.frame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(13, 26, 24, 0.76), rgba(13, 26, 24, 0.3) 28%, transparent 56%),
+    linear-gradient(
+      0deg,
+      rgba(8, 24, 22, 0.72),
+      transparent 22%,
+      transparent 78%,
+      rgba(9, 24, 23, 0.35)
+    );
+  transition: opacity 0.5s;
+}
+header {
+  position: fixed;
+  left: 4.2%;
+  right: 4.2%;
+  top: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  font-family: Georgia, serif;
+  font-size: 20px;
+  letter-spacing: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+.brand span {
+  display: block;
+  font: 8px sans-serif;
+  letter-spacing: 3.7px;
+  margin-top: 8px;
+  color: #d3d8c8;
+}
+.chapter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #e1e6d8;
+}
+.chapter i {
+  height: 12px;
+  border-left: 1px solid #a4b09d66;
+  margin: 0 6px;
+}
+.live-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #d4cb98;
+  box-shadow: 0 0 8px #dfcd95;
+}
+.icon-button {
+  background: transparent;
+  border: 1px solid #e0e8d13b;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+}
+#journal {
+  position: fixed;
+  left: 7%;
+  top: 26%;
+  pointer-events: none;
+}
+#journal button {
+  pointer-events: auto;
+}
+.eyebrow {
+  font: 9px sans-serif;
+  letter-spacing: 3px;
+  color: #e0d2a8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.eyebrow span {
+  font: italic 19px Georgia;
+  border-right: 1px solid #d8c69a65;
+  padding-right: 13px;
+}
+h1 {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: clamp(38px, 4.6vw, 66px);
+  font-weight: 400;
+  letter-spacing: 0.13em;
+  margin: 25px 0 9px;
+  line-height: 1.3;
+  text-shadow: 0 3px 30px #14251e44;
+}
+.english {
+  font:
+    10px Georgia,
+    serif;
+  letter-spacing: 4.7px;
+  color: #d7ddcc;
+  margin: 0;
+}
+.gold-line {
+  width: 34px;
+  border-top: 1px solid #d0bb85;
+  margin: 26px 0;
+}
+.description {
+  font-size: 11px;
+  letter-spacing: 1.8px;
+  line-height: 2.5;
+  color: #d5dbcc;
+  margin: 0 0 30px;
+}
+.primary {
+  background: #e2dbc2;
+  color: #253a32;
+  border: 1px solid #e2dbc2;
+  padding: 15px 22px;
+  text-align: left;
+  min-width: 218px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+.primary:hover {
+  background: #f7efd4;
+  transform: translateY(-2px);
+}
+.primary span {
+  float: right;
+  font-size: 17px;
+  line-height: 14px;
+  margin-left: 32px;
+}
+.walk-note {
+  font-size: 9px;
+  letter-spacing: 0.6px;
+  color: #b7c5b6;
+  margin-top: 14px;
+}
+.compass {
+  position: fixed;
+  right: 5%;
+  top: 33%;
+  width: 150px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0.85;
+}
+.compass-heading {
+  font: 10px Georgia;
+  color: #e7d5a3;
+}
+.compass svg {
+  width: 150px;
+  fill: none;
+  stroke: #dce6d1;
+  stroke-width: 0.6;
+}
+.compass .inner {
+  opacity: 0.35;
+}
+.compass .contour {
+  opacity: 0.3;
+}
+.compass .route {
+  stroke: #e2cca0;
+  stroke-dasharray: 2 3;
+  opacity: 0.7;
+}
+.compass .north {
+  fill: #e3dbb9;
+  stroke: none;
+}
+.compass .position {
+  fill: #e3dbb9;
+  stroke: #283e32;
+  stroke-width: 1;
+}
+.compass > span {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #e0e5d5;
+}
+nav {
+  position: fixed;
+  bottom: 94px;
+  left: 7%;
+  display: flex;
+  border-bottom: 1px solid #d1ddc633;
+  gap: 31px;
+}
+nav button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: none;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  padding: 15px 0;
+  color: #b1bfad;
+  white-space: nowrap;
+}
+nav button > span {
+  font: italic 12px Georgia;
+  color: #bec8af80;
+}
+nav button.active {
+  color: #f6ebc9;
+}
+nav button.active:after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: #ddca95;
+}
+nav button.active > span {
+  color: #d6c390;
+}
+nav button:hover {
+  color: #fff0c6;
+}
+footer {
+  position: fixed;
+  left: 4.2%;
+  right: 4.2%;
+  bottom: 27px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #d1ddc626;
+  padding-top: 17px;
+}
+footer > span {
+  font: 8px Georgia;
+  letter-spacing: 3px;
+  color: #c7d2bc;
+}
+footer > div {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+footer button,
+select {
+  border: 0;
+  background: none;
+  color: #c4d0bd;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+footer button:hover {
+  color: #fff1ca;
+}
+.quality-label {
+  font-size: 9px;
+  color: #b6c1ad;
+  letter-spacing: 1px;
+}
+select {
+  cursor: pointer;
+  max-width: 80px;
+}
+select option {
+  background: #223930;
+}
+kbd {
+  font: 9px sans-serif;
+  border: 1px solid #dce6d13b;
+  border-radius: 2px;
+  padding: 2px 4px;
+  margin-left: 6px;
+  color: #dae3d0;
+}
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 22px;
+  background: #172923;
+  z-index: 30;
+  color: #dfd5b2;
+  transition: opacity 0.7s;
+  font-size: 14px;
+  letter-spacing: 4px;
+}
+#loading small {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #8da495;
+}
+.sigil {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border: 1px solid #ad9b6d;
+  transform: rotate(45deg);
+  font: 34px Georgia;
+  margin-bottom: 25px;
+}
+.hidden {
+  display: none !important;
+}
+#walk-help {
+  position: fixed;
+  left: 50%;
+  bottom: 35px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  white-space: nowrap;
+  padding: 14px 20px;
+  background: #152d27b3;
+  border: 1px solid #d1ddc626;
+  backdrop-filter: blur(10px);
+}
+#walk-help i {
+  height: 10px;
+  border-left: 1px solid #b7c2aa55;
+  margin: 0 10px;
+}
+body.walking #journal {
+  top: auto;
+  bottom: 94px;
+}
+body.walking #journal .description,
+body.walking #journal .english,
+body.walking #journal .gold-line,
+body.walking #journal .eyebrow,
+body.walking #journal .walk-note,
+body.walking nav,
+body.walking footer {
+  display: none;
+}
+body.walking h1 {
+  font-size: 23px;
+  margin: 0 0 14px;
+}
+body.walking .primary {
+  min-width: 150px;
+  padding: 10px 14px;
+  font-size: 10px;
+}
+body.walking .frame {
+  background: linear-gradient(0deg, #15282277, transparent 25%);
+}
+body.clean header,
+body.clean #journal,
+body.clean .compass,
+body.clean nav,
+body.clean footer,
+body.clean .frame,
+body.clean #walk-help {
+  opacity: 0;
+  pointer-events: none;
+}
+#restore-ui {
+  position: fixed;
+  bottom: 22px;
+  right: 25px;
+  border: 1px solid #e0e8d13b;
+  background: #172c2580;
+  padding: 8px 12px;
+  font-size: 10px;
+  color: #e7e8dc;
+}
+body:not(.clean) #restore-ui {
+  display: none;
+}
+header,
+#journal,
+.compass,
+nav,
+footer {
+  transition: opacity 0.4s;
+}
+@media (max-width: 760px) {
+  header {
+    top: 23px;
+    left: 6%;
+    right: 6%;
+  }
+  .brand {
+    font-size: 15px;
+  }
+  .brand span {
+    font-size: 7px;
+    letter-spacing: 2px;
+  }
+  .chapter {
+    font-size: 8px;
+    gap: 7px;
+    letter-spacing: 1px;
+  }
+  .chapter i {
+    margin: 0;
+  }
+  #journal {
+    left: 7%;
+    top: 23%;
+  }
+  .compass {
+    display: none;
+  }
+  h1 {
+    font-size: 42px;
+  }
+  .description {
+    font-size: 10px;
+  }
+  .frame {
+    background:
+      linear-gradient(90deg, #142b22b3, transparent 100%),
+      linear-gradient(0deg, #142b22bb, transparent 40%);
+  }
+  nav {
+    bottom: 97px;
+    left: 7%;
+    right: 7%;
+    gap: 0;
+    justify-content: space-between;
+  }
+  nav button {
+    font-size: 9px;
+    letter-spacing: 0;
+    gap: 5px;
+  }
+  footer {
+    left: 7%;
+    right: 7%;
+    bottom: 25px;
+  }
+  footer > span {
+    display: none;
+  }
+  footer > div {
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+  }
+  #walk-help {
+    font-size: 8px;
+    padding: 10px;
+    bottom: 20px;
+    gap: 2px;
+  }
+  #walk-help i {
+    margin: 0 3px;
+  }
+  #walk-help kbd {
+    margin-left: 2px;
+  }
+  body.walking #journal {
+    bottom: 78px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+@media (max-height: 650px) {
+  #journal {
+    top: 23%;
+  }
+  #journal .description {
+    display: none;
+  }
+  h1 {
+    font-size: 40px;
+    margin-top: 15px;
+  }
+  .gold-line {
+    margin: 17px 0;
+  }
+  .walk-note {
+    margin-top: 10px;
+  }
+  .compass {
+    top: 28%;
+    width: 120px;
+  }
+  .compass svg {
+    width: 120px;
+  }
+  nav {
+    bottom: 75px;
+  }
+  footer {
+    bottom: 18px;
+    padding-top: 12px;
+  }
+  header {
+    top: 22px;
+  }
+  body.walking #journal {
+    top: auto;
+  }
+}
+#touch-pad {
+  display: none;
+  position: fixed;
+  right: 7%;
+  bottom: 88px;
+  text-align: center;
+  touch-action: none;
+}
+#touch-pad button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #c7d6bc66;
+  background: #193b2e99;
+  margin: 3px;
+  border-radius: 3px;
+  font-size: 18px;
+  touch-action: none;
+}
+#touch-pad button:active {
+  background: #a0ac7f99;
+}
+body.clean #touch-pad {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 600px), (pointer: coarse) {
+  body.walking #touch-pad {
+    display: block;
+  }
+  body.walking #walk-help {
+    display: none;
+  }
+}

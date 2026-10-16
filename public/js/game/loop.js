@@ -432,7 +432,8 @@ export function update(dt) {
   view.OCC.uOccR.value = state.settings.occlusion === false ? 0 : 1.9;
   view.OCC.uOccNear.value = view.camera.position.distanceTo(view.OCC.uOccTgt.value) * 0.5;
 
-  view.sun.position.set(state.me.x + 20, 40, state.me.z + 10);
+  const sunlight = field.env.atmosphere?.sunOffset ?? [20, 40, 10];
+  view.sun.position.set(state.me.x + sunlight[0], sunlight[1], state.me.z + sunlight[2]);
   view.sun.target.position.set(state.me.x, 0, state.me.z);
 
   field.env.update(t, state.me.x, state.me.z);
