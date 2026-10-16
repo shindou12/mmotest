@@ -30,7 +30,7 @@ const dome = (r, cut = 0.55) => new THREE.SphereGeometry(r, 18, 10, 0, Math.PI *
 const band = (r0, r1, h, from, len, seg = 20) => new THREE.CylinderGeometry(r0, r1, h, seg, 1, true, from, len);
 
 // 王の大鉈: 溝（樋）と刃こぼれのある幅広の刃、巻き付けた柄、金の鍔と柄頭の宝石。刃は +Y（段階 1 と同じ向き）
-function royalCleaver(M) {
+export function royalCleaver(M) {
   const sword = new THREE.Group(); sword.name = 'graz-royal-cleaver';
   const blade = [[-0.15, 0.24], [0.18, 0.24], [0.24, 1.2], [0.2, 1.3], [0.245, 1.38], [0.23, 1.72], [0.17, 1.82], [0.215, 1.92], [0.14, 2.07], [-0.09, 2.2], [-0.23, 1.9], [-0.21, 0.55]];
   sword.add(mesh(shape(blade, 0.1, 0.016, 2), M.steel));
@@ -51,7 +51,7 @@ function royalCleaver(M) {
 }
 
 // 王の盾: 金の縁に鋲を並べ、鉄の面に赤い帯と王冠の浮き彫り、中央に盾の突起
-function kingShield(M) {
+export function kingShield(M) {
   const shield = new THREE.Group(); shield.name = 'graz-king-shield';
   const rim = [[-0.37, 0.4], [-0.23, 0.54], [0.23, 0.54], [0.39, 0.37], [0.34, -0.3], [0, -0.69], [-0.34, -0.3]];
   shield.add(mesh(shape(rim, 0.11, 0.02, 2), M.gold));
@@ -71,7 +71,7 @@ function kingShield(M) {
 }
 
 // 籠手の手: 掌と、柄に巻きつく4本の指（握る位置 grip の中に置く）
-function gauntletHand(M, s) {
+export function gauntletHand(M, s) {
   const hand = new THREE.Group();
   hand.add(mesh(sphere(0.115, 14, 10), M.iron, null, null, [1, 0.85, 1.05]));
   for (let i = 0; i < 4; i++) hand.add(mesh(new THREE.TorusGeometry(0.075, 0.03, 6, 10, Math.PI * 1.2), M.steelD, [s * 0.02, -0.06 + i * 0.045, 0.02], [0, Math.PI / 2, -0.4]));
@@ -79,14 +79,52 @@ function gauntletHand(M, s) {
   return hand;
 }
 
-export function buildGrazHQ(body, accent) {
-  const M = {
+export function grazCrown(M) {
+  // 王冠: 上下の縁を持つ金の輪と5つの尖り（先に小さな玉）、正面の大きな宝石
+  const crown = new THREE.Group(); crown.name = 'graz-crown'; crown.position.set(0, 0.325, 0);
+  crown.add(mesh(new THREE.CylinderGeometry(0.258, 0.272, 0.12, 24, 1, true), M.gold));
+  for (const y of [-0.06, 0.06]) crown.add(mesh(new THREE.TorusGeometry(0.265, 0.018, 6, 28), M.goldD, [0, y, 0], [Math.PI / 2, 0, 0]));
+  for (let i = 0; i < 5; i++) {
+    const a = i * Math.PI * 2 / 5, x = Math.sin(a) * 0.25, z = Math.cos(a) * 0.25, h = i === 0 ? 0.24 : 0.17;
+    crown.add(mesh(shape([[-0.06, 0], [0.06, 0], [0.028, 0.075], [0, h], [-0.028, 0.075]], 0.035, 0.008), M.gold, [x, 0.04, z], [0, a, 0]));
+    crown.add(mesh(sphere(0.022, 8, 6), i === 0 ? M.amber : M.edge, [x * 1.02, 0.04 + h + 0.01, z * 1.02]));
+  }
+  crown.add(mesh(new THREE.OctahedronGeometry(0.06), M.amber, [0, 0, 0.29], null, [0.9, 1.25, 0.6]));
+  return crown;
+}
+
+export function grazCape(M) {
+  // マント: ひだのある布（裾は破れて互い違い）、上に毛皮の襟
+  const cape = new THREE.Group(); cape.name = 'graz-cape'; cape.position.set(0, 0.85, -0.05);
+  const clothGeo = new THREE.CylinderGeometry(0.4, 0.68, 1.36, 28, 8, true, Math.PI * 0.68, Math.PI * 0.64);
+  const p = clothGeo.attributes.position, uv = clothGeo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), u = uv.getX(i), down = (0.68 - y) / 1.36; // down: 上 0 → 裾 1
+    const fold = Math.sin(u * Math.PI * 9) * 0.045 * (0.3 + down); // 縦のひだ
+    const r = Math.hypot(x, z), k = (r + fold) / r;
+    const tear = down > 0.95 ? (Math.floor(u * 9) % 2) * 0.12 + Math.sin(u * 40) * 0.02 : 0; // 破れた裾
+    p.setXYZ(i, x * k, y + tear, z * k);
+  }
+  clothGeo.computeVertexNormals();
+  const cloth = mesh(clothGeo, toon(0x953749, { side: THREE.DoubleSide }), [0, 0.07, -0.045]);
+  cloth.userData.noOutline = true; cape.add(cloth);
+  cape.add(mesh(new THREE.TorusGeometry(0.42, 0.075, 8, 20, Math.PI * 0.75), M.furLight, [0, 0.72, -0.06], [Math.PI / 2, 0, Math.PI * 1.125], [1, 0.75, 0.8]));
+  return cape;
+}
+
+// 段階 3 以上のグラズで使う色（toon の材質）
+export function grazMaterials(accent) {
+  return {
     fur: toon(0x986348), furLight: toon(0xc6976d), furDark: toon(0x613f32),
     iron: toon(0x35444c), steel: toon(0x6f8089), steelD: toon(0x4b5962), edge: toon(0xd0dde2),
     gold: toon(0xd9aa50), goldD: toon(0xa47a32), leather: toon(0x47352e), leatherL: toon(0x6a5040), red: toon(0x953749),
     ivory: toon(0xe5d5b4), black: toon(0x231e23), ear: toon(0x6c3c3a), scar: toon(0xd8b49a),
     amber: glow(new THREE.Color(accent).multiplyScalar(1.6)),
   };
+}
+
+export function buildGrazHQ(body, accent) {
+  const M = grazMaterials(accent);
   body.name = 'graz-body';
   const parts = { identity: 'graz' };
 
@@ -137,16 +175,7 @@ export function buildGrazHQ(body, accent) {
     ear.add(mesh(shape([[-0.06, -0.06], [0.06, -0.06], [0.025, 0.26]], 0.03, 0.004), M.ear, [0, 0, 0.05]));
   }
   head.add(mesh(new THREE.BoxGeometry(0.02, 0.2, 0.015), M.scar, [-0.17, 0.08, 0.31], [0, -0.28, 0.35])); // 左目の傷
-  // 王冠: 上下の縁を持つ金の輪と5つの尖り（先に小さな玉）、正面の大きな宝石
-  const crown = new THREE.Group(); crown.name = 'graz-crown'; crown.position.set(0, 0.325, 0); head.add(crown);
-  crown.add(mesh(new THREE.CylinderGeometry(0.258, 0.272, 0.12, 24, 1, true), M.gold));
-  for (const y of [-0.06, 0.06]) crown.add(mesh(new THREE.TorusGeometry(0.265, 0.018, 6, 28), M.goldD, [0, y, 0], [Math.PI / 2, 0, 0]));
-  for (let i = 0; i < 5; i++) {
-    const a = i * Math.PI * 2 / 5, x = Math.sin(a) * 0.25, z = Math.cos(a) * 0.25, h = i === 0 ? 0.24 : 0.17;
-    crown.add(mesh(shape([[-0.06, 0], [0.06, 0], [0.028, 0.075], [0, h], [-0.028, 0.075]], 0.035, 0.008), M.gold, [x, 0.04, z], [0, a, 0]));
-    crown.add(mesh(sphere(0.022, 8, 6), i === 0 ? M.amber : M.edge, [x * 1.02, 0.04 + h + 0.01, z * 1.02]));
-  }
-  crown.add(mesh(new THREE.OctahedronGeometry(0.06), M.amber, [0, 0, 0.29], null, [0.9, 1.25, 0.6]));
+  head.add(grazCrown(M));
   parts.head = head;
 
   // 脚: 毛の太もも → 腿当て → 膝当て（棘）→ すね当て（金の帯）→ 爪のある足と甲の板
@@ -197,21 +226,7 @@ export function buildGrazHQ(body, accent) {
   const shield = kingShield(M); shield.position.set(-0.245, -0.32, 0.21); shield.rotation.y = -0.35; guardArm.add(shield);
   parts.shield = shield; parts.guardArm = guardArm;
 
-  // マント: ひだのある布（裾は破れて互い違い）、上に毛皮の襟
-  const cape = new THREE.Group(); cape.name = 'graz-cape'; cape.position.set(0, 0.85, -0.05); body.add(cape);
-  const clothGeo = new THREE.CylinderGeometry(0.4, 0.68, 1.36, 28, 8, true, Math.PI * 0.68, Math.PI * 0.64);
-  const p = clothGeo.attributes.position, uv = clothGeo.attributes.uv;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), u = uv.getX(i), down = (0.68 - y) / 1.36; // down: 上 0 → 裾 1
-    const fold = Math.sin(u * Math.PI * 9) * 0.045 * (0.3 + down); // 縦のひだ
-    const r = Math.hypot(x, z), k = (r + fold) / r;
-    const tear = down > 0.95 ? (Math.floor(u * 9) % 2) * 0.12 + Math.sin(u * 40) * 0.02 : 0; // 破れた裾
-    p.setXYZ(i, x * k, y + tear, z * k);
-  }
-  clothGeo.computeVertexNormals();
-  const cloth = mesh(clothGeo, toon(0x953749, { side: THREE.DoubleSide }), [0, 0.07, -0.045]);
-  cloth.userData.noOutline = true; cape.add(cloth);
-  cape.add(mesh(new THREE.TorusGeometry(0.42, 0.075, 8, 20, Math.PI * 0.75), M.furLight, [0, 0.72, -0.06], [Math.PI / 2, 0, Math.PI * 1.125], [1, 0.75, 0.8]));
+  const cape = grazCape(M); body.add(cape);
   parts.cape = cape;
   for (const s of [-1, 1]) {
     body.add(mesh(cylinder(0.065, 0.065, 0.03, 14), M.gold, [s * 0.27, 1.64, 0.21], [Math.PI / 2, 0, 0]));

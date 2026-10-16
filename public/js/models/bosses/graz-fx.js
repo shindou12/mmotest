@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { toon } from '../../toon.js';
 import { buildGrazHQ } from './graz3-model.js';
+import { buildGrazSculpt } from './graz-sculpt.js';
 import { glowSprite, rimMaterial, rimShell, motes, markKeep } from './fx-parts.js';
 
 // 刃の上を斜めに走る光の筋（刃の形の上に重ねる加算の板）
@@ -58,8 +59,8 @@ function sigilMaterial() {
   });
 }
 
-export function buildGraz3(body, accent) {
-  const u = buildGrazHQ(body, accent);
+// 形（段階 3 の graz3-model か、段階 4 の graz-sculpt）の上に光の部品を重ねる
+function decorate(body, accent, u) {
   const fx = { shaders: [], motes: [], rim: null, sigil: null };
   const amber = new THREE.Color(accent);
 
@@ -106,8 +107,10 @@ export function buildGraz3(body, accent) {
     v.set(Math.sin(a + k * 1.5) * r, 0.2 + k * 2.6, Math.cos(a + k * 1.5) * r);
   });
   body.add(embers); fx.motes.push(embers); fx.embers = embers;
-  return { ...u, identity: 'graz3', fx };
+  return { ...u, fx };
 }
+export const buildGraz3 = (body, accent) => ({ ...decorate(body, accent, buildGrazHQ(body, accent)), identity: 'graz3' });
+export const buildGraz4 = (body, accent) => ({ ...decorate(body, accent, buildGrazSculpt(body, accent)), identity: 'graz4' });
 
 export function animateGraz3(u, s) {
   const t = s.t, F = u.fx;
