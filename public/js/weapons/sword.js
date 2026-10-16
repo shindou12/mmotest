@@ -413,7 +413,8 @@ function effects({ player, attack, tree, show, party, register }) {
           floatText(me.x, 3.2, me.z, '剣聖!', 'just');
         }
       }
-      if (W.ks2 === 'sw_berserk' && me.mom > 0) heal(dmg * me.mom / 100 * BALANCE.lifestealEfficiency, false);
+      // 狂剣士の吸収も、ふつうの吸収と同じく間隔に1回（継続ダメージは対象外）
+      if (W.ks2 === 'sw_berserk' && me.mom > 0 && o.type !== 'dot' && now() - (me.berserkVampT || -1e9) >= BALANCE.lifestealGap) { me.berserkVampT = now(); heal(dmg * me.mom / 100 * BALANCE.lifestealEfficiency, false); }
       if (crit && W.br('sw_edge') === 'A' && now() - me.edgeT > 0.5) {
         me.edgeT = now();
         strikes.proj({ a: Math.atan2(mb.x - me.x, mb.z - me.z), mult: 0.5, type: 'proc', speed: 26, life: 0.45, rad: 0.9, wtNo: true });

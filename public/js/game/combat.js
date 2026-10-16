@@ -97,7 +97,11 @@ export function dealDamage(mb, mult, o = {}) {
     if (stunned > 1) { view.audio.sfx('stunHit'); view.fx.parts.burst(mb.x, 2.2, mb.z, 14, { color: 0xffe060, speed: 11, size: 0.55, life: 0.35 }); rules.setHitStop(Math.max(rules.hitStop, 0.035)); }
   }
   const vamp = stats.S.vamp + stats.buffMod('vamp');
-  if (vamp > 0) rules.heal(dmg * vamp / 100 * BALANCE.lifestealEfficiency, false);
+  // HP吸収は一定の間隔に1回だけ、その一撃のダメージから（重い一撃ほど大きく戻り、手数では増えない）。継続ダメージは対象外
+  if (vamp > 0 && o.type !== 'dot' && now() - (state.me.vampT || -1e9) >= BALANCE.lifestealGap) {
+    state.me.vampT = now();
+    rules.heal(dmg * vamp / 100 * BALANCE.lifestealEfficiency, false);
+  }
   if (o.sv) rules.onVariantHit(mb, dmg, o);
   // 称号「流星」: 武器スキルが当たると流れ星が降る（0.6秒に1回）
   if (o.type === 'wskill' && rules.tf('t_star') && !o.noProc && now() - (state.me.starT || 0) > 0.6) {

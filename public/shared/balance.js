@@ -7,7 +7,7 @@ export const BALANCE = Object.freeze({
   enemyHp: 65, enemyDamage: 12, floorSpacing: 8,
   bossHp: 48, bossDamage: 1.1, bossStun: 100, bossStunPerPlayer: 0.5, stunSeconds: 3,
   eliteHp: 3.2, eliteDamage: 1.5, namedHp: 8, namedDamage: 1.75,
-  potionHeal: 0.30, potionCooldown: 8, lifestealEfficiency: 0.55,
+  potionHeal: 0.30, potionCooldown: 8, lifestealEfficiency: 0.55, lifestealGap: 0.6,
   deathSeconds: 5,
   questXp: 0.60,
   // ボスの攻撃の圧（全ボス共通）: range は予兆の範囲の倍率、gap は技と技の間の倍率、chain は連続で出す確率の上乗せ
