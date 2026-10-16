@@ -1,9 +1,9 @@
-// コボルド王 グラズの作り込み版（作り込みの段階 3）。形は graz-model.js のまま（技の動き GRAZ_MOTIONS がそのまま使える）で、上に重ねる:
+// コボルド王 グラズの作り込み版（作り込みの段階 3）。形は graz3-model.js（部位と支点は段階 1 と同じなので、技の動き GRAZ_MOTIONS がそのまま使える）。上に重ねる光の部品:
 //   剣の刃を走る光の筋と峰のルーン / 首と肩のたてがみ（毛束をまとめて1回で描く）/ 王冠の宝石と目の光のにじみ /
 //   マントの専用の質感（深紅の移り変わりと金の刺繍の帯）/ 体の縁の金の光（激昂で赤） / 足元の王の紋章の輪 / 立ちのぼる火の粉
 import * as THREE from 'three';
 import { toon } from '../../toon.js';
-import { buildGraz } from './graz-model.js';
+import { buildGrazHQ } from './graz3-model.js';
 import { glowSprite, rimMaterial, rimShell, motes, markKeep } from './fx-parts.js';
 
 // 刃の上を斜めに走る光の筋（刃の形の上に重ねる加算の板）
@@ -59,7 +59,7 @@ function sigilMaterial() {
 }
 
 export function buildGraz3(body, accent) {
-  const u = buildGraz(body, accent);
+  const u = buildGrazHQ(body, accent);
   const fx = { shaders: [], motes: [], rim: null, sigil: null };
   const amber = new THREE.Color(accent);
 
@@ -74,18 +74,18 @@ export function buildGraz3(body, accent) {
   const gem = glowSprite(amber, 0.55, 0.8); gem.position.set(0, 0, 0.3); crown.add(gem);
   for (const s of [-1, 1]) { const e = glowSprite(amber, 0.22, 0.75); e.position.set(s * 0.17, 0.072, 0.31); u.head.add(e); }
 
-  // たてがみ: 首まわりと盾の側の肩に、毛束（小さな円すい）を密に並べる
-  const tuftGeo = new THREE.ConeGeometry(0.06, 0.24, 5); tuftGeo.translate(0, 0.12, 0);
+  // たてがみ: 首まわりと肩に、地の毛色の短い毛束を密に並べる（顔を隠さないよう、首の下から外・下向きに）
+  const tuftGeo = new THREE.ConeGeometry(0.075, 0.17, 5); tuftGeo.translate(0, 0.085, 0);
   const n = 70, mane = new THREE.InstancedMesh(tuftGeo, toon(0xffffff), n); // 色は毛束ごと（setColorAt）
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), d = new THREE.Vector3(), c = new THREE.Color();
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 * 1.618 * 7, ring = i % 3;
-    const r = 0.36 + ring * 0.06, y = 1.78 + ring * 0.07 - (Math.cos(a) < 0 ? 0.05 : 0);
-    d.set(Math.sin(a), 0.55 + ring * 0.25, Math.cos(a)).normalize();
+    const a = i * 2.39996, ring = i % 3;
+    const r = 0.38 + ring * 0.05, y = 1.74 - ring * 0.06;
+    d.set(Math.sin(a), -0.15 - ring * 0.2, Math.cos(a)).normalize();
     q.setFromUnitVectors(up, d);
-    m4.compose(new THREE.Vector3(Math.sin(a) * r, y, Math.cos(a) * r * 0.9), q, new THREE.Vector3(1, 0.8 + ((i * 7) % 5) * 0.12, 1));
+    m4.compose(new THREE.Vector3(Math.sin(a) * r, y, Math.cos(a) * r * 0.85), q, new THREE.Vector3(1, 0.8 + ((i * 7) % 5) * 0.1, 1));
     mane.setMatrixAt(i, m4);
-    mane.setColorAt(i, c.setHex(i % 4 === 0 ? 0xe9cfa5 : i % 3 === 0 ? 0x986348 : 0xc6976d));
+    mane.setColorAt(i, c.setHex(i % 4 === 0 ? 0xc6976d : i % 3 === 0 ? 0x613f32 : 0x986348));
   }
   body.add(markKeep(mane));
 
