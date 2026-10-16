@@ -351,6 +351,7 @@ export function updateBossProjs(dt) {
   }
 }
 
+const DODGE_GAP = 0.15; // 回避の無敵が切れてから次の回避までの最短の隙
 export function tryDodge() {
   view.audio.init();
   if (state.me.downT > 0) { rules.tryTech(); return; } // ダウン中は受け身
@@ -363,8 +364,9 @@ export function tryDodge() {
   const after = stats.hasBuff('afterimage');
   state.me.dodgeDir = [dx / l, dz / l];
   state.me.dodgeT = 0.38;
-  state.me.dodgeCd = stats.S.dodgeCd * (after ? 0.25 : 1);
   state.me.iframe = (after ? 0.6 : 0.32) + stats.S.iframeBonus;
+  // 待ち時間は必ず無敵より長い（連打で無敵をつなげない）
+  state.me.dodgeCd = Math.max(stats.S.dodgeCd * (after ? 0.25 : 1), state.me.iframe + DODGE_GAP);
   state.me.swingT = 9; state.me.skillT = -1; state.me.motion = '';state.me.charging = false; state.me.guarding = false;
   view.audio.sfx('dodge');
   fxCall('onDodge'); // 速射・罠師 など

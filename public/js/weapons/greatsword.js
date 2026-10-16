@@ -28,7 +28,7 @@ const GREATSWORD = {
     { kind: 'ks1', nodes: [
       { id: 'gt_wave', icon: '☾', name: '光波', desc: '強攻撃を振ると光波も飛ぶ（溜め1段目は100%、最大まで溜めると200%の大きな光波）。その代わり、剣そのものの強攻撃は -15%', tags: ['light', 'charge'] },
       { id: 'gt_blow', icon: '⚒', name: '一撃', desc: '最大まで溜めた強攻撃 +40%、溜めている間は被ダメージ -30%。その代わり、溜めにかかる時間が +25%', tags: ['charge', 'recv'] },
-      { id: 'gt_counter', icon: '⚔', name: 'カウンター', desc: '強攻撃を押した直後（0.35秒）に攻撃を受けると、無傷で受け流して反撃する（350%）', tags: ['recv'] },
+      { id: 'gt_counter', icon: '⚔', name: 'カウンター', desc: '強攻撃を押した直後（0.35秒）に攻撃を受けると、無傷で受け流して反撃する（350%）。受け流したあと1.5秒は次の受け流しが出ない', tags: ['recv'] },
     ] },
     { kind: 'passive', nodes: [
       { id: 'gt_break', icon: '✸', name: '崩しの極意', base: 'ボスを崩す力（スタン値）', lv: ['+20%', '+35%', L3], tags: [], mods: [{ stunp: 20 }, { stunp: 35 }],
@@ -330,7 +330,8 @@ function effects({ player, attack, tree, show, register }) {
     },
     // カウンター: 強攻撃を押した直後に攻撃を受けたら、無傷で受け流して反撃する
     counter(src) {
-      if (player.S.wt?.ks1 !== 'gt_counter' || !me.charging || now() - me.chargeStart > 0.35) return false;
+      if (player.S.wt?.ks1 !== 'gt_counter' || !me.charging || now() - me.chargeStart > 0.35 || now() < (me.parryReadyT || 0)) return false;
+      me.parryReadyT = now() + 1.5; // 受け流したあと1.5秒は次の受け流しが出ない
       me.charging = false; me.chargeT = 0; me.chargeLv = 0;
       me.iframe = Math.max(me.iframe, 0.4);
       const a = src ? Math.atan2(src.x - me.x, src.z - me.z) : me.a;

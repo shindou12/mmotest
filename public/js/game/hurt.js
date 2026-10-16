@@ -155,7 +155,9 @@ export function takeDamage(raw, src = null, kd = false, guarded = false) {
   if (now() < (state.me.brokenT || 0)) raw *= rules.GUARD.breakDmg; // ガードブレイク中は被ダメージ1.5倍
   raw = fxReduce('incoming', raw); // 狂剣士・捨て身 など
   const backB = fxReduce('drLowHp', 0); // 不撓B「背水」
-  const dr = clamp(stats.buffMod('dr') + backB + rules.wtDr() + (rules.tf('t_relic') ? 8 : 0) + (rules.tf('t_shell') ? 12 : 0) - (rules.tf('t_berserk') ? 15 : 0), -100, 90);
+  // 一時的な被ダメージ軽減は重ねず、いちばん大きいものだけが効く（増える側＝マイナスはすべて足す）。防御（S.def）とは別の段
+  const drs = [...state.me.buffs.map((b) => b.mods.dr || 0), backB, rules.wtDr(), rules.tf('t_relic') ? 8 : 0, rules.tf('t_shell') ? 12 : 0, rules.tf('t_berserk') ? -15 : 0];
+  const dr = clamp(Math.max(0, ...drs) + drs.reduce((a, v) => a + Math.min(0, v), 0), -100, 90);
   const dmg = Math.max(1, Math.round(raw * (1 - stats.S.def / 100) * (1 - dr / 100) * rnd(0.9, 1.1)));
   state.me.hp -= dmg;
   state.me.lastHurt = now();
