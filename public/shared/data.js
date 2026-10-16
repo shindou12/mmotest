@@ -385,7 +385,7 @@ export const FLOORS = [
     particles: 'sparkle', amb: 'cave',
     music: { root: 64, mode: 'lydian', bpm: 76, prog: [0, 1, 4, 5], feel: 'crystal' },
     mobs: [{ t: 'golem', name: 'クリスタルゴーレム', color: 0x88ddff }, { t: 'wisp', name: 'プリズムバット', color: 0xd08cff }],
-    boss: { name: '水晶巨兵 クリスタロス', t: 'golem', color: 0x66ccff, accent: 0xff8cff, scale: 3.4, patterns: ['slam', 'nova', 'rain', 'cross'] },
+    boss: { name: '水晶巨兵 クリスタロス', t: 'golem', appearance: 'crystalos', color: 0x66ccff, accent: 0xff8cff, scale: 3.4, patterns: ['slam', 'nova', 'rain', 'cross'] },
   },
   {
     n: 5, name: '溶岩地帯', ground: 0x4a2c24, ground2: 0x6a3a2a, fog: 0x401810, skyTop: 0x200806, skyBot: 0x802010,

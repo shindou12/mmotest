@@ -5,7 +5,7 @@ import { makeMob, animateMob } from '../public/js/models.js';
 import { FLOORS } from '../public/shared/data.js';
 
 test('all three early bosses use distinct appearances while regular enemies retain their models', () => {
-  const expected = ['graz', 'yugdra', 'skorpio'];
+  const expected = ['graz', 'yugdra', 'skorpio', 'crystalos']; // 4層（まだ遊べない層）のクリスタロスも専用の姿
   for (const [i, floor] of FLOORS.entries()) {
     const b = floor.boss, boss = makeMob(b.t, b.color, b.scale, b.accent, true, b.appearance);
     assert.equal(boss.userData.identity, expected[i]);
