@@ -20,7 +20,15 @@ export function animatePlayer(model, s) {
   u.cape.rotation.x = s.moving ? -0.35 - Math.abs(walk) * 0.1 : -0.06 + Math.sin(s.t * 1.7) * 0.03;
   applyAttackMotion(u, s, walk);
   if (s.dodge > 0) { u.body.rotation.x = (1 - s.dodge) * Math.PI * 2; u.body.position.y = 0.4 * Math.sin((1 - s.dodge) * Math.PI); }
-  else if (s.down > 0) {
+  else if (s.crawl) {
+    // 這いずり: うつ伏せで、腕を交互に前へ伸ばして地面をかき、脚で蹴る（止まっているときは小さく息をつく）
+    const c = s.moving ? Math.sin(s.walkT * 7) : 0, br = Math.sin(s.t * 2) * 0.04;
+    u.body.rotation.x = 1.38; u.body.position.y = 0.2 + Math.abs(c) * 0.03;
+    u.armR.rotation.set(-2.5 - c * 0.55 + br, 0, 0.35); u.armL.rotation.set(-2.5 + c * 0.55 + br, 0, -0.35);
+    u.elbowR.rotation.x = -0.5 - Math.max(0, c) * 0.6; u.elbowL.rotation.x = -0.5 - Math.max(0, -c) * 0.6;
+    u.legs[0].rotation.x = -0.15 + c * 0.35; u.legs[1].rotation.x = -0.15 - c * 0.35;
+    u.head.rotation.x = -0.75; u.cape.rotation.x = -0.2;
+  } else if (s.down > 0) {
     // ダウン: 仰向けに倒れる（down 1 = 倒れきった状態）。手足を投げ出す
     u.body.rotation.x = -s.down * 1.45; u.body.position.y = 0.12 * s.down;
     u.armR.rotation.set(-2.6 * s.down, 0, 0.5); u.armL.rotation.set(-2.6 * s.down, 0, -0.5);

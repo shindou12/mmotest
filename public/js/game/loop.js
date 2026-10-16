@@ -265,6 +265,7 @@ export function update(dt) {
     spin: state.me.skillT >= 0 && state.me.spin ? state.me.skillT / 0.55 : -1,
     dodge: state.me.dodgeT > 0 ? state.me.dodgeT / 0.38 : 0,
     // 倒れる → 起き上がる（最後の0.25秒で起きる）/ のけぞり
+    crawl: state.me.crawl,
     down: state.me.crawl ? 1 : state.me.downT > 0 ? Math.min(1, (rules.REACT.downT - state.me.downT) / 0.12, state.me.downT / 0.25) : 0,
     hurt: state.me.hurtT > 0 ? Math.sin(state.me.hurtT / 0.28 * Math.PI) : 0,
     motion: state.me.motion, motionT: state.me.motionT,
@@ -306,7 +307,7 @@ export function update(dt) {
     if (moving) o.walkT += dt;
     o.model.position.set(o.x, field.heightAt(o.x, o.z), o.z);
     o.model.rotation.y = o.a;
-    view.animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, shieldBack: !!WEAPONS[o.wk]?.shield && (o.cl & 1) > 0, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (WEAPONS[o.wk]?.skillSpin || isSpinMotion(o.motion)) ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
+    view.animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, shieldBack: !!WEAPONS[o.wk]?.shield && (o.cl & 1) > 0, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (WEAPONS[o.wk]?.skillSpin || isSpinMotion(o.motion)) ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, crawl: o.rv >= 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
     afterimage(o, o.model, o.x, o.z, trailColor(o.wr ?? 0), dt);
     if (state.settings.quality !== 'low' && !WEAPONS[o.wk]?.ranged && o.model.userData.weaponModel) {
       o.model.updateMatrixWorld();

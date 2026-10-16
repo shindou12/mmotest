@@ -230,11 +230,12 @@ export function revived(by) {
   view.fx.beam(state.me.x, state.me.z, 0x9affc8, 10, 0.9, 1.0);
   view.fx.ringWave(state.me.x, state.me.z, 0x9affc8, 4, 0.5);
 }
-// 倒れている仲間に攻撃が当たった → スタン値ぶんゲージを減らす（ダメージは関係なし）
+// 倒れている仲間に攻撃が当たった → 固定値 + スタン値ぶんゲージを減らす（ダメージは関係なし）
 export function reviveHit(o, opt) {
   if (state.me.crawl || state.me.dead || !(o.rv >= 0) || now() - (o.revHitT || 0) < 0.05) return;
   o.revHitT = now();
-  const v = Math.min(REVIVE.perHit, rules.stunValue(opt));
+  // 固定値 + スタン値（手数の多い武器でも起こせるように）
+  const v = Math.round(Math.min(REVIVE.perHit, REVIVE.flat + rules.stunValue(opt)) * 10) / 10;
   if (v <= 0) return;
   link.net.send({ t: 'rev', id: o.id, v });
   screen.floatText(o.x, 2.2, o.z, `起こす +${v}`, 'info');
