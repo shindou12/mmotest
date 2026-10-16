@@ -24,7 +24,7 @@ export const BALANCE = Object.freeze({
 //   perHit / range: 不正な値を弾くための上限（弓でも届くように射程は広め）
 export const REVIVE = Object.freeze({
   base: 10.5, mult: [1, 2.5, 4], disp: [1 / 3, 2 / 3, 1], decay: 300, regenDelay: 2.5, regen: 0.1,
-  flat: 0.6, perHit: 60, hp: 0.3, iframe: 2, crawl: 1.4, range: 30,
+  flat: 0.45, perHit: 60, hp: 0.3, iframe: 2, crawl: 1.4, range: 30,
 });
 // 倒れた回数（1〜）→ 段階の番号
 export const reviveStep = (n) => Math.max(0, Math.min(REVIVE.mult.length - 1, (n | 0) - 1));
