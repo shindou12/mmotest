@@ -5,7 +5,6 @@ import { waypointOf } from '../shared/areas.js';
 import { makeWaypoint } from './env/landmarks.js';
 import { buildOpen } from './env/open.js';
 import { buildGrid } from './env/grid.js';
-import { buildTerrain } from './env/terrain.js';
 export { textSprite, makeHeight } from './env/kit.js';
 export { AmbientParticles } from './env/ambient.js';
 
@@ -26,7 +25,7 @@ export function buildArea(def, fdef, opts = {}) {
     fd.fogNear = fdef.fogNear * W.near; fd.fogFar = fdef.fogFar * W.far; fd.sunI = fdef.sunI * W.sun;
     fd.sun = tint(fdef.sun, W.mix * 0.5);
   }
-  const env = def.shape === 'grid' ? buildGrid(def, fd) : def.shape === 'terrain' ? buildTerrain(def, fd, opts) : buildOpen(def, fd, opts);
+  const env = def.shape === 'grid' ? buildGrid(def, fd) : buildOpen(def, fd, opts);
   // ワープポイント（町・野営地は転移門が兼ねるので置かない）
   const w = waypointOf(def);
   env.waypoint = null;

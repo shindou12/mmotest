@@ -2,7 +2,6 @@
 import { REVIVE, enemyScale, floorPressure } from '../balance.js';
 import { floorLevel, mobHp, mobDmg, ELITE_BASE } from '../data.js';
 import { PLATE_WINDOW, grid, collide, exitsOf, obstaclesOf, hazardsOf, namedSpot, insideOpen, boundR, dirOf, inLair } from '../areas.js';
-import { terrainSpot } from '../terrain/index.js';
 
 import { rnd, pick, dist, r2 } from './common.js';
 import { NAMED } from './tuning.js';
@@ -29,7 +28,7 @@ export const AreaTickMethods = {
     }
 
     // 湧き
-    if (def.mobs && def.shape !== 'grid') {
+    if (def.mobs && def.shape === 'open') {
       const field = [...A.mobs.values()].filter((m) => m.kind === 'mob').length;
       const want = Math.min(36, def.mobs.count + 3 + players.length * def.mobs.perPlayer);
       A.spawnT -= dt;
@@ -37,18 +36,15 @@ export const AreaTickMethods = {
         A.spawnT = field < want / 2 ? 0.1 : (def.mobs.respawn ?? 1.2);
         const exits = exitsOf(def), blocks = [...obstaclesOf(def), ...hazardsOf(def)];
         for (let tries = 0; tries < 12; tries++) {
-          let pos;
-          if (def.shape === 'terrain') pos = terrainSpot(def); // 地形エリア: 決められた広い場所から
-          else { const ang = Math.random() * Math.PI * 2, [dx, dz] = dirOf(ang), rr = rnd(0.15, 0.85) * boundR(def, ang); pos = { x: dx * rr, z: dz * rr }; }
-          if (!insideOpen(def, pos.x, pos.z, 2)) continue;
+          const ang = Math.random() * Math.PI * 2, [dx, dz] = dirOf(ang), rr = rnd(0.15, 0.85) * boundR(def, ang);
+          const pos = { x: dx * rr, z: dz * rr };
+          if (!insideOpen(def, pos.x, pos.z, 3)) continue;
           if (blocks.some((o) => dist(o, pos) < o.r + 1.5)) continue;
           if (exits.some((e) => dist(e, pos) < 10)) continue;
           if (def.gate && dist(def.gate, pos) < 14) continue;
           if (players.some((p) => dist(p, pos) < 12)) continue;
           const d = def.mobs.only ?? pick(def.mobs.pool || [0, 1]); // エリアごとの出現候補
-          const lv = floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1));
-          if (this.rollElite(A)) this.spawnElite(A, d, pos.x, pos.z, lv); // まれに性質つきの精鋭が手下を連れて
-          else this.spawnMob(A, d, pos.x, pos.z, lv);
+          this.spawnMob(A, d, pos.x, pos.z, floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1)));
           break;
         }
       }
@@ -76,7 +72,7 @@ export const AreaTickMethods = {
     }
 
     // きらめくトカゲ: 屋外で 30 秒ごとに 4% の確率（1エリアに1匹まで）
-    if (def.mobs && def.shape !== 'grid' && players.length) {
+    if (def.mobs && def.shape === 'open' && players.length) {
       A.treasureT = (A.treasureT ?? TREASURE_EVERY) - dt;
       if (A.treasureT <= 0) {
         A.treasureT = TREASURE_EVERY;
@@ -85,7 +81,7 @@ export const AreaTickMethods = {
     }
 
     // ネームド（秘境の主）
-    if (def.named && !def.named.omen && !(A.namedId && A.mobs.has(A.namedId))) { // 秘境の主は時間で。フィールドの主は気配で（sim/elites.js）
+    if (def.named && !(A.namedId && A.mobs.has(A.namedId))) {
       A.namedId = null;
       A.namedT = (A.namedT ?? 2) - dt;
       const sp = namedSpot(def);

@@ -78,15 +78,15 @@
    ],
    [
     "st",
-    90
+    91
    ],
    [
     "hit",
-    7
+    6
    ],
    [
     "absorb",
-    5
+    3
    ]
   ],
   "slots": [
@@ -102,14 +102,14 @@
    "ks1": null,
    "ks2": null
   },
-  "hp": 32,
-  "mobHp": 77,
+  "hp": 49,
+  "mobHp": 16,
   "xp": 0,
   "lv": 1
  },
  "dom/after-run": {
-  "hash": "8170f101ae9ca501cdc7ca75",
-  "size": 25087
+  "hash": "5772ba5c850075b6859da760",
+  "size": 24937
  },
  "errors": []
 }

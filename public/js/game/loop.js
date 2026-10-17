@@ -15,6 +15,8 @@ export let sendT = 0;
 export let saveT = 0;
 // ---- 弓の照準ガイド: 足元の射程の円（引くほど広がり、最大射程で止まる）と狙いの線 ----
 export let bowGuide = null;
+// 振りの軌跡（トレイル）と残像: 重いので今は切っている。true に戻すと出る
+const MOTION_FX = false;
 // 振りの軌跡の色: 武器の出来（レア度）の色。粗悪・普通は白っぽい青
 const trailColor = (r) => (r >= 2 ? RARITIES[r].color : 0xcfe8ff);
 // 残像: すばやく動いた瞬間（回避・すり抜け・跳び退きなど）に、0.04秒ごとに体の像を残す。ワープのような大移動は除く
@@ -22,7 +24,7 @@ const GHOST = { speed: 11, every: 0.04, jump: 6 };
 function afterimage(who, model, x, z, color, dt) {
   const d = who.ghostP ? Math.hypot(x - who.ghostP.x, z - who.ghostP.z) : 0;
   who.ghostP = { x, z };
-  if (state.settings.quality === 'low' || dt <= 0 || d > GHOST.jump || d / dt < GHOST.speed) { who.ghostT = 0; return; }
+  if (!MOTION_FX || state.settings.quality === 'low' || dt <= 0 || d > GHOST.jump || d / dt < GHOST.speed) { who.ghostT = 0; return; }
   who.ghostT = (who.ghostT || 0) - dt;
   if (who.ghostT > 0) return;
   who.ghostT = GHOST.every;
@@ -275,7 +277,7 @@ export function update(dt) {
   });
   afterimage(state.me, state.me.model, state.me.x, state.me.z, trailColor(stats.S.wr), dt);
   // 振りの軌跡（近接武器。画質「低」では出さない）
-  if (state.settings.quality !== 'low' && !WEAPONS[stats.S.wk]?.ranged && state.me.model.userData.weaponModel) {
+  if (MOTION_FX && state.settings.quality !== 'low' && !WEAPONS[stats.S.wk]?.ranged && state.me.model.userData.weaponModel) {
     state.me.model.updateMatrixWorld();
     view.fx.swordTrail(state.me.model.userData.weaponModel, state.me.swingT < state.me.swingDur || state.me.skillT >= 0, trailColor(stats.S.wr), dt);
   }
@@ -309,7 +311,7 @@ export function update(dt) {
     o.model.rotation.y = o.a;
     view.animatePlayer(o.model, { t, moving, walkT: o.walkT, kind: o.wk, motion: o.motion, motionT: o.motionT, combo: o.combo, dead: o.dead, guard: !!o.gd, shieldBack: !!WEAPONS[o.wk]?.shield && (o.cl & 1) > 0, swing: o.swingT < 0.35 ? o.swingT / 0.35 : -1, spin: o.spinT >= 0 && (WEAPONS[o.wk]?.skillSpin || isSpinMotion(o.motion)) ? o.spinT / 0.55 : -1, dodge: o.dg > 0 ? 0.5 : 0, crawl: o.rv >= 0, down: o.rv >= 0 || o.rc === 2 ? 1 : 0, hurt: o.rc === 1 ? 0.8 : 0 });
     afterimage(o, o.model, o.x, o.z, trailColor(o.wr ?? 0), dt);
-    if (state.settings.quality !== 'low' && !WEAPONS[o.wk]?.ranged && o.model.userData.weaponModel) {
+    if (MOTION_FX && state.settings.quality !== 'low' && !WEAPONS[o.wk]?.ranged && o.model.userData.weaponModel) {
       o.model.updateMatrixWorld();
       view.fx.swordTrail(o.model.userData.weaponModel, o.swingT < 0.35 || o.spinT >= 0, trailColor(o.wr ?? 0), dt);
     }
@@ -336,13 +338,12 @@ export function update(dt) {
       if (Math.random() < 0.35) view.fx.parts.emit(mb.x + rnd(-0.7, 0.7), rnd(0.4, 3.2), mb.z + rnd(-0.7, 0.7), { color: mb.accent, size: 0.35, life: 0.8, speed: 0.3, gravity: -0.6 }); // 暗いオーラ
     } else view.animateMob(mb.model, { t: t + mb.id, st: mb.st, flash: mb.flash, enraged: mb.enraged, act: mb.act, stun: mb.stunT > 0 });
     // 武器を持ったボス（グラズ）の振りの軌跡: 技の動きの最中だけ
-    if (mb.kind === 2 && mb.model.userData.weaponModel && state.settings.quality !== 'low') {
+    if (MOTION_FX && mb.kind === 2 && mb.model.userData.weaponModel && state.settings.quality !== 'low') {
       mb.model.updateMatrixWorld();
       view.fx.swordTrail(mb.model.userData.weaponModel, !!mb.act && !mb.act.done && mb.st >= 2, mb.accent ?? 0xffcc33, dt);
     }
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) view.fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[state.world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
-    mb.model.userData.efx?.(t, mb.enraged); // 精鋭・ネームドの飾り（足元の輪・粒・縁の光）
-    if (mb.elite && !mb.model.userData.efx && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
+    if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
     // きらめくトカゲ: いつもきらめき、走ると金色の粒を残す
     if (mb.t === 'lizard') view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 1.4), mb.z + rnd(-0.6, 0.6), { color: Math.random() < 0.5 ? 0xffd84a : 0xffffff, size: 0.35, life: 0.6, speed: 0.6, gravity: -0.5 });
     // 砂に潜って追ってくる（潜行）: 盛り上がりの砂ぼこり
@@ -425,8 +426,6 @@ export function update(dt) {
   }
   view.cam.back = view.cam.back == null ? back : view.cam.back + (back - view.cam.back) * (1 - Math.exp(-6 * dt));
   view.camera.position.set(view.cam.focus.x, view.cam.focus.y + Math.sqrt(Math.max(0, dist * dist - view.cam.back * view.cam.back)), view.cam.focus.z + view.cam.back);
-  // 地形エリア: カメラが山や丘に埋まらないよう、地面より上に保つ
-  if (state.world.def.shape === 'terrain') view.camera.position.y = Math.max(view.camera.position.y, field.heightAt(view.camera.position.x, view.camera.position.z) + 3);
   if (rules.shake > 0) view.camera.position.add(view.tmpV.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(rules.shake * 0.35));
   view.camera.lookAt(view.cam.focus);
   // 近景の透過（カメラと自キャラの間のもの・カメラに近すぎるもの）

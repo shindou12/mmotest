@@ -17,7 +17,7 @@
   }
  },
  "03 to field": {
-  "hash": "f319ca5976d1a076dd6396fb",
+  "hash": "3cb6e85428f516bb13ab41c5",
   "types": {
    "warped": 3,
    "snap": 30,
@@ -25,20 +25,19 @@
   }
  },
  "04 field fight": {
-  "hash": "06f8b95cca362333ca627dc3",
+  "hash": "7ef5892e9f5991ab32aee962",
   "types": {
    "snap": 600,
-   "chat": 3,
-   "tele": 108,
+   "tele": 63,
    "roster": 60,
-   "die": 18,
-   "xp": 18,
-   "gold": 13,
+   "die": 24,
+   "xp": 24,
+   "gold": 17,
    "loot": 9
   }
  },
  "05 to labyrinth": {
-  "hash": "64118d31fee56d277d905952",
+  "hash": "fcc966ccd22456fce96247fe",
   "types": {
    "warped": 3,
    "snap": 30,
@@ -46,13 +45,13 @@
   }
  },
  "06 lever": {
-  "hash": "12477a1083df46517da6df87",
+  "hash": "9753b2e8a5a3db1b7fb0b0a2",
   "types": {
    "snap": 15
   }
  },
  "07 enter lair": {
-  "hash": "de0326e60c60f764f193ad8d",
+  "hash": "49e9d853b06daa1710964244",
   "types": {
    "bossStart": 3,
    "snap": 90,
@@ -62,7 +61,7 @@
   }
  },
  "08 boss fight": {
-  "hash": "6cd234275b88af0e36ce5eb3",
+  "hash": "2f02e9162f6a8bf4bdd8eb1b",
   "types": {
    "snap": 900,
    "roster": 90,
@@ -72,8 +71,6 @@
    "hateReset": 6,
    "pdown": 3,
    "prev": 3,
-   "aim": 3,
-   "proj": 21,
    "bossEv": 3,
    "cast": 3,
    "castP": 57,
@@ -90,17 +87,16 @@
   }
  },
  "10 floor 2 field": {
-  "hash": "3c67eb25c764b9af55232bee",
+  "hash": "5a53dc72e511b35d08945d20",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 36,
+   "tele": 27,
    "die": 12,
    "xp": 12,
-   "gold": 11,
-   "loot": 4,
-   "chat": 3
+   "gold": 7,
+   "loot": 3
   }
  },
  "11 warp floor 3": {
@@ -112,32 +108,36 @@
   }
  },
  "12 floor 3 field": {
-  "hash": "f2876aee3419875d8184ac88",
+  "hash": "e3bfd310a22f248cc7b55abe",
   "types": {
    "warped": 3,
    "snap": 300,
    "roster": 30,
-   "tele": 39
+   "tele": 21,
+   "die": 3,
+   "xp": 3,
+   "gold": 3,
+   "loot": 2
   }
  },
  "13 wipe": {
-  "hash": "66c2c9614391db28a123db67",
+  "hash": "fa2e051a5c943cf325594c59",
   "types": {
    "pdown": 9,
    "bleed": 3,
    "snap": 60,
    "roster": 6,
-   "tele": 15
+   "tele": 6
   }
  },
  "14 leave": {
-  "hash": "3a7bd1de7721b3c65bc5edd3",
+  "hash": "73a701ba0ecbad581f74694a",
   "types": {
    "chat": 2,
    "leave": 2,
    "snap": 20,
    "roster": 2,
-   "tele": 6
+   "tele": 2
   }
  },
  "saves": "4f53cda18c2baa0c0354bb5f"

@@ -10,7 +10,7 @@ Math.random = () => { seed = (seed * 16807) % 2147483647; return seed / 21474836
 function field() {
   const w = new World({ unlocked: 3 }), inbox = [];
   w.addPlayer(1, (m) => inbox.push(m)); w.handle(1, { t: 'hello', name: 'P', lv: 5 });
-  const A = w.area('f1_field'), p = w.players.get(1); p.area = A.id; p.x = 8; p.z = 40; p.hp = p.mhp = 300; // 谷の中央の草地
+  const A = w.area('f1_field'), p = w.players.get(1); p.area = A.id; p.x = 0; p.z = 0; p.hp = p.mhp = 300;
   const tick = (sec) => { for (let t = 0; t < sec; t += 0.05) w.tick(0.05); };
   return { w, A, p, tick, sent: (t) => inbox.filter((m) => m.t === t) };
 }

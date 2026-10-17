@@ -2,12 +2,11 @@
 import { TECHNIQUES } from '../techniques.js';
 import { BALANCE, partySize, enemyScale, floorPressure, attackPressure, levelXpMultiplier } from '../balance.js';
 import { FLOORS, RARITIES, MAX_FLOOR, mobHp, mobDmg, mobXp, makeItem, rollRarity, mobDef, floorLevel, TREASURE_ID } from '../data.js';
-import { collide, pathStep, obstaclesOf, insideOpen, waypointOf } from '../areas.js';
+import { collide, pathStep, obstaclesOf, insideOpen } from '../areas.js';
 
 import { MOB_ATTACKS } from './mob-attacks.js';
 import { rnd, dist, r2, ARCH, HATE_RESET } from './common.js';
 import { ELITE, NAMED } from './tuning.js';
-import { OMEN, ELITE_REWARD } from './elites.js';
 
 const SENTINEL_OPEN = 1.2; // 番兵が攻撃を出し切った後、盾が下がっている秒数
 const SENTINEL_REWARD = { xp: 4, gold: 6, rarity: 0.4 }; // 番兵の報酬（精鋭より一段おいしく）
@@ -68,12 +67,7 @@ export const MobsMethods = {
     this.broadcastArea(A.id, { t: 'die', id: mob.id, x: r2(mob.x), z: r2(mob.z), boss: isBoss });
     const sentinel = mob.ai === 'sentinel', treasure = mob.ai === 'treasure';
     let xp = mobXp(mob.lv) * (A.def.mobs?.xp || 1) * (mob.named ? NAMED.xp : treasure ? TREASURE.xp : sentinel ? SENTINEL_REWARD.xp : mob.elite ? ELITE.xp : 1);
-    if (mob.named) { A.namedT = NAMED.respawn; A.omenCd = this.time + OMEN.cooldown; }
-    this.affixOnDeath(A, mob); // 分裂
-    this.addOmen(A, mob); // フィールドの主の気配
-    const nAff = mob.affix?.length || 0;
-    if (nAff) xp *= 1 + ELITE_REWARD.xpPerAffix * (nAff - 1); // 性質が多いほどおいしい
-    if (mob.spawnling) xp *= 0.3;
+    if (mob.named) A.namedT = NAMED.respawn;
     if (isBoss) xp *= 12;
     if (mob.kind === 'add') xp *= 0.3;
     for (const p of this.areaPlayers(A.id)) {
@@ -81,9 +75,9 @@ export const MobsMethods = {
       const mult = levelXpMultiplier(p.lv, mob.lv);
       this.send(p, { t: 'xp', n: Math.max(1, Math.round(xp * mult)), nm: isBoss ? A.fdef.boss.name : mob.name, ar: A.id, boss: isBoss ? A.n : 0, el: mob.named ? 3 : mob.elite ? 1 : 0 });
       // ゴールド（個人ごと）。雑魚はたまに落とさない。ボス・ネームドは金貨袋
-      let gold = (3 + mob.lv * 1.5) * rnd(0.7, 1.3) * (isBoss ? 40 : mob.named ? 15 : treasure ? TREASURE.gold : sentinel ? SENTINEL_REWARD.gold : mob.elite ? 3 * Math.max(1, nAff) : 1) * (mob.kind === 'add' ? 0.2 : 1);
-      if (!isBoss && !mob.named && !mob.elite && !treasure && Math.random() < 0.25) gold = 0; // 雑魚はたまに落とさない（トカゲ・精鋭は必ず）
-      if (gold >= 1) this.send(p, { t: 'gold', n: Math.round(gold), x: r2(mob.x), z: r2(mob.z), bag: isBoss || !!mob.named || treasure || nAff > 0 });
+      let gold = (3 + mob.lv * 1.5) * rnd(0.7, 1.3) * (isBoss ? 40 : mob.named ? 15 : treasure ? TREASURE.gold : sentinel ? SENTINEL_REWARD.gold : mob.elite ? 3 : 1) * (mob.kind === 'add' ? 0.2 : 1);
+      if (!isBoss && !mob.named && !mob.elite && Math.random() < 0.25) gold = 0;
+      if (gold >= 1) this.send(p, { t: 'gold', n: Math.round(gold), x: r2(mob.x), z: r2(mob.z), bag: isBoss || !!mob.named || treasure });
       // 個人ドロップ（友達と取り合いにならない）
       const items = [];
       const ilvl = mob.lv;
@@ -101,13 +95,6 @@ export const MobsMethods = {
         // ネームド: レア以上が必ず出る（エピック以上はアイテムレベルで出やすくなる）
         items.push(makeItem(ilvl + 2, rollRarity(1, 2, ilvl, DR.rare), B));
         items.push(makeItem(ilvl, rollRarity(0.6, 1, ilvl, DR.rare), B));
-        if (Math.random() < 0.2) items.push(makeItem(ilvl + 1, rollRarity(1, 3, ilvl, DR.rare), B)); // まれにもう1つ（エピック以上が出やすい）
-      } else if (nAff) {
-        // 屋外の精鋭: 必ず1つ（性質が多いほど良い品）。性質2つ以上ならもう1つ出ることも
-        items.push(makeItem(ilvl + 1, rollRarity(ELITE_REWARD.rarity + ELITE_REWARD.rarityPerAffix * nAff, 1, ilvl, DR.rare), B));
-        if (nAff >= 2 && Math.random() < ELITE_REWARD.second) items.push(makeItem(ilvl, rollRarity(ELITE_REWARD.rarity, 1, ilvl, DR.rare), B));
-      } else if (mob.spawnling) {
-        // 分裂の分身は落とさない
       } else if (sentinel) {
         items.push(makeItem(ilvl, rollRarity(SENTINEL_REWARD.rarity, 1, ilvl, DR.rare), B)); // 番兵: 必ず1つ、良い品が少し出やすい
       } else if (Math.random() < (mob.elite ? 0.6 : mob.kind === 'add' ? 0.08 : 0.34)) {
@@ -167,7 +154,6 @@ export const MobsMethods = {
     const Ar = m.arch;
     if (Ar.flee) { this.tickTreasure(A, m, alive, dt); return; }
     m.cd -= dt; m.provoked -= dt; m.tauntT -= dt; m.openT -= dt;
-    this.tickAffixes(A, m, alive, dt); // 精鋭の性質（炎の足跡・雷鳴・再生・狂化）
     // 盾（番兵）: 攻撃中と、攻撃を出し切った直後の隙（openT）は下がる
     m.guard = !!Ar.guard && m.st < 2 && m.openT <= 0;
     if (m.st === 2) { // 予兆中
@@ -244,7 +230,7 @@ export const MobsMethods = {
     else ang = m.a + Math.sin(this.time * 1.1 + m.id) * 0.04;
     // 外周に近づいたら内側へ曲がる
     const nx = m.x + Math.sin(ang) * 3, nz = m.z + Math.cos(ang) * 3;
-    if (A.def.shape !== 'grid' && !insideOpen(A.def, nx, nz, 4)) { const c = A.def.shape === 'terrain' ? waypointOf(A.def) : { x: 0, z: 0 }; ang = Math.atan2(c.x - m.x, c.z - m.z) + (Math.random() - 0.5); }
+    if (A.def.shape === 'open' && !insideOpen(A.def, nx, nz, 4)) ang = Math.atan2(-m.x, -m.z) + (Math.random() - 0.5);
     m.a = ang;
     this.moveMob(A, m, ang, m.arch.speed * (near && nd < TREASURE.scare ? 1 : 0.45), dt);
   },
@@ -256,7 +242,7 @@ export const MobsMethods = {
 
   // 迷路では経路探索しながら近づく
   moveMobToward(A, m, t, speed, dt) {
-    if (A.def.shape === 'grid' || A.def.shape === 'terrain') { // 迷路・地形（崖や川をはさむときは回り込む）
+    if (A.def.shape === 'grid') {
       m.pathT -= dt;
       if (m.pathT <= 0 || !m.wp) { m.pathT = 0.4; m.wp = pathStep(A.def, m.x, m.z, t.x, t.z, A.door); }
       this.moveMob(A, m, Math.atan2(m.wp.x - m.x, m.wp.z - m.z), speed, dt);
@@ -292,7 +278,6 @@ export const MobsMethods = {
 
   moveMob(A, m, ang, speed, dt) {
     if (m.slowT > 0) speed *= 1 - m.slowRate;
-    speed *= this.affixSpeed(m);
     m.x += Math.sin(ang) * speed * dt;
     m.z += Math.cos(ang) * speed * dt;
     const c = collide(A.def, m.x, m.z, 0.6, A.door);
@@ -308,11 +293,9 @@ export const MobsMethods = {
 
   mobAttack(A, m, target, ang) {
     const Ar = m.arch;
-    if (m.named && this.namedMove(A, m, target, ang)) return; // ネームドの技
-    const dmg = this.mobPower(A, m);
+    const dmg = mobDmg(m.lv) * floorPressure(A.n) * attackPressure(m.scaleN) * Ar.dmg * (m.named ? NAMED.dmg : m.elite ? ELITE.dmg : 1);
     const wind = Math.max(0.42, Ar.wind * (m.elite ? 0.85 : 1) * 0.9);
-    m.st = 2; m.windT = wind; m.cd = (rnd(1.0, 1.8) + wind) * this.affixCd(m);
-    this.affixOnAttack(A, m, target); // 号令
+    m.st = 2; m.windT = wind; m.cd = rnd(1.0, 1.8) + wind;
     const fx = Math.sin(ang), fz = Math.cos(ang);
     const s = m.elite ? 1.3 : 1;
     // 種類ごとの攻撃の形は sim/mob-attacks.js の登録表（null なら自分で予兆を出し終えている）

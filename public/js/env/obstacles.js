@@ -70,13 +70,10 @@ export const OBSTACLES = {
   },
 };
 
-export function makeObstacle(B, o, fdef, heightAt, R, group, anims, q = 1) {
+export function makeObstacle(B, o, fdef, heightAt, R, group, anims) {
   const y = heightAt(o.x, o.z);
   const M = local(I, o.x, o.kind === 'pond' ? 0 : y, o.z, 0, R() * Math.PI * 2, 0);
   const C = (c, d = 0.08) => new THREE.Color(c).offsetHSL(0, 0, (R() - 0.5) * d);
-  // 見た目の段階3以上: 大樹・大岩は作り込み版の形を大きくして使う（当たりの大きさ o.r に合わせる）
-  if (q >= 3 && o.kind === 'tree') return makeProp(B, 'tree', local(M, 0, 0, 0, 0, 0, 0, o.r * 0.78), R, propColor(fdef, ['tree', 'pine'], 0, 0x3f8f3a), propColor(fdef, ['tree', 'pine'], 1, 0x6a4a2a), fdef, q);
-  if (q >= 3 && o.kind === 'rock') return makeProp(B, 'rock', local(M, 0, 0, 0, 0, 0, 0, o.r * 0.8), R, propColor(fdef, ['rock'], 0, 0x8a8a8a), 0, fdef, q);
   // 形は OBSTACLES の登録表（種類ごと）
   if (Object.hasOwn(OBSTACLES, o.kind)) OBSTACLES[o.kind]({ B, o, fdef, heightAt, R, group, anims, y, M, C });
 }

@@ -51,7 +51,7 @@ export function grantTitle(id) {
 export function rollTitleDrop(m) {
   if (!state.char) return;
   const A = AREAS[m.ar];
-  const k = { el: m.el | 0, boss: m.boss, weather: A && A.shape !== 'grid' ? A.weather : null, type: A?.type };
+  const k = { el: m.el | 0, boss: m.boss, weather: A?.shape === 'open' ? A.weather : null, type: A?.type };
   for (const d of TITLE_DROPS) {
     if (state.char.titles[d.id] || !d.when(k) || Math.random() >= d.chance) continue;
     state.char.titles[d.id] = true;

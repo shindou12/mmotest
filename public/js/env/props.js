@@ -131,96 +131,15 @@ export const PROPS = {
     B.add(new THREE.OctahedronGeometry(0.3), new THREE.Color(c2).multiplyScalar(1.5), local(M, 0, y, 0), { glowing: true });
     B.add(new THREE.TorusGeometry(1.1, 0.03, 4, 24), new THREE.Color(c2).multiplyScalar(1.2), local(M, 0, y, 0, R() * 3, R() * 3, 0), { glowing: true });
   },
-  // 段階2以上の群れで使う小物（低木・小石・切り株・倒木）
-  bush(ctx) {
-    const { B, M, R, c1, C, S } = ctx;
-    const lc = new THREE.Color(c1).offsetHSL(0, 0, -0.04);
-    for (let k = 0; k < 3; k++) B.add(S(0.55 + R() * 0.25, 9, 7), C(lc.clone().offsetHSL(0, 0, k === 0 ? 0.03 : 0)), local(M, (R() - 0.5) * 0.9, 0.35, (R() - 0.5) * 0.9, 0, 0, 0, 1, 0.75, 1));
-  },
-  pebble(ctx) {
-    const { B, M, R, c1, C } = ctx;
-    B.add(new THREE.DodecahedronGeometry(0.16 + R() * 0.12, 0), C(c1, 0.12), local(M, 0, 0.05, 0, R(), R() * 3, R(), 1.3, 0.6, 1), { flat: true });
-  },
-  stump(ctx) {
-    const { B, M, c1, c2, C } = ctx;
-    B.add(new THREE.CylinderGeometry(0.45, 0.6, 0.6, 10), C(c2), local(M, 0, 0.3, 0));
-    B.add(new THREE.CylinderGeometry(0.42, 0.42, 0.04, 10), C(0xc8a878), local(M, 0, 0.61, 0));
-    B.add(new THREE.SphereGeometry(0.3, 8, 6), C(c1), local(M, 0.35, 0.15, 0.2, 0, 0, 0, 1, 0.4, 1));
-  },
-  log(ctx) {
-    const { B, M, c1, c2, C } = ctx;
-    B.add(new THREE.CylinderGeometry(0.35, 0.4, 3.2, 10), C(c2), local(M, 0, 0.32, 0, 0, 0, Math.PI / 2));
-    B.add(new THREE.CylinderGeometry(0.3, 0.3, 0.04, 10), C(0xc8a878), local(M, 1.61, 0.32, 0, 0, 0, Math.PI / 2));
-    B.add(new THREE.SphereGeometry(0.4, 8, 6), C(c1), local(M, -0.4, 0.6, 0, 0, 0, 0, 1.6, 0.35, 0.9));
-  },
   cloud(ctx) {
     const { B, M, R, c1, C, S } = ctx;
     for (let k = 0; k < 5; k++) B.add(S(0.8 + R() * 0.6, 12, 10), C(c1, 0.03), local(M, (R() - 0.5) * 3, 0.5 + R() * 0.4, (R() - 0.5) * 3, 0, 0, 0, 1, 0.7, 1));
   },
 };
 
-// 作り込み版（見た目の段階3以上）。形のばらつき・根元・陰影（下を暗く上を明るく）・苔などを足す
-export const PROPS_HQ = {
-  tree(ctx) {
-    const { B, M, R, c1, c2, C } = ctx;
-    const kind = R(), tall = kind < 0.25, wide = kind > 0.75;
-    const th = tall ? 3.4 : 2.6, tw = wide ? 0.46 : 0.36;
-    B.add(new THREE.CylinderGeometry(tw * 0.55, tw, th, 8), C(c2), local(M, 0, th / 2, 0, (R() - 0.5) * 0.08, 0, (R() - 0.5) * 0.08), { flat: true });
-    // 根の張り出し
-    for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2 + R(); B.add(new THREE.ConeGeometry(0.16, 0.9, 5), C(c2, 0.1), local(M, Math.sin(a) * tw * 0.8, 0.18, Math.cos(a) * tw * 0.8, Math.cos(a) * 1.15, 0, -Math.sin(a) * 1.15), { flat: true }); }
-    // 枝
-    for (let i = 0; i < 2; i++) { const a = R() * Math.PI * 2; B.add(new THREE.CylinderGeometry(0.05, 0.11, 1.3, 5), C(c2), local(M, Math.sin(a) * 0.35, th * 0.8, Math.cos(a) * 0.35, Math.cos(a) * 0.9, 0, -Math.sin(a) * 0.9), { flat: true }); }
-    // 葉のかたまり: 下は暗く、上ほど明るい。形は 丸・縦長・横広
-    const lc = new THREE.Color(c1), hue = (R() - 0.5) * 0.03;
-    const n = 7 + Math.floor(R() * 4), base = th + 0.4;
-    for (let i = 0; i < n; i++) {
-      const a = i * 2.4 + R(), up = i / n, rr = (wide ? 1.35 : tall ? 0.6 : 0.95) * (1 - up * 0.45) * (0.8 + R() * 0.4);
-      const y = base + up * (tall ? 2.6 : 1.6) + (R() - 0.5) * 0.3, r = (wide ? 1.0 : 0.85) * (1.1 - up * 0.35) * (0.8 + R() * 0.35);
-      const col = lc.clone().offsetHSL(hue, 0.02, -0.08 + up * 0.16 + (R() - 0.5) * 0.03);
-      B.add(new THREE.IcosahedronGeometry(r, 1), col, local(M, Math.sin(a) * rr, y, Math.cos(a) * rr, R(), R() * 3, R(), 1, tall ? 1.25 : 0.85, 1), { flat: true });
-    }
-    B.add(new THREE.IcosahedronGeometry(wide ? 1.2 : 0.9, 1), lc.clone().offsetHSL(hue, 0.03, 0.1), local(M, 0, base + (tall ? 3.1 : 2.0), 0, 0, R() * 3, 0, 1, tall ? 1.3 : 0.8, 1), { flat: true });
-    if (R() < 0.3) for (let k = 0; k < 5; k++) B.add(new THREE.SphereGeometry(0.09, 6, 4), C(0xff5a4a), local(M, (R() - 0.5) * 2.2, base + R() * 1.2, (R() - 0.5) * 2.2));
-  },
-  rock(ctx) {
-    const { B, M, R, c1, def, C } = ctx;
-    const n = 1 + Math.floor(R() * 3), rc = new THREE.Color(c1);
-    for (let k = 0; k < n; k++) {
-      const s = k === 0 ? 1 : 0.4 + R() * 0.3, x = k ? (R() - 0.5) * 2.2 : 0, z = k ? (R() - 0.5) * 2.2 : 0, rot = [R() * 0.4, R() * 3, R() * 0.4];
-      // 下半分は暗く沈め、上に明るい面を重ねて、地面から生えた重さを出す
-      B.add(new THREE.DodecahedronGeometry(0.95 * s, 1), rc.clone().multiplyScalar(0.78), local(M, x, 0.15 * s, z, ...rot, 1.4, 0.55, 1.15), { flat: true });
-      B.add(new THREE.DodecahedronGeometry(0.85 * s, 1), C(rc.clone().offsetHSL(0, 0, 0.03)), local(M, x + 0.08 * s, 0.45 * s, z, rot[0] + 0.3, rot[1] + 0.7, rot[2], 1.2, 0.75, 1.0), { flat: true });
-      if (def.n <= 2 && R() < 0.75) B.add(new THREE.IcosahedronGeometry(0.62 * s, 1), C(0x5f9a3c, 0.1), local(M, x + 0.1 * s, 0.86 * s, z, 0, R() * 3, 0, 1.25, 0.32, 1.05), { flat: true });
-    }
-  },
-  flower(ctx) {
-    const { B, M, R, c1, c2, C, S } = ctx;
-    // 1株に数本。葉を2枚、花びらは輪に6枚
-    const fc = R() < 0.5 ? c1 : c2, n = 2 + Math.floor(R() * 3);
-    for (let k = 0; k < n; k++) {
-      const x = (R() - 0.5) * 0.4, z = (R() - 0.5) * 0.4, h = 0.3 + R() * 0.2;
-      B.add(new THREE.CylinderGeometry(0.012, 0.018, h, 4), C(0x3a7a2a), local(M, x, h / 2, z));
-      B.add(new THREE.ConeGeometry(0.05, 0.22, 3), C(0x4a8a32), local(M, x + 0.05, 0.08, z, 0, R() * 3, 0.9));
-      for (let j = 0; j < 6; j++) { const a = j / 6 * Math.PI * 2; B.add(S(0.055, 5, 4), C(fc, 0.1), local(M, x + Math.sin(a) * 0.07, h + 0.02, z + Math.cos(a) * 0.07, 0, 0, 0, 1, 0.45, 1)); }
-      B.add(S(0.045, 5, 4), C(0xfff2a0), local(M, x, h + 0.04, z));
-    }
-  },
-  bush(ctx) {
-    const { B, M, R, c1, C } = ctx;
-    const lc = new THREE.Color(c1);
-    const n = 4 + Math.floor(R() * 3);
-    for (let k = 0; k < n; k++) {
-      const a = k * 2.3, d = k ? 0.45 : 0, up = k ? 0 : 0.15;
-      B.add(new THREE.IcosahedronGeometry(0.45 + R() * 0.2, 1), C(lc.clone().offsetHSL(0, 0, -0.07 + up + (k ? 0 : 0.05)), 0.05), local(M, Math.sin(a) * d, 0.32 + up, Math.cos(a) * d, R(), R() * 3, R(), 1, 0.78, 1), { flat: true });
-    }
-    if (R() < 0.35) for (let k = 0; k < 4; k++) B.add(new THREE.SphereGeometry(0.06, 6, 4), new THREE.Color(R() < 0.5 ? 0xfff0f0 : 0xffe36b), local(M, (R() - 0.5) * 1.0, 0.6 + R() * 0.15, (R() - 0.5) * 1.0));
-  },
-};
-
-export function makeProp(B, type, M, R, c1, c2, def, q = 1) {
+export function makeProp(B, type, M, R, c1, c2, def) {
   const C = (c, d = 0.08) => new THREE.Color(c).offsetHSL(0, 0, (R() - 0.5) * d);
   const S = (r, w = 12, h = 10) => new THREE.SphereGeometry(r, w, h);
-  // 形は PROPS の登録表（種類ごと）。段階3以上で作り込み版があればそちら
-  const table = q >= 3 && Object.hasOwn(PROPS_HQ, type) ? PROPS_HQ : PROPS;
-  if (Object.hasOwn(table, type)) table[type]({ B, M, R, c1, c2, def, C, S });
+  // 形は PROPS の登録表（種類ごと）
+  if (Object.hasOwn(PROPS, type)) PROPS[type]({ B, M, R, c1, c2, def, C, S });
 }
