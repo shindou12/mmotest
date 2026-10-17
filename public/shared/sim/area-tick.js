@@ -46,7 +46,9 @@ export const AreaTickMethods = {
           if (def.gate && dist(def.gate, pos) < 14) continue;
           if (players.some((p) => dist(p, pos) < 12)) continue;
           const d = def.mobs.only ?? pick(def.mobs.pool || [0, 1]); // エリアごとの出現候補
-          this.spawnMob(A, d, pos.x, pos.z, floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1)));
+          const lv = floorLevel(A.n) + Math.floor(rnd(def.mobs.lv[0], def.mobs.lv[1] + 1));
+          if (this.rollElite(A)) this.spawnElite(A, d, pos.x, pos.z, lv); // まれに性質つきの精鋭が手下を連れて
+          else this.spawnMob(A, d, pos.x, pos.z, lv);
           break;
         }
       }
@@ -83,7 +85,7 @@ export const AreaTickMethods = {
     }
 
     // ネームド（秘境の主）
-    if (def.named && !(A.namedId && A.mobs.has(A.namedId))) {
+    if (def.named && !def.named.omen && !(A.namedId && A.mobs.has(A.namedId))) { // 秘境の主は時間で。フィールドの主は気配で（sim/elites.js）
       A.namedId = null;
       A.namedT = (A.namedT ?? 2) - dt;
       const sp = namedSpot(def);

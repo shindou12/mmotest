@@ -303,6 +303,8 @@ export const AREAS = {
     floor: 1, type: 'field', name: 'ひだまりの谷', shape: 'terrain', terrain: 'meadow', mapPos: [50, 52],
     exits: [{ to: 'f1_town' }, { to: 'f1_hunt' }, { to: 'f1_dun' }, { to: 'f1_lab' }],
     mobs: { count: 12, perPlayer: 3, lv: [0, 3] },
+    // フィールドの主: エリアで倒すと気配が溜まり（omen）、満ちると巣（at）で目を覚ます。技は sim/elites.js の NAMED_MOVES
+    named: { name: '暴れ大猪ドルガ', d: 1, lv: 7, at: [24, -56], omen: 30, moves: ['charge', 'quake', 'call'], title: 't_dolga', look: 'tusks' },
   },
   f1_hunt: {
     floor: 1, type: 'hunt', name: 'イノシシの丘', shape: 'open', R: 32, ell: [1, 1.35], wob: 0.22, mapPos: [84, 34],
@@ -341,6 +343,7 @@ export const AREAS = {
     exits: [{ to: 'f2_camp', ang: 180 }, { to: 'f2_dun', ang: 265 }, { to: 'f2_hunt', ang: 0 }],
     obst: { n: 20, kinds: ['tree', 'tree', 'rock'] }, hazard: { kind: 'poison', n: 6, r: [2.5, 4] }, chests: 2,
     mobs: { count: 10, perPlayer: 3, lv: [0, 3] },
+    named: { name: '霧喰いの大狼フェンリ', d: 1, lv: 15, omen: 30, moves: ['charge', 'howl', 'fangs'], title: 't_fenri', look: 'mane' },
   },
   f2_dun: {
     floor: 2, type: 'dungeon', name: '朽ちた樹洞', shape: 'grid', map: MAPS.dun2, mapPos: [16, 64],
@@ -374,6 +377,7 @@ export const AREAS = {
     exits: [{ to: 'f3_camp', ang: 180 }, { to: 'f3_dun', ang: 330 }],
     obst: { n: 12, kinds: ['rock', 'ruin', 'ruin'] }, hazard: { kind: 'sand', n: 7, r: [4, 6] }, chests: 3,
     mobs: { count: 10, perPlayer: 3, lv: [0, 3] },
+    named: { name: '砂岩の巨人ガルム', d: 1, lv: 23, omen: 30, moves: ['quake', 'rocks', 'call'], title: 't_garum', look: 'crown' },
   },
   f3_dun: {
     floor: 3, type: 'dungeon', name: '埋もれた神殿', shape: 'grid', map: MAPS.dun3, mapPos: [22, 6],

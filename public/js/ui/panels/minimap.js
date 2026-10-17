@@ -113,6 +113,11 @@ export function installMinimap(ui) {
       const [x, y] = p(mb.x, mb.z);
       sh.push({ t: 'circle', x, y, r: (mb.kind === 2 ? 6 : mb.elite === 3 ? 5 : mb.elite ? 3 : 2) * k, fill: mb.kind === 2 ? '#ff2a2a' : mb.elite === 3 ? '#ff6ad0' : mb.elite ? '#ffb030' : '#ff7a6a' });
       if (mb.elite === 3) label(mb.x, mb.z, mb.name, '#ff6ad0');
+      // 目覚めた主はミニマップの外でも、縁に★で向きを示す
+      if (mb.elite === 3 && !v.full) {
+        const dx = x - v.W / 2, dy = y - v.H / 2, d = Math.hypot(dx, dy), max = v.W / 2 - 9;
+        if (d > max) sh.push({ t: 'text', x: v.W / 2 + dx / d * max, y: v.H / 2 + dy / d * max, text: '★', fill: '#ff6ad0', size: 14 });
+      }
     }
     for (const o of game.others.values()) { const [x, y] = p(o.x, o.z); sh.push({ t: 'circle', x, y, r: 3.5 * k, fill: '#7f7' }); label(o.x, o.z, o.name || '', '#7f7'); }
     // ピン（ミニマップでは範囲外なら縁に寄せて向きを示す）

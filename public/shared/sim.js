@@ -24,6 +24,7 @@ import './sim/bosses/graz.js';
 import './sim/bosses/yugdra.js';
 import './sim/bosses/skorpio.js';
 import { BossMethods } from './sim/boss.js';
+import { ELITE_MIXIN } from './sim/elites.js';
 
 export class World {
   constructor(opts = {}) {
@@ -152,6 +153,7 @@ export class World {
       m.kind === 'boss' ? 2 : m.kind === 'add' ? 1 : 0, m.enraged ? 1 : 0, m.named ? 3 : m.elite ? (m.gatekeeper ? 2 : 1) : 0, m.target || 0,
       Math.round(m.hateT * 10) / 10, m.kind === 'boss' ? Math.round(m.stun / m.stunMax * 100) : 0, m.stunT > 0 ? Math.round(m.stunT * 10) / 10 : 0,
       m.guard ? 1 : 0, // 盾を構えている（番兵）
+      m.aff | 0, // 精鋭の性質（ビットの和。sim/elites.js の AFFIX_IDS の順）
     ]);
     const plates = A.plates.map((t) => this.time - t <= PLATE_WINDOW ? 1 : 0);
     this.broadcastArea(A.id, { t: 'snap', ar: A.id, p: ps, m: ms, bs: A.bossState, door: A.door ? 1 : 0, pl: plates });
@@ -163,3 +165,4 @@ Object.assign(World.prototype, InteractMethods);
 Object.assign(World.prototype, MobsMethods);
 Object.assign(World.prototype, AreaTickMethods);
 Object.assign(World.prototype, BossMethods);
+Object.assign(World.prototype, ELITE_MIXIN);

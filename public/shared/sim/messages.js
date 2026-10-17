@@ -36,7 +36,7 @@ export const MESSAGES = {
     const mob = A.mobs.get(m.id);
     if (!mob || mob.hp <= 0) return;
     if (mob.burrow) return; // 砂に潜っている間は当たらない（砂塵の大蠍の潜行）
-    const dmg = Math.max(0, Math.min(Number(m.dmg) || 0, 1e9));
+    const dmg = world.affixTaken(mob, Math.max(0, Math.min(Number(m.dmg) || 0, 1e9))); // 鉄壁は構えている間ダメージが減る
     mob.hp -= dmg;
     if (mob.cast) world.castDamage(A, mob, dmg);
     world.applyTechniqueControl(A, p, mob, m.tech);

@@ -11,6 +11,8 @@ import { tf } from './variants.js';
 import { fxArrow, heal } from './actions.js';
 import { makeMobLabel } from './labels.js';
 import { fxCall } from './weapon-fx.js';
+import { decorateElite, decorateNamed } from '../models/elite-fx.js';
+import { AFFIXES, affixesOf } from '../../shared/sim/elites.js';
 import { reviveRingGeo, reviveRingMesh } from './meshes.js';
 
 // ======================================================================
@@ -48,7 +50,7 @@ export function onSnap(m) {
   const seenM = new Set();
   const fdef = FLOORS[world.floor - 1];
   for (const r of m.m) {
-    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr, elite, target, hateT, stunPct, stunT, guard] = r;
+    const [id, d, x, z, a, hp, mhp, lv, st, kind, enr, elite, target, hateT, stunPct, stunT, guard, aff] = r;
     seenM.add(id);
     let mb = mobs.get(id);
     if (!mb) {
@@ -60,9 +62,13 @@ export function onSnap(m) {
       } else {
         const md = mobDef(fdef, d);
         // elite: 1 精鋭 / 2 門番 / 3 ネームド（秘境の主）
-        const sc = md.scale ?? (kind === 1 ? 0.8 : elite === 3 ? 1.9 : elite ? 1.3 : 1); // md.scale: ボスの手下・番兵の大きさ
+        const sc = md.scale ?? (kind === 1 ? 0.8 : elite === 3 ? 2.1 : elite ? 1.3 : 1); // md.scale: ボスの手下・番兵の大きさ
         model = md.look === 'player' ? makeDarkAdventurer(md, sc) : makeMob(md.t, md.color, sc, elite === 3 ? 0xff60d0 : elite ? 0xffb030 : null);
-        name = elite === 3 ? `★ ${world.def.named?.name || md.name}` : elite === 2 ? '門番' : md.look === 'player' ? md.name : (elite ? '精鋭 ' : '') + md.name;
+        const affix = affixesOf(aff | 0);
+        name = elite === 3 ? `★ ${world.def.named?.name || md.name}` : elite === 2 ? '門番' : md.look === 'player' ? md.name : affix.length ? `精鋭〔${affix.map((k) => AFFIXES[k].name).join('・')}〕${md.name}` : (elite ? '精鋭 ' : '') + md.name;
+        // 飾り: 性質つきの精鋭は足元の輪と性質ごとの粒、ネームドは紋章の輪・光る目・種類ごとの飾り（models/elite-fx.js）
+        if (affix.length) decorateElite(model, affix);
+        else if (elite === 3) decorateNamed(model, world.def.named?.look);
         rad = 0.75 * sc;
       }
       mb = { id, model, name, rad, kind, elite, x, z, a, hp, mhp, lv, st, flash: 0, label: null, localT: 0, poisonUntil: 0, poisonT: 0 };

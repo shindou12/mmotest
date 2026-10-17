@@ -21,6 +21,7 @@ export function titleDmg(mb) {
   if (tf('t_berserk')) k *= 1.2;
   if (tf('t_hunter') && mb.kind !== 2 && !mb.elite) k *= 1.15;
   if (tf('t_breaker') && mb.stunT > 0) k *= 1.15;
+  if (mb.elite && mb.kind !== 2 && (tf('t_dolga') || tf('t_fenri') || tf('t_garum'))) k *= 1.1; // フィールドの主の称号（重ならない）
   return k;
 }
 export const desperate = () => tf('t_boss3') && state.me.hp < stats.S.mhp * 0.5; // 称号「砂王を屠りし者」

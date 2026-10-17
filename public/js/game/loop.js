@@ -341,7 +341,8 @@ export function update(dt) {
       view.fx.swordTrail(mb.model.userData.weaponModel, !!mb.act && !mb.act.done && mb.st >= 2, mb.accent ?? 0xffcc33, dt);
     }
     if (mb.model.userData.float && !mb.model.userData.flap && Math.random() < 0.25) view.fx.parts.emit(mb.x + rnd(-0.3, 0.3), 1.2 * mb.model.scale.y + mb.model.userData.body.position.y, mb.z + rnd(-0.3, 0.3), { color: FLOORS[state.world.floor - 1].mobs.find((d) => d.t === 'wisp')?.color ?? 0xffffff, size: 0.35, life: 0.7, speed: 0.4, gravity: 0.8 });
-    if (mb.elite && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
+    mb.model.userData.efx?.(t, mb.enraged); // 精鋭・ネームドの飾り（足元の輪・粒・縁の光）
+    if (mb.elite && !mb.model.userData.efx && Math.random() < 0.15) view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 2.4), mb.z + rnd(-0.6, 0.6), { color: 0xffb030, size: 0.3, life: 0.7, speed: 0.4, gravity: 1.5 });
     // きらめくトカゲ: いつもきらめき、走ると金色の粒を残す
     if (mb.t === 'lizard') view.fx.parts.emit(mb.x + rnd(-0.6, 0.6), rnd(0.3, 1.4), mb.z + rnd(-0.6, 0.6), { color: Math.random() < 0.5 ? 0xffd84a : 0xffffff, size: 0.35, life: 0.6, speed: 0.6, gravity: -0.5 });
     // 砂に潜って追ってくる（潜行）: 盛り上がりの砂ぼこり
