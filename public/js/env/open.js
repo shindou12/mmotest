@@ -1,11 +1,14 @@
 // エリアの見た目: 屋外のエリア（フィールド・狩場・町・野営地）
 import * as THREE from 'three';
-import { AREAS, exitsOf, boundR, maxR, insideOpen, obstaclesOf, hazardsOf, chestsOf } from '../../shared/areas.js';
+import { AREAS, exitsOf, boundR, angOf, maxR, insideOpen, obstaclesOf, hazardsOf, chestsOf } from '../../shared/areas.js';
 import { toon, glow, Batch } from '../toon.js';
 import { seeded, hashStr, makeHeight, local, I } from './kit.js';
 import { makeSky, makeGate, makePortal, makeGrass, makeFar } from './landmarks.js';
 import { makeProp } from './props.js';
 import { makeObstacle, makeHazard, makeChest, makeBox } from './obstacles.js';
+import { groundDetail } from './textures.js';
+import { buildTown } from './town.js';
+export { buildTown };
 
 export function buildOpen(def, fdef, opts) {
   const group = new THREE.Group();
@@ -52,7 +55,10 @@ export function buildOpen(def, fdef, opts) {
   }
   ground.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   ground.computeVertexNormals();
-  const gm = new THREE.Mesh(ground, toon(0xffffff, { vertexColors: true, noOcc: true }));
+  // 細かいムラの模様は約7m ごとに繰り返す
+  const uv = ground.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * size / 7, uv.getY(i) * size / 7);
+  const gm = new THREE.Mesh(ground, toon(0xffffff, { vertexColors: true, noOcc: true, map: groundDetail() }));
   gm.receiveShadow = true;
   group.add(gm);
 
@@ -71,7 +77,8 @@ export function buildOpen(def, fdef, opts) {
       B.add(new THREE.DodecahedronGeometry(1, 1), wallC.clone().offsetHSL(0, 0, (R() - 0.5) * 0.06 + (ring ? -0.03 : 0)), local(I, x, heightAt(x, z) + h * 0.25, z, R() * 0.3, R() * 6, R() * 0.3, w, h, w), { flat: true });
     }
   }
-  const avoid = (x, z, pad = 3) => Math.hypot(x, z) < plaza + pad || !insideOpen(def, x, z, 2) || nearBlock(x, z, 1.5) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
+  // 町は家並みの外側（崖ぎわ）にだけ木や岩を置く
+  const avoid = (x, z, pad = 3) => Math.hypot(x, z) < (def.type === 'town' ? boundR(def, angOf(x, z)) - 3 : plaza + pad) || !insideOpen(def, x, z, 2) || nearBlock(x, z, 1.5) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
   const sx = def.ell?.[0] ?? 1, sz = def.ell?.[1] ?? 1;
   const scale = (def.R / 68) ** 2 * sx * sz * (def.type === 'hunt' ? 0.6 : def.type === 'field' ? 1.1 : def.type === 'secret' ? 0.9 : 0.7);
   for (const [type, count, col1, col2] of fdef.props) {
@@ -99,7 +106,7 @@ export function buildOpen(def, fdef, opts) {
     box.rotation.y = Math.atan2(-def.box.x, -def.box.z);
     group.add(box); anims.push(box.userData.anim);
   }
-  if (def.type === 'town') buildTown(B, def, R, heightAt, anims, group);
+  if (def.type === 'town') buildTown(B, def, R, heightAt, anims, group, { plaza, onPath });
   if (def.type === 'camp') buildCamp(B, def, R, heightAt, anims, group, nearBlock);
   if (def.type === 'hunt') {
     // 狩場: 木の柵と獣よけの杭
@@ -137,43 +144,6 @@ export function buildOpen(def, fdef, opts) {
     light: { hemi: 1.1, sun: fdef.sunI, fogNear: fdef.fogNear, fogFar: fdef.fogFar, fog: fdef.fog },
     update(t, px, pz) { for (const a of anims) a(t); if (grass) { grass.U.uTime.value = t; grass.U.uPlayer.value.set(px, pz); } },
   };
-}
-
-export function buildTown(B, def, R, heightAt, anims, group) {
-  // 家並み（北の出口側は空ける）
-  const roofs = [0xb0483a, 0x3a6ab0, 0x7a5a3a, 0x4a8a5a, 0x8a4a8a];
-  const n = 10;
-  for (let i = 0; i < n; i++) {
-    const a = (i + 0.5) / n * Math.PI * 2;
-    if (Math.abs(Math.atan2(Math.sin(a), -Math.cos(a))) > Math.PI - 0.5) continue; // 北
-    const r = boundR(def, Math.atan2(Math.sin(a), -Math.cos(a))) - 7, x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (def.box && Math.hypot(def.box.x - x, def.box.z - z) < 7) continue;
-    const m = local(I, x, heightAt(x, z), z, 0, a, 0, 0.9 + R() * 0.3);
-    const w = 5 + R() * 2, d = 4.5, h = 3.2 + R() * 1.2;
-    B.add(new THREE.BoxGeometry(w, h, d), 0xeee6d4, local(m, 0, h / 2, 0));
-    B.add(new THREE.BoxGeometry(w + 0.3, 0.4, d + 0.3), 0x8a7a64, local(m, 0, 0.2, 0));
-    const roof = new THREE.CylinderGeometry(0.01, d * 0.78, 2.4, 4, 1);
-    B.add(roof, roofs[i % roofs.length], local(m, 0, h + 1.2, 0, 0, Math.PI / 4, 0, w / d * 1.0, 1, 1));
-    B.add(new THREE.BoxGeometry(1.1, 1.9, 0.1), 0x6a4428, local(m, 0, 0.95, -d / 2 - 0.02));
-    for (const s of [-1, 1]) B.add(new THREE.BoxGeometry(0.8, 0.8, 0.08), 0xffd88a, local(m, s * w * 0.3, h * 0.6, -d / 2 - 0.03), { glowing: true });
-    B.add(new THREE.BoxGeometry(0.6, 1.6, 0.6), 0x8a6a5a, local(m, w * 0.3, h + 1.4, d * 0.1));
-  }
-  // 街灯
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * Math.PI * 2 + 0.2, r = 13, x = Math.sin(a) * r, z = Math.cos(a) * r;
-    if (def.box && Math.hypot(def.box.x - x, def.box.z - z) < 4) continue;
-    B.add(new THREE.CylinderGeometry(0.1, 0.14, 3.2, 8), 0x3a3a44, local(I, x, 1.6, z));
-    B.add(new THREE.SphereGeometry(0.28, 10, 8), 0xffe0a0, local(I, x, 3.3, z), { glowing: true });
-  }
-  // 露店（NPCの近く）
-  for (const npc of def.npcs || []) {
-    const m = local(I, npc.x + 1.5, heightAt(npc.x, npc.z), npc.z - 2, 0, 0.3, 0);
-    for (const s of [-1, 1]) B.add(new THREE.CylinderGeometry(0.08, 0.08, 2.4, 6), 0x6a4a2a, local(m, s * 1.4, 1.2, 0));
-    B.add(new THREE.BoxGeometry(3.2, 0.9, 1.4), 0x9a7a52, local(m, 0, 0.45, 0));
-    B.add(new THREE.BoxGeometry(3.4, 0.12, 1.8), new THREE.Color(npc.color).lerp(new THREE.Color(0xffffff), 0.3), local(m, 0, 2.4, 0, 0.15, 0, 0));
-    for (let k = 0; k < 3; k++) B.add(new THREE.SphereGeometry(0.22, 8, 6), [0xd04a3a, 0xe0c040, 0x6ab04a][k], local(m, -0.9 + k * 0.9, 1.05, 0));
-  }
-  void group; void anims;
 }
 
 export function buildCamp(B, def, R, heightAt, anims, group, nearBlock) {

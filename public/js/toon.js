@@ -144,8 +144,9 @@ export function compact(group) {
 
 // 静的な背景用: ジオメトリを色付きで溜めて最後に1メッシュへ
 export class Batch {
-  constructor() { this.solid = []; this.glow = []; this.m = new THREE.Matrix4(); }
-  add(geo, color, matrix, { glowing = false, flat = false } = {}) {
+  constructor() { this.solid = []; this.glow = []; this.plain = []; this.m = new THREE.Matrix4(); }
+  // plain: 輪郭線を付けない（紐のような細いもの。輪郭線だけが太く見えてしまうため）
+  add(geo, color, matrix, { glowing = false, flat = false, plain = false } = {}) {
     let g = geo.index ? geo.toNonIndexed() : geo.clone();
     for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
     if (flat) g.computeVertexNormals();
@@ -153,7 +154,7 @@ export class Batch {
     const c = new THREE.Color(color), n = g.attributes.position.count, arr = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-    (glowing ? this.glow : this.solid).push(g);
+    (glowing ? this.glow : plain ? this.plain : this.solid).push(g);
     geo.dispose();
   }
   build() {
@@ -162,6 +163,11 @@ export class Batch {
       const mesh = new THREE.Mesh(mergeGeometries(this.solid), toon(0xffffff, { vertexColors: true }));
       mesh.castShadow = mesh.receiveShadow = true;
       outline(mesh, 0.9);
+      group.add(mesh);
+    }
+    if (this.plain.length) {
+      const mesh = new THREE.Mesh(mergeGeometries(this.plain), toon(0xffffff, { vertexColors: true }));
+      mesh.castShadow = true;
       group.add(mesh);
     }
     if (this.glow.length) {

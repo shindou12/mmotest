@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { AudioEngine } from '../audio.js';
 import { FX } from '../fx.js';
 import { AmbientParticles } from '../env.js';
@@ -35,10 +36,27 @@ composer.addPass(new RenderPass(scene, camera));
 export const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.45, 0.95);
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
+// 仕上げ: 少しだけ彩度とコントラストを上げ、画面の四隅をやわらかく落とす（画面の色のあとに掛ける）
+export const gradePass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, sat: { value: 1.08 }, contrast: { value: 1.04 }, vig: { value: 0.22 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vig; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+      c.rgb = mix(vec3(l), c.rgb, sat);
+      c.rgb = (c.rgb - 0.5) * contrast + 0.5;
+      vec2 d = vUv - 0.5; d.x *= 1.3;
+      c.rgb *= 1.0 - vig * smoothstep(0.35, 0.85, length(d));
+      gl_FragColor = vec4(clamp(c.rgb, 0.0, 1.0), c.a);
+    }`,
+});
+composer.addPass(gradePass);
 
 export function applyQuality() {
   const q = settings.quality;
   bloomPass.enabled = q !== 'low';
+  gradePass.enabled = q !== 'low';
   sun.castShadow = q !== 'low';
   renderer.setPixelRatio(q === 'high' ? Math.min(devicePixelRatio, 1.5) : 1);
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
