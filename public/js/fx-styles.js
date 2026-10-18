@@ -5,6 +5,7 @@
 //   subtle … 控えめ。細い斬撃と細い輪、小さく少ない粒。画面と敵の予兆が見やすい
 // ゲームの技は fx.slash / ringWave / waveMesh / lightning / flash / parts.burst / swordTrail を組み合わせて呼んでいるので、
 // ここを差し替えればすべての技の見た目が変わる（技ごとの呼び方は変えなくてよい）
+// ゲームは設定の「エフェクト」で選ぶ（setStyle。'classic' は今までの見た目 = FX のまま）
 import * as THREE from 'three';
 import { FX } from './fx.js';
 
@@ -143,29 +144,41 @@ void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c); if (d > 0.3) dis
 export class StyledFX extends FX {
   constructor(scene, style) {
     super(scene);
-    this.st = typeof style === 'string' ? FX_STYLES[style] : style;
-    const P = this.st.parts, parts = this.parts;
-    parts.points.material.fragmentShader = PART_FS[P.shape];
-    parts.points.material.needsUpdate = true;
+    const parts = this.parts;
+    this.classicFrag = parts.points.material.fragmentShader;
     this.sparks = new Sparks(scene);
     // 粒の数と大きさ。速く飛び散る粒（当たり・弾き）には線の火花も添える
-    const emit = parts.emit.bind(parts);
+    const emit = parts.emit.bind(parts), burst = parts.burst.bind(parts);
     parts.burst = (x, y, z, count, o = {}) => {
-      const n = Math.max(1, Math.round(count * P.count));
+      if (!this.st) { burst(x, y, z, count, o); return; }
+      const P = this.st.parts, n = Math.max(1, Math.round(count * P.count));
       for (let i = 0; i < n; i++) emit(x, y, z, { ...o, size: (o.size ?? 0.5) * P.size });
       if ((o.speed ?? 3) >= 5 && this.st.sparks > 0) {
         const gy = o.abs ? y : y + this.ground(x, z);
         for (let i = 0; i < Math.round(count * this.st.sparks); i++) this.sparks.emit(x, gy, z, (o.speed ?? 6) * 1.6, o.color ?? 0xffffff);
       }
     };
+    this.setStyle(style);
   }
+
+  // 見た目を切り替える（'classic' か知らない名前は今までの見た目）。すでに出ている軌跡は作り直す
+  setStyle(style) {
+    this.st = typeof style === 'string' ? FX_STYLES[style] || null : style || null;
+    const mat = this.parts.points.material;
+    mat.fragmentShader = this.st ? PART_FS[this.st.parts.shape] : this.classicFrag;
+    mat.needsUpdate = true;
+    for (const tr of this.trails.values()) tr.dispose();
+    this.trails.clear();
+  }
+  get bloom() { return this.st?.bloom ?? 0.5; }
 
   update(dt) { super.update(dt); this.sparks.update(dt); }
 
-  flash(x, y, z, color, intensity = 30, life = 0.25, dist = 12) { super.flash(x, y, z, color, intensity * this.st.flash, life, dist); }
+  flash(x, y, z, color, intensity = 30, life = 0.25, dist = 12) { super.flash(x, y, z, color, intensity * (this.st?.flash ?? 1), life, dist); }
 
   // 斬撃: 三日月が振りの向きへ走って消える
   slash(x, z, a, range, arcDeg, color, y = 1.0, reverse = false) {
+    if (!this.st) return super.slash(x, z, a, range, arcDeg, color, y, reverse);
     const S = this.st.slash, arc = THREE.MathUtils.degToRad(arcDeg);
     const mat = bandMaterial(color, S, reverse);
     const mesh = new THREE.Mesh(crescentGeometry(range, arc, S.width), mat);
@@ -180,7 +193,8 @@ export class StyledFX extends FX {
   }
 
   // 衝撃波: 縁の光る輪（アニメ調は少し遅れてもう1本）
-  ringWave(x, z, color, maxR = 6, life = 0.45, y = 0.15) {
+  ringWave(x, z, color, maxR = 6, life = 0.45, y = 0.15, width = 0.6) {
+    if (!this.st) return super.ringWave(x, z, color, maxR, life, y, width);
     const R = this.st.ring;
     const one = (delay, scale) => {
       const mat = new THREE.ShaderMaterial({
@@ -201,6 +215,7 @@ export class StyledFX extends FX {
 
   // 飛ぶ光波: 三日月をそのまま（頭が端まで走りきった形）
   waveMesh(color) {
+    if (!this.st) return super.waveMesh(color);
     const S = { ...this.st.slash, tail: 9 };
     const mat = bandMaterial(color, S, false); mat.uniforms.uHead.value = 1;
     const mesh = new THREE.Mesh(crescentGeometry(1.5, 1.8, S.width * 1.4), mat);
@@ -209,12 +224,13 @@ export class StyledFX extends FX {
 
   lightning(x, z, color = 0xbfd8ff) {
     super.lightning(x, z, color);
-    if (this.st.sparks > 0) for (let i = 0; i < 24 * this.st.sparks; i++) this.sparks.emit(x, 0.3 + this.ground(x, z), z, 12, color);
+    if (this.st?.sparks > 0) for (let i = 0; i < 24 * this.st.sparks; i++) this.sparks.emit(x, 0.3 + this.ground(x, z), z, 12, color);
   }
 
   // 振りの軌跡: 刃先側に白い芯
   makeTrail(color) {
-    const tr = super.makeTrail(color), T = this.st.trail;
+    const tr = super.makeTrail(color), T = this.st?.trail;
+    if (!T) return tr;
     tr.mat.uniforms.uCore = { value: T.core }; tr.mat.uniforms.uHard = { value: T.hard };
     tr.mat.fragmentShader = `uniform vec3 uColor; uniform float uCore, uHard; varying float vA; varying float vE;
 void main(){ float core = mix(smoothstep(1.0 - uCore, 0.85, vE), step(1.0 - uCore, vE), uHard);
