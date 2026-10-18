@@ -159,6 +159,7 @@ const TEX = {
 // 素材: 模様・1枚の大きさ（m）・濃さ
 export const SURF = {
   bark: { key: 'bark', tex: TEX.bark, scale: 1.1, strength: 0.75 },
+  birch: { key: 'birch', tex: TEX.bark, scale: 0.9, strength: 0.22 },
   leaf: { key: 'leaf', tex: TEX.leaf, scale: 1.4, strength: 0.55 },
   stone: { key: 'stone', tex: TEX.stone, scale: 2.2, strength: 0.6 },
   plaster: { key: 'plaster', tex: TEX.plaster, scale: 2.5, strength: 0.5 },

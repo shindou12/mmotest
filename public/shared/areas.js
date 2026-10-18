@@ -3,10 +3,13 @@
 // エリアの形は2種類:
 //   open … 屋外。半径 R を基準に、ell（横・縦の伸び）と wob（輪郭のゆらぎ）でいびつな形にする。
 //          obst（障害物）、hazard（毒沼・流砂）、chests（小さな宝箱）、named（ネームド）を種から決定的に配置。
-//          出口は ang（北=0°、東=90°）で輪郭上に置く
+//          出口は ang（北=0°、東=90°）で輪郭上に置く。sq（2より大きい数）で輪郭を角の丸い四角に寄せる（城壁の町）。
+//          layout: 'town' なら通り・広場・建物の敷地を shared/town-layout.js で決め、建物は当たり判定になる
 //   grid … 屋内のマス目（ダンジョン・迷宮区）。map の文字:
 //     # 壁  . 床  E 入口（出口）  M 敵の湧き  G 門番（精鋭）  B ボス部屋の中心  C 宝箱
 //     L レバー  D 扉  P 感圧板  T / t 罠床（2グループが交互に作動）
+
+import { townLayout as makeTownLayout, pushOutBox } from './town-layout.js';
 
 export const CELL = 4;
 
@@ -285,7 +288,7 @@ const MAPS = {
 export const AREAS = {
   // ---------------- 第1層: 町を中心に枝分かれ ----------------
   f1_town: {
-    floor: 1, type: 'town', name: 'はじまりの街', shape: 'open', R: 34, wob: 0.05, gate: { x: 0, z: 0 }, box: { x: -10, z: 9 }, mapPos: [50, 82],
+    floor: 1, type: 'town', name: 'はじまりの街', shape: 'open', layout: 'town', R: 42, ell: [1.2, 1], sq: 5, wob: 0, gate: { x: 0, z: 0 }, box: { x: -10, z: 9 }, mapPos: [50, 82],
     exits: [{ to: 'f1_field', ang: 0 }, { to: 'f1_lake', ang: 255 }],
     npcs: [
       { id: 'captain', name: '衛兵隊長 ガレス', x: -9, z: -6, color: '#c0504a', line: '迷宮区を越えねば、上の層へは行けん。腕を磨いてこい。' },
@@ -475,7 +478,8 @@ function shapeParams(def) {
 export function boundR(def, a) {
   const [sx, sz] = def.ell || [1, 1];
   const [dx, dz] = dirOf(a);
-  const base = 1 / Math.sqrt((dx / (def.R * sx)) ** 2 + (dz / (def.R * sz)) ** 2);
+  const n = def.sq || 2;
+  const base = 1 / (Math.abs(dx / (def.R * sx)) ** n + Math.abs(dz / (def.R * sz)) ** n) ** (1 / n);
   const w = def.wob || 0, p = shapeParams(def);
   return base * (1 + w * (0.55 * Math.sin(3 * a + p.p1) + 0.3 * Math.sin(5 * a + p.p2) + 0.15 * Math.sin(8 * a + p.p3)));
 }
@@ -504,6 +508,7 @@ const centerFree = (def, x, z, r) => {
 // 障害物（種から決定的に配置）
 const obstCache = new Map();
 export function obstaclesOf(def) {
+  if (def.layout === 'town') return townObstacles(def);
   if (def.shape !== 'open' || !def.obst) return [];
   if (obstCache.has(def.id)) return obstCache.get(def.id);
   const R = seeded(hashStr(def.id) ^ 0x51);
@@ -614,10 +619,25 @@ export function solidAt(g, c, r, doorOpen) {
 }
 
 // 壁・輪郭・障害物との当たり判定
+// 町の区画（通り・広場・建物）。建物は向きのある長方形の当たり判定（box）
+export const townLayout = (def) => (def.layout === 'town' ? makeTownLayout(def, { exitsOf, insideOpen, boundR, angOf }) : null);
+const townObstCache = new Map();
+function townObstacles(def) {
+  if (!townObstCache.has(def.id)) townObstCache.set(def.id, townLayout(def).buildings.map((b) => ({ kind: 'building', x: b.x, z: b.z, r: Math.hypot(b.w, b.d) / 2, solid: true, box: b })));
+  return townObstCache.get(def.id);
+}
+
 export function collide(def, x, z, rad = 0.5, doorOpen = false) {
   if (def.shape === 'open') {
-    for (const o of obstaclesOf(def)) {
+    // 町は建物が密集しているので、押し出した先が隣の建物でも抜けられるように2回見る
+    for (let pass = def.layout ? 2 : 1; pass > 0; pass--) for (const o of obstaclesOf(def)) {
       if (!o.solid) continue;
+      if (o.box) {
+        if (Math.hypot(x - o.x, z - o.z) > o.r + rad) continue;
+        const q = pushOutBox(o.box, x, z, rad);
+        if (q) { x = q.x; z = q.z; }
+        continue;
+      }
       const dx = x - o.x, dz = z - o.z, d = Math.hypot(dx, dz), min = o.r + rad;
       if (d < min) { const k = d > 1e-4 ? min / d : 1; x = o.x + (d > 1e-4 ? dx : min) * k; z = o.z + (d > 1e-4 ? dz : 0) * k; }
     }

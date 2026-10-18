@@ -177,10 +177,12 @@ export function texToon(key, tex, { scale = 2, strength = 0.6 } = {}) {
 // 静的な背景用: ジオメトリを色付きで溜めて最後に1メッシュへ（素材 surf ごとに1メッシュ）
 //   color: 色、または (面の中心, 面の法線) => 色（面ごとに塗り分ける。木の幹の根元を暗く、岩の上面を苔に、など）
 //   surf: { key, tex, scale, strength }（模様つきの素材。なければ無地）
+//   chunk: 0 より大きければ、置いた場所で chunk m 四方の区画に分けて別のメッシュにする（画面外・影の範囲外を描かずに済む）
 export class Batch {
-  constructor() { this.solid = new Map(); this.glow = []; this.plain = []; this.m = new THREE.Matrix4(); }
+  constructor({ chunk = 0 } = {}) { this.solid = new Map(); this.glow = []; this.plain = []; this.m = new THREE.Matrix4(); this.chunk = chunk; }
   // plain: 輪郭線を付けない（紐のような細いもの。輪郭線だけが太く見えてしまうため）
-  add(geo, color, matrix, { glowing = false, flat = false, plain = false, surf = null } = {}) {
+  //   perVertex: 色の関数を頂点ごとに呼ぶ（面の法線は同じ。苔の縁などを面の中でもなめらかに変える）
+  add(geo, color, matrix, { glowing = false, flat = false, plain = false, surf = null, perVertex = false } = {}) {
     let g = geo.index ? geo.toNonIndexed() : geo.clone();
     for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
     if (flat) g.computeVertexNormals();
@@ -191,8 +193,11 @@ export class Batch {
       for (let f = 0; f + 2 < n; f += 3) {
         cen.set((p.getX(f) + p.getX(f + 1) + p.getX(f + 2)) / 3, (p.getY(f) + p.getY(f + 1) + p.getY(f + 2)) / 3, (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3);
         nor.set(nr.getX(f) + nr.getX(f + 1) + nr.getX(f + 2), nr.getY(f) + nr.getY(f + 1) + nr.getY(f + 2), nr.getZ(f) + nr.getZ(f + 1) + nr.getZ(f + 2)).normalize();
-        c.set(color(cen, nor));
-        for (let k = 0; k < 3; k++) { arr[(f + k) * 3] = c.r; arr[(f + k) * 3 + 1] = c.g; arr[(f + k) * 3 + 2] = c.b; }
+        if (!perVertex) c.set(color(cen, nor));
+        for (let k = 0; k < 3; k++) {
+          if (perVertex) c.set(color(cen.set(p.getX(f + k), p.getY(f + k), p.getZ(f + k)), nor));
+          arr[(f + k) * 3] = c.r; arr[(f + k) * 3 + 1] = c.g; arr[(f + k) * 3 + 2] = c.b;
+        }
       }
     } else {
       const c = new THREE.Color(color);
@@ -202,7 +207,12 @@ export class Batch {
     if (glowing) this.glow.push(g);
     else if (plain) this.plain.push(g);
     else {
-      const key = surf ? surf.key : '';
+      let key = surf ? surf.key : '';
+      if (this.chunk) {
+        g.computeBoundingBox();
+        const bb = g.boundingBox;
+        key += '|' + Math.floor((bb.min.x + bb.max.x) / 2 / this.chunk) + ',' + Math.floor((bb.min.z + bb.max.z) / 2 / this.chunk);
+      }
       if (!this.solid.has(key)) this.solid.set(key, { surf, list: [] });
       this.solid.get(key).list.push(g);
     }

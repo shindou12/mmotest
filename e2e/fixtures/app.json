@@ -46,27 +46,27 @@
   "errors": []
  },
  "dom/town": {
-  "hash": "fd6402f062559888686f6823",
+  "hash": "1119a752ba9a2e1058240031",
   "size": 11926
  },
  "dom/inventory": {
-  "hash": "ff0e195ab03b21476d757dab",
+  "hash": "96600d23be44e1f689513a12",
   "size": 13547
  },
  "dom/tree": {
-  "hash": "ae8c9aab75d5fa64f85c0313",
+  "hash": "4fe642ac4f20feb87c945d19",
   "size": 24800
  },
  "dom/map": {
-  "hash": "80cdc667616e56f822a478a9",
+  "hash": "f40ccf85f499c6a2f05cff51",
   "size": 24819
  },
  "dom/settings": {
-  "hash": "39577e70a0c8fd1e1ad2fac5",
+  "hash": "fd71486566fe826235efb718",
   "size": 24847
  },
  "dom/closed": {
-  "hash": "df69b08ad027b6fa2ef6f822",
+  "hash": "03b2b4c8adf2d8a5d64db8c0",
   "size": 24854
  },
  "run": {

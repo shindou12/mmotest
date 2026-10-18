@@ -82,7 +82,7 @@ function build() {
   ground.receiveShadow = true; world.add(ground);
   // 町の一角: ゲームの町と同じ家並み・街灯・露店
   const B = new Batch(), anims = [];
-  const townDef = { id: 'sandbox_town', type: 'town', R: 24, ell: [1, 1], wob: 0.05, npcs: [{ x: -4, z: 6, color: '#c0504a' }, { x: 5, z: -4, color: '#5aa060' }] };
+  const townDef = { id: 'sandbox_town', type: 'town', shape: 'open', layout: 'town', exits: [], R: 30, ell: [1.2, 1], sq: 5, wob: 0, npcs: [{ x: -4, z: 6, color: '#c0504a' }, { x: 5, z: -4, color: '#5aa060' }] };
   buildTown(B, townDef, R, hAt, anims, world);
   // 外側の自然: 林・岩場・花畑（階の配色の木・岩・花）
   const P = Object.fromEntries(fdef.props.map((p) => [p[0], p]));

@@ -84,43 +84,47 @@ export function addTree(B, M, R, { leaf = 0x3f8f3a, bark = 0x6b4a2a, size = 1, s
   const S = (m) => local(M, 0, 0, 0, 0, 0, 0, size).multiply(m || new THREE.Matrix4());
   const barkC = (y0) => (c) => {
     const ly = (c.y - y0w) / size, k = Math.min(1, Math.max(0, (ly - y0) / 1.2));
-    if (sp === 'birch') return hash3(Math.floor(ly * 4), seed, 1) < 0.3 ? new THREE.Color(0x3a3530) : bc.clone().offsetHSL(0, 0, (hash3(c.x, c.y, c.z) - 0.5) * 0.06);
+    if (sp === 'birch') { // 白い幹に、横向きの短い黒い斑
+      const band = Math.floor(ly * 5), ang = Math.floor((Math.atan2(c.z - M.elements[14], c.x - M.elements[12]) + 3.2) * 1.3);
+      return hash3(band, ang, seed) < 0.22 && ly > 0.3 ? new THREE.Color(0x3a3530) : bc.clone().offsetHSL(0, 0, (hash3(c.x, c.y, c.z) - 0.5) * 0.04);
+    }
     return bc.clone().offsetHSL(0, 0, 0.04 - 0.08 * (1 - k) + (hash3(c.x, c.y, c.z) - 0.5) * 0.05);
   };
   const add = (geo, color, opt) => B.add(geo, color, S(), opt);
+  const barkS = sp === 'birch' ? SURF.birch : SURF.bark;
   // 幹（二股は途中で分かれる）
   const tips = [];
   if (sp === 'twin') {
     const split = 0.4;
-    add(tube((t) => trunk(t * split), (t) => P.r0 * (1.25 - t * 0.3) + Math.max(0, 0.15 - t) * 1.4, 4, 9, seed), barkC(0), { surf: SURF.bark });
+    add(tube((t) => trunk(t * split), (t) => P.r0 * (1.25 - t * 0.3) + Math.max(0, 0.15 - t) * 1.4, 4, 9, seed), barkC(0), { surf: barkS });
     for (const s of [-1, 1]) {
       const b = trunk(split), a = ph + s * 1.2;
       const f = (t) => b.clone().add(V(Math.cos(a) * t * 1.1, t * H * 0.75, Math.sin(a) * t * 1.1));
-      add(tube(f, (t) => P.r0 * (0.9 - t * 0.55), 6, 8, seed + s), barkC(0), { surf: SURF.bark });
+      add(tube(f, (t) => P.r0 * (0.9 - t * 0.55), 6, 8, seed + s), barkC(0), { surf: barkS });
       tips.push({ p: f(1), w: 0.8 });
       tips.push({ p: f(0.65).add(V(Math.cos(a + 1.6) * 0.7, 0.2, Math.sin(a + 1.6) * 0.7)), w: 0.6 });
     }
   } else {
-    add(tube(trunk, (t) => P.r0 * (1 - t * 0.6) + Math.max(0, 0.12 - t) * P.r0 * 5, sp === 'tall' ? 8 : 6, sp === 'young' ? 6 : 9, seed), barkC(0), { surf: SURF.bark });
+    add(tube(trunk, (t) => P.r0 * (1 - t * 0.6) + Math.max(0, 0.12 - t) * P.r0 * 5, sp === 'tall' ? 8 : 6, sp === 'young' ? 6 : 9, seed), barkC(0), { surf: barkS });
     tips.push({ p: trunk(1), w: 1 });
   }
   // 根（若木以外）
   if (sp !== 'young') for (let k = 0; k < (sp === 'old' ? 6 : 4); k++) {
     const a = k / (sp === 'old' ? 6 : 4) * Math.PI * 2 + R() * 0.8, L = (0.7 + R() * 0.5) * (sp === 'old' ? 1.5 : 1);
-    add(tube((t) => V(Math.cos(a) * t * L, P.r0 * 1.2 * (1 - t) ** 2 - 0.05, Math.sin(a) * t * L), (t) => P.r0 * 0.45 * (1 - t) + 0.03, 4, 5, seed + k), barkC(0), { surf: SURF.bark });
+    add(tube((t) => V(Math.cos(a) * t * L, P.r0 * 1.2 * (1 - t) ** 2 - 0.05, Math.sin(a) * t * L), (t) => P.r0 * 0.45 * (1 - t) + 0.03, 4, 5, seed + k), barkC(0), { surf: barkS });
   }
   // 枝: 幹の上半分から外向きに伸び、先に葉の房をつける
   const nb = Math.round(rr(P.br));
   for (let k = 0; k < nb; k++) {
     const t0 = sp === 'twin' ? 0.3 : 0.5 + R() * 0.35, b = trunk(t0), a = k / nb * Math.PI * 2 + R() * 0.9, L = rr(P.brL);
     const pth = (t) => V(b.x + Math.cos(a) * t * L, b.y + t * L * P.brUp + Math.sin(t * 3) * 0.08, b.z + Math.sin(a) * t * L);
-    add(tube(pth, (t) => P.r0 * 0.42 * (1 - t * 0.7), 4, 5, seed + 10 + k), barkC(0.5), { surf: SURF.bark });
+    add(tube(pth, (t) => P.r0 * 0.42 * (1 - t * 0.7), 4, 5, seed + 10 + k), barkC(0.5), { surf: barkS });
     tips.push({ p: pth(1), w: 0.75 });
   }
   // 老木の枯れ枝
   if (sp === 'old' && R() < 0.7) {
     const b = trunk(0.55), a = R() * 6.28;
-    add(tube((t) => V(b.x + Math.cos(a) * t * 1.6, b.y + t * 0.6 - t * t * 0.4, b.z + Math.sin(a) * t * 1.6), (t) => 0.09 * (1 - t * 0.8) + 0.02, 4, 5, seed + 99), barkC(0.5), { surf: SURF.bark });
+    add(tube((t) => V(b.x + Math.cos(a) * t * 1.6, b.y + t * 0.6 - t * t * 0.4, b.z + Math.sin(a) * t * 1.6), (t) => 0.09 * (1 - t * 0.8) + 0.02, 4, 5, seed + 99), barkC(0.5), { surf: barkS });
   }
   // 樹冠: 枝先の周りと、樹冠の外殻に房を散らす（横は spread、縦は flat で形を変える）
   const top = trunk(1), cTop = top.y + 0.8;
@@ -188,13 +192,17 @@ export function addRock(B, M, R, { color = 0x8a8f96, moss = 0, size = 1, kind = 
   const k = kind || ROCKS[Math.floor(R() * ROCKS.length)], seed = Math.floor(R() * 1e6);
   const base = new THREE.Color(color).offsetHSL((R() - 0.5) * 0.02, (R() - 0.5) * 0.05, (R() - 0.5) * 0.06);
   const mossC = new THREE.Color(0x5f8f3c);
+  // 苔: 上向きの面ほど、模様（ゆるいノイズ）の濃い所ほど苔になる。頂点ごとに混ぜて縁をやわらかく
+  const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   const shade = (c, n) => {
-    if (moss && n.y > 0.6 && fbm(c.x * 0.9, c.y * 0.9, c.z * 0.9) + n.y * 0.3 > 1.15 - moss * 0.5) return mossC.clone().offsetHSL(0, 0, (hash3(c.z, c.x, c.y) - 0.5) * 0.08);
-    return base.clone().offsetHSL(0, 0, (hash3(c.x * 2.3, c.y * 2.3, c.z * 2.3) - 0.5) * 0.07 + (n.y < -0.15 ? -0.1 : n.y > 0.5 ? 0.04 : 0));
+    const rock = base.clone().offsetHSL(0, 0, (fbm(c.x * 1.3, c.y * 1.3, c.z * 1.3) - 0.5) * 0.12 + (n.y < -0.15 ? -0.1 : n.y > 0.5 ? 0.03 : 0));
+    if (!moss) return rock;
+    const m = sm(0.35, 0.8, n.y) * sm(0.62 - moss * 0.25, 0.8 - moss * 0.25, fbm(c.x * 0.7 + 3, c.y * 0.7, c.z * 0.7));
+    return rock.lerp(mossC.clone().offsetHSL(0, 0, (fbm(c.z * 2, c.x * 2, c.y * 2) - 0.5) * 0.1), m);
   };
   const put = (sd, o, x, y, z, sx, sy, sz, ry = R() * 6.28, tilt = 0.12) => {
     const g = lump(sd, o);
-    B.add(g, shade, local(M, x * size, y * size, z * size, (R() - 0.5) * tilt, ry, (R() - 0.5) * tilt, sx * size, sy * size, sz * size), { flat: true, surf: SURF.stone });
+    B.add(g, shade, local(M, x * size, y * size, z * size, (R() - 0.5) * tilt, ry, (R() - 0.5) * tilt, sx * size, sy * size, sz * size), { flat: true, surf: SURF.stone, perVertex: true });
   };
   const pebbles = (n, d) => { for (let i = 0; i < n; i++) { const a = R() * 6.28, r = d * (1 + R() * 0.5), s = 0.15 + R() * 0.25; put(seed + 50 + i, { detail: 0, amp: 0.2, cuts: 2 }, Math.cos(a) * r, s * 0.3, Math.sin(a) * r, s, s * 0.7, s); } };
   if (k === 'boulder') { put(seed, { detail: 2, amp: 0.2, cuts: 9, cutAt: 0.56, flatBottom: true }, 0, 0.45, 0, 1.2, 0.85, 1.05); pebbles(2 + Math.floor(R() * 3), 1.3); }

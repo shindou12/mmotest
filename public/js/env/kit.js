@@ -17,7 +17,7 @@ export function noise2(x, z) {
 export function makeHeight(def) {
   if (def.shape === 'grid') return () => 0;
   const exits = exitsOf(def);
-  const flat = def.type === 'town' ? 0.15 : def.type === 'camp' ? 0.4 : 1;
+  const flat = def.layout === 'town' ? 0 : def.type === 'town' ? 0.15 : def.type === 'camp' ? 0.4 : 1;
   // 池はくぼみ、毒沼・流砂は平らにならす
   const sinks = [
     ...obstaclesOf(def).filter((o) => o.kind === 'pond').map((o) => ({ x: o.x, z: o.z, r: o.r, y: -0.9 })),

@@ -1,7 +1,7 @@
 // 画面: ミニマップ・エリアマップの図形。Presenter（描画パラメータを計算して View に set する）を P に足す。createUI（ui/app.js）が呼ぶ
 // ui: 画面の部品と Presenter の入れ物（app.js が作る）。ほかの画面と共有する値は ui.〜 で読み書きする
 import { FLOORS, RARITIES } from '../../../shared/data.js';
-import { AREAS, CELL, grid, boundR, obstaclesOf, hazardsOf, chestsOf } from '../../../shared/areas.js';
+import { AREAS, CELL, grid, boundR, obstaclesOf, hazardsOf, chestsOf, townLayout } from '../../../shared/areas.js';
 import { hex } from '../helpers.js';
 
 export function installMinimap(ui) {
@@ -50,7 +50,14 @@ export function installMinimap(ui) {
       // 輪郭（いびつな形）
       const pts = Array.from({ length: 64 }, (_, i) => { const a = i / 64 * Math.PI * 2, r = boundR(def, a); return p(Math.sin(a) * r, -Math.cos(a) * r); });
       sh.push({ t: 'poly', pts, close: true, fill: hex(FLOORS[world.floor - 1].ground) + 'aa', stroke: 'rgba(255,255,255,.35)', lw: 2 });
-      for (const o of obstaclesOf(def)) { const [x, y] = p(o.x, o.z); sh.push({ t: 'circle', x, y, r: Math.max(1.5, o.r * sc), fill: o.kind === 'pond' ? '#3a8ad0cc' : '#20242ecc' }); }
+      const TL = townLayout(def);
+      if (TL) { // 町: 通りと広場、建物の形
+        for (const st of TL.streets) sh.push({ t: 'poly', pts: st.pts.map(([x, z]) => p(x, z)), close: false, stroke: '#d8ccb0aa', lw: Math.max(2, st.w * sc) });
+        const q = TL.square; sh.push({ t: 'poly', pts: [[q.x0, q.z0], [q.x1, q.z0], [q.x1, q.z1], [q.x0, q.z1]].map(([x, z]) => p(x, z)), close: true, fill: '#d8ccb0aa' });
+      }
+      for (const o of obstaclesOf(def)) {
+        if (o.box) { const b = o.box, c = Math.cos(b.ry), s2 = Math.sin(b.ry); sh.push({ t: 'poly', pts: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, w]) => p(b.x + u * b.w / 2 * c + w * b.d / 2 * s2, b.z - u * b.w / 2 * s2 + w * b.d / 2 * c)), close: true, fill: '#8a5a48dd' }); continue; }
+        const [x, y] = p(o.x, o.z); sh.push({ t: 'circle', x, y, r: Math.max(1.5, o.r * sc), fill: o.kind === 'pond' ? '#3a8ad0cc' : '#20242ecc' }); }
       for (const h of hazardsOf(def)) { const [x, y] = p(h.x, h.z); sh.push({ t: 'circle', x, y, r: Math.max(1.5, h.r * sc), fill: h.kind === 'poison' ? '#8a3ab0aa' : '#e0c890aa' }); }
       if (def.box) { const [x, y] = p(def.box.x, def.box.z); sh.push({ t: 'rect', x: x - 3.5 * k, y: y - 3.5 * k, w: 7 * k, h: 7 * k, fill: '#7ae0ff' }); label(def.box.x, def.box.z, '共有ボックス', '#7ae0ff'); }
     }

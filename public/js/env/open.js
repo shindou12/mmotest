@@ -1,6 +1,6 @@
 // エリアの見た目: 屋外のエリア（フィールド・狩場・町・野営地）
 import * as THREE from 'three';
-import { AREAS, exitsOf, boundR, angOf, maxR, insideOpen, obstaclesOf, hazardsOf, chestsOf } from '../../shared/areas.js';
+import { AREAS, exitsOf, boundR, angOf, maxR, townLayout,  insideOpen, obstaclesOf, hazardsOf, chestsOf } from '../../shared/areas.js';
 import { toon, glow, Batch } from '../toon.js';
 import { seeded, hashStr, makeHeight, local, I } from './kit.js';
 import { makeSky, makeGate, makePortal, makeGrass, makeFar } from './landmarks.js';
@@ -8,6 +8,7 @@ import { makeProp } from './props.js';
 import { makeObstacle, makeHazard, makeChest, makeBox } from './obstacles.js';
 import { groundDetail } from './textures.js';
 import { buildTown } from './town.js';
+import { inBox } from '../../shared/town-layout.js';
 export { buildTown };
 
 export function buildOpen(def, fdef, opts) {
@@ -30,7 +31,8 @@ export function buildOpen(def, fdef, opts) {
   const cols = new Float32Array(pos.count * 3);
   const c1 = new THREE.Color(fdef.ground), c2 = new THREE.Color(fdef.ground2), tmp = new THREE.Color();
   const stoneC = new THREE.Color(0xa8a49a).lerp(c1, 0.15), pathC = c1.clone().lerp(new THREE.Color(0x8a7458), 0.55);
-  const plaza = def.type === 'town' ? def.R * 0.62 : def.type === 'camp' ? 9 : 0;
+  const TL = townLayout(def); // 区画のある町（石畳・建物は town.js が描く）
+  const plaza = TL ? 0 : def.type === 'town' ? def.R * 0.62 : def.type === 'camp' ? 9 : 0;
   const exits = exitsOf(def);
   const onPath = (x, z, w) => exits.some((e) => {
     // 中心から各出口への小道
@@ -45,6 +47,7 @@ export function buildOpen(def, fdef, opts) {
     tmp.copy(c1).lerp(c2, k * 0.85 + Math.random() * 0.15);
     const r = Math.hypot(x, z);
     if (r < plaza) tmp.copy(stoneC).offsetHSL(0, 0, ((Math.floor(x * 0.8) + Math.floor(z * 0.8)) % 2) * 0.03 + Math.random() * 0.02);
+    else if (TL) { if (TL.paved(x, z, 0.8)) tmp.lerp(pathC, 0.7); }
     else if (onPath(x, z, 2.6)) tmp.lerp(pathC, onPath(x, z, 1.7) ? 0.85 : 0.45);
     for (const h of haz) {
       const d = Math.hypot(x - h.x, z - h.z);
@@ -63,11 +66,11 @@ export function buildOpen(def, fdef, opts) {
   group.add(gm);
 
   // 外周の崖（輪郭に沿って並べる）とプロップ
-  const B = new Batch();
+  const B = new Batch({ chunk: 24 });
   const wallC = new THREE.Color(fdef.ground).multiplyScalar(0.55);
   // 岩の内側の面が輪郭（boundR）より内へはみ出さないように、岩の大きさぶん外へ置く
   const nWall = Math.round(MR * 1.8);
-  for (let ring = 0; ring < 2; ring++) {
+  for (let ring = TL ? 1 : 0; ring < 2; ring++) { // 区画のある町は内側の崖の代わりに城壁
     for (let i = 0; i < nWall; i++) {
       const a = (i / nWall) * Math.PI * 2 + R() * 0.08;
       const w = ring ? 5 + R() * 4 : 3 + R() * 2.5, h = ring ? 12 + R() * 14 : 5 + R() * 8;
@@ -81,7 +84,7 @@ export function buildOpen(def, fdef, opts) {
   const avoid = (x, z, pad = 3) => Math.hypot(x, z) < (def.type === 'town' ? boundR(def, angOf(x, z)) - 3 : plaza + pad) || !insideOpen(def, x, z, 2) || nearBlock(x, z, 1.5) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 7) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 10) || onPath(x, z, 3) || (def.npcs || []).some((n) => Math.hypot(n.x - x, n.z - z) < 3);
   const sx = def.ell?.[0] ?? 1, sz = def.ell?.[1] ?? 1;
   const scale = (def.R / 68) ** 2 * sx * sz * (def.type === 'hunt' ? 0.6 : def.type === 'field' ? 1.1 : def.type === 'secret' ? 0.9 : 0.7);
-  for (const [type, count, col1, col2] of fdef.props) {
+  for (const [type, count, col1, col2] of TL ? [] : fdef.props) {
     for (let i = 0; i < Math.round(count * scale); i++) {
       const a = R() * Math.PI * 2, r = 4 + Math.sqrt(R()) * (boundR(def, a) - 3);
       const x = Math.sin(a) * r, z = -Math.cos(a) * r;
@@ -106,7 +109,7 @@ export function buildOpen(def, fdef, opts) {
     box.rotation.y = Math.atan2(-def.box.x, -def.box.z);
     group.add(box); anims.push(box.userData.anim);
   }
-  if (def.type === 'town') buildTown(B, def, R, heightAt, anims, group, { plaza, onPath });
+  if (TL) buildTown(B, def, R, heightAt, anims, group);
   if (def.type === 'camp') buildCamp(B, def, R, heightAt, anims, group, nearBlock);
   if (def.type === 'hunt') {
     // 狩場: 木の柵と獣よけの杭
@@ -124,7 +127,7 @@ export function buildOpen(def, fdef, opts) {
   group.add(makeFar(fdef, R));
 
   // 草
-  const grassAvoid = (x, z) => Math.hypot(x, z) < plaza + 1 || !insideOpen(def, x, z, 0) || nearBlock(x, z, 0.2) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 7) || onPath(x, z, 1.6) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 3);
+  const grassAvoid = (x, z) => (TL && (TL.paved(x, z, 0.5) || TL.buildings.some((b) => inBox(b, x, z, 0.8)))) || Math.hypot(x, z) < plaza + 1 || !insideOpen(def, x, z, 0) || nearBlock(x, z, 0.2) || (def.gate && Math.hypot(x - def.gate.x, z - def.gate.z) < 7) || onPath(x, z, 1.6) || exits.some((e) => Math.hypot(e.x - x, e.z - z) < 3);
   const grass = makeGrass(fdef, MR, heightAt, R, grassAvoid, (opts.grass ?? 1) * (def.type === 'town' ? 0.5 : 1), def.R * Math.sqrt(sx * sz));
   if (grass) group.add(grass.mesh);
 
