@@ -8,7 +8,7 @@ import { PROF_MAX } from '../weapon-tree.js';
 import { DEBUG, char, saveChar } from './save.js';
 import { me } from './state.js';
 import { S, calcStats } from './stats.js';
-import { HIT_SOUNDS, VOICE_DEFAULTS } from '../sample-sfx.js';
+import { HIT_SOUNDS, SYNTH_HITS, VOICE_DEFAULTS } from '../sample-sfx.js';
 import { audio } from './render.js';
 import { toast, ui } from './ui-bridge.js';
 
@@ -71,7 +71,7 @@ function setupHitSound() {
   } catch { /* 保存なし */ }
   if (!HIT_SOUNDS.some((x) => x.id === h.pick)) h.pick = 'synth';
   audio.hitSound = h;
-  for (const x of HIT_SOUNDS) audio.samples?.load(x.id, x.url);
+  for (const x of HIT_SOUNDS) x.synth ? audio.samples?.render(x.id, SYNTH_HITS[x.synth]) : audio.samples?.load(x.id, x.url);
 }
 const saveHitSound = () => { try { localStorage.setItem(HIT_KEY, JSON.stringify(audio.hitSound)); } catch { /* 保存できない */ } };
 

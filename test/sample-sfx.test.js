@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HIT_SOUNDS, SampleBank, jitter } from '../public/js/sample-sfx.js';
+import { HIT_SOUNDS, SYNTH_HITS, SampleBank, jitter } from '../public/js/sample-sfx.js';
 import fs from 'node:fs';
 
 test('jitter は 1 ± range に収まり、range 0 なら揺れない', () => {
@@ -67,6 +67,10 @@ test('同時ヒットはまとめ、続けて当てると小さくし、上限�
   assert.equal(bank.voices.get('x').at(-1).g.gain.value, 1);
 });
 
+test('自作のヒット音はレシピがある', () => {
+  for (const h of HIT_SOUNDS.filter((x) => x.synth)) assert.equal(typeof SYNTH_HITS[h.synth], 'function', h.id);
+});
+
 test('ヒット音の候補のファイルがすべてある', () => {
-  for (const h of HIT_SOUNDS) assert.ok(fs.existsSync(new URL(`../public/${h.url}`, import.meta.url)), h.url);
+  for (const h of HIT_SOUNDS.filter((x) => !x.synth)) assert.ok(fs.existsSync(new URL(`../public/${h.url}`, import.meta.url)), h.url);
 });
