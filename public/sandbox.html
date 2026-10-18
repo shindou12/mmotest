@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>見た目の箱庭</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }</script>
+<style>
+  :root { --bg: #10141c; --panel: rgba(14,18,26,.88); --ink: #e8edf5; --sub: #9aa6b8; --line: rgba(255,255,255,.12); --acc: #7ad0ff; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.5 system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #ui { position: fixed; top: 10px; right: 10px; width: 270px; max-height: calc(100% - 20px); overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-sizing: border-box; }
+  #ui h1 { font-size: 14px; margin: 0 0 6px; }
+  #ui h2 { font-size: 12px; color: var(--acc); margin: 12px 0 4px; font-weight: 600; }
+  .row { display: grid; grid-template-columns: 92px 1fr 38px; align-items: center; gap: 6px; margin: 3px 0; }
+  .row span { color: var(--sub); } .row output { text-align: right; font-variant-numeric: tabular-nums; color: var(--sub); }
+  input[type=range] { width: 100%; }
+  .btns { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0; }
+  .btns button { flex: 1 1 auto; background: #1d2533; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; cursor: pointer; font: inherit; }
+  .btns button.on { background: #2b4a66; border-color: var(--acc); }
+  #fps { position: fixed; left: 10px; top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; color: var(--sub); font-variant-numeric: tabular-nums; }
+  #hide { position: fixed; right: 10px; bottom: 10px; }
+  @media (max-width: 640px) { #ui { top: auto; bottom: 0; right: 0; left: 0; width: auto; max-height: 45%; border-radius: 10px 10px 0 0; } }
+</style></head>
+<body>
+<div id="fps">-- fps</div>
+<div id="ui"></div>
+<script type="module" src="./js/sandbox.js"></script>
+</body></html>
