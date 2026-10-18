@@ -170,36 +170,44 @@ const heavy = {
 
 // ---------------------------------------------------------------------------
 // 構え（motions/index.js が近接の動きに上書きする）。溜めと強攻撃の振りだけ大剣の動き、ほかは近接と同じ
-//   溜め: 頭の上で大きく振りかぶり、溜まるほど刃を背中側へ倒して上体を反らす
+//   溜め: 頭の後ろへ大きく振りかぶり、溜まるほど刃を右肩の後ろへ倒して上体を反らし、ひねる
 //   強攻撃: 溜めの振りかぶりを一瞬保ってから、前へ腕を伸ばして振り下ろす（当たりは 0.12 秒 = k 0.24）
 // ---------------------------------------------------------------------------
 const motion = (rig) => {
   const { THREE, aimHand, orientWeapon, ease, applyMeleePose } = rig;
   const lerp = (a, b, k) => a + (b - a) * k;
-  // 姿勢: 右手の位置（体の向き基準）・刃の向き（pitch: 上向き。π/2 を越えると背中側）・上体の前後の傾き
-  const REST = { y: 1.15, z: .34, pitch: .60, lean: 0 };
-  const windup = (c) => ({ y: 1.62 + .16 * c, z: .04 - .12 * c, pitch: 1.75 + .55 * c, lean: -.06 - .12 * c });
-  const STRIKE = { y: 1.12, z: .50, pitch: -.20, lean: .22 };
-  const mix = (a, b, k) => ({ y: lerp(a.y, b.y, k), z: lerp(a.z, b.z, k), pitch: lerp(a.pitch, b.pitch, k), lean: lerp(a.lean, b.lean, k) });
-  function hold(u, s, p, twist) {
+  // 姿勢: 右手の位置（体の向き基準）・刃の向き（pitch: 上向き。π/2 を越えると背中側 / yaw: 左右）・上体の前後の傾き（lean）とひねり（twist）・足の開き（stance）
+  const REST = { x: -.04, y: 1.15, z: .34, pitch: .60, yaw: 0, lean: 0, twist: 0, stance: 0 };
+  // 溜め: 両手を頭の後ろへ上げ、刃を右肩の後ろへ深く倒す（溜めきると刃先は背中側のやや上）。上体を反らして右肩を大きく引き、足を前後に開く
+  const windup = (c) => ({ x: lerp(-.04, .02, c), y: lerp(1.60, 1.76, c), z: lerp(.06, -.22, c), pitch: lerp(1.75, 2.65, c), yaw: lerp(0, -.35, c), lean: lerp(-.06, -.26, c), twist: lerp(0, -.5, c), stance: c });
+  const STRIKE = { x: -.04, y: 1.12, z: .50, pitch: -.20, yaw: 0, lean: .26, twist: .12, stance: 1 };
+  const mix = (a, b, k) => Object.fromEntries(Object.keys(a).map((key) => [key, lerp(a[key], b[key], k)]));
+  function hold(u, s, p) {
     u.armR.position.z = 0;
-    if (!(s.dodge > 0) && !(s.down > 0) && !(s.hurt > 0)) { u.body.rotation.x = p.lean; u.body.rotation.y = twist; }
-    const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(-.04, p.y, p.z), new THREE.Vector3(1, -.6, -.2));
-    const axis = new THREE.Vector3(0, Math.sin(p.pitch), Math.cos(p.pitch));
+    if (!(s.dodge > 0) && !(s.down > 0) && !(s.hurt > 0)) {
+      u.body.rotation.x = p.lean; u.body.rotation.y = p.twist;
+      // 足は体に付いているので、反らした分を戻して地面に立たせ、前後に踏ん張る（歩いているときは歩きのまま）
+      if (!s.moving) { u.legs[0].rotation.x = -p.lean - .35 * p.stance; u.legs[1].rotation.x = -p.lean + .25 * p.stance; }
+      u.head.rotation.y = -p.twist * .6;
+    }
+    const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(p.x, p.y, p.z), new THREE.Vector3(1, -.6, -.2));
+    const axis = new THREE.Vector3(Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), Math.cos(p.yaw) * Math.cos(p.pitch));
     aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, -.18), new THREE.Vector3(-1, -.6, -.2));
-    orientWeapon(u, 0, p.pitch, Math.PI / 2); // 縦振り: 刃を前へ
+    orientWeapon(u, p.yaw, p.pitch, Math.PI / 2); // 縦振り: 刃を前へ
   }
   return {
     pose(u, s) {
       const k = s.swing ?? -1;
       if (s.heavy && k >= 0) {
-        // 振りかぶりを保つ → 振り下ろす → 構えに戻る
+        // 振りかぶりを保つ → 一気に振り下ろす → 構えに戻る
         const top = windup(1);
-        const p = k < .06 ? top : k < .30 ? mix(top, STRIKE, ease((k - .06) / .24)) : k < .62 ? STRIKE : mix(STRIKE, REST, ease((k - .62) / .38));
-        hold(u, s, p, 0);
+        const p = k < .06 ? top : k < .28 ? mix(top, STRIKE, ease((k - .06) / .22)) : k < .62 ? STRIKE : mix(STRIKE, REST, ease((k - .62) / .38));
+        hold(u, s, p);
       } else if (s.charging && k >= 0 && k <= .02) {
-        const c = ease(Math.min(1, Math.max(0, s.charge ?? 0)));
-        hold(u, s, windup(c), -.12 * c); // 溜まるほど右肩を引く
+        // 溜めの前半で振りかぶりきり、溜めきったら力をこめて小さく震える
+        const charge = Math.min(1, Math.max(0, s.charge ?? 0)), p = windup(ease(Math.min(1, charge / .6)));
+        if (charge >= 1) p.pitch += Math.sin((s.t ?? 0) * 45) * .02;
+        hold(u, s, p);
       } else applyMeleePose(u, s);
     },
   };
