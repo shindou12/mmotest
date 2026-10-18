@@ -13,6 +13,7 @@ import { makeProp } from './env/props.js';
 import { buildTown } from './env/open.js';
 import { makeSky, makeGrass } from './env/landmarks.js';
 import { seeded, local, I } from './env/kit.js';
+import { loadManifest, placeExternal } from './sandbox-external.js';
 import { REGIONS, CLASSES, PATTERN_NAMES, paletteTexture, paletteRows, patternAtlas, makeStyleUniforms, styledToon, addRim, tagGeometry } from './sandbox-style.js';
 
 // ---- 描画の土台（ゲームの render.js と同じ組み方） ----
@@ -42,11 +43,11 @@ const PRESETS = {
   '陰影強め': { steps: 3, shadow: 40, outline: 1.4, outlineColor: '#2a1a14', hemi: 0.75, sun: 1.25, warm: 0.35, exposure: 0.95, fog: 0.8, bloom: 0.35, sat: 0.9 },
   'ミニマル': { steps: 2, shadow: 110, outline: 0.7, outlineColor: '#3a3448', hemi: 1.2, sun: 0.85, warm: 0.1, exposure: 1.05, fog: 1.3, bloom: 0.15, sat: 1.1 },
 };
-const S = { floor: 1, view: 'game', spot: 'town', anim: 'idle', shadows: true, look: 'now', region: 0, patStr: 1, rim: 0, ...PRESETS['現行'] };
+const S = { extToon: true, floor: 1, view: 'game', spot: 'town', anim: 'idle', shadows: true, look: 'now', region: 0, patStr: 1, rim: 0, ...PRESETS['現行'] };
 // 質感の試作（A 配色画像 / B パターン画像 / 縁の明かり）: sandbox-style.js
 const PAL = paletteTexture(), ATLAS = patternAtlas(), U = makeStyleUniforms(PAL, ATLAS.tex);
 // ゲームのカメラで見る場所（町の中・町の外れ・林の中）
-const SPOTS = { town: [-4.5, 8, 1.3], edge: [0, 22, 1.3], woods: [20, 26, 1.3], close: [12, 12, 0.6] };
+const SPOTS = { ext: [-22, 30, 1.0], town: [-4.5, 8, 1.3], edge: [0, 22, 1.3], woods: [20, 26, 1.3], close: [12, 12, 0.6] };
 
 // トゥーンの段: 段数と、いちばん暗い段の明るさ
 function makeGradient(steps, dark) {
@@ -115,6 +116,7 @@ function build() {
   boss.position.set(0, hAt(0, -28), -28); world.add(boss); actors.push({ m: boss, boss: true, i: 9 });
   world.userData.anims = anims;
   scene.add(world);
+  showExternal();
   apply();
 }
 
@@ -170,7 +172,7 @@ h('h2', '場所（階の配色）');
 buttons([['1層 草原', 1], ['2層 霧の森', 2], ['3層 砂漠', 3]], () => S.floor, (v) => { S.floor = v; build(); });
 h('h2', '視点');
 buttons([['ゲームのカメラ', 'game'], ['自由に回す', 'free']], () => S.view, (v) => { S.view = v; });
-buttons([['町の中', 'town'], ['町の外れ', 'edge'], ['林', 'woods'], ['寄る', 'close']], () => S.spot, (v) => { S.spot = v; S.view = 'game'; });
+buttons([['町の中', 'town'], ['町の外れ', 'edge'], ['林', 'woods'], ['寄る', 'close'], ['外部モデル', 'ext']], () => S.spot, (v) => { S.spot = v; S.view = 'game'; });
 h('h2', 'キャラの動き');
 buttons([['待機', 'idle'], ['歩き', 'walk'], ['攻撃', 'attack']], () => S.anim, (v) => { S.anim = v; });
 h('h2', '質感（A 配色画像・B パターン画像）');
@@ -187,6 +189,9 @@ syncs.push(row('模様の強さ', 'patStr', 0, 2, 0.05), row('縁の明かり', 
   const cap2 = document.createElement('div'); cap2.style.cssText = 'color:var(--sub);font-size:11px'; cap2.textContent = `模様: ${PATTERN_NAMES.join('・')}`;
   box.append(pal, cap, atl, cap2); ui.append(box);
 }
+h('h2', '外部モデル（assets/models/manifest.json）');
+const extInfo = document.createElement('div'); extInfo.style.cssText = 'color:var(--sub);font-size:11px'; extInfo.textContent = '読み込み中…'; ui.append(extInfo);
+buttons([['トゥーン化', true], ['元の質感', false]], () => S.extToon, (v) => { S.extToon = v; showExternal(); });
 h('h2', '陰影');
 syncs.push(row('段の数', 'steps', 2, 6, 1), row('影の明るさ', 'shadow', 0, 160, 5));
 h('h2', '輪郭線');
@@ -222,3 +227,15 @@ function loop() {
 build();
 loop();
 window.sandbox = { S, apply, build, PRESETS }; // 確認用
+
+// 外部モデルの列（町の外れ、南西）。manifest がなければ何も置かない
+var extGroup = null, manifest; // var: build() がこの行より先に呼ぶため
+async function showExternal() {
+  if (manifest === undefined) manifest = await loadManifest();
+  if (extGroup) { extGroup.parent?.remove(extGroup); extGroup = null; }
+  if (!manifest) { extInfo.textContent = 'まだありません（public/assets/models/ に GLB と manifest.json を置くと、町の外れに並びます）'; return; }
+  extGroup = await placeExternal(manifest, { toon: S.extToon, gradientMap: makeGradient(S.steps, S.shadow) });
+  world.add(extGroup);
+  extInfo.textContent = `${manifest.source ?? ''} ${manifest.items.length}点（視点「外部モデル」で見る）`;
+  apply();
+}
