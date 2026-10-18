@@ -13,6 +13,7 @@ import { makeProp } from './env/props.js';
 import { buildTown } from './env/open.js';
 import { makeSky, makeGrass } from './env/landmarks.js';
 import { seeded, local, I } from './env/kit.js';
+import { REGIONS, CLASSES, PATTERN_NAMES, paletteTexture, paletteRows, patternAtlas, makeStyleUniforms, styledToon, addRim, tagGeometry } from './sandbox-style.js';
 
 // ---- 描画の土台（ゲームの render.js と同じ組み方） ----
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -41,9 +42,11 @@ const PRESETS = {
   '陰影強め': { steps: 3, shadow: 40, outline: 1.4, outlineColor: '#2a1a14', hemi: 0.75, sun: 1.25, warm: 0.35, exposure: 0.95, fog: 0.8, bloom: 0.35, sat: 0.9 },
   'ミニマル': { steps: 2, shadow: 110, outline: 0.7, outlineColor: '#3a3448', hemi: 1.2, sun: 0.85, warm: 0.1, exposure: 1.05, fog: 1.3, bloom: 0.15, sat: 1.1 },
 };
-const S = { floor: 1, view: 'game', spot: 'town', anim: 'idle', shadows: true, ...PRESETS['現行'] };
+const S = { floor: 1, view: 'game', spot: 'town', anim: 'idle', shadows: true, look: 'now', region: 0, patStr: 1, rim: 0, ...PRESETS['現行'] };
+// 質感の試作（A 配色画像 / B パターン画像 / 縁の明かり）: sandbox-style.js
+const PAL = paletteTexture(), ATLAS = patternAtlas(), U = makeStyleUniforms(PAL, ATLAS.tex);
 // ゲームのカメラで見る場所（町の中・町の外れ・林の中）
-const SPOTS = { town: [-4.5, 8], edge: [0, 22], woods: [20, 26] };
+const SPOTS = { town: [-4.5, 8, 1.3], edge: [0, 22, 1.3], woods: [20, 26, 1.3], close: [12, 12, 0.6] };
 
 // トゥーンの段: 段数と、いちばん暗い段の明るさ
 function makeGradient(steps, dark) {
@@ -72,7 +75,8 @@ function build() {
     cols.set([tmp.r, tmp.g, tmp.b], i * 3);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(cols, 3)); geo.computeVertexNormals();
-  const ground = new THREE.Mesh(geo, new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: makeGradient(4, 70) }));
+  tagGeometry(geo, true);
+  const ground = new THREE.Mesh(geo, styledToon(U, makeGradient(4, 70)));
   ground.receiveShadow = true; world.add(ground);
   // 町の一角: ゲームの町と同じ家並み・街灯・露店
   const B = new Batch(), anims = [];
@@ -94,7 +98,10 @@ function build() {
     const a = g / 3 * Math.PI * 2 + 2.2, d = 23, cx = Math.sin(a) * d, cz = Math.cos(a) * d;
     for (let i = 0; i < 70; i++) put(kinds[2] ?? kinds[0], cx + (R() - 0.5) * 7, cz + (R() - 0.5) * 7, 1 + R() * 0.4);
   }
-  world.add(B.build());
+  const built = B.build();
+  // まとめ描きの木・岩・家にも素材の種類を付けて、質感の試作を掛けられるようにする
+  built.traverse((o) => { if (o.isMesh && o.material?.isMeshToonMaterial && o.material.vertexColors && o.geometry.attributes.color) { tagGeometry(o.geometry, false); o.material = styledToon(U, makeGradient(4, 70)); } });
+  world.add(built);
   grass = makeGrass(fdef, 58, hAt, R, (x, z) => Math.hypot(x, z) < 20, 1, 58);
   if (grass) world.add(grass.mesh);
   // 人（大きさの目安）と敵
@@ -118,7 +125,7 @@ function apply() {
   const oc = new THREE.Color(S.outlineColor).getHex();
   scene.traverse((o) => {
     if (!o.isMesh || !o.material) return;
-    for (const m of [].concat(o.material)) if (m.isMeshToonMaterial) { m.gradientMap = grad; m.needsUpdate = true; }
+    for (const m of [].concat(o.material)) if (m.isMeshToonMaterial) { m.gradientMap = grad; addRim(m, U); m.needsUpdate = true; }
     if (o.userData.noOutline && o.material.side === THREE.BackSide && o.material.isMeshBasicMaterial) {
       o.visible = S.outline > 0.05;
       if (o.visible) o.material = outlineMat(Math.round(S.outline * 10) / 10, oc);
@@ -131,6 +138,11 @@ function apply() {
   renderer.toneMappingExposure = S.exposure;
   bloom.strength = S.bloom;
   renderer.domElement.style.filter = S.sat === 1 ? '' : `saturate(${S.sat})`;
+  U.uPalOn.value = S.look === 'now' ? 0 : 1; U.uPatOn.value = S.look === 'ab' ? 1 : 0;
+  U.uRegion.value = S.region; U.uPatStr.value = S.patStr; U.uRim.value = S.rim;
+  U.uRimC.value.set(fd.hemi[0]);
+  // 草（別描きの葉）も配色に寄せる
+  if (grass) grass.mesh.material.color.set(S.look === 'now' ? 0xffffff : [0xffffff, 0x9ab4a4, 0xe8d49a, 0xd8b898][S.region]);
 }
 
 // ---- 操作盤 ----
@@ -158,9 +170,23 @@ h('h2', '場所（階の配色）');
 buttons([['1層 草原', 1], ['2層 霧の森', 2], ['3層 砂漠', 3]], () => S.floor, (v) => { S.floor = v; build(); });
 h('h2', '視点');
 buttons([['ゲームのカメラ', 'game'], ['自由に回す', 'free']], () => S.view, (v) => { S.view = v; });
-buttons([['町の中', 'town'], ['町の外れ', 'edge'], ['林', 'woods']], () => S.spot, (v) => { S.spot = v; S.view = 'game'; });
+buttons([['町の中', 'town'], ['町の外れ', 'edge'], ['林', 'woods'], ['寄る', 'close']], () => S.spot, (v) => { S.spot = v; S.view = 'game'; });
 h('h2', 'キャラの動き');
 buttons([['待機', 'idle'], ['歩き', 'walk'], ['攻撃', 'attack']], () => S.anim, (v) => { S.anim = v; });
+h('h2', '質感（A 配色画像・B パターン画像）');
+buttons([['今のまま', 'now'], ['A', 'a'], ['A＋B', 'ab']], () => S.look, (v) => { S.look = v; apply(); });
+buttons(REGIONS.map((r, i) => [r, i]), () => S.region, (v) => { S.region = v; apply(); });
+syncs.push(row('模様の強さ', 'patStr', 0, 2, 0.05), row('縁の明かり', 'rim', 0, 1.5, 0.05));
+{ // 配色画像と模様の見本
+  const box = document.createElement('div'); box.style.cssText = 'display:grid;grid-template-columns:1fr;gap:6px;margin:6px 0';
+  const pal = document.createElement('canvas'); pal.width = CLASSES.length * 16; pal.height = paletteRows.length * 14; pal.style.cssText = 'width:100%;image-rendering:pixelated;border-radius:4px';
+  const g = pal.getContext('2d');
+  paletteRows.forEach((row, y) => row.slice(0, CLASSES.length).forEach((hex, x) => { g.fillStyle = hex ? '#' + hex.toString(16).padStart(6, '0') : '#444'; g.fillRect(x * 16, y * 14, 16, 14); }));
+  const cap = document.createElement('div'); cap.style.cssText = 'color:var(--sub);font-size:11px'; cap.textContent = `配色画像: 行=場所（${REGIONS.join('・')}）/ 列=${CLASSES.join('・')}`;
+  const atl = ATLAS.canvas; atl.style.cssText = 'width:100%;border-radius:4px';
+  const cap2 = document.createElement('div'); cap2.style.cssText = 'color:var(--sub);font-size:11px'; cap2.textContent = `模様: ${PATTERN_NAMES.join('・')}`;
+  box.append(pal, cap, atl, cap2); ui.append(box);
+}
 h('h2', '陰影');
 syncs.push(row('段の数', 'steps', 2, 6, 1), row('影の明るさ', 'shadow', 0, 160, 5));
 h('h2', '輪郭線');
@@ -186,7 +212,7 @@ function loop() {
   if (grass) grass.U.uTime.value = t;
   if (S.view === 'game') {
     // ゲームと同じ見下ろし（ズーム 1.3 相当）。自キャラの位置を見る
-    const pitch = 0.62 + 0.3 * ((1.3 - 0.55) / 1.05), dist = 19.5 * 1.3, [fx, fz] = SPOTS[S.spot];
+    const [fx, fz, zoom] = SPOTS[S.spot], pitch = 0.62 + 0.3 * ((zoom - 0.55) / 1.05), dist = 19.5 * zoom;
     camera.position.set(fx, 1.2 + Math.sin(pitch) * dist, fz + Math.cos(pitch) * dist); camera.lookAt(fx, 1.2, fz);
     controls.target.set(fx, 1.2, fz);
   } else controls.update();
