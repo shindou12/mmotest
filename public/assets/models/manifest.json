@@ -1,0 +1,35 @@
+{
+  "source": "Blender 生成（tools/blender）",
+  "items": [
+    {
+      "file": "blender/rock_01.glb",
+      "kind": "岩",
+      "scale": 1.0
+    },
+    {
+      "file": "blender/rock_02.glb",
+      "kind": "岩",
+      "scale": 1.0
+    },
+    {
+      "file": "blender/rock_03.glb",
+      "kind": "岩",
+      "scale": 1.0
+    },
+    {
+      "file": "blender/tree_broadleaf_01.glb",
+      "kind": "木",
+      "scale": 1.0
+    },
+    {
+      "file": "blender/tree_broadleaf_02.glb",
+      "kind": "木",
+      "scale": 1.0
+    },
+    {
+      "file": "blender/tree_broadleaf_03.glb",
+      "kind": "木",
+      "scale": 1.0
+    }
+  ]
+}

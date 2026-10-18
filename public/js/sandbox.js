@@ -48,7 +48,7 @@ const S = { extToon: true, floor: 1, view: 'game', spot: 'town', anim: 'idle', s
 // 質感の試作（A 配色画像 / B パターン画像 / 縁の明かり）: sandbox-style.js
 const PAL = paletteTexture(), ATLAS = patternAtlas(), U = makeStyleUniforms(PAL, ATLAS.tex);
 // ゲームのカメラで見る場所（町の中・町の外れ・林の中）
-const SPOTS = { old_new: [0, 31, 1.2], remake: [0, 46, 1.05], ext: [-22, 30, 1.0], town: [-4.5, 8, 1.3], edge: [0, 22, 1.3], woods: [20, 26, 1.3], close: [12, 12, 0.6] };
+const SPOTS = { old_new: [0, 31, 1.2], remake: [0, 46, 1.05], ext: [-24, 30, 0.85], town: [-4.5, 8, 1.3], edge: [0, 22, 1.3], woods: [20, 26, 1.3], close: [12, 12, 0.6] };
 
 // トゥーンの段: 段数と、いちばん暗い段の明るさ
 function makeGradient(steps, dark) {
@@ -61,6 +61,7 @@ function makeGradient(steps, dark) {
 
 // ---- 箱庭の中身: 中央に町の一角（家並み・街灯・露店）、外側に林・岩場・花畑、人と敵を少し ----
 let world = null, actors = [], grass = null;
+const hAt = (x, z) => Math.max(0, Math.hypot(x, z) - 22) * 0.08 * (1 + Math.sin(x * 0.2) * 0.3); // 地面の高さ
 function build() {
   if (world) { scene.remove(world); world.traverse((o) => { o.geometry?.dispose?.(); }); }
   world = new THREE.Group(); actors = [];
@@ -69,7 +70,6 @@ function build() {
   // 地面（なだらかな起伏と2色のまだら）
   const geo = new THREE.CircleGeometry(60, 96); geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3), c1 = new THREE.Color(fdef.ground), c2 = new THREE.Color(fdef.ground2), tmp = new THREE.Color();
-  const hAt = (x, z) => Math.max(0, Math.hypot(x, z) - 22) * 0.08 * (1 + Math.sin(x * 0.2) * 0.3);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, hAt(x, z));
     tmp.copy(c1).lerp(c2, 0.5 + 0.5 * Math.sin(x * 0.21 + Math.cos(z * 0.17) * 2) * Math.cos(z * 0.09));
@@ -247,7 +247,7 @@ function loop() {
 }
 build();
 loop();
-window.sandbox = { S, apply, build, PRESETS }; // 確認用
+window.sandbox = { S, apply, build, PRESETS, SPOTS, ext: () => extGroup }; // 確認用
 
 // 外部モデルの列（町の外れ、南西）。manifest がなければ何も置かない
 var extGroup = null, manifest; // var: build() がこの行より先に呼ぶため
@@ -255,7 +255,7 @@ async function showExternal() {
   if (manifest === undefined) manifest = await loadManifest();
   if (extGroup) { extGroup.parent?.remove(extGroup); extGroup = null; }
   if (!manifest) { extInfo.textContent = 'まだありません（public/assets/models/ に GLB と manifest.json を置くと、町の外れに並びます）'; return; }
-  extGroup = await placeExternal(manifest, { toon: S.extToon, gradientMap: makeGradient(S.steps, S.shadow) });
+  extGroup = await placeExternal(manifest, { toon: S.extToon, gradientMap: makeGradient(S.steps, S.shadow), at: [-34, 30], heightAt: hAt });
   world.add(extGroup);
   extInfo.textContent = `${manifest.source ?? ''} ${manifest.items.length}点（視点「外部モデル」で見る）`;
   apply();
