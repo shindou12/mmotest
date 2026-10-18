@@ -152,6 +152,7 @@ export function getUp() {
 
 // 被ダメージの共通処理（予兆・ボスの弾）。src: 攻撃してきた位置 / kd: 吹き飛ばす大技
 export function takeDamage(raw, src = null, kd = false, guarded = false) {
+  if (state.me.god) return; // デバッグ部屋の無敵
   if (now() < (state.me.brokenT || 0)) raw *= rules.GUARD.breakDmg; // ガードブレイク中は被ダメージ1.5倍
   raw = fxReduce('incoming', raw); // 狂剣士・捨て身 など
   const backB = fxReduce('drLowHp', 0); // 不撓B「背水」
@@ -201,6 +202,12 @@ export function onJustDodge() {
 // エリアの全員が倒れたら力尽きる（判定はサーバー。ひとりなら即座に力尽きる）
 export function fall() {
   if (state.me.crawl || state.me.dead) return;
+  // デバッグ部屋: 倒れず、その場で全回復する（セーブは消えない）
+  if (state.DEBUG) {
+    state.me.hp = stats.S.mhp; state.me.iframe = 1; state.me.staggerT = 0;
+    screen.banner('デバッグ部屋', '倒れたので全回復した', '#9affc8', 2);
+    return;
+  }
   // 称号「不死鳥」: その場で一度だけ復活
   if (rules.tf('t_phoenix') && now() - (state.me.phoenixT ?? -1e9) > 300) {
     state.me.phoenixT = now();
@@ -261,6 +268,7 @@ export function crawlTick(dt) {
 export const downedAllies = () => [...state.others.values()].filter((o) => o.rv >= 0);
 
 export function die() {
+  if (state.DEBUG) return; // デバッグ部屋では力尽きない（fall で全回復する）
   state.me.crawl = false; state.me.rv = -1;
   const removed = state.characterStore.discard();
   screen.toast(removed ? '戦闘不能：このキャラクターのセーブデータを失いました' : 'キャラクターを失いました。ブラウザの保存データを削除できませんでした。', '#f99');

@@ -15,7 +15,7 @@ import { arrowMesh, bossProjMesh, projShape, toColor, touchGuideMesh } from './m
 import { net } from './net-client.js';
 import { chestOpen, exploreTick } from './progress.js';
 import { ambient, applyQuality, audio, cam, camera, fx, renderFrame, scene, screenToGround, sun, tmpV, weatherParts } from './render.js';
-import { char, characterStore, params, saveChar, saveSettings, settings } from './save.js';
+import { DEBUG, char, characterStore, params, saveChar, saveSettings, settings } from './save.js';
 import { reviveRing } from './snapshot.js';
 import { CAM_ZOOM, CHARGE_MAX, CHARGE_MIN, DODGE_CD, bprojs, drops, keys, me, mobs, mouse, npcs, others, pending, projs, setStarted, started, teles, world } from './state.js';
 import { S, addBuff, bowRange, buffMod, calcStats, hasBuff, itemPower } from './stats.js';
@@ -25,7 +25,7 @@ import { castWeaponSkill, desperate, indoorNow, onVariantHit, tf, titleAspd, tit
 import { wirePorts } from './ports.js';
 
 wirePorts({
-  state: { CAM_ZOOM, CHARGE_MAX, CHARGE_MIN, DODGE_CD, bprojs, get char() { return char; }, characterStore, drops, keys, me, mobs, mouse, npcs, others, params, pending, projs, saveChar, saveSettings, setStarted, settings, get started() { return started; }, teles, world },
+  state: { CAM_ZOOM, CHARGE_MAX, CHARGE_MIN, DEBUG, DODGE_CD, bprojs, get char() { return char; }, characterStore, drops, keys, me, mobs, mouse, npcs, others, params, pending, projs, saveChar, saveSettings, setStarted, settings, get started() { return started; }, teles, world },
   stats: { get S() { return S; }, addBuff, bowRange, buffMod, calcStats, hasBuff, itemPower },
   view: { OCC, ambient, animateMob, animatePlayer, applyQuality, armorLook, arrowMesh, audio, bossProjMesh, cam, camera, fx, makeCoin, makeGoldBag, makeLootItem, makeShard, makeTelegraph, projShape, renderFrame, reviveRing, scene, screenToGround, setPlayerArmor, setPlayerWeapon, sun, tmpV, toColor, touchGuideMesh, updateMobLabels, weaponStyle, weatherParts },
   screen: { banner, floatText, renderQuests, toast, get ui() { return ui; } },

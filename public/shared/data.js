@@ -515,6 +515,8 @@ export function makeItem(ilvl, grade, opts = {}) {
   if (opts.uniqueDef) {
     // ダンジョン固有のユニーク装備（格が伝説・神器ならその色、それ以外は出来で決まる・逸品以上）
     unique = { key: 'dun_' + opts.uniqueDef.name, ...opts.uniqueDef };
+  } else if (opts.unique) {
+    unique = opts.unique; // UNIQUES のどれか（デバッグ部屋で選んで出す）
   } else if (r.rarity) {
     const pool = UNIQUES.filter((u) => u.rarity === r.rarity);
     unique = pick(pool);
