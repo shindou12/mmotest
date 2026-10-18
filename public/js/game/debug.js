@@ -8,7 +8,7 @@ import { PROF_MAX } from '../weapon-tree.js';
 import { DEBUG, char, saveChar } from './save.js';
 import { me } from './state.js';
 import { S, calcStats } from './stats.js';
-import { HIT_SOUNDS } from '../sample-sfx.js';
+import { HIT_SOUNDS, VOICE_DEFAULTS } from '../sample-sfx.js';
 import { audio } from './render.js';
 import { toast, ui } from './ui-bridge.js';
 
@@ -59,10 +59,15 @@ export function startDebug(net) {
 //   設定はこのブラウザに保存する（デバッグ部屋でだけ使う。通常のゲームは合成音のまま）
 const HIT_KEY = 'eterna_debug_hit_sound_v1';
 function setupHitSound() {
-  const h = { pick: 'synth', pitch: 0.05, vol: 0.05, per: Object.fromEntries(HIT_SOUNDS.map((x) => [x.id, { gain: x.gain, trim: x.trim }])) };
+  const per = Object.fromEntries(HIT_SOUNDS.map(({ id, gain, trim, lowCut, drive, click }) => [id, { gain, trim, lowCut, drive, click }]));
+  const h = { pick: 'synth', pitch: 0.05, vol: 0.05, voice: { ...VOICE_DEFAULTS }, per };
   try {
     const saved = JSON.parse(localStorage.getItem(HIT_KEY));
-    if (saved) Object.assign(h, saved, { per: { ...h.per, ...saved.per } });
+    if (saved) {
+      // 項目が増えても、保存にない項目は初期値のまま
+      Object.assign(h, saved, { voice: { ...h.voice, ...saved.voice }, per });
+      for (const id in per) Object.assign(per[id], saved.per?.[id]);
+    }
   } catch { /* 保存なし */ }
   if (!HIT_SOUNDS.some((x) => x.id === h.pick)) h.pick = 'synth';
   audio.hitSound = h;
@@ -153,8 +158,20 @@ function buildPanel(net) {
   const hitTrim = slider('頭出し', 0, 120, 5, () => (cur() ? cur().trim * 1000 : 0), set((v) => { if (cur()) cur().trim = v / 1000; }), (v) => `${v}ms`);
   const hitPitch = slider('ピッチの揺れ', 0, 25, 1, () => H.pitch * 100, set((v) => { H.pitch = v / 100; }), (v) => `±${v}%`);
   const hitVol = slider('音量の揺れ', 0, 40, 1, () => H.vol * 100, set((v) => { H.vol = v / 100; }), (v) => `±${v}%`);
-  // 音量・頭出しは音ごとに覚える。合成音のときは触れない
-  const syncPer = () => { for (const s of [hitGain, hitTrim]) { s.input.disabled = H.pick === 'synth'; s.sync(); } };
+  // 聞き取りやすさ（音ごと）: 超低音を削る・倍音を足す・合成音のアタックを重ねる
+  const perSlider = (label, min, max, step, key, toUi, fromUi, fmt) =>
+    slider(label, min, max, step, () => (cur() ? toUi(cur()[key]) : min), set((v) => { if (cur()) cur()[key] = fromUi(v); }), fmt);
+  const hitLowCut = perSlider('低音カット', 0, 200, 10, 'lowCut', (x) => x, (v) => v, (v) => (v ? `${v}Hz以下` : 'なし'));
+  const hitDrive = perSlider('倍音（歪み）', 0, 100, 5, 'drive', (x) => x * 100, (v) => v / 100, (v) => `${v}%`);
+  const hitClick = perSlider('アタックを重ねる', 0, 100, 5, 'click', (x) => x * 100, (v) => v / 100, (v) => `${v}%`);
+  // 連打・同時ヒット（全部の音で共通）
+  const V = H.voice;
+  const hitMerge = slider('同時ヒットをまとめる', 0, 80, 5, () => V.merge * 1000, set((v) => { V.merge = v / 1000; }), (v) => (v ? `${v}ms以内` : 'しない'));
+  const hitRepeat = slider('続けて当てた音量', 20, 100, 5, () => V.repeatGain * 100, set((v) => { V.repeatGain = v / 100; }), (v) => `${v}%ずつ`);
+  const hitWindow = slider('「続けて」の間隔', 50, 400, 10, () => V.window * 1000, set((v) => { V.window = v / 1000; }), (v) => `${v}ms以内`);
+  const hitMax = slider('同時に鳴る数', 1, 8, 1, () => V.max, set((v) => { V.max = v; }), (v) => `${v}つまで`);
+  // 音ごとの項目は音を切り替えたら読み直す。合成音のときは触れない
+  const syncPer = () => { for (const s of [hitGain, hitTrim, hitLowCut, hitDrive, hitClick]) { s.input.disabled = H.pick === 'synth'; s.sync(); } };
   const hitBtns = choice(['synth', ...HIT_SOUNDS.map((x) => x.id)], (id) => (id === 'synth' ? '今の合成音' : HIT_SOUNDS.find((x) => x.id === id).name),
     (id) => { H.pick = id; saveHitSound(); syncPer(); audio.sfx('hit'); }, H.pick);
   syncPer();
@@ -177,7 +194,16 @@ function buildPanel(net) {
     el('h3', { textContent: 'ヒット音（敵に当てたとき）' }),
     row(...hitBtns),
     hitGain.row, hitTrim.row, hitPitch.row, hitVol.row,
-    row(btn('試し鳴らし', () => audio.sfx('hit')), btn('8連打（0.25秒おき）', () => { for (let i = 0; i < 8; i++) setTimeout(() => audio.sfx('hit'), i * 250); }), btn('クリティカル', () => audio.sfx('hit', { crit: true }))),
+    el('div', { textContent: '聞き取りやすさ（この音だけ）', style: 'margin-top:4px;color:#b8c0d0' }),
+    hitLowCut.row, hitDrive.row, hitClick.row,
+    el('div', { textContent: '連打・複数ヒット（全部の音）', style: 'margin-top:4px;color:#b8c0d0' }),
+    hitMerge.row, hitRepeat.row, hitWindow.row, hitMax.row,
+    row(
+      btn('試し鳴らし', () => audio.sfx('hit')),
+      btn('8連打（0.12秒おき）', () => { for (let i = 0; i < 8; i++) setTimeout(() => audio.sfx('hit'), i * 120); }),
+      btn('3体同時', () => { for (let i = 0; i < 3; i++) audio.sfx('hit'); }),
+      btn('クリティカル', () => audio.sfx('hit', { crit: true })),
+    ),
     el('h3', { textContent: 'そのほか' }),
     row(
       btn('全回復', () => { calcStats(); me.hp = S.mhp; me.potions = S.maxPot; }),

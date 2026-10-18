@@ -429,7 +429,10 @@ export class AudioEngine {
       case 'hit': {
         // hitSound（デバッグ部屋で選ぶ）が音声ファイルなら、そちらを鳴らす。読み込み前は合成音
         const h = this.hitSound;
-        const usedSample = h && h.pick !== 'synth' && this.samples?.play(h.pick, { ...h.per[h.pick], pitch: h.pitch, vol: h.vol, when: t, bus: B });
+        const per = h && h.per[h.pick];
+        const usedSample = h && h.pick !== 'synth' && this.samples?.play(h.pick, { ...per, pitch: h.pitch, vol: h.vol, voice: h.voice, when: t, bus: B });
+        // 低音だけの音は輪郭が出ないので、合成音のアタック（ノイズ）を per.click の分だけ重ねる
+        if (usedSample === true && per.click > 0) this.noiseHit(t, 0.35 * per.click, 'bandpass', 2000, 0.08, B);
         if (!usedSample) {
           tone('sine', 220, 70, 0.12, 0.5);
           this.noiseHit(t, 0.35, 'bandpass', opt.crit ? 3500 : 2000, 0.08, B);
