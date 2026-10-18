@@ -14,6 +14,7 @@ import { buildTown } from './env/open.js';
 import { makeSky, makeGrass } from './env/landmarks.js';
 import { seeded, local, I } from './env/kit.js';
 import { loadManifest, placeExternal } from './sandbox-external.js';
+import { makeRock, makeTree, makePine, makeHouse } from './sandbox-models.js';
 import { REGIONS, CLASSES, PATTERN_NAMES, paletteTexture, paletteRows, patternAtlas, makeStyleUniforms, styledToon, addRim, tagGeometry } from './sandbox-style.js';
 
 // ---- 描画の土台（ゲームの render.js と同じ組み方） ----
@@ -47,7 +48,7 @@ const S = { extToon: true, floor: 1, view: 'game', spot: 'town', anim: 'idle', s
 // 質感の試作（A 配色画像 / B パターン画像 / 縁の明かり）: sandbox-style.js
 const PAL = paletteTexture(), ATLAS = patternAtlas(), U = makeStyleUniforms(PAL, ATLAS.tex);
 // ゲームのカメラで見る場所（町の中・町の外れ・林の中）
-const SPOTS = { ext: [-22, 30, 1.0], town: [-4.5, 8, 1.3], edge: [0, 22, 1.3], woods: [20, 26, 1.3], close: [12, 12, 0.6] };
+const SPOTS = { old_new: [0, 31, 1.2], remake: [0, 46, 1.05], ext: [-22, 30, 1.0], town: [-4.5, 8, 1.3], edge: [0, 22, 1.3], woods: [20, 26, 1.3], close: [12, 12, 0.6] };
 
 // トゥーンの段: 段数と、いちばん暗い段の明るさ
 function makeGradient(steps, dark) {
@@ -115,6 +116,26 @@ function build() {
   const b = fdef.boss, boss = makeMob(b.t, b.color, b.scale * 0.8, b.accent, true, b.appearance);
   boss.position.set(0, hAt(0, -28), -28); world.add(boss); actors.push({ m: boss, boss: true, i: 9 });
   world.userData.anims = anims;
+  // 作り直したモデルの見本（南の草地）: 奥の列が今の積み木、手前の列が作り直し（同じ並び: 広葉樹・岩・針葉樹・家）
+  {
+    const zo = 27, zn = 34, row = new THREE.Group(), pr = Object.fromEntries(fdef.props.map((p) => [p[0], p]));
+    const xs = [-9, -4, 0.5, 8];
+    const old = new Batch(), O = (type, x, s = 1.2) => { const p = pr[type] || ['tree', 0, 0x3f8f3a, 0x6b4a2a]; makeProp(old, type, local(I, x, hAt(x, zo), zo, 0, 0.6, 0, s), seeded(7), p[2], p[3], fdef); };
+    O('tree', xs[0]); O('rock', xs[1], 1.6); O('pine', xs[2]);
+    old.add(new THREE.BoxGeometry(6, 3.6, 4.5), 0xeee6d4, local(I, xs[3], hAt(xs[3], zo) + 1.8, zo));
+    old.add(new THREE.CylinderGeometry(0.01, 4.5 * 0.78, 2.4, 4, 1), 0xb0483a, local(I, xs[3], hAt(xs[3], zo) + 4.8, zo, 0, Math.PI / 4, 0, 6 / 4.5, 1, 1));
+    row.add(old.build());
+    const put = (obj, x, s = 1) => { obj.position.set(x, hAt(x, zn), zn); obj.scale.setScalar(s); obj.rotation.y = 0.5; row.add(obj); };
+    put(makeTree(3), xs[0]); put(makeRock(5), xs[1], 1.5); put(makePine(4), xs[2]); put(makeHouse(2), xs[3], 0.85);
+    // 作り直しの一角（家2軒・林・岩場）
+    const cx = 0, cz = 44;
+    const at = (obj, x, zz, ry = 0, s = 1) => { obj.position.set(cx + x, hAt(cx + x, cz + zz), cz + zz); obj.rotation.y = ry; obj.scale.setScalar(s); row.add(obj); };
+    at(makeHouse(7, { roof: 0x4a6a9a }), -6, 0, 0.2); at(makeHouse(9, { roof: 0x8a5a3a }), 6, 2, -0.35);
+    for (let i = 0; i < 6; i++) at(makeTree(20 + i), -14 + (i % 3) * 3.2, 7 + Math.floor(i / 3) * 3.5, i, 0.8 + (i % 2) * 0.3);
+    for (let i = 0; i < 4; i++) at(makeRock(40 + i), 12 + (i % 2) * 2.2, 8 + Math.floor(i / 2) * 1.8, i, i ? 0.5 : 1.0);
+    for (let i = 0; i < 3; i++) at(makePine(60 + i), 15 + i * 2.6, -2 + (i % 2) * 2, i);
+    world.add(row);
+  }
   scene.add(world);
   showExternal();
   apply();
@@ -172,7 +193,7 @@ h('h2', '場所（階の配色）');
 buttons([['1層 草原', 1], ['2層 霧の森', 2], ['3層 砂漠', 3]], () => S.floor, (v) => { S.floor = v; build(); });
 h('h2', '視点');
 buttons([['ゲームのカメラ', 'game'], ['自由に回す', 'free']], () => S.view, (v) => { S.view = v; });
-buttons([['町の中', 'town'], ['町の外れ', 'edge'], ['林', 'woods'], ['寄る', 'close'], ['外部モデル', 'ext']], () => S.spot, (v) => { S.spot = v; S.view = 'game'; });
+buttons([['町の中', 'town'], ['町の外れ', 'edge'], ['林', 'woods'], ['寄る', 'close'], ['外部モデル', 'ext'], ['今と作り直し', 'old_new'], ['作り直しの一角', 'remake']], () => S.spot, (v) => { S.spot = v; S.view = 'game'; });
 h('h2', 'キャラの動き');
 buttons([['待機', 'idle'], ['歩き', 'walk'], ['攻撃', 'attack']], () => S.anim, (v) => { S.anim = v; });
 h('h2', '質感（A 配色画像・B パターン画像）');
