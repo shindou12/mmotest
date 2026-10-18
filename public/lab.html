@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>グラフィック実験場</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }</script>
+<style>
+html,body{margin:0;height:100%;background:#9cc8ee;overflow:hidden;font:13px system-ui,sans-serif}canvas{display:block}
+#ui{position:fixed;left:8px;top:8px;background:rgba(0,0,0,.55);color:#fff;padding:6px 8px;border-radius:6px;max-width:calc(100vw - 32px)}
+#ui div{margin:3px 0;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+#ui button{font:12px system-ui;padding:3px 8px;border:1px solid #fff4;border-radius:4px;background:#ffffff18;color:#fff;cursor:pointer}
+#ui button.on{background:#ffd27a;color:#222}
+</style>
+</head><body><div id="ui"><b>グラフィック実験場</b>（ドラッグで回す・右ドラッグで移動・ホイールで寄る）</div>
+<script type="module" src="./js/previews/graphics-lab.js"></script></body></html>
