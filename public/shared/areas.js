@@ -6,13 +6,14 @@
 //          出口は ang（北=0°、東=90°）で輪郭上に置く。sq（2より大きい数）で輪郭を角の丸い四角に寄せる（城壁の町）。
 //          layout: 'town' なら通り・広場・建物の敷地を shared/town-layout.js で決め、建物は当たり判定になる
 //          scene なら Blender で作って並べた一角（モデル・当たり判定・小道・花壇・明かり。例: glade-layout.js）。
-//          地面は平らにし、決まった配置の当たり判定が障害物になる（ランダムな障害物・飾りは置かない）
+//          地面は平ら（scene.height があればその高さの表）にし、決まった配置の当たり判定が障害物になる（ランダムな障害物・飾りは置かない）
 //   grid … 屋内のマス目（ダンジョン・迷宮区）。map の文字:
 //     # 壁  . 床  E 入口（出口）  M 敵の湧き  G 門番（精鋭）  B ボス部屋の中心  C 宝箱
 //     L レバー  D 扉  P 感圧板  T / t 罠床（2グループが交互に作動）
 
 import { townLayout as makeTownLayout, pushOutBox } from './town-layout.js';
 import { GLADE } from './glade-layout.js';
+import { HOLLOW } from './hollow-layout.js';
 
 export const CELL = 4;
 
@@ -314,7 +315,7 @@ export const AREAS = {
   },
   f1_lake: {
     floor: 1, type: 'secret', name: '静かな湖畔', shape: 'open', R: 30, ell: [1.2, 1], wob: 0.1, mapPos: [14, 86],
-    exits: [{ to: 'f1_town', ang: 80 }, { to: 'f1_glade', ang: 20 }],
+    exits: [{ to: 'f1_town', ang: 80 }, { to: 'f1_glade', ang: 20 }, { to: 'f1_hollow', ang: 320 }],
     obst: { n: 1, kinds: ['pond'], big: true }, chests: 1,
     named: { name: 'ヌシ・ギガスライム', d: 0, lv: 10, title: 't_lake' },
   },
@@ -322,6 +323,11 @@ export const AREAS = {
     floor: 1, type: 'secret', name: '木漏れ日の小屋', shape: 'open', R: 18, ell: [1.15, 1], wob: 0.08, mapPos: [30, 70],
     exits: [{ to: 'f1_lake', ang: 180 }],
     scene: GLADE, particles: 'firefly', // 森に囲まれた小屋と前庭。敵は出ない
+  },
+  f1_hollow: {
+    floor: 1, type: 'secret', name: '陽だまりの森の家', shape: 'open', R: 24, ell: [1.25, 1], wob: 0.06, mapPos: [6, 68],
+    exits: [{ to: 'f1_lake', ang: 180 }],
+    scene: HOLLOW, particles: 'pollen', // 岩の台地と森に囲まれた明るい草地の家（地形の高さは scene.height）。敵は出ない
   },
   f1_dun: {
     floor: 1, type: 'dungeon', name: '古井戸の洞窟', shape: 'grid', map: MAPS.dun1, mapPos: [14, 46],

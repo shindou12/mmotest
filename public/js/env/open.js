@@ -67,7 +67,7 @@ export function buildOpen(def, fdef, opts) {
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * size / 7, uv.getY(i) * size / 7);
   const gm = new THREE.Mesh(ground, toon(0xffffff, { vertexColors: true, noOcc: true, map: groundDetail() }));
   gm.receiveShadow = true;
-  group.add(gm);
+  if (!SC?.hideGround) group.add(gm); // 地形ごと GLB が持つ一角では描かない
 
   // 外周の崖（輪郭に沿って並べる）とプロップ
   const B = new Batch({ chunk: 24 });

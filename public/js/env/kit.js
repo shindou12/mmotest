@@ -16,6 +16,7 @@ export function noise2(x, z) {
 // エリアごとの地面の高さ関数（屋内は平ら）
 export function makeHeight(def) {
   if (def.shape === 'grid') return () => 0;
+  if (def.scene?.height) return heightTable(def.scene.height);
   const exits = exitsOf(def);
   const flat = def.layout === 'town' || def.scene ? 0 : def.type === 'town' ? 0.15 : def.type === 'camp' ? 0.4 : 1;
   // 池はくぼみ、毒沼・流砂は平らにならす
@@ -35,6 +36,15 @@ export function makeHeight(def) {
     const br = boundR(def, angOf(x, z)) - 0.5;
     if (r > br) h += (r - br) * 0.6;
     return h;
+  };
+}
+
+// Blender から書き出した高さの表（step m ごと、行 = z・列 = x）を補間する
+function heightTable({ x0, z0, step, n, h }) {
+  return (x, z) => {
+    const fx = Math.min(n - 1.001, Math.max(0, (x - x0) / step)), fz = Math.min(n - 1.001, Math.max(0, (z - z0) / step));
+    const i = Math.floor(fz), j = Math.floor(fx), u = fx - j, v = fz - i, a = i * n + j;
+    return (h[a] * (1 - u) + h[a + 1] * u) * (1 - v) + (h[a + n] * (1 - u) + h[a + n + 1] * u) * v;
   };
 }
 
