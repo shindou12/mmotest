@@ -5,6 +5,8 @@
 | `mmo_common.py` | 共通処理（パレット材質・削ぎ面・原点合わせ・GLB 書き出し・manifest 追記） |
 | `rock.py` | 岩 3 種 → `public/assets/models/blender/rock_0*.glb` |
 | `tree_broadleaf.py` | 広葉樹 3 種 → `tree_broadleaf_0*.glb` |
+| `cottage_glade.py` | 森の小屋の一角（エリア f1_glade「木漏れ日の小屋」）の小屋・前庭・周りの森 → `cottage_glade.glb`・`cottage.glb`・`public/shared/glade-layout.js`・`cottage_glade.blend`（現状版。比較の基準） |
+| `cottage_glade_ro3.py` | 同じ一角の RO3 風の比較版（同じ配置。描いたテクスチャ・葉の板）→ `cottage_glade_ro3.glb`・`glade-layout-ro3.js`・`cottage_glade_ro3.blend`。ゲームでは `/?solo&glade=ro3`。見比べは `docs/glade/README.md` |
 
 ## 動かし方
 - **デスクトップの Blender**: Scripting タブでスクリプトを開いて Run。今のシーンは空になって作り直されます（保存していない作業があれば先に保存してください）

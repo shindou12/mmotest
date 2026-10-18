@@ -2,3 +2,4 @@ node_modules/
 world-save.json
 
 world-save-coop-hard.json
+*.blend1

@@ -5,11 +5,14 @@
 //          obst（障害物）、hazard（毒沼・流砂）、chests（小さな宝箱）、named（ネームド）を種から決定的に配置。
 //          出口は ang（北=0°、東=90°）で輪郭上に置く。sq（2より大きい数）で輪郭を角の丸い四角に寄せる（城壁の町）。
 //          layout: 'town' なら通り・広場・建物の敷地を shared/town-layout.js で決め、建物は当たり判定になる
+//          scene なら Blender で作って並べた一角（モデル・当たり判定・小道・花壇・明かり。例: glade-layout.js）。
+//          地面は平らにし、決まった配置の当たり判定が障害物になる（ランダムな障害物・飾りは置かない）
 //   grid … 屋内のマス目（ダンジョン・迷宮区）。map の文字:
 //     # 壁  . 床  E 入口（出口）  M 敵の湧き  G 門番（精鋭）  B ボス部屋の中心  C 宝箱
 //     L レバー  D 扉  P 感圧板  T / t 罠床（2グループが交互に作動）
 
 import { townLayout as makeTownLayout, pushOutBox } from './town-layout.js';
+import { GLADE } from './glade-layout.js';
 
 export const CELL = 4;
 
@@ -311,9 +314,14 @@ export const AREAS = {
   },
   f1_lake: {
     floor: 1, type: 'secret', name: '静かな湖畔', shape: 'open', R: 30, ell: [1.2, 1], wob: 0.1, mapPos: [14, 86],
-    exits: [{ to: 'f1_town', ang: 80 }],
+    exits: [{ to: 'f1_town', ang: 80 }, { to: 'f1_glade', ang: 20 }],
     obst: { n: 1, kinds: ['pond'], big: true }, chests: 1,
     named: { name: 'ヌシ・ギガスライム', d: 0, lv: 10, title: 't_lake' },
+  },
+  f1_glade: {
+    floor: 1, type: 'secret', name: '木漏れ日の小屋', shape: 'open', R: 18, ell: [1.15, 1], wob: 0.08, mapPos: [30, 70],
+    exits: [{ to: 'f1_lake', ang: 180 }],
+    scene: GLADE, particles: 'firefly', // 森に囲まれた小屋と前庭。敵は出ない
   },
   f1_dun: {
     floor: 1, type: 'dungeon', name: '古井戸の洞窟', shape: 'grid', map: MAPS.dun1, mapPos: [14, 46],
@@ -509,6 +517,7 @@ const centerFree = (def, x, z, r) => {
 const obstCache = new Map();
 export function obstaclesOf(def) {
   if (def.layout === 'town') return townObstacles(def);
+  if (def.scene) return sceneObstacles(def);
   if (def.shape !== 'open' || !def.obst) return [];
   if (obstCache.has(def.id)) return obstCache.get(def.id);
   const R = seeded(hashStr(def.id) ^ 0x51);
@@ -627,10 +636,16 @@ function townObstacles(def) {
   return townObstCache.get(def.id);
 }
 
+const sceneObstCache = new Map();
+function sceneObstacles(def) {
+  if (!sceneObstCache.has(def.id)) sceneObstCache.set(def.id, def.scene.colliders.map((c) => ({ kind: 'scene', solid: true, ...c })));
+  return sceneObstCache.get(def.id);
+}
+
 export function collide(def, x, z, rad = 0.5, doorOpen = false) {
   if (def.shape === 'open') {
-    // 町は建物が密集しているので、押し出した先が隣の建物でも抜けられるように2回見る
-    for (let pass = def.layout ? 2 : 1; pass > 0; pass--) for (const o of obstaclesOf(def)) {
+    // 町や一角（scene）は物が密集しているので、押し出した先が隣の物でも抜けられるように2回見る
+    for (let pass = def.layout || def.scene ? 2 : 1; pass > 0; pass--) for (const o of obstaclesOf(def)) {
       if (!o.solid) continue;
       if (o.box) {
         if (Math.hypot(x - o.x, z - o.z) > o.r + rad) continue;
@@ -760,6 +775,7 @@ export function spawnPoint(def) {
 export function waypointOf(def) {
   if (def.gate) return { ...spawnPoint(def), hub: true };
   if (def.shape === 'grid') return spawnPoint(def);
+  if (def.scene?.waypoint) return { ...def.scene.waypoint };
   // 屋外: 中央付近で、障害物・毒沼・流砂・出口から離れた所
   const obs = obstaclesOf(def), haz = hazardsOf(def), ex = exitsOf(def);
   for (let k = 0; k < 40; k++) {

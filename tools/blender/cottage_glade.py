@@ -958,7 +958,7 @@ def render_previews():
     sc.render.resolution_x, sc.render.resolution_y = 1280, 800; sc.view_settings.view_transform = 'AgX'
     try: sc.view_settings.look = 'AgX - Medium High Contrast'
     except TypeError: pass
-    out_dir = os.path.join(C.repo_root(), 'docs', 'glade')
+    out_dir = os.path.join(C.repo_root(), 'docs', 'glade', 'toon')
     os.makedirs(out_dir, exist_ok=True)
     for cam, fn in (('俯瞰', 'blender-overview.png'), ('正面', 'blender-front.png')):
         sc.camera = bpy.data.objects[cam]; sc.render.filepath = os.path.join(out_dir, fn)
@@ -1000,4 +1000,5 @@ def main():
     print('保存:', blend)
     if '--render' in ARGS: render_previews()
 
-main()
+if __name__ == '__main__':  # RO3 風の比較版（cottage_glade_ro3.py）は部品として読み込む
+    main()

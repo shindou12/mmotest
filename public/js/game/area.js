@@ -44,7 +44,7 @@ export function enterArea(id, x, z) {
   const W = indoor ? null : WEATHERS[def.weather];
   sun.color.set(fdef.sun);
   if (W) tintSun(W.tint, W.mix * 0.5);
-  ambient.setKind(indoor ? 'dust' : fdef.particles);
+  ambient.setKind(indoor ? 'dust' : def.particles ?? fdef.particles);
   weatherParts.setKind(W ? W.particles : null);
   weatherParts.points.geometry.setDrawRange(0, W ? W.count : 0);
   weatherParts.lines.geometry.setDrawRange(0, W ? W.count * 2 : 0);
