@@ -271,6 +271,7 @@ export function update(dt) {
     down: state.me.crawl ? 1 : state.me.downT > 0 ? Math.min(1, (rules.REACT.downT - state.me.downT) / 0.12, state.me.downT / 0.25) : 0,
     hurt: state.me.hurtT > 0 ? Math.sin(state.me.hurtT / 0.28 * Math.PI) : 0,
     motion: state.me.motion, motionT: state.me.motionT,
+    heavy: state.me.heavySwing && state.me.swingT < state.me.swingDur, // 強攻撃の振り
     charging: state.me.charging, charge: Math.min(1, state.me.chargeT / (stats.S?.chargeMax || state.CHARGE_MAX)),
     gg: state.me.gg / rules.GUARD.max, // 盾の縁の光（ガードゲージの残り）
     sweep: state.me.sweepT > 0 ? rules.sweepAngle(state.me.sweepT) : -1, // ガードカウンターの回転なぎ払い（回った角度）
