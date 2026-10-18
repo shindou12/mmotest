@@ -84,11 +84,12 @@ class WeaponTrail {
     this.pos = new Float32Array(N * 2 * 3); this.alpha = new Float32Array(N * 2);
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     g.setAttribute('alpha', new THREE.BufferAttribute(this.alpha, 1));
+    g.setAttribute('edge', new THREE.BufferAttribute(new Float32Array(N * 2).map((_, i) => i % 2), 1)); // 0: 根元側 / 1: 刃先側（形違いの軌跡が使う）
     const idx = []; for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     g.setIndex(idx);
     this.mat = new THREE.ShaderMaterial({
       uniforms: { uColor: { value: new THREE.Color(color) } },
-      vertexShader: 'attribute float alpha; varying float vA; void main() { vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      vertexShader: 'attribute float alpha; attribute float edge; varying float vA; varying float vE; void main() { vA = alpha; vE = edge; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: 'uniform vec3 uColor; varying float vA; void main() { gl_FragColor = vec4(uColor * (1.0 + vA), vA); }',
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     });
@@ -175,12 +176,14 @@ export class FX {
   // 武器の振りの軌跡。毎フレーム呼ぶ（active: 振っている間）。武器の持ち主のワールド行列は呼ぶ前に更新しておく
   swordTrail(weapon, active, color, dt) {
     let tr = this.trails.get(weapon);
-    if (!tr) { if (!active) return; tr = new WeaponTrail(this.scene, color); this.trails.set(weapon, tr); }
+    if (!tr) { if (!active) return; tr = this.makeTrail(color); this.trails.set(weapon, tr); }
     const S = bladeSpan(weapon);
     tr.mat.uniforms.uColor.value.set(color);
     const alive = tr.update(weapon.localToWorld(S.b.clone()), weapon.localToWorld(S.t.clone()), active, dt);
     if (!alive && !weapon.parent) { tr.dispose(); this.trails.delete(weapon); } // 持ち替えた武器の軌跡は消えたら片付ける
   }
+
+  makeTrail(color) { return new WeaponTrail(this.scene, color); }
 
   flash(x, y, z, color, intensity = 30, life = 0.25, dist = 12) {
     const L = this.lights.reduce((a, b) => (a.t < b.t ? a : b));
