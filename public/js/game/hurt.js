@@ -162,7 +162,7 @@ export function takeDamage(raw, src = null, kd = false, guarded = false) {
   state.me.hp -= dmg;
   state.me.lastHurt = now();
   screen.floatText(state.me.x, 2.2, state.me.z, dmg, 'me');
-  view.audio.sfx('hurt');
+  view.audio.sfx('hurt', { heavy: !guarded && (kd || dmg >= stats.S.mhp * REACT.down), guarded });
   rules.addShake(0.3);
   screen.ui.hurt();
   if (stats.S.wt) rules.wtOnHurt(guarded);
@@ -218,7 +218,7 @@ export function fall() {
   state.me.downT = 0; state.me.kbT = 0; state.me.staggerT = 0; state.me.dodgeT = 0; state.me.dashT = 0; state.me.sweepT = 0; state.me.skillT = -1; state.me.swingT = 9;
   link.net.send({ t: 'down', n: state.me.downs });
   screen.banner('這いずり状態', '仲間に攻撃を当ててもらうと起き上がれる', '#ff9a8a', 4);
-  view.audio.sfx('hurt');
+  view.audio.sfx('hurt', { heavy: true });
   view.fx.parts.burst(state.me.x, 0.5, state.me.z, 40, { color: 0xff9a8a, speed: 5, size: 0.45, life: 0.8 });
 }
 export function revived(by) {

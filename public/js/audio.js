@@ -57,6 +57,7 @@ export class AudioEngine {
     for (let i = 0; i < bd.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; bd[i] = last * 3.5; }
     this.brown = bb;
 
+    this.loadSamples();
     this.nextTime = ctx.currentTime + 0.1;
     setInterval(() => this.schedule(), 25);
     setInterval(() => this.ambientEvents(), 200);
@@ -407,6 +408,29 @@ export class AudioEngine {
   gust(t) { const n = this.noiseHit(t, 0.0001, 'bandpass', 600, 3, this.ambBus, 2); n.g.gain.cancelScheduledValues(t); n.g.gain.setValueAtTime(0.0001, t); n.g.gain.exponentialRampToValueAtTime(0.1, t + 1.2); n.g.gain.exponentialRampToValueAtTime(0.0001, t + 3); n.f.frequency.linearRampToValueAtTime(1100, t + 1.5); }
 
   // ===================== 効果音 =====================
+  // 生成した効果音ファイル（tools/sfx/generate.mjs が assets/sfx/manifest.json に載せたもの）。読めなければ合成音のまま
+  async loadSamples() {
+    this.samples = {};
+    let list = {};
+    try { list = await (await fetch('assets/sfx/manifest.json', { cache: 'no-cache' })).json(); } catch { return; }
+    await Promise.all(Object.entries(list).map(async ([k, files]) => {
+      const got = await Promise.allSettled(files.map(async (f) => this.ctx.decodeAudioData(await (await fetch('assets/' + f)).arrayBuffer())));
+      const bufs = got.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+      if (bufs.length) this.samples[k] = bufs;
+    }));
+  }
+  // 録音を1つ鳴らす。毎回同じに聞こえないよう、直前と違うものを選んで高さを少し揺らす。無ければ false
+  sample(key, vol = 1, rate = 1) {
+    const bufs = this.samples?.[key];
+    if (!bufs?.length) return false;
+    let i = Math.floor(Math.random() * bufs.length);
+    if (bufs.length > 1 && i === this.lastSample?.[key]) i = (i + 1) % bufs.length;
+    (this.lastSample ||= {})[key] = i;
+    const s = this.ctx.createBufferSource(), g = this.ctx.createGain();
+    s.buffer = bufs[i]; s.playbackRate.value = rate * (0.94 + Math.random() * 0.12); g.gain.value = vol;
+    s.connect(g).connect(this.sfxBus); s.start(this.ctx.currentTime + 0.005);
+    return true;
+  }
   sfx(name, opt = {}) {
     if (!this.ctx) return;
     const ctx = this.ctx, t = ctx.currentTime + 0.005, B = this.sfxBus;
@@ -440,7 +464,12 @@ export class AudioEngine {
         [1318, 1760, 2637].forEach((f, i) => tone('sine', f, 0, 0.5, 0.12, i * 0.04).connect(this.revSend));
         break;
       }
-      case 'hurt': tone('sawtooth', 200, 90, 0.18, 0.25); this.noiseHit(t, 0.3, 'lowpass', 900, 0.15, B); break;
+      // 被弾。heavy: 大技・ダウン / guarded: ガードの上から削られた（小さく）
+      case 'hurt':
+        if (this.sample(opt.heavy ? 'hurt_heavy' : 'hurt_light', opt.guarded ? 0.45 : 1)) break;
+        tone('sawtooth', 200, 90, 0.18, opt.guarded ? 0.12 : 0.25); this.noiseHit(t, opt.guarded ? 0.15 : 0.3, 'lowpass', 900, 0.15, B);
+        if (opt.heavy) { tone('sine', 110, 35, 0.35, 0.45); this.noiseHit(t, 0.3, 'lowpass', 600, 0.4, B); }
+        break;
       case 'block': tone('triangle', 1200, 1100, 0.4, 0.2).connect(this.revSend); break;
       case 'telegraph': tone('square', 180, 140, 0.12, 0.05); break;
       case 'impact': {

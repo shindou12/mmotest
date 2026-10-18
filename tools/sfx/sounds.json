@@ -1,0 +1,17 @@
+{
+  "_doc": "ElevenLabs で作る効果音の一覧。node tools/sfx/generate.mjs で public/assets/sfx/ に書き出し、manifest.json を更新する。方針は docs/sfx-enemy-hit.md",
+  "hurt_light": {
+    "use": "敵の通常攻撃が自分に当たった（のけぞり・ひるみ。ガードの上から削られたときも小さめに鳴らす）",
+    "prompt": "Close-up game sound effect: a monster's claw strikes an adventurer wearing leather armor. One tight punchy body thud with a dry leather and cloth slap and a faint rattle of metal buckles. Sharp attack, very short decay, dry, no reverb tail, no voice, no grunt, no music.",
+    "duration_seconds": 0.5,
+    "prompt_influence": 0.6,
+    "variations": 3
+  },
+  "hurt_heavy": {
+    "use": "大技・最大HPの25%以上の被弾（吹き飛んでダウン）、這いずり状態になった瞬間",
+    "prompt": "Brutal heavy impact game sound effect: a giant ogre's club slams into an armored warrior and knocks him down. Deep low-end boom with a crunchy armor clank on the hit and a short scatter of metal and gravel afterwards. Hard punchy transient, tail under one second, dry, no voice, no scream, no music.",
+    "duration_seconds": 0.9,
+    "prompt_influence": 0.6,
+    "variations": 3
+  }
+}
