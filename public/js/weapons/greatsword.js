@@ -143,6 +143,7 @@ const legacy = { prefixes: ['greatsword_', 'gs_'], slots: ['gslam', 'fortress', 
 // ---------------------------------------------------------------------------
 const stats = {
   name: '大剣', skillPool: ['cyclone', 'breaker', 'avalanche', 'meteor'], grip: -0.20, range: 3.4, arc: 160, speed: 0.66, mult: 1.6, weight: 9, stun: 1.5, melee: true, twoHanded: true, skillSpin: true,
+  edgeForward: true, // 構え・縦振りで刃（平らな面ではなく）を前に向ける
   passive: [], // 大剣は武器ツリー（熟練度）で決める
   skill: { name: 'サイクロン', cd: 6, desc: '周囲を薙ぎ払う回転斬り', mult: 2.6 },
 };

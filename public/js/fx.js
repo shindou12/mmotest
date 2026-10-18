@@ -14,6 +14,7 @@ void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c); if(d>0.5) discar
 export class Particles {
   constructor(scene, max = 6000) {
     this.max = max; this.n = 0;
+    this.ground = () => 0; // 地面の高さ。emit の y は地面からの高さ（o.abs ならワールドの高さ）
     this.p = new Float32Array(max * 3); this.v = new Float32Array(max * 3);
     this.c = new Float32Array(max * 3); this.s = new Float32Array(max); this.a = new Float32Array(max);
     this.life = new Float32Array(max); this.maxLife = new Float32Array(max); this.grav = new Float32Array(max); this.drag = new Float32Array(max);
@@ -36,6 +37,7 @@ export class Particles {
     const i = this.n++, c = new THREE.Color(o.color ?? 0xffffff);
     const sp = o.speed ?? 3, sp2 = o.spread ?? 1;
     const dir = o.dir;
+    if (!o.abs) y += this.ground(x, z);
     this.p[i * 3] = x + (Math.random() - 0.5) * (o.jitter ?? 0); this.p[i * 3 + 1] = y; this.p[i * 3 + 2] = z + (Math.random() - 0.5) * (o.jitter ?? 0);
     if (dir) {
       this.v[i * 3] = dir[0] * sp + (Math.random() - 0.5) * sp2; this.v[i * 3 + 1] = dir[1] * sp + (Math.random() - 0.5) * sp2; this.v[i * 3 + 2] = dir[2] * sp + (Math.random() - 0.5) * sp2;
@@ -143,6 +145,7 @@ export class FX {
     this.scene = scene;
     this.parts = new Particles(scene);
     this.items = [];
+    this.ground = (x, z) => this.parts.ground(x, z); // setGround で地形の高さを渡す。エフェクトの y はすべて地面からの高さ
     this.trails = new Map(); // 武器 → 振りの軌跡
     this.lights = [];
     // 動的ポイントライトのプール（シェーダー再コンパイルを防ぐため固定数）
@@ -151,6 +154,8 @@ export class FX {
       scene.add(l); this.lights.push({ l, t: 0, max: 1, i0: 0 });
     }
   }
+
+  setGround(fn) { this.parts.ground = fn; }
 
   add(obj, life, update) { this.scene.add(obj); this.items.push({ obj, life, max: life, update }); return obj; }
 
@@ -179,7 +184,7 @@ export class FX {
 
   flash(x, y, z, color, intensity = 30, life = 0.25, dist = 12) {
     const L = this.lights.reduce((a, b) => (a.t < b.t ? a : b));
-    L.l.position.set(x, y, z); L.l.color.set(color); L.l.distance = dist; L.t = life; L.max = life; L.i0 = intensity;
+    L.l.position.set(x, y + this.ground(x, z), z); L.l.color.set(color); L.l.distance = dist; L.t = life; L.max = life; L.i0 = intensity;
   }
 
   update(dt) {
@@ -209,7 +214,10 @@ export class FX {
     g.rotateX(-Math.PI / 2);
     const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
     const mesh = new THREE.Mesh(g, m);
-    mesh.position.set(x, y, z); mesh.rotation.y = a;
+    // 坂でも扇が地面に埋まらないよう、扇の範囲で一番高い地面に合わせる
+    let gy = this.ground(x, z);
+    for (let i = 0; i < 6; i++) { const t = a + (i / 5 - 0.5) * arc; for (const f of [0.5, 1]) gy = Math.max(gy, this.ground(x + Math.sin(t) * range * f, z + Math.cos(t) * range * f)); }
+    mesh.position.set(x, y + gy, z); mesh.rotation.y = a;
     mesh.rotation.z = reverse ? 0.25 : -0.25;
     this.add(mesh, 0.22, (o, k) => { o.material.opacity = 0.9 * (1 - k); o.scale.setScalar(0.85 + k * 0.25); });
     for (let i = 0; i < 10; i++) {
@@ -221,8 +229,9 @@ export class FX {
 
   ringWave(x, z, color, maxR = 6, life = 0.45, y = 0.15, width = 0.6) {
     const g = new THREE.RingGeometry(0.8, 1, 48); g.rotateX(-Math.PI / 2);
-    const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const mesh = new THREE.Mesh(g, m); mesh.position.set(x, y, z);
+    // 地面すれすれの輪は起伏で欠けるので、地形より手前に描く（深度を見ない）
+    const m = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(g, m); mesh.position.set(x, y + this.ground(x, z), z); mesh.renderOrder = 3;
     this.add(mesh, life, (o, k) => { const r = 0.5 + maxR * Math.sqrt(k); o.scale.set(r, 1, r); o.material.opacity = 1 - k; });
     void width;
   }
@@ -239,7 +248,7 @@ export class FX {
         gl_FragColor = vec4(uColor * 1.6, a * uFade); }`,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     });
-    const mesh = new THREE.Mesh(g, m); mesh.position.set(x, 0, z);
+    const mesh = new THREE.Mesh(g, m); mesh.position.set(x, this.ground(x, z), z);
     if (life === Infinity) { this.scene.add(mesh); return mesh; }
     return this.add(mesh, life, (o, k, dt) => { o.material.uniforms.uTime.value += dt; o.material.uniforms.uFade.value = 1 - k; o.scale.x = o.scale.z = 1 + k * 1.5; });
   }
@@ -253,6 +262,7 @@ export class FX {
       if (y < 3) { px = px * 0.5 + x * 0.5; pz = pz * 0.5 + z * 0.5; }
     }
     pts.push(new THREE.Vector3(x, 0, z));
+    const g0 = this.ground(x, z); for (const p of pts) p.y += g0;
     const g = new THREE.BufferGeometry().setFromPoints(pts);
     const line = new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending }));
     this.add(line, 0.25, (o, k) => { o.material.opacity = Math.random() > 0.3 ? 1 - k : 0.2; });

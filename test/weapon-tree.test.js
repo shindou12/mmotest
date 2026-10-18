@@ -247,7 +247,8 @@ test('axe: berserker / crush / throw classes, the old heavy +25% and lifesteal m
   assert.equal(run('ax_exec').find((e) => e.m === 'hit').a[1], 6.8, 'low-HP targets take double');
   wtLearn(c, 'ax_return'); wtLearn(c, 'ax_return'); wtLearn(c, 'ax_return'); wtChoose(c, 'ax_return', 'A');
   const p = run('ax_return').filter((e) => e.m === 'proj');
-  assert.equal(p.length, 4, 'twin blades: out, two side axes, back'); assert.equal(p[0].a[0].mult, 1.9); assert.equal(p[1].a[0].mult, 0.95);
+  assert.equal(p.length, 3, 'twin blades: the main axe and two side axes, each flies out and comes back');
+  assert.equal(p[0].a[0].mult, 3.0); assert.ok(Math.abs(p[1].a[0].mult - 1.125) < 1e-9); assert.ok(p.every((e) => e.a[0].boomerang));
   wtLearn(c, 'ax_lust'); wtLearn(c, 'ax_lust'); wtLearn(c, 'ax_lust'); wtChoose(c, 'ax_lust', 'A');
   const ev = run('ax_lust');
   assert.deepEqual(ev.find((e) => e.m === 'pay').a, [0.15]);

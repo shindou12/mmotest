@@ -67,14 +67,19 @@ export function buildCombat() {
     proj(o) {
       const color = o.color ?? RARITIES[stats.S.wr].color;
       const shape = view.projShape(o.shape), mesh = shape.make(color, view.fx, stats.S.wr, stats.S.wst||0);
-      mesh.position.set(o.sx ?? state.me.x, 1, o.sz ?? state.me.z); mesh.rotation.y = o.a;
-      state.projs.push({ mesh, x: o.sx ?? state.me.x, z: o.sz ?? state.me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast, wave: shape.wave, wtNo: !!o.wtNo, stun: o.stun, eclipse: !!o.eclipse });
+      if (!mesh.parent) view.scene.add(mesh); // 斬撃波は自分で場面に足すが、斧の幻影は足さない（足し忘れると見えない）
+      mesh.position.set(o.sx ?? state.me.x, 1 + view.fx.ground(o.sx ?? state.me.x, o.sz ?? state.me.z), o.sz ?? state.me.z); mesh.rotation.y = o.a;
+      // boomerang: { out: 飛んでいく秒数, hover: 先で回り続ける秒数, hoverMult, rehit: 回っている間に同じ敵へ当たる間隔, onCatch }
+      //   行き → (回る) → 持ち主へ戻る。戻り始めに当たった敵を忘れるので、往復とも当たる
+      const boom = o.boomerang;
+      if (boom) mesh.scale.setScalar(o.scale ?? 1);
+      state.projs.push({ mesh, x: o.sx ?? state.me.x, z: o.sz ?? state.me.z, a: o.a, tech: o.tech, shape: o.shape, color, t: 0, speed: o.speed ?? 22, life: boom ? boom.out + (boom.hover || 0) + 3 : o.life ?? 0.7, rad: o.rad ?? 1.8, mult: o.mult ?? 1.4, type: o.type, hit: new Set(), sv: o.sv, cast: o.cast, wave: shape.wave, wtNo: !!o.wtNo, stun: o.stun, eclipse: !!o.eclipse, boom, phase: 0, hitT: new Map() });
       view.audio.sfx('wave');
     },
     arrow(o) {
       const color = o.color ?? RARITIES[stats.S.wr].color;
       const mesh = view.arrowMesh(color, o.big);
-      mesh.position.set(state.me.x, 1.2, state.me.z); mesh.rotation.y = o.a;
+      mesh.position.set(state.me.x, 1.2 + view.fx.ground(state.me.x, state.me.z), state.me.z); mesh.rotation.y = o.a;
       // 射程: 指定がなければ、弓の通常攻撃は引かずに撃つ射程・スキルは最大射程（弓以外の投げナイフなどは24m）
       const range = o.range ?? (stats.S.W.ranged ? (o.type === 'normal' ? stats.S.bowBase : stats.S.bowMax) : 24);
       state.projs.push({ mesh, arrow: true, x: state.me.x, z: state.me.z, sx: state.me.x, sz: state.me.z, a: o.a, t: 0, speed: o.speed ?? 42, life: (range + 0.6) / (o.speed ?? 42), range, rad: o.rad ?? 0.7, mult: o.mult ?? 1, type: o.type, pierce: !!o.pierce, hit: new Set(), color, sv: o.sv, cast: o.cast, tech: o.tech, poison: o.poison || 0, crit: o.crit, snipe: o.snipe, full: o.full, onHit: o.onHit });
@@ -153,8 +158,8 @@ export function doSwing() {
 // 他プレイヤーの矢（見た目だけ）
 export function fxArrow(x, z, a, color) {
   const m = view.arrowMesh(color, false);
-  m.position.set(x, 1.2, z); m.rotation.y = a;
-  view.fx.add(m, 0.6, (o, k) => { o.position.x = x + Math.sin(a) * 40 * k * 0.6; o.position.z = z + Math.cos(a) * 40 * k * 0.6; });
+  m.position.set(x, 1.2 + view.fx.ground(x, z), z); m.rotation.y = a;
+  view.fx.add(m, 0.6, (o, k) => { o.position.x = x + Math.sin(a) * 40 * k * 0.6; o.position.z = z + Math.cos(a) * 40 * k * 0.6; o.position.y = 1.2 + view.fx.ground(o.position.x, o.position.z); });
 }
 
 export function doHeavy(lv) {
@@ -268,6 +273,24 @@ export function projRevive(w, arrow) {
   }
   return false;
 }
+// 戻ってくる飛び道具の動き（位置は updateProjs が先に向きと速さで進めている）。持ち主に戻ったら true
+function boomerangStep(w, dt) {
+  const B = w.boom;
+  if (w.phase === 0 && w.t >= B.out) { w.phase = B.hover ? 1 : 2; w.turnT = w.t; if (w.phase === 2) w.hit.clear(); }
+  if (w.phase === 1) {
+    w.x -= Math.sin(w.a) * w.speed * dt; w.z -= Math.cos(w.a) * w.speed * dt; // 先で止まって回る
+    if (w.t >= B.out + B.hover) { w.phase = 2; w.hit.clear(); }
+    return false;
+  }
+  if (w.phase !== 2) return false;
+  // 持ち主へ向かって曲がりながら戻る（少し速く）
+  const tx = state.me.x - w.x, tz = state.me.z - w.z, d = Math.hypot(tx, tz);
+  w.x -= Math.sin(w.a) * w.speed * dt; w.z -= Math.cos(w.a) * w.speed * dt;
+  w.a = Math.atan2(tx, tz);
+  const v = w.speed * 1.15 * dt;
+  w.x += Math.sin(w.a) * Math.min(v, d); w.z += Math.cos(w.a) * Math.min(v, d);
+  return d < 1.2;
+}
 export function updateProjs(dt) {
   for (let i = state.projs.length - 1; i >= 0; i--) {
     const w = state.projs[i];
@@ -275,7 +298,7 @@ export function updateProjs(dt) {
     w.x += Math.sin(w.a) * w.speed * dt; w.z += Math.cos(w.a) * w.speed * dt;
     if (w.arrow) {
       // 矢: 射程（離したときの円の大きさ）まで飛ぶ
-      w.mesh.position.set(w.x, 1.2, w.z);
+      w.mesh.position.set(w.x, 1.2 + view.fx.ground(w.x, w.z), w.z);
       if (Math.random() < 0.7) view.fx.parts.emit(w.x, 1.2, w.z, { color: w.color, size: 0.35, life: 0.25, speed: 0.4, gravity: 0 });
       let done = false;
       fxCall('arrowTick', w); // 射抜き など
@@ -297,23 +320,31 @@ export function updateProjs(dt) {
       if (done || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { fxCall('arrowGone', w); view.fx.dispose(w.mesh); state.projs.splice(i, 1); }
       continue;
     }
-    w.mesh.position.set(w.x, 1, w.z);
+    const caught = w.boom && boomerangStep(w, dt);
+    w.mesh.position.set(w.x, 1 + view.fx.ground(w.x, w.z), w.z);
     view.projShape(w.shape).tick(w, dt);
-    view.fx.parts.emit(w.x, 1, w.z, { color: w.color ?? w.mesh.material.color, size: 0.4, life: 0.3, speed: 1, gravity: 0 });
+    view.fx.parts.emit(w.x, 1, w.z, { color: w.color ?? w.mesh.material.color, size: w.boom ? 0.6 : 0.4, life: 0.3, speed: 1, gravity: 0 });
+    const hovering = w.boom && w.phase === 1;
     for (const mb of [...state.mobs.values()]) {
-      if (w.hit.has(mb.id)) continue;
-      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) { w.hit.add(mb.id); rules.dealDamage(mb, w.mult, { type: w.type, tech: w.tech, noProc: true, sv: w.sv, cast: w.cast, wave: w.wave, proj: w, wtNo: w.wtNo, stun: w.stun }); }
+      if (w.hit.has(mb.id) && !(w.boom?.rehit && hovering && w.t - (w.hitT.get(mb.id) ?? -9) >= w.boom.rehit)) continue;
+      if (Math.hypot(mb.x - w.x, mb.z - w.z) < w.rad + mb.rad) {
+        w.hit.add(mb.id); w.hitT.set(mb.id, w.t);
+        rules.dealDamage(mb, hovering ? w.boom.hoverMult ?? w.mult : w.mult, { type: w.type, tech: w.tech, noProc: true, sv: w.sv, cast: w.cast, wave: w.wave, proj: w, wtNo: w.wtNo, stun: w.stun });
+        if (w.boom) { view.fx.parts.burst(mb.x, 1.1, mb.z, 12, { color: 0xffe0b0, speed: 7, size: 0.4, life: 0.3 }); view.fx.parts.burst(mb.x, 1.1, mb.z, 8, { color: w.color, speed: 4, size: 0.6, life: 0.35 }); }
+      }
     }
     projRevive(w, false);
-    const c = collide(state.world.def, w.x, w.z, 0.1, state.world.door);
-    if (w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { view.fx.dispose(w.mesh); state.projs.splice(i, 1); }
+    // 戻ってくる斧は壁を抜ける（持ち主のところへ必ず帰る）
+    const c = w.boom ? w : collide(state.world.def, w.x, w.z, 0.1, state.world.door);
+    if (caught || w.t > w.life || Math.hypot(c.x - w.x, c.z - w.z) > 0.05) { if (caught) w.boom.onCatch?.(); view.fx.dispose(w.mesh); state.projs.splice(i, 1); }
   }
 }
 
 // ---- ボスの弾 ----
+const BULLET_GAP = 0.6; // ボスの弾を1発受けてから、次の弾が当たるまでの秒数（同時に何発も当たらない）
 export function spawnBossProj(m) {
   const g = view.bossProjMesh(m);
-  g.position.set(m.x, 1.3, m.z);
+  g.position.set(m.x, 1.3 + view.fx.ground(m.x, m.z), m.z);
   view.scene.add(g);
   state.bprojs.push({ ...m, mesh: g, dodged: false });
 }
@@ -322,11 +353,11 @@ export function updateBossProjs(dt) {
   for (let i = state.bprojs.length - 1; i >= 0; i--) {
     const p = state.bprojs[i];
     p.x += p.vx * dt; p.z += p.vz * dt; p.life -= dt;
-    p.mesh.position.set(p.x, 1.3, p.z);
+    p.mesh.position.set(p.x, 1.3 + view.fx.ground(p.x, p.z), p.z);
     if (Math.random() < 0.6) view.fx.parts.emit(p.x, 1.3, p.z, { color: p.c, size: 0.4, life: 0.3, speed: 0.3, gravity: 0 });
     let gone = p.life <= 0;
     const d = Math.hypot(p.x - state.me.x, p.z - state.me.z);
-    if (!gone && !state.me.dead && !state.me.crawl && d < p.r + 0.6) {
+    if (!gone && !p.spent && !state.me.dead && !state.me.crawl && d < p.r + 0.6) {
       const facing = Math.abs(angDiff(Math.atan2(p.x - state.me.x, p.z - state.me.z), state.me.a)) < degToRad(80);
       if (rules.guardUp() && stats.S.guard && facing) {
         // ガードで弾を消す
@@ -340,7 +371,10 @@ export function updateBossProjs(dt) {
         gone = true; // 大剣カウンターで弾を受け流す
       } else if (state.me.iframe > 0) {
         if (!p.dodged) { p.dodged = true; rules.onJustDodge(); }
+      } else if (state.me.bulletT > 0) {
+        p.spent = true; // 直前に別の弾を受けた: 弾幕がまとめて当たらないよう、すり抜ける
       } else {
+        state.me.bulletT = BULLET_GAP;
         link.net.send({ t: 'absorb', id: p.src });
         rules.takeDamage(p.dmg * (rules.tf('t_spell') ? 0.65 : 1), { x: p.x - p.vx, z: p.z - p.vz });
         view.fx.parts.burst(p.x, 1.3, p.z, 20, { color: p.c, speed: 6, size: 0.5, life: 0.4 });

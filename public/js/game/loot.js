@@ -151,9 +151,9 @@ export function spawnGold(n, x, z, bag = false) {
   for (let i = 0; i < k; i++) {
     const model = view.makeCoin();
     const a = Math.random() * Math.PI * 2, sp = rnd(1.5, 4.5);
-    model.position.set(x, 1, z);
+    model.position.set(x, 1 + view.fx.ground(x, z), z);
     view.scene.add(model);
-    coins.push({ model, value: each + (i === 0 ? n - each * k : 0), x, z, y: 1.0, vx: Math.sin(a) * sp, vz: Math.cos(a) * sp, vy: rnd(5, 8.5), t: 0, spin: rnd(8, 16), bounces: 0 });
+    coins.push({ model, value: each + (i === 0 ? n - each * k : 0), x, z, y: 1.0 + view.fx.ground(x, z), vx: Math.sin(a) * sp, vz: Math.cos(a) * sp, vy: rnd(5, 8.5), t: 0, spin: rnd(8, 16), bounces: 0 });
   }
 }
 export function addGold(n, bonus = true) {
@@ -220,13 +220,13 @@ export function updateCoins(dt) {
       c.model.userData.body.rotation.y += dt * 1.2;
       c.model.userData.halo.material.opacity = 0.35 + Math.sin(c.t * 4) * 0.2;
       if (c.beam) { c.beam.position.set(c.x, field.heightAt(c.x, c.z), c.z); c.beam.material.uniforms.uTime.value = c.t; }
-      if (Math.random() < 0.15) view.fx.parts.emit(c.x + rnd(-0.4, 0.4), c.y + rnd(0.3, 1), c.z + rnd(-0.4, 0.4), { color: 0xfff0a0, size: 0.3, life: 0.5, speed: 0.3, gravity: -1 });
+      if (Math.random() < 0.15) view.fx.parts.emit(c.x + rnd(-0.4, 0.4), c.y + rnd(0.3, 1), c.z + rnd(-0.4, 0.4), { abs: true, color: 0xfff0a0, size: 0.3, life: 0.5, speed: 0.3, gravity: -1 });
     } else {
       c.model.position.set(c.x, c.y, c.z);
       const b = c.model.userData.body;
       b.rotation.y += c.spin * dt;
       if (c.vy === 0 && c.y <= ground + 0.01) { c.spin = Math.max(2.5, c.spin * (1 - dt * 2)); }
-      if (Math.random() < 0.012) view.fx.parts.emit(c.x, c.y + 0.2, c.z, { color: 0xffffff, size: 0.35, life: 0.25, speed: 0, gravity: 0 });
+      if (Math.random() < 0.012) view.fx.parts.emit(c.x, c.y + 0.2, c.z, { abs: true, color: 0xffffff, size: 0.35, life: 0.25, speed: 0, gravity: 0 });
     }
     if (c.t > 90) { disposeCoin(c); coins.splice(i, 1); }
   }

@@ -59,10 +59,10 @@ export function spawnSalvaged(it, x, z, src, delay) {
     const ox = src?.x ?? x, oz = src?.z ?? z;
     rules.spawnGold(salvageValue(it), ox, oz);
     const model = view.makeShard();
-    model.position.set(ox, 1, oz);
+    model.position.set(ox, 1 + view.fx.ground(ox, oz), oz);
     view.scene.add(model);
     const a = Math.atan2(x - ox, z - oz) + rnd(-0.3, 0.3), sp = Math.max(1.5, Math.hypot(x - ox, z - oz) * 1.6);
-    rules.coins.push({ mat: it, model, value: 0, x: ox, z: oz, y: 1.0, vx: Math.sin(a) * sp, vz: Math.cos(a) * sp, vy: rnd(6, 8), t: 0, spin: rnd(4, 8), bounces: 0 });
+    rules.coins.push({ mat: it, model, value: 0, x: ox, z: oz, y: 1.0 + view.fx.ground(ox, oz), vx: Math.sin(a) * sp, vz: Math.cos(a) * sp, vy: rnd(6, 8), t: 0, spin: rnd(4, 8), bounces: 0 });
     if (Math.hypot(ox - state.me.x, oz - state.me.z) < 30) view.audio.sfx('shard', { drop: true });
   }, delay * 1000);
 }

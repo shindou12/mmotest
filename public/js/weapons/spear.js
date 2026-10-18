@@ -357,7 +357,7 @@ function effects({ player, field, attack, tree, show, register }) {
     const old = me.banner && fx.items.find((it) => it.obj === me.banner.mesh);
     if (old) old.life = 0; // 前の旗は消す
     const { g, flag, ring } = bannerMesh();
-    g.position.set(x, 0, z);
+    g.position.set(x, fx.ground(x, z), z);
     fx.add(g, 8, (o, k) => { flag.rotation.y = Math.sin(k * 40) * 0.3; ring.material.opacity = 0.35 * (1 - k * 0.5); });
     me.banner = { x, z, until: now() + 8, mesh: g };
     fx.beam(x, z, 0x6ab0ff, 4, 0.5, 0.5);
@@ -467,7 +467,7 @@ function effects({ player, field, attack, tree, show, register }) {
       // 騎士: 雷をまとう間、槍の穂先から火花
       if (hasBuff('sp_thunder')) {
         const hp = handPos(me.model);
-        wtEmit('thunder', 30, dt, () => fx.parts.emit(hp.x + rnd(-0.4, 0.4), hp.y + rnd(0, 1.2), hp.z + rnd(-0.4, 0.4), { color: Math.random() < 0.5 ? 0xffffff : 0x9ad8ff, size: 0.28, life: 0.2, speed: 3, gravity: 0 }));
+        wtEmit('thunder', 30, dt, () => fx.parts.emit(hp.x + rnd(-0.4, 0.4), hp.y + rnd(0, 1.2), hp.z + rnd(-0.4, 0.4), { abs: true, color: Math.random() < 0.5 ? 0xffffff : 0x9ad8ff, size: 0.28, life: 0.2, speed: 3, gravity: 0 }));
       }
       if (me.soarReady && now() < me.soarReady) wtEmit('soar', 20, dt, () => fx.parts.emit(me.x + rnd(-0.4, 0.4), 0.2, me.z + rnd(-0.4, 0.4), { color: 0x9affc8, size: 0.3, life: 0.5, speed: 1.5, gravity: -5 }));
     },

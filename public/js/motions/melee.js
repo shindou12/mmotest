@@ -5,7 +5,7 @@ import { WEAPONS } from '../../shared/data.js';
 export function applyMeleePose(u, s) {
   const heavyWeapon = !!WEAPONS[u.wKind]?.twoHanded;
   const k = clamp(s.swing ?? -1, 0, 1), dir = (s.combo || 0) % 2 === 0 ? 1 : -1;
-  let yaw = -.2, pitch = .25;
+  let yaw = -.2, pitch = .25, roll = 0;
   if (s.swing >= 0) {
     const cut = k < .25 ? k / .25 : 1 - (k - .25) / .75 * .3;
     yaw = dir * (1.1 - cut * 2.2);pitch = .10;
@@ -20,8 +20,10 @@ export function applyMeleePose(u, s) {
     const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(-.04, y, overhead ? .22 : .34), new THREE.Vector3(1, -.6, -.2));
     const axis = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
     aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, -.18), new THREE.Vector3(-1, -.6, -.2));
+    // 刃を前へ: 構えと縦振りは刃を立てる。横振りは振り始めに寝かせて、刃が振る向きを向く
+    if (WEAPONS[u.wKind]?.edgeForward) roll = overhead || !(s.swing >= 0 || s.spin >= 0) ? Math.PI / 2 : s.swing >= 0 ? Math.PI / 2 * clamp(1 - k / .15, 0, 1) : 0;
   }
-  orientWeapon(u, yaw, pitch);
+  orientWeapon(u, yaw, pitch, roll);
 }
 
 export function applyMeleeSwing(u, s, e, dir) {

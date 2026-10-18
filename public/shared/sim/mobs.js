@@ -11,6 +11,9 @@ import { ELITE, NAMED } from './tuning.js';
 const SENTINEL_OPEN = 1.2; // 番兵が攻撃を出し切った後、盾が下がっている秒数
 const SENTINEL_REWARD = { xp: 4, gold: 6, rarity: 0.4 }; // 番兵の報酬（精鋭より一段おいしく）
 // きらめくトカゲ: 寿命・走る秒数・止まる秒数・逃げ出す距離・1回にまくコインの量の基準・報酬
+// 縄張り: 出現地点からこれ以上離れると帰る / 追い続ける距離 / 帰る速さの倍率 / 攻撃を受けずにこの秒数たつと回復し始める / 1秒に戻る体力の割合
+//   殴られ続けている間は range を越えても追う（hard まで）。帰り始めたら出現地点に着くまで寄り道しない
+const LEASH = { range: 48, hard: 76, chase: 34, runBack: 1.25, calm: 6, regen: 0.03, hurt: 4 };
 const TREASURE = { life: 45, run: 2.2, rest: 0.9, scare: 18, coin: 2, xp: 5, gold: 20 };
 
 // ボスの予兆を全体に広げる（BALANCE.bossRange）。輪は内側の安全地帯を保ったまま外へ、線は幅だけ広げる
@@ -164,7 +167,16 @@ export const MobsMethods = {
     if (m.st === 3) { m.windT -= dt; if (m.windT <= 0) { m.st = 0; if (Ar.guard) m.openT = SENTINEL_OPEN; } return; }
 
     const home = { x: m.hx, z: m.hz };
-    let target = this.threatTarget(m, alive, 26);
+    // 攻撃を受けてからの秒数（回復は落ち着いてから少しずつ）
+    if (m.hp < (m.lastHp ?? m.hp)) m.calmT = 0; else m.calmT = (m.calmT || 0) + dt;
+    m.lastHp = m.hp;
+    // 縄張りから離れすぎたら、追うのをやめて走って帰る（体力はそのまま。帰り着いてから少しずつ戻る）
+    if (m.returning) {
+      const dh = dist(m, home);
+      if (dh > 3) { m.target = null; m.a = Math.atan2(home.x - m.x, home.z - m.z); this.moveMobToward(A, m, home, Ar.speed * LEASH.runBack, dt); return; }
+      m.returning = false; m.wanderT = 0;
+    }
+    let target = this.threatTarget(m, alive, LEASH.chase);
     if (!target) {
       let best = Ar.aggro * 1.15;
       for (const p of alive) {
@@ -173,7 +185,8 @@ export const MobsMethods = {
       }
     }
     m.target = target ? target.id : null;
-    if (target && dist(m, home) > 28) { m.target = null; target = null; m.hp = m.mhp; m.threat.clear(); }
+    const far = dist(m, home);
+    if (target && far > LEASH.range && (m.calmT > LEASH.hurt || far > LEASH.hard)) { m.target = null; target = null; m.threat.clear(); m.returning = true; return; }
 
     if (target) {
       const d = dist(target, m);
@@ -188,9 +201,9 @@ export const MobsMethods = {
       m.wanderT -= dt;
       if (m.wanderT <= 0) { m.wanderT = rnd(2, 5); m.wx = m.hx + rnd(-5, 5); m.wz = m.hz + rnd(-5, 5); }
       const d = Math.hypot(m.wx - m.x, m.wz - m.z);
-      if (d > 0.5) { m.a = Math.atan2(m.wx - m.x, m.wz - m.z); this.moveMob(A, m, m.a, Ar.speed * 0.4, dt); }
+      if (d > 0.5) this.moveMobToward(A, m, { x: m.wx, z: m.wz }, Ar.speed * 0.4, dt);
       else m.st = 0;
-      if (m.hp < m.mhp) m.hp = Math.min(m.mhp, m.hp + m.mhp * 0.05 * dt);
+      if (m.hp < m.mhp && m.calmT > LEASH.calm) m.hp = Math.min(m.mhp, m.hp + m.mhp * LEASH.regen * dt);
     }
   },
 
@@ -240,27 +253,47 @@ export const MobsMethods = {
     }
   },
 
-  // 迷路では経路探索しながら近づく
+  // 目標へ近づく。迷路は経路探索（壁の角で引っかからないよう、見通せるときはまっすぐ）、屋外は障害物をよけて回り込む
   moveMobToward(A, m, t, speed, dt) {
     if (A.def.shape === 'grid') {
       m.pathT -= dt;
-      if (m.pathT <= 0 || !m.wp) { m.pathT = 0.4; m.wp = pathStep(A.def, m.x, m.z, t.x, t.z, A.door); }
+      if (m.pathT <= 0 || !m.wp) { m.pathT = 0.3; m.wp = pathStep(A.def, m.x, m.z, t.x, t.z, A.door); }
       this.moveMob(A, m, Math.atan2(m.wp.x - m.x, m.wp.z - m.z), speed, dt);
-      m.a = Math.atan2(t.x - m.x, t.z - m.z);
-    } else {
-      // 屋外: 正面の障害物は横へ回り込む
-      let ang = Math.atan2(t.x - m.x, t.z - m.z);
-      const fx = Math.sin(ang), fz = Math.cos(ang), dT = dist(m, t);
-      for (const o of obstaclesOf(A.def)) {
-        const ox = o.x - m.x, oz = o.z - m.z, along = ox * fx + oz * fz;
-        if (along <= 0 || along > Math.min(dT, o.r + 4)) continue;
-        const side = ox * fz - oz * fx;
-        if (Math.abs(side) > o.r + 0.9) continue;
-        ang += (side > 0 ? 1 : -1) * Math.PI / 2.2;
-        break;
-      }
-      this.moveMob(A, m, ang, speed, dt);
+    } else this.moveMob(A, m, this.steer(A, m, t.x, t.z, dt), speed, dt);
+    m.a = Math.atan2(t.x - m.x, t.z - m.z);
+  },
+  // 屋外の回り込み: 行きたい向きの少し先がふさがっていたら、左右に振った向きを順に試す。
+  // 一度選んだ側はしばらく続け（行ったり来たりしない）、進めていなければ反対側を試す
+  steer(A, m, tx, tz, dt) {
+    const want = Math.atan2(tx - m.x, tz - m.z), dT = Math.hypot(tx - m.x, tz - m.z);
+    const free = (ang, L) => {
+      const x = m.x + Math.sin(ang) * L, z = m.z + Math.cos(ang) * L, c = collide(A.def, x, z, 0.75, A.door);
+      return Math.hypot(c.x - x, c.z - z) < 0.05;
+    };
+    const clear = (ang) => free(ang, Math.min(1.3, dT)) && free(ang, Math.min(3, dT));
+    // 進み具合（1秒ごと）: 目標に近づけていなければ回る側を替える
+    m.stuckT = (m.stuckT || 0) + dt;
+    if (m.stuckT > 1) {
+      if (m.lastD !== undefined && m.lastD - dT < 0.4 && m.side) m.side = -m.side;
+      m.stuckT = 0; m.lastD = dT;
     }
+    m.sideT = (m.sideT || 0) - dt;
+    if (m.sideT <= 0) m.side = 0;
+    if (!m.side && clear(want)) return want;
+    // 回る側: 覚えている側。なければ目標に近い側の障害物の外側
+    let side = m.side;
+    if (!side) {
+      let best = null, bd = Infinity;
+      for (const o of obstaclesOf(A.def)) { const d = Math.hypot(o.x - m.x, o.z - m.z) - o.r; if (d < bd) { bd = d; best = o; } }
+      side = best ? ((best.x - m.x) * Math.cos(want) - (best.z - m.z) * Math.sin(want) > 0 ? -1 : 1) : 1;
+    }
+    for (let i = m.side ? 0 : 1; i <= 9; i++) {
+      for (const sd of [side, -side]) {
+        const ang = want + sd * i * 0.33;
+        if (clear(ang)) { if (i) { m.side = sd; m.sideT = 1.2; } else m.side = 0; return ang; }
+      }
+    }
+    return want;
   },
 
   applyTechniqueControl(A, p, mob, id) {

@@ -21,6 +21,7 @@ import { makeNpc } from '../models/npc-models.js';
 // ======================================================================
 export let env = null;
 export const heightAt = (x, z) => (env ? env.heightAt(x, z) : 0);
+fx.setGround(heightAt); // エフェクトの高さは地面から
 export function buildEnv(id) {
   if (env) fx.dispose(env.group);
   const def = AREAS[id];

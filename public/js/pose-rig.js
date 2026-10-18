@@ -25,10 +25,12 @@ export function aimHand(arm, elbow, goal, bend) {
   return target.add(arm.position);
 }
 
-export function orientWeapon(u, yaw, pitch) {
+// roll: 刃の幅の向きを柄のまわりに回す（0: 幅が水平 / π/2: 幅が縦で、刃が前を向く）
+export function orientWeapon(u, yaw, pitch, roll = 0) {
   width.set(Math.cos(yaw), 0, -Math.sin(yaw));
   shaft.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
   normal.crossVectors(width, shaft).normalize();
+  if (roll) { const c = Math.cos(roll), s = Math.sin(roll); width.multiplyScalar(c).addScaledVector(normal, s); normal.crossVectors(width, shaft).normalize(); }
   desired.setFromRotationMatrix(basis.makeBasis(width, shaft, normal));
   const offHand = !!WEAPONS[u.wKind]?.offHand;
   const arm = offHand ? u.armL : u.armR;

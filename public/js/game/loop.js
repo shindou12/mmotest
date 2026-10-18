@@ -100,7 +100,7 @@ export function update(dt) {
   // 遅延処理（スキルの多段ヒットなど）
   for (let i = state.pending.length - 1; i >= 0; i--) if (state.pending[i].at <= t) { const p = state.pending.splice(i, 1)[0]; if (!state.me.dead && !state.me.crawl) p.fn(); }
 
-  state.me.dodgeCd -= dt; state.me.wsCd -= dt; state.me.potCd -= dt; state.me.iframe -= dt; state.me.staggerT -= dt; state.me.hurtT -= dt;
+  state.me.dodgeCd -= dt; state.me.wsCd -= dt; state.me.potCd -= dt; state.me.iframe -= dt; state.me.bulletT = (state.me.bulletT || 0) - dt; state.me.staggerT -= dt; state.me.hurtT -= dt;
   state.me.dStackT -= dt; if (state.me.dStackT <= 0) state.me.dStack = 0;
   const cdt = fxReduce('cooldownDt', dt); // ブレイブハートB「速攻」 など
   state.me.wsCd -= cdt - dt;

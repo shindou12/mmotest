@@ -30,7 +30,16 @@ export function phantomAxe(color, wr, wst) {
   const group=new THREE.Group(),weapon=makeWeapon('axe',wr,wst),oldMaterials=new Set();
   const material=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.9});
   weapon.traverse(part=>{if(part.material){oldMaterials.add(part.material);part.material=material;}});
-  for(const mat of oldMaterials)mat.dispose();weapon.rotation.x=Math.PI/2;group.add(weapon);return group;
+  for(const mat of oldMaterials)mat.dispose();
+  // 水平に回す: 柄を横に寝かせ、柄の中ほどを軸にする
+  const spin=new THREE.Group();weapon.rotation.z=Math.PI/2;weapon.position.x=-.55;spin.add(weapon);group.add(spin);
+  // 回転の渦（加算の円盤2枚）
+  const whirl=new THREE.Group(),bright=new THREE.Color(color).multiplyScalar(1.4);
+  for(const [r0,r1,op] of [[.55,1.45,.35],[1.2,1.6,.55]]){
+    const m=new THREE.Mesh(new THREE.RingGeometry(r0,r1,40,1,0,Math.PI*1.4),new THREE.MeshBasicMaterial({color:bright,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+    m.rotation.x=-Math.PI/2;m.userData.op=op;whirl.add(m);
+  }
+  group.add(whirl);group.userData.spin=spin;group.userData.whirl=whirl;return group;
 }
 
 // ボスの弾の見た目（芯と光の輪）
@@ -166,10 +175,18 @@ export const PROJ_SHAPES = {
     tick(w) { w.mesh.material.opacity = 0.9 * (1 - w.t / w.life); w.mesh.scale.setScalar(1 + w.t * 1.5); },
   },
   // 投げた斧: 今の武器の斧の幻影が回りながら飛ぶ
+  //   横倒しで水平に回り、まわりに光の渦。消える直前だけ薄くなる
   axe: {
     wave: false,
     make: (color, fx, wr, wst) => phantomAxe(color, wr, wst),
-    tick(w, dt) { w.mesh.children[0].rotation.z += dt * 18; w.mesh.traverse((part) => { if (part.material) part.material.opacity = .9 * (1 - w.t / w.life); }); },
+    tick(w, dt) {
+      const spin = w.mesh.userData.spin;
+      spin.rotation.y -= dt * 20;
+      w.mesh.userData.whirl.rotation.y -= dt * 26;
+      w.mesh.rotation.y = 0;
+      const k = Math.min(1, Math.max(0, (w.life - w.t) / 0.15));
+      w.mesh.traverse((part) => { if (part.material) part.material.opacity = (part.userData.op ?? .9) * k; });
+    },
   },
 };
 export const projShape = (shape) => (Object.hasOwn(PROJ_SHAPES, shape ?? '') ? PROJ_SHAPES[shape] : PROJ_SHAPES.wave);

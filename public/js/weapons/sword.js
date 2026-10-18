@@ -522,7 +522,7 @@ function effects({ player, attack, tree, show, party, register }) {
       // 剣聖: 全会心の間は、剣から金の光がこぼれ、足元に金の輪
       if (hasBuff('sw_saint')) {
         const hp = handPos(me.model);
-        wtEmit('saint', 45, dt, () => fx.parts.emit(hp.x + rnd(-0.35, 0.35), hp.y + rnd(-0.2, 0.7), hp.z + rnd(-0.35, 0.35), { color: 0xffe070, size: 0.34, life: 0.45, speed: 0.6, gravity: -2 }));
+        wtEmit('saint', 45, dt, () => fx.parts.emit(hp.x + rnd(-0.35, 0.35), hp.y + rnd(-0.2, 0.7), hp.z + rnd(-0.35, 0.35), { abs: true, color: 0xffe070, size: 0.34, life: 0.45, speed: 0.6, gravity: -2 }));
         if (now() - (me.saintFxT || 0) > 0.5) { me.saintFxT = now(); fx.ringWave(me.x, me.z, 0xffd84a, 2.2, 0.4); }
       }
       // 報復者: 溜めたダメージが多いほど、赤い揺らめきが濃くなり、足元の赤い輪が脈打つ

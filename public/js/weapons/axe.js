@@ -11,8 +11,8 @@ const AXE = {
     { kind: 'skill', nodes: [
       { id: 'ax_hook', icon: '⟲', name: '引き裂き', base: '前の敵（ボス以外）を引き寄せてから叩く', lv: ['威力280%', '威力360%', L3], tags: ['break'],
         A: { name: '大引き', desc: '周り全体の敵を引き寄せる' }, B: { name: '叩き伏せ', desc: 'もう一度叩く（150%）' } },
-      { id: 'ax_return', icon: '⟳', name: '返り刃', base: '斧の分身を投げる。8m先まで飛んで戻り、往復とも当たる', lv: ['各150%', '各190%', L3], tags: ['throw'],
-        A: { name: '双刃', desc: '左右にも1本ずつ飛ぶ（各50%）' }, B: { name: '旋回', desc: '飛んだ先で1.5秒回り続けてから戻る（0.3秒ごとに40%）' } },
+      { id: 'ax_return', icon: '⟳', name: '返り刃', base: '大きな斧の分身を投げる。9m先まで回りながら飛び、手元へ戻る。往復とも当たる', lv: ['各240%', '各300%', L3], tags: ['throw'],
+        A: { name: '双刃', desc: '左右にも1本ずつ飛ぶ（各90%）' }, B: { name: '旋回', desc: '飛んだ先で1.5秒回り続けてから戻る（0.25秒ごとに70%）' } },
       { id: 'ax_stomp', icon: '⊚', name: 'ウォーストンプ', base: '地面を踏み鳴らし、周りの敵を揺さぶる（ボスを大きく崩す）', lv: ['威力180%', '威力230%', L3], tags: ['break'],
         A: { name: '地鳴り', desc: '1秒後にもう一度揺れる（100%）' }, B: { name: '大踏み', desc: '範囲 +50%' } },
     ] },
@@ -70,14 +70,16 @@ const skills = {
     name: '返り刃', kind: 'axe', cd: 10.8, motion: 'axe_return', duration: T.axe_return.duration,
     motionOf: (W) => (W.br('ax_return') === 'A' ? 'ax_return_tri' : 'axe_return'),
     run(c) {
-      const W = c.wt(), a = c.aim(), m = W.lv('ax_return') >= 2 ? 1.9 : 1.5, b = W.br('ax_return'), sx = c.me.x, sz = c.me.z;
-      const far = spOff(sx, sz, a, 8), wait = b === 'B' ? 1.5 : 0;
+      const W = c.wt(), a = c.aim(), m = W.lv('ax_return') >= 2 ? 3.0 : 2.4, b = W.br('ax_return');
+      const boomerang = { out: 0.5, hover: b === 'B' ? 1.5 : 0, hoverMult: 0.7, rehit: 0.25 };
       at(c, T.axe_return.hits[0], () => {
-        c.proj({ a, mult: m, speed: 20, life: 0.4, rad: 1.3, shape: 'axe', type: 'tskill' });
-        if (b === 'A') for (const d of [-0.35, 0.35]) c.proj({ a: a + d, mult: m * 0.5, speed: 20, life: 0.4, rad: 1.1, shape: 'axe', type: 'tskill' });
+        // 投げる: 足元の衝撃と前への斬撃。斧は大きく、渦を巻いて飛ぶ
+        c.proj({ a, mult: m, speed: 18, rad: 2.2, scale: 1.7, shape: 'axe', type: 'tskill', stun: 4, boomerang: { ...boomerang, onCatch: () => { c.fx.ringWave(c.me.x, c.me.z, c.col(), 2.2, 0.3); c.sfx('block'); } } });
+        if (b === 'A') for (const d of [-0.4, 0.4]) c.proj({ a: a + d, mult: m * 0.375, speed: 18, rad: 1.6, scale: 1.2, shape: 'axe', type: 'tskill', boomerang });
+        c.fx.slash(c.me.x, c.me.z, a, 3.2, 70, c.col(), 1.1);
+        c.fx.parts.burst(c.me.x + Math.sin(a) * 1.2, 0.3, c.me.z + Math.cos(a) * 1.2, 24, { color: 0xd8b080, speed: 6, size: 0.5, life: 0.45, up: 2 });
+        c.sfx('heavy'); c.shake(0.25);
       });
-      if (b === 'B') for (let k = 0; k < 5; k++) at(c, T.axe_return.hits[0] + 0.4 + k * 0.3, () => { c.circle(far.x, far.z, 2.2, 0.4, { type: 'tskill', stun: 1 }); c.fx.slash(far.x, far.z, k * 1.3, 2.2, 200, c.col(), 0.7); });
-      at(c, T.axe_return.hits[1] + wait, () => c.proj({ a: a + Math.PI, mult: m, speed: 20, life: 0.4, rad: 1.3, shape: 'axe', type: 'tskill', sx: far.x, sz: far.z }));
     },
   },
   ax_stomp: {

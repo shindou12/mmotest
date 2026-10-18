@@ -672,28 +672,50 @@ export function pathStep(def, x, z, tx, tz, doorOpen) {
   const s = worldToCell(g, x, z), t = worldToCell(g, tx, tz);
   if (s.c === t.c && s.r === t.r) return { x: tx, z: tz };
   const key = (c, r) => r * g.W + c;
+  // 見通せる（間のマスがすべて床で、斜めに壁の角をかすめない）ならまっすぐ
+  if (gridSight(g, x, z, tx, tz, doorOpen)) return { x: tx, z: tz };
   const prev = new Map([[key(s.c, s.r), -1]]);
   const q = [[s.c, s.r]];
-  while (q.length) {
-    const [c, r] = q.shift();
+  for (let qi = 0; qi < q.length && prev.size < 4000; qi++) {
+    const [c, r] = q[qi];
     if (c === t.c && r === t.r) break;
     for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nc = c + dc, nr = r + dr, k = key(nc, nr);
       if (prev.has(k) || solidAt(g, nc, nr, doorOpen)) continue;
       prev.set(k, key(c, r));
-      if (prev.size > 800) break;
       q.push([nc, nr]);
     }
   }
-  // 目標から出発点の隣までさかのぼる
+  // 目標から出発点までさかのぼり、見通せる一番先のマスへ向かう（マスの中心をジグザグにたどらない）
   const sk = key(s.c, s.r);
   let k = key(t.c, t.r);
   if (!prev.has(k)) return { x: tx, z: tz };
-  while (prev.get(k) !== sk) {
+  const route = [];
+  while (k !== sk) {
+    route.push(k);
     k = prev.get(k);
     if (k === -1 || k === undefined) return { x: tx, z: tz };
   }
-  return cellToWorld(g, k % g.W, Math.floor(k / g.W));
+  let next = null;
+  for (let i = route.length - 1; i >= 0; i--) {
+    const p = cellToWorld(g, route[i] % g.W, Math.floor(route[i] / g.W));
+    if (next && !gridSight(g, x, z, p.x, p.z, doorOpen)) break;
+    next = p;
+  }
+  return next;
+}
+// 迷路で 2 点の間が見通せるか（体の幅ぶん左右にずらした線も見る）
+function gridSight(g, x, z, tx, tz, doorOpen) {
+  const L = Math.hypot(tx - x, tz - z);
+  if (L < 0.01) return true;
+  const nx = -(tz - z) / L * 0.7, nz = (tx - x) / L * 0.7;
+  for (const o of [-1, 0, 1]) {
+    for (let d = 0; d <= L; d += 0.8) {
+      const k = d / L, c = worldToCell(g, x + (tx - x) * k + nx * o, z + (tz - z) * k + nz * o);
+      if (solidAt(g, c.c, c.r, doorOpen)) return false;
+    }
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
