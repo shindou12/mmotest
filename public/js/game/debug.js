@@ -8,6 +8,8 @@ import { PROF_MAX } from '../weapon-tree.js';
 import { DEBUG, char, saveChar } from './save.js';
 import { me } from './state.js';
 import { S, calcStats } from './stats.js';
+import { HIT_SOUNDS } from '../sample-sfx.js';
+import { audio } from './render.js';
 import { toast, ui } from './ui-bridge.js';
 
 const INV_MAX = 60;
@@ -49,8 +51,25 @@ export function startDebug(net) {
     return b;
   };
   warp(net, ROOMS[0]);
+  setupHitSound();
   buildPanel(net);
 }
+
+// ---- ヒット音の比較: 音声ファイルの候補に切り替え、音量・頭出し・ランダムの揺れ幅を変える ----
+//   設定はこのブラウザに保存する（デバッグ部屋でだけ使う。通常のゲームは合成音のまま）
+const HIT_KEY = 'eterna_debug_hit_sound_v1';
+function setupHitSound() {
+  const h = { pick: 'synth', pitch: 0.05, vol: 0.05, per: Object.fromEntries(HIT_SOUNDS.map((x) => [x.id, { gain: x.gain, trim: x.trim }])) };
+  try {
+    const saved = JSON.parse(localStorage.getItem(HIT_KEY));
+    if (saved) Object.assign(h, saved, { per: { ...h.per, ...saved.per } });
+  } catch { /* 保存なし */ }
+  if (!HIT_SOUNDS.some((x) => x.id === h.pick)) h.pick = 'synth';
+  audio.hitSound = h;
+  for (const x of HIT_SOUNDS) audio.samples?.load(x.id, x.url);
+}
+const saveHitSound = () => { try { localStorage.setItem(HIT_KEY, JSON.stringify(audio.hitSound)); } catch { /* 保存できない */ } };
+
 
 function warp(net, id, pos) {
   const p = net.world?.players.get(1);
@@ -100,6 +119,16 @@ function choice(values, label, pick, current) {
 }
 const row = (...kids) => el('div', { className: 'row' }, kids);
 const select = (options) => el('select', {}, options.map(([value, text]) => el('option', { value, textContent: text })));
+// 目盛り（つまみを離したらフォーカスを外して、ゲームのキー操作を奪わない）
+function slider(label, min, max, step, get, set, fmt) {
+  const out = el('span', { style: 'min-width:4.5em;font-variant-numeric:tabular-nums' });
+  const input = el('input', { type: 'range', min, max, step, style: 'width:150px' });
+  const sync = () => { input.value = get(); out.textContent = fmt(+input.value); };
+  input.oninput = () => { set(+input.value); out.textContent = fmt(+input.value); };
+  input.onchange = () => input.blur();
+  sync();
+  return { row: row(el('span', { textContent: label, style: 'min-width:8em' }), input, out), input, sync };
+}
 
 function buildPanel(net) {
   document.head.append(el('style', { textContent: CSS }));
@@ -118,6 +147,17 @@ function buildPanel(net) {
   const make = (slot) => addItem(makeItem(MAX_LEVEL, +grade.value, { slot, kind: slot === 'weapon' ? kind.value : null }));
 
   const title = select(Object.entries(TITLES).map(([id, t]) => [id, t.name]));
+  const H = audio.hitSound, cur = () => H.per[H.pick];
+  const set = (fn) => (v) => { fn(v); saveHitSound(); };
+  const hitGain = slider('音量', 0, 200, 5, () => (cur() ? cur().gain * 100 : 100), set((v) => { if (cur()) cur().gain = v / 100; }), (v) => `${v}%`);
+  const hitTrim = slider('頭出し', 0, 120, 5, () => (cur() ? cur().trim * 1000 : 0), set((v) => { if (cur()) cur().trim = v / 1000; }), (v) => `${v}ms`);
+  const hitPitch = slider('ピッチの揺れ', 0, 25, 1, () => H.pitch * 100, set((v) => { H.pitch = v / 100; }), (v) => `±${v}%`);
+  const hitVol = slider('音量の揺れ', 0, 40, 1, () => H.vol * 100, set((v) => { H.vol = v / 100; }), (v) => `±${v}%`);
+  // 音量・頭出しは音ごとに覚える。合成音のときは触れない
+  const syncPer = () => { for (const s of [hitGain, hitTrim]) { s.input.disabled = H.pick === 'synth'; s.sync(); } };
+  const hitBtns = choice(['synth', ...HIT_SOUNDS.map((x) => x.id)], (id) => (id === 'synth' ? '今の合成音' : HIT_SOUNDS.find((x) => x.id === id).name),
+    (id) => { H.pick = id; saveHitSound(); syncPer(); audio.sfx('hit'); }, H.pick);
+  syncPer();
   const god = btn('無敵: OFF', () => { me.god = !me.god; god.textContent = `無敵: ${me.god ? 'ON' : 'OFF'}`; god.classList.toggle('on', me.god); });
 
   panel.append(
@@ -134,6 +174,10 @@ function buildPanel(net) {
     row(...UNIQUES.map((u) => btn(u.name, () => addItem(makeItem(MAX_LEVEL, u.rarity === 7 ? 5 : 4, { unique: u })), `color:${RARITIES[u.rarity].color}`))),
     el('h3', { textContent: '称号' }),
     row(title, btn('出す', () => addItem(makeTitle(title.value)))),
+    el('h3', { textContent: 'ヒット音（敵に当てたとき）' }),
+    row(...hitBtns),
+    hitGain.row, hitTrim.row, hitPitch.row, hitVol.row,
+    row(btn('試し鳴らし', () => audio.sfx('hit')), btn('8連打（0.25秒おき）', () => { for (let i = 0; i < 8; i++) setTimeout(() => audio.sfx('hit'), i * 250); }), btn('クリティカル', () => audio.sfx('hit', { crit: true }))),
     el('h3', { textContent: 'そのほか' }),
     row(
       btn('全回復', () => { calcStats(); me.hp = S.mhp; me.potions = S.maxPot; }),
