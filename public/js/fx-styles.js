@@ -1,5 +1,5 @@
 // エフェクトの形違い（見比べ用の3案）: FX と同じ呼び方のまま、見た目の部品だけを差し替える。
-//   anime  … アニメ調。三日月の斬撃が振りの向きに走り、白い芯と色の縁がくっきり。星形の粒と線の火花
+//   anime  … アニメ調。三日月の斬撃が振りの向きに走り、白い芯がくっきり（外側の縁はぼかして、円の輪郭を線で見せない）。星形の粒と線の火花
 //   flashy … 派手。太く光る斬撃、塗りつぶしの衝撃波、大きくにじむ粒と多めの火花。Bloom を強く
 //   blend  … A+B。形はアニメ調（くっきりした三日月・星形の粒・2重の輪）、光の強さと粒の多さは派手寄り
 //   subtle … 控えめ。細い斬撃と細い輪、小さく少ない粒。画面と敵の予兆が見やすい
@@ -12,9 +12,9 @@ export const FX_STYLES = {
   anime: {
     name: 'A アニメ調', bloom: 0.55, flash: 1,
     parts: { shape: 'star', count: 1, size: 1.1 }, sparks: 0.7,
-    slash: { width: 0.34, core: 0.32, hard: 1, gain: 1.3, opacity: 1, life: 0.26, tail: 0.75 },
-    ring: { width: 0.09, fill: 0, hard: 1, gain: 1.4, double: true },
-    trail: { core: 0.45, hard: 1 },
+    slash: { width: 0.34, core: 0.3, hard: 1, gain: 1.3, opacity: 1, life: 0.26, tail: 0.75, feather: 0.4 },
+    ring: { width: 0.26, fill: 0, hard: 0, gain: 1.4, double: true },
+    trail: { core: 0.45, hard: 0 },
   },
   flashy: {
     name: 'B 派手', bloom: 0.85, flash: 1.25,
@@ -26,9 +26,9 @@ export const FX_STYLES = {
   blend: {
     name: 'A+B', bloom: 0.72, flash: 1.15,
     parts: { shape: 'star', count: 1.35, size: 1.2 }, sparks: 1,
-    slash: { width: 0.42, core: 0.36, hard: 1, gain: 1.7, opacity: 1, life: 0.3, tail: 0.9 },
-    ring: { width: 0.14, fill: 0.15, hard: 0, gain: 1.7, double: true },
-    trail: { core: 0.5, hard: 1 },
+    slash: { width: 0.42, core: 0.34, hard: 1, gain: 1.7, opacity: 1, life: 0.3, tail: 0.9, feather: 0.4 },
+    ring: { width: 0.3, fill: 0.1, hard: 0, gain: 1.7, double: true },
+    trail: { core: 0.5, hard: 0 },
   },
   subtle: {
     name: 'C 控えめ', bloom: 0.3, flash: 0.6,
@@ -55,20 +55,22 @@ function crescentGeometry(range, arc, width) {
 }
 // 頭（uHead）が振りの向きへ走り、通ったあとは尾を引いて消える。uHard 1 でセル調の2段（白い芯 / 色）
 const BAND_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-const BAND_FS = `uniform vec3 uColor; uniform float uHead, uTail, uCore, uHard, uGain, uOpacity, uRev; varying vec2 vUv;
+const BAND_FS = `uniform vec3 uColor; uniform float uHead, uTail, uCore, uHard, uGain, uOpacity, uRev, uFeather; varying vec2 vUv;
 void main(){
   float t = mix(vUv.x, 1.0 - vUv.x, uRev), s = vUv.y;
   float behind = uHead - t;
   float sweep = step(0.0, behind) * (1.0 - smoothstep(0.0, uTail, behind));
   float soft = smoothstep(0.0, 0.5, s) * sweep, hard = step(0.12, s) * step(0.15, sweep);
-  float a = mix(soft, hard, uHard);
-  float core = mix(smoothstep(1.0 - uCore, 1.0, s), step(1.0 - uCore, s), uHard);
+  float edge = 1.0 - smoothstep(1.0 - uFeather, 1.0, s); // 外側の縁: uFeather の幅でなだらかに消える（輪郭の線を見せない）
+  float a = mix(soft, hard, uHard) * edge;
+  float c0 = 1.0 - uCore - uFeather * 0.5, c1 = 1.0 - uFeather * 0.5;
+  float core = mix(smoothstep(c0, c1, s), step(c0, s), uHard);
   vec3 c = mix(uColor * uGain, vec3(1.0), core * 0.85);
   gl_FragColor = vec4(c, a * uOpacity);
 }`;
 function bandMaterial(color, st, rev) {
   return new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color(color) }, uHead: { value: 0 }, uTail: { value: st.tail }, uCore: { value: st.core }, uHard: { value: st.hard }, uGain: { value: st.gain }, uOpacity: { value: st.opacity }, uRev: { value: rev ? 1 : 0 } },
+    uniforms: { uColor: { value: new THREE.Color(color) }, uHead: { value: 0 }, uTail: { value: st.tail }, uCore: { value: st.core }, uHard: { value: st.hard }, uGain: { value: st.gain }, uOpacity: { value: st.opacity }, uRev: { value: rev ? 1 : 0 }, uFeather: { value: st.feather ?? 0 } },
     vertexShader: BAND_VS, fragmentShader: BAND_FS,
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
   });
@@ -78,10 +80,11 @@ function bandMaterial(color, st, rev) {
 const RING_FS = `uniform vec3 uColor; uniform float uK, uWidth, uFill, uHard, uGain; varying vec2 vUv;
 void main(){
   float r = length(vUv - 0.5) * 2.0;
-  float band = mix(1.0 - smoothstep(0.0, uWidth, abs(1.0 - uWidth - r)), step(abs(1.0 - uWidth - r), uWidth), uHard);
+  float wave = smoothstep(1.0 - 2.0 * uWidth, 1.0 - 0.5 * uWidth, r) * (1.0 - smoothstep(1.0 - 0.5 * uWidth, 1.0, r));
+  float band = mix(wave, step(abs(1.0 - uWidth - r), uWidth), uHard);
   float fill = uFill * smoothstep(0.2, 1.0, r) * step(r, 1.0);
   float a = (band + fill) * (1.0 - uK);
-  vec3 c = mix(uColor * uGain, vec3(1.0), band * (1.0 - uK) * 0.4);
+  vec3 c = mix(uColor * uGain, vec3(1.0), band * (1.0 - uK) * mix(0.25, 0.4, uHard));
   gl_FragColor = vec4(c, a);
 }`;
 
@@ -214,8 +217,9 @@ export class StyledFX extends FX {
     const tr = super.makeTrail(color), T = this.st.trail;
     tr.mat.uniforms.uCore = { value: T.core }; tr.mat.uniforms.uHard = { value: T.hard };
     tr.mat.fragmentShader = `uniform vec3 uColor; uniform float uCore, uHard; varying float vA; varying float vE;
-void main(){ float core = mix(smoothstep(1.0 - uCore, 1.0, vE), step(1.0 - uCore, vE), uHard);
-  gl_FragColor = vec4(mix(uColor * (1.0 + vA), vec3(1.0), core * 0.8), vA); }`;
+void main(){ float core = mix(smoothstep(1.0 - uCore, 0.85, vE), step(1.0 - uCore, vE), uHard);
+  float tip = mix(1.0 - 0.75 * smoothstep(0.8, 1.0, vE), 1.0, uHard); // 刃先の端はぼかして、弧の輪郭を線で見せない
+  gl_FragColor = vec4(mix(uColor * (1.0 + vA), vec3(1.0), core * 0.8), vA * tip); }`;
     return tr;
   }
 }
