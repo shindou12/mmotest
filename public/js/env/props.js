@@ -1,36 +1,23 @@
 // エリアの見た目: 飾りのプロップ（木・岩・花…）。種類ごとの登録表 PROPS
 import * as THREE from 'three';
 import { local } from './kit.js';
+import { addTree, addPine, addRock } from './flora.js';
 
 // プロップの登録表。種類（type）ごとの関数。プロップを足すときは、ここに関数を足して、エリアの props に名前を書く
 // ctx: { B（まとめて描く入れ物）, M（置く位置の行列）, R（決まった乱数）, c1・c2（色）, def（エリア）, C（色の揺らぎ）, S（球） }
 export const PROPS = {
+  // 木・針葉樹・岩は env/flora.js（樹種・岩の型を種から選び、1本ずつ形を変える）
   tree(ctx) {
-    const { B, M, R, c1, c2, C, S } = ctx;
-    B.add(new THREE.CylinderGeometry(0.22, 0.38, 2.6, 9), C(c2), local(M, 0, 1.3, 0));
-    for (let i = 0; i < 3; i++) B.add(new THREE.ConeGeometry(0.16, 1.0, 6), C(c2), local(M, 0, 0.15, 0, 1.25, i * 2.1, 0, 1, 1, 1).multiply(local(new THREE.Matrix4(), 0, 0.4, 0)));
-    B.add(new THREE.CylinderGeometry(0.06, 0.1, 1.0, 6), C(c2), local(M, 0.35, 2.2, 0, 0, 0, -0.8));
-    const lc = new THREE.Color(c1);
-    const clumps = [[0, 3.3, 0, 1.35], [0.8, 2.9, 0.3, 0.95], [-0.75, 3.0, -0.2, 1.0], [0.2, 4.1, -0.2, 0.95], [-0.2, 2.9, 0.75, 0.85], [0.3, 2.8, -0.8, 0.85]];
-    for (const [x, y, z, r] of clumps) B.add(S(r), C(lc.clone().offsetHSL(0, 0, y > 3.5 ? 0.06 : -0.02)), local(M, x, y, z, 0, 0, 0, 1, 0.85, 1));
-    if (R() < 0.35) for (let k = 0; k < 4; k++) B.add(S(0.09, 6, 4), C(0xff5a4a), local(M, (R() - 0.5) * 2, 2.7 + R() * 1.2, 0.9 + R() * 0.3));
+    const { B, M, R, c1, c2 } = ctx;
+    addTree(B, M, R, { leaf: c1, bark: c2, fruit: 0.35 });
   },
   pine(ctx) {
-    const { B, M, c1, c2, def, C } = ctx;
-    B.add(new THREE.CylinderGeometry(0.16, 0.3, 1.8, 8), C(c2), local(M, 0, 0.9, 0));
-    for (let i = 0; i < 4; i++) {
-      B.add(new THREE.ConeGeometry(1.9 - i * 0.38, 1.9, 11), C(c1, 0.06), local(M, 0, 1.8 + i * 1.05, 0, 0, i * 0.5, 0));
-      if (def.n === 6) B.add(new THREE.ConeGeometry(0.9 - i * 0.18, 0.7, 11), C(0xffffff, 0.02), local(M, 0, 2.5 + i * 1.05, 0));
-    }
+    const { B, M, R, c1, c2, def } = ctx;
+    addPine(B, M, R, { leaf: c1, bark: c2, snow: def.n === 6, size: 0.85 });
   },
   rock(ctx) {
-    const { B, M, R, c1, def, C } = ctx;
-    const n = 1 + Math.floor(R() * 3);
-    for (let k = 0; k < n; k++) {
-      const s = k === 0 ? 1 : 0.45 + R() * 0.3;
-      B.add(new THREE.DodecahedronGeometry(0.9 * s, 1), C(c1), local(M, k ? (R() - 0.5) * 2.4 : 0, 0.35 * s, k ? (R() - 0.5) * 2.4 : 0, R(), R() * 3, R(), 1.3, 0.75, 1.1), { flat: true });
-    }
-    if (def.n <= 2) B.add(new THREE.SphereGeometry(0.75, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.5), C(0x5a9a3a), local(M, 0, 0.55, 0, 0, 0, 0, 1.2, 0.5, 1));
+    const { B, M, R, c1, def } = ctx;
+    addRock(B, M, R, { color: c1, moss: def.n <= 2 ? 0.6 : 0, size: 0.9 });
   },
   flower(ctx) {
     const { B, M, R, c1, c2, C, S } = ctx;

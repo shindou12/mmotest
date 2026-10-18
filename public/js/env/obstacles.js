@@ -3,32 +3,21 @@ import * as THREE from 'three';
 import { toon, glow, outline } from '../toon.js';
 import { local, I, at, textSprite, propColor } from './kit.js';
 import { makeProp } from './props.js';
+import { addTree, addRock } from './flora.js';
 
 // 障害物の登録表。種類（o.kind）ごとの関数。障害物を足すときは、ここに関数を足す
 // ctx: { B, o（障害物）, fdef（階層）, heightAt, R, group, anims, y（地面の高さ）, M（置く位置の行列）, C（色の揺らぎ） }
 export const OBSTACLES = {
   rock(ctx) {
-    const { B, o, fdef, R, M, C } = ctx;
-    const col = new THREE.Color(propColor(fdef, ['rock'], 0, 0x8a8a8a));
-    B.add(new THREE.DodecahedronGeometry(o.r * 0.95, 1), C(col), local(M, 0, o.r * 0.3, 0, R(), R() * 3, R(), 1.05, 0.85, 1), { flat: true });
-    for (let k = 0; k < 3; k++) {
-      const a = R() * Math.PI * 2, s = o.r * (0.3 + R() * 0.2);
-      B.add(new THREE.DodecahedronGeometry(s, 0), C(col), local(M, Math.sin(a) * o.r * 0.85, s * 0.3, Math.cos(a) * o.r * 0.85, R(), R(), R()), { flat: true });
-    }
-    if (fdef.n <= 2) B.add(new THREE.SphereGeometry(o.r * 0.7, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2.4), C(0x5a9a3a), local(M, 0, o.r * 0.62, 0, 0, 0, 0, 1.15, 0.45, 1.1));
+    const { B, o, fdef, R, M } = ctx;
+    const col = propColor(fdef, ['rock'], 0, 0x8a8a8a);
+    addRock(B, M, R, { color: col, moss: fdef.n <= 2 ? 0.7 : 0, size: o.r * 0.95, kind: ['boulder', 'cluster', 'split', 'slab'][Math.floor(R() * 4)] });
   },
   tree(ctx) {
-    const { B, o, fdef, R, M, C } = ctx;
-    // 大樹: 太い幹と張った根、大きな樹冠
+    const { B, o, fdef, R, M } = ctx;
+    // 大樹: 太い幹の樹種を大きく
     const trunk = propColor(fdef, ['tree', 'pine'], 1, 0x6a4a2a), leaf = propColor(fdef, ['tree', 'pine'], 0, 0x3f8f3a);
-    const s = o.r * 0.9;
-    B.add(new THREE.CylinderGeometry(0.32 * s, 0.55 * s, 3.4 * s, 10), C(trunk), local(M, 0, 1.7 * s, 0));
-    for (let k = 0; k < 5; k++) {
-      const a = k / 5 * Math.PI * 2 + R() * 0.5;
-      B.add(new THREE.CylinderGeometry(0.08 * s, 0.22 * s, 1.5 * s, 6), C(trunk), local(M, Math.sin(a) * 0.55 * s, 0.25 * s, Math.cos(a) * 0.55 * s, Math.cos(a) * 1.1, 0, -Math.sin(a) * 1.1));
-    }
-    const clumps = [[0, 4.2, 0, 1.6], [1.0, 3.7, 0.4, 1.15], [-0.95, 3.8, -0.3, 1.2], [0.3, 5.1, -0.3, 1.1], [-0.3, 3.6, 1.0, 1.0], [0.4, 3.5, -1.0, 1.0]];
-    for (const [x, yy, z, r] of clumps) B.add(new THREE.SphereGeometry(r * s, 12, 10), C(new THREE.Color(leaf).offsetHSL(0, 0, yy > 4.5 ? 0.06 : -0.02)), local(M, x * s, yy * s, z * s, 0, 0, 0, 1, 0.85, 1));
+    addTree(B, M, R, { leaf, bark: trunk, size: o.r * 0.62, species: ['old', 'oak', 'twin'][Math.floor(R() * 3)] });
   },
   ruin(ctx) {
     const { B, o, fdef, R, M, C } = ctx;

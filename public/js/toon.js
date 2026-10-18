@@ -142,25 +142,77 @@ export function compact(group) {
   return group;
 }
 
-// 静的な背景用: ジオメトリを色付きで溜めて最後に1メッシュへ
+// 模様つきのトゥーン: 白黒の模様（tex）をワールド座標から3方向に貼り、頂点色に掛ける（UV がいらない）
+//   scale: 模様1枚が何 m か / strength: 模様の濃さ（0 で無地）
+const TRI_VERT = `
+  {
+    vec4 tpW = modelMatrix * vec4(transformed, 1.0);
+    vTpW = tpW.xyz; vTpN = normalize(mat3(modelMatrix) * objectNormal);
+  }`;
+const TRI_FRAG = `
+  {
+    vec3 tw = pow(abs(normalize(vTpN)), vec3(4.0)); tw /= (tw.x + tw.y + tw.z);
+    vec3 q = vTpW / uTpScale;
+    float t = texture2D(uTpTex, q.zy).r * tw.x + texture2D(uTpTex, q.xz).r * tw.y + texture2D(uTpTex, q.xy).r * tw.z;
+    diffuseColor.rgb *= mix(1.0, t * 1.12, uTpStr);
+  }`;
+const texMats = new Map();
+export function texToon(key, tex, { scale = 2, strength = 0.6 } = {}) {
+  if (texMats.has(key)) return texMats.get(key);
+  const m = new THREE.MeshToonMaterial({ color: 0xffffff, vertexColors: true, gradientMap: gradientMap() });
+  const U = { uTpTex: { value: tex }, uTpScale: { value: scale }, uTpStr: { value: strength } };
+  m.onBeforeCompile = (sh) => {
+    injectOcc(sh);
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = 'varying vec3 vTpW; varying vec3 vTpN;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>' + TRI_VERT);
+    sh.fragmentShader = 'uniform sampler2D uTpTex; uniform float uTpScale; uniform float uTpStr; varying vec3 vTpW; varying vec3 vTpN;\n'
+      + sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>' + TRI_FRAG);
+  };
+  m.customProgramCacheKey = () => 'tri-occ';
+  m.userData.shared = true;
+  texMats.set(key, m);
+  return m;
+}
+
+// 静的な背景用: ジオメトリを色付きで溜めて最後に1メッシュへ（素材 surf ごとに1メッシュ）
+//   color: 色、または (面の中心, 面の法線) => 色（面ごとに塗り分ける。木の幹の根元を暗く、岩の上面を苔に、など）
+//   surf: { key, tex, scale, strength }（模様つきの素材。なければ無地）
 export class Batch {
-  constructor() { this.solid = []; this.glow = []; this.plain = []; this.m = new THREE.Matrix4(); }
+  constructor() { this.solid = new Map(); this.glow = []; this.plain = []; this.m = new THREE.Matrix4(); }
   // plain: 輪郭線を付けない（紐のような細いもの。輪郭線だけが太く見えてしまうため）
-  add(geo, color, matrix, { glowing = false, flat = false, plain = false } = {}) {
+  add(geo, color, matrix, { glowing = false, flat = false, plain = false, surf = null } = {}) {
     let g = geo.index ? geo.toNonIndexed() : geo.clone();
     for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
     if (flat) g.computeVertexNormals();
     g.applyMatrix4(matrix);
-    const c = new THREE.Color(color), n = g.attributes.position.count, arr = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+    const n = g.attributes.position.count, arr = new Float32Array(n * 3);
+    if (typeof color === 'function') {
+      const p = g.attributes.position, nr = g.attributes.normal, cen = new THREE.Vector3(), nor = new THREE.Vector3(), c = new THREE.Color();
+      for (let f = 0; f + 2 < n; f += 3) {
+        cen.set((p.getX(f) + p.getX(f + 1) + p.getX(f + 2)) / 3, (p.getY(f) + p.getY(f + 1) + p.getY(f + 2)) / 3, (p.getZ(f) + p.getZ(f + 1) + p.getZ(f + 2)) / 3);
+        nor.set(nr.getX(f) + nr.getX(f + 1) + nr.getX(f + 2), nr.getY(f) + nr.getY(f + 1) + nr.getY(f + 2), nr.getZ(f) + nr.getZ(f + 1) + nr.getZ(f + 2)).normalize();
+        c.set(color(cen, nor));
+        for (let k = 0; k < 3; k++) { arr[(f + k) * 3] = c.r; arr[(f + k) * 3 + 1] = c.g; arr[(f + k) * 3 + 2] = c.b; }
+      }
+    } else {
+      const c = new THREE.Color(color);
+      for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+    }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-    (glowing ? this.glow : plain ? this.plain : this.solid).push(g);
+    if (glowing) this.glow.push(g);
+    else if (plain) this.plain.push(g);
+    else {
+      const key = surf ? surf.key : '';
+      if (!this.solid.has(key)) this.solid.set(key, { surf, list: [] });
+      this.solid.get(key).list.push(g);
+    }
     geo.dispose();
   }
   build() {
     const group = new THREE.Group();
-    if (this.solid.length) {
-      const mesh = new THREE.Mesh(mergeGeometries(this.solid), toon(0xffffff, { vertexColors: true }));
+    for (const { surf, list } of this.solid.values()) {
+      const mat = surf ? texToon(surf.key, surf.tex(), surf) : toon(0xffffff, { vertexColors: true });
+      const mesh = new THREE.Mesh(mergeGeometries(list), mat);
       mesh.castShadow = mesh.receiveShadow = true;
       outline(mesh, 0.9);
       group.add(mesh);
