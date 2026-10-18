@@ -2,6 +2,11 @@
   "source": "Blender 生成（tools/blender）",
   "items": [
     {
+      "file": "blender/cottage.glb",
+      "kind": "建物",
+      "scale": 1.0
+    },
+    {
       "file": "blender/rock_01.glb",
       "kind": "岩",
       "scale": 1.0
