@@ -1,4 +1,4 @@
-// エフェクトの見比べ（effects-lab.html）: 現行と3案（アニメ調・派手・控えめ）の4画面に、同じ場面を同じ時間で流す。
+// エフェクトの見比べ（effects-lab.html）: 現行と案（アニメ調・派手・A+B）の4画面に、同じ場面を同じ時間で流す。?c で控えめ（C）も見られる
 // 場面はゲームの呼び方そのまま（fx.slash / ringWave / parts.burst / lightning / waveMesh / 予兆）。ゲーム本体には影響しない
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -58,7 +58,8 @@ function pose(t) {
 
 // ---- 4画面 ----
 const grid = document.getElementById('grid');
-const panels = [['現行', null], ...Object.entries(FX_STYLES).map(([k, s]) => [s.name, k])].map(([label, key]) => makePanel(label, key));
+const SHOWN = ['anime', 'flashy', new URLSearchParams(location.search).has('c') ? 'subtle' : 'blend'];
+const panels = [['現行', null], ...SHOWN.map((k) => [FX_STYLES[k].name, k])].map(([label, key]) => makePanel(label, key));
 
 function makePanel(label, key) {
   const cell = document.createElement('div'); cell.className = 'cell';

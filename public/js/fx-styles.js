@@ -1,6 +1,7 @@
 // エフェクトの形違い（見比べ用の3案）: FX と同じ呼び方のまま、見た目の部品だけを差し替える。
 //   anime  … アニメ調。三日月の斬撃が振りの向きに走り、白い芯と色の縁がくっきり。星形の粒と線の火花
 //   flashy … 派手。太く光る斬撃、塗りつぶしの衝撃波、大きくにじむ粒と多めの火花。Bloom を強く
+//   blend  … A+B。形はアニメ調（くっきりした三日月・星形の粒・2重の輪）、光の強さと粒の多さは派手寄り
 //   subtle … 控えめ。細い斬撃と細い輪、小さく少ない粒。画面と敵の予兆が見やすい
 // ゲームの技は fx.slash / ringWave / waveMesh / lightning / flash / parts.burst / swordTrail を組み合わせて呼んでいるので、
 // ここを差し替えればすべての技の見た目が変わる（技ごとの呼び方は変えなくてよい）
@@ -21,6 +22,13 @@ export const FX_STYLES = {
     slash: { width: 0.5, core: 0.4, hard: 0, gain: 1.8, opacity: 0.9, life: 0.32, tail: 1 },
     ring: { width: 0.2, fill: 0.22, hard: 0, gain: 1.8, double: false },
     trail: { core: 0.6, hard: 0 },
+  },
+  blend: {
+    name: 'A+B', bloom: 0.72, flash: 1.15,
+    parts: { shape: 'star', count: 1.35, size: 1.2 }, sparks: 1,
+    slash: { width: 0.42, core: 0.36, hard: 1, gain: 1.7, opacity: 1, life: 0.3, tail: 0.9 },
+    ring: { width: 0.14, fill: 0.15, hard: 0, gain: 1.7, double: true },
+    trail: { core: 0.5, hard: 1 },
   },
   subtle: {
     name: 'C 控えめ', bloom: 0.3, flash: 0.6,
