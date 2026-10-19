@@ -68,6 +68,7 @@ M_BANNER = lambda: material('banner', 'banner.png')
 M_PAINT = lambda: material('paint', 'paint.png')
 M_SOIL = lambda: material('soil', 'ground_dirt.png')
 M_SPRAY = lambda: material('leaf_spray', 'spray_maple.png', alpha=True)
+M_PLATE = lambda: material('leaf_plate', 'plate_maple.png', alpha=True)
 M_CLUMP = lambda: material('leaf_clump', 'clump_maple.png', alpha=True)
 M_CLOVER = lambda: material('leaf_clover', 'spray_clover.png', alpha=True)
 M_FIRF = lambda: material('leaf_firfrond', 'frond_fir.png', alpha=True)
@@ -990,6 +991,41 @@ def rail_fence(name, seed, L=3.0):
     return B.build(name, smooth=False)
 
 
+def maple2(name, seed, height=6.0, width=4.2, base=2.0, tiers=5):
+    """広葉樹 第 3 世代（見本② B01/B02、L06）: 細い幹が上まで伸び、枝ごとに平たい葉の房（plate_maple、1.2〜1.7m）を
+    ほぼ水平（外へ 15〜35° 傾ける）に置き、段を 4〜5 つ重ねる。上の段ほど小さく明るい。段の間から幹と下の房の陰が見える"""
+    R_ = random.Random(seed); B = Builder()
+    lean = Vector((R_.uniform(-.2, .2), R_.uniform(-.2, .2), 0))
+    top = Vector((0, 0, height * 0.92)) + lean
+    tube(B, [Vector((0, 0, -0.3)), Vector((0, 0, 0)), Vector((0, 0, base)) + lean * 0.3, Vector((0, 0, height * 0.6)) + lean * 0.7, top],
+         [0.16, 0.14, 0.11, 0.08, 0.04], M_BARK(), sides=7, ao=(0.55, 0.85))
+    for i in range(tiers):
+        t = i / (tiers - 1)
+        z = base + (height * 0.95 - base) * t
+        rad = width / 2 * (1.0 - 0.35 * t) * R_.uniform(0.9, 1.05)
+        cnt = max(3, int(round(9 - 5 * t)))
+        a0 = R_.uniform(0, 6.28)
+        for k in range(cnt):
+            a = a0 + 2 * math.pi * k / cnt + R_.uniform(-0.35, 0.35)
+            out = Vector((math.cos(a), math.sin(a), 0))
+            ctr = Vector((0, 0, z + R_.uniform(-0.25, 0.25))) + lean * (z / height) + out * rad * R_.uniform(0.35, 0.7)
+            st = Vector((0, 0, z - 0.35)) + lean * (z / height)
+            tube(B, [st, ctr - out * 0.3], [0.05, 0.025], M_BARK(), sides=5, ao=(0.55, 0.75))
+            S = R_.uniform(1.25, 1.7) * (1.0 - 0.25 * t)
+            tilt = math.radians(R_.uniform(15, 35))
+            nrm_plate = (UP * math.cos(tilt) + out * math.sin(tilt)).normalized()
+            fwd = (out - nrm_plate * out.dot(nrm_plate)).normalized(); side = nrm_plate.cross(fwd).normalized()
+            rot = R_.uniform(0, 6.28); fwd, side = (fwd * math.cos(rot) + side * math.sin(rot)), (side * math.cos(rot) - fwd * math.sin(rot))
+            hb = 0.45 + 0.55 * t
+            c0 = crown_color(hb * 0.8, 0.5, 0.4, 0.95); c1 = crown_color(min(1.0, hb), 1.0, 0.45, 1.02)
+            nrm = (nrm_plate * 0.6 + (ctr - Vector((0, 0, (base + height) / 2))).normalized() * 0.4).normalized()
+            card2(B, ctr - fwd * S / 2, fwd, side, S, S, M_PLATE(), [c0, c1], nrm)
+            if R_.random() < 0.6:     # 房の下にもう 1 枚（厚み）
+                card2(B, ctr - fwd * S * 0.45 - nrm_plate * 0.25 + side * 0.2, fwd, side, S * 0.9, S * 0.9, M_PLATE(),
+                      [crown_color(hb * 0.5, 0.3, 0.45, 0.9), crown_color(hb * 0.7, 0.6, 0.45, 1.0)], nrm)
+    return B.build(name)
+
+
 ASSETS = {
     'tree_broad_a': lambda n: tree_broad(n, 101),
     'tree_broad_b': lambda n: tree_broad(n, 102, height=5.0, crown=1.2),
@@ -1034,6 +1070,10 @@ ASSETS = {
     'curb': lambda n: curb(n, 1010),
     'rail_fence': lambda n: rail_fence(n, 1011),
     'maple_big': lambda n: maple(n, 904, width=5.6, height=7.5, base=2.4),
+    'maple2_a': lambda n: maple2(n, 961),
+    'maple2_b': lambda n: maple2(n, 962, height=7.0, width=4.8, base=2.4),
+    'maple2_c': lambda n: maple2(n, 963, height=5.0, width=3.6, base=1.6, tiers=4),
+    'maple2_big': lambda n: maple2(n, 964, height=8.5, width=6.2, base=2.8, tiers=6),
     'palm2_low': lambda n: palm2(n, 953, height=0.5, frond=0.9, lean=0.1),
     'house_a': lambda n: house(n, 801),
     'house_b': lambda n: house(n, 802, w=9.0, d=5.5, h=5.4, roof_h=3.0),

@@ -329,7 +329,29 @@ def meander(n=512, seed=114):
     img.save(os.path.join(OUT, 'stone_meander.png'))
 
 
+def plate_maple(n=512, seed=115):
+    """上から見た平たい葉の房（見本② B01/B02 の広葉樹、L06）: 中心の小枝から放射状に大きな星形の葉が 2 重の輪で並ぶ。
+    不透明 ≈ 60%、暗い詰まりは作らない（下の房との重なりで陰を作る）。葉 1 枚 ≈ 房の幅の 1/4"""
+    r = rng(seed); W = n * SS
+    img = canvas(n, n); d = ImageDraw.Draw(img)
+    cx = cy = W / 2
+    leaves = []
+    for ring, (rad, cnt, size, depth) in enumerate([(0.26, 8, 0.21, 0.85), (0.12, 5, 0.21, 0.98), (0.0, 1, 0.2, 1.1)]):   # L07: 葉を大きく（房の幅の ≈ 1/3）
+        for k in range(cnt):
+            a = 2 * math.pi * k / max(cnt, 1) + r.uniform(-0.25, 0.25) + ring * 0.4
+            rr = rad * W * r.uniform(0.85, 1.05)
+            x, y = cx + math.cos(a) * rr, cy + math.sin(a) * rr
+            leaves.append((depth + r.uniform(-0.1, 0.1), x, y, a + r.normal(0, 0.3), W * size * r.uniform(0.9, 1.1)))
+            d.line([(cx, cy), (x, y)], fill=col((0.40, 0.36, 0.20)), width=int(W * 0.008))
+    leaves.sort()
+    for depth, x, y, a, L in leaves:
+        k = 0.8 + 0.25 * depth
+        mid = np.array((0.52, 0.64, 0.14)); hi = np.array((0.72, 0.80, 0.22))     # L07: 葉はほぼ一色の鮮やかな緑、明るいのは芯だけ
+        star_leaf(d, x, y, a, L, mid * 0.78 * k, mid * k, (mid * 0.5 + hi * 0.5) * k, mid * 0.7)
+    finish(img, n, n, 'plate_maple.png')
+
+
 if __name__ == '__main__':
     spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
-    canvas_beige(); canvas_blue(); lavender(); flagstone(); meander()
+    plate_maple(); canvas_beige(); canvas_blue(); lavender(); flagstone(); meander()
     print('textures2 ->', OUT)

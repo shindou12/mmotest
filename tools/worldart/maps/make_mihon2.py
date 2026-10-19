@@ -14,7 +14,7 @@ VIEWS = {
     'B02': dict(CAM, target=[10.1, 0, 0]),         # 円錐の天幕の位置から計算（goal-mihon2.md 2）
     'B03': dict(CAM, target=[-36, 0, -26]),        # 位置は推測
     'B04': dict(CAM, target=[8, 0, -52], pitch=42, dist=17,   # 位置・カメラとも推測（カットシーン）
-                light=dict(sun=0.55, hemi=1.05, exposure=1.0, sat=0.82, vignette=0.45, topDark=0.3)),   # カットシーンの照明（L02）
+                light=dict(sun=0.55, hemi=1.05, exposure=0.95, sat=1.1, vignette=0.45, topDark=0.3)),   # カットシーンの照明（L02）
 }
 
 B01 = dict(name='B01', camera=VIEWS['B01'],
@@ -115,8 +115,8 @@ spec = {
   "sun": {"azimuth": 70, "elevation": 40, "color": "#fff0d4", "intensity": 4.4},
   "sky": {"color": "#cfe0ee", "light": "#c4ccc8", "ground": "#8a8050", "intensity": 1.8},
   "albedoSat": 0.9, "shadowMap": "vsm", "shadowRadius": 6,
-  "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": False, "sat": 0.9, "lift": 0.12},
-  "post": {"sat": 0.94, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
+  "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
+  "post": {"exposure": 1.1, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
   "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.98, 0.88], "rock": "crack",
              "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 3.0},
   "terrain": {"size": 150, "cell": 0.5, "ground": "grass", "center": [-8, -22], "hills": {"amp": 0.25, "scale": 16}},
@@ -136,6 +136,13 @@ spec = {
     "flowers": {"asset": "flowers_a", "spacing": 1.3, "prob": 0.5}
   },
 }
+# L06: 広葉樹を第 3 世代（平たい房を段に重ねる maple2）に置き換える
+REP = {'maple_a': 'maple2_a', 'maple_b': 'maple2_b', 'maple_c': 'maple2_c', 'maple_big': 'maple2_big'}
+def rep(o):
+    if isinstance(o, dict): return {k: rep(v) for k, v in o.items()}
+    if isinstance(o, list): return [rep(v) for v in o]
+    return REP.get(o, o) if isinstance(o, str) else o
+spec = rep(spec)
 out = os.path.join(ROOT, 'public/worldart/maps/mihon2.json')
 json.dump(spec, open(out, 'w'), ensure_ascii=False)
 print('->', out)

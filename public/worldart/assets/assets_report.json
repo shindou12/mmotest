@@ -611,6 +611,66 @@
   "colors": 1
  },
  {
+  "name": "maple2_a",
+  "tris": 484,
+  "size": [
+   4.18,
+   3.98,
+   6.37
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_b",
+  "tris": 486,
+  "size": [
+   4.36,
+   4.45,
+   7.45
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_c",
+  "tris": 396,
+  "size": [
+   3.59,
+   3.48,
+   5.54
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_big",
+  "tris": 580,
+  "size": [
+   5.22,
+   5.13,
+   8.67
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
   "name": "palm2_low",
   "tris": 246,
   "size": [

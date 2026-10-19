@@ -20,7 +20,8 @@ bpy.ops.object.light_add(type='SUN', rotation=(math.radians(55), 0, math.radians
 bpy.context.object.data.energy = 4.0; bpy.context.object.data.angle = math.radians(3)
 w = bpy.data.worlds.new('w'); bpy.context.scene.world = w; w.use_nodes = True
 w.node_tree.nodes['Background'].inputs[0].default_value = (0.55, 0.65, 0.8, 1); w.node_tree.nodes['Background'].inputs[1].default_value = 0.8
-bpy.ops.object.camera_add(location=(x / 2, -x * 0.95, x * 0.55), rotation=(math.radians(62), 0, 0))
+zt = max(o.dimensions.z for o in bpy.data.objects if o.type == 'MESH' and o.dimensions.x < 50)
+bpy.ops.object.camera_add(location=(x / 2, -max(x, zt * 3) * 0.95, max(x, zt * 3) * 0.55 + zt * 0.3), rotation=(math.radians(62), 0, 0))
 cam = bpy.context.object; cam.data.lens = 50; bpy.context.scene.camera = cam
 s = bpy.context.scene; s.render.engine = 'BLENDER_EEVEE_NEXT'; s.render.resolution_x = 1600; s.render.resolution_y = 600
 s.view_settings.view_transform = 'Standard'
