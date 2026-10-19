@@ -39,7 +39,7 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
 ## 現在の状態（最良版）
-- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v08.webp`
+- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v10.webp`
 - south_coast（同じ規則で作った別の地図）: `art/shots/south_coast/v06.webp`、歩いたとき `walk_sheet.webp`
 - 詳細と経緯は `experiments.md` の「履歴」。
 

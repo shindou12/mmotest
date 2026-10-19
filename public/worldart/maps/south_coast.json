@@ -167,6 +167,11 @@
       "asset": "grass_a",
       "prob": 0.55,
       "near": 4.5
+    },
+    "flowers": {
+      "asset": "flowers_a",
+      "spacing": 1.1,
+      "prob": 0.7
     }
   },
   "trees": [
@@ -175,5 +180,8 @@
       "world": [-8.5, 4.5],
       "scale": 1.0
     }
-  ]
+  ],
+  "ground": {
+    "dirtTint": [1.0, 0.97, 0.74]
+  }
 }

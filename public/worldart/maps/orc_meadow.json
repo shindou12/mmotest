@@ -132,6 +132,11 @@
     "pebble": {
       "asset": "rock_c",
       "prob": 0.03
+    },
+    "flowers": {
+      "asset": "flowers_a",
+      "spacing": 1.1,
+      "prob": 0.7
     }
   },
   "albedoSat": 0.7,
@@ -173,5 +178,8 @@
     "wrap": 0.5,
     "trans": 0.3,
     "receiveShadow": false
+  },
+  "ground": {
+    "dirtTint": [1.0, 0.97, 0.74]
   }
 }

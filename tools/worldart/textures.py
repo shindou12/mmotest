@@ -199,6 +199,25 @@ def leaf_palm(n=512, seed=14):
     save_rgba(img, 'leaf_palm.png')
 
 
+def flowers(n=256, seed=15):
+    """草地の小花（青・白・薄桃の5弁）を数輪ずつ。R01・R03 の草地の点景"""
+    r = rng(seed)
+    img = Image.new('RGBA', (n, n), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    pal = [((0.45, 0.62, 0.95), (0.85, 0.92, 1.0))] * 3 + [((0.95, 0.95, 0.92), (1, 1, 1)), ((0.95, 0.66, 0.74), (1.0, 0.88, 0.9))]
+    for k in range(9):
+        cx, cy = r.uniform(0.15, 0.85) * n, r.uniform(0.15, 0.85) * n
+        base, hi = pal[int(r.integers(len(pal)))]
+        rad = r.uniform(0.045, 0.07) * n
+        for j in range(5):
+            a = j * 2 * math.pi / 5 + r.uniform(0, 1)
+            px, py = cx + math.cos(a) * rad * 0.6, cy + math.sin(a) * rad * 0.6
+            d.ellipse([px - rad * 0.5, py - rad * 0.5, px + rad * 0.5, py + rad * 0.5], fill=col(base))
+            d.ellipse([px - rad * 0.3, py - rad * 0.3, px + rad * 0.2, py + rad * 0.2], fill=col(hi))
+        d.ellipse([cx - rad * 0.25, cy - rad * 0.25, cx + rad * 0.25, cy + rad * 0.25], fill=col((0.98, 0.85, 0.3)))
+    save_rgba(img, 'flowers.png')
+
+
 # ---------------------------------------------------------------- 地面
 def ground_grass(n=1024, seed=21):
     big = fnoise(n, 0.18 * n, seed)            # 大きなむら
@@ -323,7 +342,27 @@ def wood(n=512, seed=71):
     save_rgb(out, 'wood.png')
 
 
+def crate_tex(n=512, seed=72):
+    """木箱の面: 横板4枚、外枠、×の補強材。R01・R04 の木箱"""
+    r = rng(seed)
+    g = fnoise(n, 0.008 * n, seed)
+    base = lerp((0.52, 0.38, 0.24), (0.70, 0.54, 0.36), g[..., None])
+    img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB')
+    d = ImageDraw.Draw(img)
+    for k in range(1, 4):   # 板の継ぎ目
+        y = k * n / 4; d.line([(0, y), (n, y)], fill=col((0.28, 0.19, 0.11)), width=4)
+    fw = int(n * 0.1)
+    dark = col((0.40, 0.28, 0.17)); light = col((0.78, 0.62, 0.42))
+    for a, b in [((0, 0), (n, fw)), ((0, n - fw), (n, n)), ((0, 0), (fw, n)), ((n - fw, 0), (n, n))]:
+        d.rectangle([a, b], fill=dark)
+    d.line([(fw, fw), (n - fw, n - fw)], fill=dark, width=int(fw * 0.9))
+    d.line([(n - fw, fw), (fw, n - fw)], fill=dark, width=int(fw * 0.9))
+    d.line([(fw, fw + 4), (n - fw - 4, n - fw)], fill=light, width=3)
+    d.rectangle([(2, 2), (n - 3, n - 3)], outline=light, width=3)
+    img.save(os.path.join(OUT, 'crate.png'))
+
+
 if __name__ == '__main__':
-    leaf_broad(); leaf_frond(); leaf_palm(); grass_blades()
-    ground_grass(); ground_dirt(); ground_sand(); ground_cobble(); rock(); wood()
+    leaf_broad(); leaf_frond(); leaf_palm(); grass_blades(); flowers()
+    ground_grass(); ground_dirt(); ground_sand(); ground_cobble(); rock(); wood(); crate_tex()
     print('textures ->', OUT, sorted(os.listdir(OUT)))

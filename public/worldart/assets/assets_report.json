@@ -133,6 +133,20 @@
   "colors": 1
  },
  {
+  "name": "flowers_a",
+  "tris": 4,
+  "size": [
+   0.86,
+   0.86,
+   0.28
+  ],
+  "zmin": -0.06,
+  "mats": [
+   "leaf_flower"
+  ],
+  "colors": 1
+ },
+ {
   "name": "rock_a",
   "tris": 56,
   "size": [
@@ -176,13 +190,13 @@
  },
  {
   "name": "fence_spike",
-  "tris": 368,
+  "tris": 406,
   "size": [
-   1.63,
-   3.0,
-   1.55
+   2.63,
+   3.22,
+   1.9
   ],
-  "zmin": -0.1,
+  "zmin": 0.05,
   "mats": [
    "wood"
   ],
@@ -198,7 +212,7 @@
   ],
   "zmin": 0.0,
   "mats": [
-   "wood"
+   "crate"
   ],
   "colors": 1
  }

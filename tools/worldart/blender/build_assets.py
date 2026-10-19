@@ -55,10 +55,12 @@ def material(name, tex, alpha=False, rough=1.0):
 
 M_BARK = lambda: material('bark', 'wood.png')
 M_WOOD = lambda: material('wood', 'wood.png')
+M_CRATE = lambda: material('crate', 'crate.png')
 M_LEAF = lambda: material('leaf_broad', 'leaf_broad.png', alpha=True)
 M_FROND = lambda: material('leaf_frond', 'leaf_frond.png', alpha=True)
 M_GRASS = lambda: material('grass', 'grass_blades.png', alpha=True)
 M_ROCK = lambda: material('rock', 'rock.png')
+M_FLOWER = lambda: material('leaf_flower', 'flowers.png', alpha=True)
 M_PALM = lambda: material('leaf_palm', 'leaf_palm.png', alpha=True)
 
 
@@ -160,7 +162,10 @@ def fib_sphere(n, r):
     return pts
 
 
-def leaf_clump(B, c, R, R_, m, cards, size, squash=0.75, tint_jit=0.08, ao_floor=0.42):
+NORMAL_MODE = arg('--normals', 'mix')   # clump: 小房の中心 / crown: 樹冠全体の中心 / mix: 6:4 で混ぜる（E07 で採用）
+
+
+def leaf_clump(B, c, R, R_, m, cards, size, squash=0.75, tint_jit=0.08, ao_floor=0.42, crown_c=None, crown_r=None):
     """葉の房: 球面上にカードを並べる。カードの向きは外向きと乱数の間。法線は外向き"""
     for d in fib_sphere(cards, 1.0):
         d = (d + Vector((R_.uniform(-.25, .25), R_.uniform(-.25, .25), R_.uniform(-.25, .25)))).normalized()
@@ -172,6 +177,10 @@ def leaf_clump(B, c, R, R_, m, cards, size, squash=0.75, tint_jit=0.08, ao_floor
         up = (out.z + 1) / 2
         ao = ao_floor + (1 - ao_floor) * (0.35 + 0.65 * up) * ((p - c).length / R) ** 0.3
         j = R_.uniform(-tint_jit, tint_jit)
+        if NORMAL_MODE == 'crown' and crown_c is not None:
+            out = (p - crown_c).normalized()
+        elif NORMAL_MODE == 'mix' and crown_c is not None:
+            out = ((p - crown_c).normalized() * 0.6 + out * 0.4).normalized()   # 大きな塊の明暗 + 小房のでこぼこ
         nrm = (out * 0.85 + UP * 0.15).normalized()
         card(B, p, hint, size * R_.uniform(0.8, 1.2), m, R_.uniform(0, 6.28), nrm, ao, (1 + j, 1 + j * 0.6, 1 - j))
 
@@ -197,12 +206,13 @@ def tree_broad(name, seed, height=4.2, crown=1.0):
         tube(B, [s, mid, e], [0.12, 0.08, 0.04], M_BARK(), sides=6, ao=(0.55, 0.85))
         tips.append(e)
     tips.append(top + Vector((0, 0, 0.9 * crown)))
+    crown_c = sum(tips, Vector()) / len(tips)
     # 枝先ごとに房を3つ寄せる → 輪郭がでこぼこ、房の間に陰ができる
     for e in tips:
         for k in range(3):
             off = Vector((R_.uniform(-.6, .6), R_.uniform(-.6, .6), R_.uniform(-.2, .5))) * crown
             Rc = R_.uniform(0.85, 1.15) * crown
-            leaf_clump(B, e + off, Rc, R_, M_LEAF(), cards=int(13 * Rc * Rc) + 6, size=1.6 * crown)
+            leaf_clump(B, e + off, Rc, R_, M_LEAF(), cards=int(13 * Rc * Rc) + 6, size=1.6 * crown, crown_c=crown_c)
     return B.build(name)
 
 
@@ -353,27 +363,41 @@ def rock(name, seed, size=(1.2, 1.0, 0.8), facet=0.18):
 
 
 def fence_spike(name, seed, length=3.0):
-    """拒馬: 中心の丸太（地面と平行）から X 字に尖った杭が出る。R01・R04"""
+    """拒馬: 地面と平行な丸太から、杭が四方へらせん状に突き出す（ブラシ状）。杭の先は太く長く削り、木口の明るい色。
+    斜めの板2枚で組む。R01・R04（平面の梯子にすると違う物に見える）"""
     R_ = random.Random(seed); B = Builder()
     y0, y1 = -length / 2, length / 2
-    hc = 0.55
-    tube(B, [Vector((0, y0, hc)), Vector((0, y1, hc))], [0.16, 0.16], M_WOOD(), sides=8, ao=(0.75, 0.75))
-    n = int(length / 0.42)
+    hc = 0.62
+    tube(B, [Vector((0, y0, hc)), Vector((0, y1, hc))], [0.2, 0.2], M_WOOD(), sides=8, ao=(0.8, 0.8))
+    n = int(length / 0.17)
     for i in range(n):
         y = y0 + (i + 0.5) * length / n
-        for sgn in (-1, 1):
-            a = math.radians(sgn * 42 + R_.uniform(-6, 6))
-            d = Vector((math.sin(a), 0, math.cos(a)))
-            base = Vector((0, y, hc)) - d * 0.75
-            body_end = Vector((0, y, hc)) + d * 0.75
-            tip = body_end + d * 0.38
-            tube(B, [base, body_end], [0.085, 0.085], M_WOOD(), sides=6, ao=(0.55, 0.95))
-            # 削った先（木口の明るい側の UV）
-            ring = tube(B, [body_end, tip], [0.085, 0.004], M_WOOD(), sides=6, ao=(1.05, 1.15), u0=0.5, u1=1.0)
-    # 斜めの板2枚
+        a = i * 2.4 + R_.uniform(-0.3, 0.3)              # らせん
+        tilt = R_.uniform(-0.25, 0.25)
+        d = Vector((math.cos(a), math.sin(tilt), math.sin(a))).normalized()
+        if d.z < -0.35: d.z = -d.z                        # 地面に刺さる向きは上へ返す
+        L = R_.uniform(0.55, 0.85); r = R_.uniform(0.11, 0.15)
+        base = Vector((0, y, hc)) + d * 0.1
+        body = base + d * L
+        tip = body + d * R_.uniform(0.45, 0.6)
+        tube(B, [base, body], [r, r * 0.95], M_WOOD(), sides=6, ao=(0.6, 1.0))
+        tube(B, [body, tip], [r * 0.95, 0.01], M_WOOD(), sides=5, ao=(1.0, 1.1), u0=0.5, u1=1.0)
     for sgn in (-1, 1):
-        p0 = Vector((sgn * 0.42, y0 + 0.2, 0.15)); p1 = Vector((sgn * 0.42, y1 - 0.2, 0.95))
-        tube(B, [p0, p1], [0.05, 0.05], M_WOOD(), sides=4, ao=(0.5, 0.7))
+        p0 = Vector((sgn * 0.5, y0 + 0.2, 0.1)); p1 = Vector((sgn * 0.5, y1 - 0.2, 1.05))
+        tube(B, [p0, p1], [0.06, 0.06], M_WOOD(), sides=4, ao=(0.55, 0.75))
+    return B.build(name)
+
+
+def flower_patch(name, seed):
+    """小花: 寝かせた2枚のカード（地面から 0.08m、15〜25° 傾ける）。法線は真上"""
+    R_ = random.Random(seed); B = Builder()
+    for k in range(2):
+        a = k * 1.7 + R_.uniform(0, 1)
+        dx = Vector((math.cos(a), math.sin(a), 0)) * 0.35; dy = Vector((-math.sin(a), math.cos(a), 0)) * 0.35
+        tilt = UP * 0.12 * (1 if k else -1)
+        ps = [-dx - dy + UP * 0.06, dx - dy + UP * 0.06 + tilt, dx + dy + UP * 0.1 + tilt, -dx + dy + UP * 0.1]
+        idx = [B.add_v(p) for p in ps]
+        B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], [(1.0,) * 3] * 4, [UP] * 4, M_FLOWER())
     return B.build(name)
 
 
@@ -383,8 +407,8 @@ def crate(name, size=0.8):
     md = ob.modifiers.new('bev', 'BEVEL'); md.width = 0.035; md.segments = 2
     bpy.ops.object.modifier_apply(modifier='bev')
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.cube_project(cube_size=size * 2.2); bpy.ops.object.mode_set(mode='OBJECT')
-    me = ob.data; me.materials.append(M_WOOD())
+    bpy.ops.uv.cube_project(cube_size=size); bpy.ops.object.mode_set(mode='OBJECT')
+    me = ob.data; me.materials.append(M_CRATE())
     ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
     for poly in me.polygons:
         for l in poly.loop_indices:
@@ -406,6 +430,7 @@ ASSETS = {
     'palm_b': lambda n: palm(n, 702, height=5.2, lean=1.6),
     'tree_broad_y': lambda n: tint_variant(lambda m: tree_broad(m, 103, height=4.6, crown=1.1), n, (1.35, 1.15, 0.55)),
     'grass_a': lambda n: grass(n, 401),
+    'flowers_a': lambda n: flower_patch(n, 451),
     'rock_a': lambda n: rock(n, 501),
     'rock_b': lambda n: rock(n, 502, size=(2.2, 1.6, 1.4), facet=0.14),
     'rock_c': lambda n: rock(n, 503, size=(0.5, 0.4, 0.3), facet=0.2),

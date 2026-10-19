@@ -276,6 +276,14 @@ def scatter():
             edge = 1 - abs(dirt - 0.35) / 0.35 if dirt < 0.7 else 0
             p = ((1 - dirt) ** 2 * (0.35 + 0.65 * float(clus)) + g.get('edge_boost', 0) * max(0, edge)) * (1 - alt) ** 3
             if RNG.random() < p: place(g['asset'], x, z, scale=RNG.uniform(*g.get('scale', [0.75, 1.35])))
+    rule_rng('flowers')
+    if 'flowers' in sc:
+        # 小花: 草の上に、群れのノイズの高いところだけ
+        fl = sc['flowers']
+        for x, z in jitter_grid(x0, x1, z0, z1, fl.get('spacing', 1.2)):
+            if field_at(DIRT, x, z) > 0.3 or field_at(ALT, x, z) > 0.3 or not dry(x, z, 0.3): continue
+            if float(N1(np.array(x * 1.3), np.array(z * 1.3), 5.0)) > 0.62 and RNG.random() < fl['prob']:
+                place(fl['asset'], x, z, scale=RNG.uniform(0.7, 1.2))
     rule_rng('beachgrass')
     if 'beachgrass' in sc:
         # 砂の上の草: 崖の下（崖の線から near m 以内）に群れて生える

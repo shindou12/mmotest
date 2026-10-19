@@ -254,7 +254,7 @@ const SKIP = new Set(flag('grass') ? [] : ['grass_a']);
 const assetNames = Object.keys(placed.assets).filter((a) => !SKIP.has(a));
 const dummy = new THREE.Object3D();
 await Promise.all(assetNames.map(async (name) => {
-  const g = await load(`${BASE}assets/${name}.glb`);
+  const g = await load(`${BASE}${q.get('adir') || 'assets'}/${name}.glb`);
   const items = placed.assets[name];
   g.scene.updateMatrixWorld(true);
   g.scene.traverse((o) => {
