@@ -556,7 +556,7 @@ def planter(name, seed, s=2.4):
 
 
 # ------------------------------------------------------------ 第 2 世代（B03・B01 の拡大から。docs/world-art/observations.md「追加の見本」）
-TEAL = (0.92, 0.98, 0.98)      # 樹冠の下・内側の色相（青緑）
+TEAL = (1.0, 1.0, 0.86)    # E25: 日陰の葉が青くなりすぎる（空の光が青いため）ので、内側はむしろ暖かく      # 樹冠の下・内側の色相（青緑）
 YELLOW = (0.82, 1.04, 1.00)    # 樹冠の上・日なた。暖かい太陽と ACES で黄へずれるのを打ち消し、葉は日なたでも緑（色相 ≈ 80°）を保つ。黄にするのは地面の草（E18）
 
 
@@ -597,7 +597,7 @@ def maple(name, seed, width=3.4, height=4.8, base=1.6, clusters=11):
     tube(B, [Vector((0, 0, -0.3)), Vector((0, 0, 0)), Vector((0, 0, base * 0.6)) + lean * 0.3, Vector((0, 0, base)) + lean * 0.6, trunk_top],
          [0.17, 0.16, 0.13, 0.11, 0.07], M_BARK(), sides=8, ao=(0.5, 0.8))
     cents = []
-    tiers = [(0.18, 0.95, 4), (0.5, 0.85, 4), (0.78, 0.6, 3)]
+    tiers = [(0.08, 1.0, 3), (0.45, 0.85, 3), (0.78, 0.55, 2)]   # 段の間をあけて幹と陰を見せる（B03 右の木）
     for tz, tr, k in tiers:
         a0 = R_.uniform(0, 6.28)
         for j in range(k):
@@ -612,9 +612,9 @@ def maple(name, seed, width=3.4, height=4.8, base=1.6, clusters=11):
         cr = R_.uniform(0.5, 0.7)
         for d in fib_sphere(R_.randint(9, 11), 1.0):
             if d.z < -0.45: continue
-            p = c + Vector((d.x, d.y, d.z * 0.75)) * cr * R_.uniform(0.55, 0.9)
+            p = c + Vector((d.x * 1.2, d.y * 1.2, d.z * 0.5)) * cr * R_.uniform(0.55, 0.9)   # 横に広い皿（段）
             # 葉の塊のカード: 面は塊の外向き（上寄り）。カードの上（絵の上端）を世界の上へ向ける
-            nrm_card = (d + UP * 0.6).normalized()
+            nrm_card = (d * 0.6 + UP * 1.0).normalized()
             hint_up = (UP - nrm_card * nrm_card.dot(UP)); hint_up = hint_up.normalized() if hint_up.length > 0.1 else Vector((1, 0, 0))
             side = hint_up.cross(nrm_card).normalized()
             L = R_.uniform(1.15, 1.35)   # 絵の中の塊は直径 ≈ 0.7（端で切れない余白）
@@ -622,7 +622,7 @@ def maple(name, seed, width=3.4, height=4.8, base=1.6, clusters=11):
             h0 = max(0.0, min(1.0, 0.6 * hc + 0.4 * hg))
             nrm = (d * 0.75 + UP * 0.35).normalized()
             card2(B, p - hint_up * L * 0.5, hint_up, side, L, L, M_CLUMP(),
-                  [crown_color(max(0.0, h0 - 0.15), 0.6, 0.34, 1.12), crown_color(min(1.0, h0 + 0.1), 1.0, 0.34, 1.12)], nrm)
+                  [crown_color(max(0.0, h0 - 0.15), 0.6, 0.5, 1.12), crown_color(min(1.0, h0 + 0.1), 1.0, 0.5, 1.12)], nrm)
     return B.build(name)
 
 
@@ -665,7 +665,7 @@ def fir2(name, seed, height=6.4, width=2.0):
             ws = [L * 0.28, L * 0.36, L * 0.34, L * 0.24]
             # 段ごとの明暗: 下の段ほど暗く青緑、上の段の先だけ明るく黄（B03 のもみ）
             tb = t ** 1.3
-            c0 = crown_color(tb * 0.5, 0.0, 0.18, 0.6); c1 = crown_color(min(1.0, tb * 0.9 + 0.1), 1.0, 0.3 + 0.25 * tb, 0.55 + 0.6 * tb)
+            c0 = crown_color(tb * 0.5, 0.0, 0.3, 0.7); c1 = crown_color(min(1.0, tb * 0.9 + 0.1), 1.0, 0.4 + 0.25 * tb, 0.65 + 0.5 * tb)
             cols = [c0, tuple((a_ + b_) / 2 for a_, b_ in zip(c0, c1)), c1, c1]
             nrm = (out * 0.55 + UP * 0.7).normalized()
             strip2(B, pts, ws, side, M_FIRF(), cols, nrm)

@@ -116,7 +116,8 @@ for cl in TS.get('cliffs', []):
     CLIFF_LINES.append((poly, cl, ref))
 
 # 注目点（カメラの target）の地面を高さ 0 にそろえる。画面の位置からの逆算は高さ 0 を前提にしているため
-H = H - H[int(np.clip(round((T[2] - zs[0]) / cell), 0, n - 1)), int(np.clip(round((T[0] - xs[0]) / cell), 0, n - 1))]
+if TS.get('anchor', False):   # 地図で "anchor": true のときだけ（水面・砂の帯の高さの基準も動くため。F20）
+    H = H - H[int(np.clip(round((T[2] - zs[0]) / cell), 0, n - 1)), int(np.clip(round((T[0] - xs[0]) / cell), 0, n - 1))]
 DIRT = np.zeros_like(H); ALT = np.zeros_like(H); GRASSP = []
 PATHS = []
 for p in SPEC.get('paths', []):

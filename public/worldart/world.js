@@ -88,7 +88,7 @@ const tex = (name, srgb = true) => {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 };
-const T = { crack: tex('rock_crack'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
+const T = { noise: tex('noise_soft', false), crack: tex('rock_crack'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
 
 // ---------------------------------------------------------------- 地面の材質
 // 頂点色 R=土の道 G=砂/石畳 B=岩肌。境目は草の絵の明るさで崩してぎざぎざにする
@@ -100,7 +100,8 @@ function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
-      tGrass: { value: T.grass }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
+      tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
+      uLushTint: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmt: { value: num('lush', GROUND.lushAmt ?? 0) },
       uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
       uDirtTint: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
       uAltScale: { value: GROUND.altScale || 6.0 },
@@ -111,7 +112,7 @@ function groundMaterial() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint; uniform float uLushAmt;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -120,6 +121,10 @@ function groundMaterial() {
         vec3 grass = mix(g1, g2, 0.35) * uGrassTint;
         float big = texture2D(tGrass, wp / 61.0).g;          // 大きなむら
         grass *= mix(0.86, 1.1, smoothstep(0.25, 0.6, big));
+        // 草地の色むら（20m 前後）: 金色の草原 ↔ 茂った緑の草。見本 B03 の地面の大きな黄緑/深緑の斑
+        vec3 nz3 = texture2D(tNoise, wp / 28.0).rgb;
+        float lush = smoothstep(0.42, 0.6, nz3.r * 0.55 + nz3.g * 0.3 + nz3.b * 0.15);
+        grass *= mix(vec3(1.0), uLushTint, lush * uLushAmt);
         vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
         vec3 alt = texture2D(tAlt, wp / uAltScale).rgb;
         vec3 an = abs(vWN);
@@ -165,7 +170,7 @@ function addOcc(sh) {
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uOccCam, uOccTgt; uniform float uOccR; varying vec3 vOccW;')
     .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>' + occChunk);
 }
-const LEAF = { wrap: { value: num('wrap', spec.foliage?.wrap ?? 0.0) }, trans: { value: num('trans', spec.foliage?.trans ?? 0.0) },
+const LEAF = { lift: { value: num('llift', spec.foliage?.lift ?? 0.0) }, wrap: { value: num('wrap', spec.foliage?.wrap ?? 0.0) }, trans: { value: num('trans', spec.foliage?.trans ?? 0.0) },
   receive: flag('leafShadow', spec.foliage?.receiveShadow ?? true) };
 const ALBEDO_SAT = { value: num('asat', spec.albedoSat ?? 1.0) };
 const LEAF_SAT = { value: num('lsat', spec.foliage?.sat ?? spec.albedoSat ?? 1.0) };   // 葉だけの地色の彩度（日陰の葉の彩度を抑える）
@@ -188,6 +193,18 @@ function addRockTriplanar(sh) {
       float mk = smoothstep(0.55, 0.85, vRN.y + (texture2D(tMoss, vRW.xz / 2.3).g - 0.5) * 0.5);
       diffuseColor.rgb *= mix(rc, moss, mk);`);
 }
+// 草の房も地面と同じ色むら（lush）に従う
+function addLushToGrass(sh) {
+  Object.assign(sh.uniforms, { tNoiseG: { value: T.noise }, uLushTintG: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) },
+    uLushAmtG: { value: num('lush', GROUND.lushAmt ?? 0) }, uGrassTintG: { value: new THREE.Color(...(GROUND.tuftTint || [1, 1, 1])) } });
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vGW;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\nvGW = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tNoiseG; uniform vec3 uLushTintG, uGrassTintG; uniform float uLushAmtG; varying vec2 vGW;')
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      vec3 nzg = texture2D(tNoiseG, vGW / 28.0).rgb;
+      float lushg = smoothstep(0.42, 0.6, nzg.r * 0.55 + nzg.g * 0.3 + nzg.b * 0.15);
+      diffuseColor.rgb *= uGrassTintG * mix(vec3(1.0), uLushTintG, lushg * uLushAmtG);`);
+}
 function fixMaterial(mesh) {
   const src = mesh.material;
   const isLeaf = /leaf|frond|grass/.test(src.name);
@@ -203,14 +220,17 @@ function fixMaterial(mesh) {
   m.onBeforeCompile = (sh) => {
     addDesat(sh, isLeaf && !isGrassMat ? LEAF_SAT : ALBEDO_SAT);
     if (!isGrassMat) addOcc(sh);
+    if (isGrassMat) addLushToGrass(sh);
     if (isRock2) addRockTriplanar(sh);
     if (!isLeaf) return;
     // 葉: 裏面で法線を反転させない（房として丸く光らせる）
     {
-      sh.uniforms.uWrap = LEAF.wrap; sh.uniforms.uTrans = LEAF.trans;
+      sh.uniforms.uWrap = LEAF.wrap; sh.uniforms.uTrans = LEAF.trans; sh.uniforms.uLeafLift = isGrassMat ? { value: 0 } : LEAF.lift;   // 草の房は持ち上げない（地面の影の深さを保つ）
       sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>',
         '#include <normal_fragment_begin>\n' + (FNORM_CARD ? '' : 'normal = normalize(vNormal);'))
-        .replace('#include <common>', '#include <common>\nuniform float uWrap, uTrans;')
+        .replace('#include <common>', '#include <common>\nuniform float uWrap, uTrans, uLeafLift;')
+        // 葉だけの持ち上げ（葉の中の光の回り込み）: 地面の影は深いまま、葉の日陰だけ明るくする（E26）
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * uLeafLift;')
         // 回り込む光（wrap）と、日を背にした葉の透け（trans）
         .replace('#include <lights_lambert_pars_fragment>', THREE.ShaderChunk.lights_lambert_pars_fragment.replace(
           'float dotNL = saturate( dot( geometryNormal, directLight.direction ) );',

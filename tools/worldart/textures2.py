@@ -176,7 +176,7 @@ def rock_crack(n=1024, seed=107):
     gy, gx = np.gradient(big)
     g = (-gx * 0.6 - gy * 0.8); shade = np.clip(0.5 + g / (np.abs(g).max() + 1e-9) * 0.6, 0, 1)
     tone = fn(n / 4, seed + 2)
-    base = lerp((0.62, 0.65, 0.58), (0.80, 0.82, 0.74), tone[..., None])
+    base = lerp((0.54, 0.58, 0.52), (0.72, 0.75, 0.68), tone[..., None])
     base *= (0.78 + 0.42 * shade[..., None])
     base *= (0.92 + 0.14 * fn(n / 120, seed + 3)[..., None])
     crack = np.zeros((n, n))
@@ -236,6 +236,15 @@ def clump_maple(n=512, seed=108):
     finish(img, n, n, 'clump_maple.png')
 
 
+def noise_soft(n=256, seed=109):
+    """やわらかい大きなむら（R・G・B に別々のノイズ、0〜1 に広げる）。地面の色むらなどの分布用。端がつながる"""
+    chans = []
+    for k, sc in enumerate([n / 3, n / 6, n / 12]):
+        w = rng(seed + k).standard_normal((n, n)); f = np.sqrt(np.fft.fftfreq(n)[:, None] ** 2 + np.fft.fftfreq(n)[None, :] ** 2)
+        v = np.real(np.fft.ifft2(np.fft.fft2(w) * np.exp(-(f * sc) ** 2))); chans.append((v - v.min()) / (v.max() - v.min()))
+    Image.fromarray((np.stack(chans, -1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'noise_soft.png'))
+
+
 if __name__ == '__main__':
-    spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack()
+    spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
     print('textures2 ->', OUT)
