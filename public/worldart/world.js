@@ -35,7 +35,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = flag('shadow');
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping }[q.get('tone') || spec.tone || 'aces'];
 renderer.toneMappingExposure = num('exposure', P.exposure);
 document.body.appendChild(renderer.domElement);
 
@@ -100,8 +100,8 @@ function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
-      tGrass: { value: T.grass }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale },
-      uGrassTint: { value: new THREE.Color(...(GROUND.grassTint || [1, 1, 1])) },
+      tGrass: { value: T.grass }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
+      uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
       uDirtTint: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
       uAltScale: { value: GROUND.altScale || 6.0 },
       uWater: { value: new THREE.Vector2(spec.terrain.water?.level ?? 0, spec.terrain.water ? 1 : 0) },
@@ -111,7 +111,7 @@ function groundMaterial() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -131,7 +131,7 @@ function groundMaterial() {
         float wr = smoothstep(0.35, 0.65, vSplat.b + n * 0.6);
         vec3 col = mix(grass, dirt, wd);
         col = mix(col, alt, wa);
-        col = mix(col, rock, wr);
+        col = mix(col, rock * uRockTint, wr);
         if (uWater.y > 0.5) {
           float wet = smoothstep(0.55, 0.05, vW.y - uWater.x);
           col *= mix(vec3(1.0), vec3(0.72, 0.74, 0.76), wet);
@@ -168,9 +168,10 @@ function addOcc(sh) {
 const LEAF = { wrap: { value: num('wrap', spec.foliage?.wrap ?? 0.0) }, trans: { value: num('trans', spec.foliage?.trans ?? 0.0) },
   receive: flag('leafShadow', spec.foliage?.receiveShadow ?? true) };
 const ALBEDO_SAT = { value: num('asat', spec.albedoSat ?? 1.0) };
+const LEAF_SAT = { value: num('lsat', spec.foliage?.sat ?? spec.albedoSat ?? 1.0) };   // 葉だけの地色の彩度（日陰の葉の彩度を抑える）
 const desatChunk = '\n{ float l_ = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)); diffuseColor.rgb = mix(vec3(l_), diffuseColor.rgb, uAlbedoSat); }\n';
-function addDesat(sh) {
-  sh.uniforms.uAlbedoSat = ALBEDO_SAT;
+function addDesat(sh, u = ALBEDO_SAT) {
+  sh.uniforms.uAlbedoSat = u;
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAlbedoSat;')
     .replace('#include <color_fragment>', '#include <color_fragment>' + desatChunk);
 }
@@ -200,7 +201,7 @@ function fixMaterial(mesh) {
   const isRock2 = src.name === 'rock_crack';
   if (isRock2) { m.map = null; m.vertexColors = true; }
   m.onBeforeCompile = (sh) => {
-    addDesat(sh);
+    addDesat(sh, isLeaf && !isGrassMat ? LEAF_SAT : ALBEDO_SAT);
     if (!isGrassMat) addOcc(sh);
     if (isRock2) addRockTriplanar(sh);
     if (!isLeaf) return;
@@ -272,7 +273,8 @@ const SKIP = new Set(flag('grass') ? [] : ['grass_a']);
 const assetNames = Object.keys(placed.assets).filter((a) => !SKIP.has(a));
 const dummy = new THREE.Object3D();
 await Promise.all(assetNames.map(async (name) => {
-  const g = await load(`${BASE}${q.get('adir') || 'assets'}/${name}.glb`);
+  const shadowOnly = name.endsWith('@shadow');          // 映らないが影だけ落とす
+  const g = await load(`${BASE}${q.get('adir') || 'assets'}/${name.replace('@shadow', '')}.glb`);
   const items = placed.assets[name];
   g.scene.updateMatrixWorld(true);
   g.scene.traverse((o) => {
@@ -288,6 +290,7 @@ await Promise.all(assetNames.map(async (name) => {
     if (/leaf|frond|grass/.test(mat.name)) {
       im.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.5 });
     }
+    if (shadowOnly) { mat.colorWrite = false; mat.depthWrite = false; im.receiveShadow = false; im.castShadow = flag('casters'); }
     im.frustumCulled = false;
     scene.add(im);
   });

@@ -206,6 +206,11 @@ def build_terrain():
 
 # ------------------------------------------------------------ 配置
 PL = {}
+# アセットの高さ（assets_report.json から）
+try:
+    ASSET_H = {r['name']: r['size'][2] + r['zmin'] for r in json.load(open(os.path.join(ROOT, 'public/worldart/assets/assets_report.json')))}
+except Exception:
+    ASSET_H = {}
 # 樹冠の中心の高さ（scale=1）。アセットの寸法から（assets_report.json の高さの約 0.65）
 CANOPY_H = {'tree_broad_a': 3.8, 'tree_broad_b': 4.4, 'pine_a': 3.5, 'pine_b': 4.3, 'bush_a': 0.6,
             'maple_a': 3.5, 'maple_b': 3.9, 'maple_c': 3.0, 'fir2_a': 3.3, 'fir2_b': 3.8, 'palm_a': 4.2, 'palm_b': 4.8, 'palm2_a': 2.9, 'palm2_b': 3.4, 'clover_a': 0.4, 'clover_b': 0.4}
@@ -353,13 +358,37 @@ def scatter():
             x, z = a + (b - a) * t
             nrm = np.array([-(b - a)[1], (b - a)[0]]) / segL[k]
             if ref is not None: lowdir = nrm if np.dot(ref - np.array([x, z]), nrm) > 0 else -nrm
-            else: lowdir = -nrm if np.dot(camxz - np.array([x, z]), nrm) > 0 else nrm      # far: カメラの反対側
+            else:
+                lowdir = -nrm if np.dot(camxz - np.array([x, z]), nrm) > 0 else nrm      # far: カメラの反対側
+                if cl.get('low', 'far') == 'near': lowdir = -lowdir                    # near: カメラの側（F19）
+            if rk.get('mode') == 'face':
+                # 崖の面に縦長の柱を並べる: 低い側の足元に、線に沿って向け、上端が台地の縁にそろうよう沈める
+                px, pz = np.array([x, z]) + lowdir * (cl['width'] * rk.get('offset', 0.55))
+                assets = rk['asset'] if isinstance(rk['asset'], list) else [rk['asset']]
+                a_ = assets[int(RNG.integers(len(assets)))]
+                sc_ = RNG.uniform(*rk.get('scale', [0.8, 1.2]))
+                # 上端を台地の縁（高い側）の高さ − top_gap にそろえる。縁の草が柱の頭にかぶさる
+                hx, hz = np.array([x, z]) - lowdir * (cl['width'] * 0.8)
+                top = height_at(hx, hz) - rk.get('top_gap', 0.25) + RNG.uniform(-0.3, 0.1)
+                y_off = top - ASSET_H.get(a_, 3.0) * sc_ - height_at(px, pz)
+                place(a_, px, pz, rot=math.atan2(*(b - a)) + math.pi / 2 + RNG.uniform(-0.25, 0.25), scale=sc_, y=y_off)
+                s_ += rk.get('spacing', 1.1) * RNG.uniform(0.8, 1.15)
+                continue
             for j in range(rk.get('rows', 2)):
                 off = (j / max(1, rk.get('rows', 2) - 1) - 0.4) * cl['width'] + RNG.uniform(-0.3, 0.3)
                 px, pz = np.array([x, z]) + lowdir * off
                 if height_at(px, pz) < TS.get('water', {}).get('level', -99) - 0.3: continue
                 place(rk['asset'], px, pz, scale=RNG.uniform(*rk.get('scale', [0.8, 1.4])), y=-rk.get('sink', 0.3))
             s_ += rk.get('spacing', 1.6) * RNG.uniform(0.7, 1.2)
+    rule_rng('shadow')
+    # 映らないが影だけ落とす木: 影を落としたい画面の位置 → 地面の点 → 太陽の方へ樹冠の高さぶん寄せた位置に置く。
+    # 名前に @shadow を付け、実行環境で色も奥行きも書かない（castShadow だけ）
+    az, el = math.radians(SPEC['sun']['azimuth']), math.radians(SPEC['sun']['elevation'])
+    sdir = np.array([math.sin(az), math.cos(az)]) / math.tan(el)       # 地面 1m あたりの水平のずれ（太陽の方向）
+    for c in SPEC.get('shadow_casters', []):
+        gx, gz = pt(c['screen'])
+        hc = CANOPY_H.get(c['asset'], 4.0) * c.get('scale', 1.0)
+        place(c['asset'] + '@shadow', gx + sdir[0] * hc, gz + sdir[1] * hc, scale=c.get('scale', 1.0))
     rule_rng('props')
     for p in SPEC.get('props', []):
         x, z = pt(p['screen']) if 'screen' in p else p['world']

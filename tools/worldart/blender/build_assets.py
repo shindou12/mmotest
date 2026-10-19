@@ -556,8 +556,8 @@ def planter(name, seed, s=2.4):
 
 
 # ------------------------------------------------------------ 第 2 世代（B03・B01 の拡大から。docs/world-art/observations.md「追加の見本」）
-TEAL = (0.78, 0.96, 1.10)      # 樹冠の下・内側の色相（青緑）
-YELLOW = (1.12, 1.04, 0.74)    # 樹冠の上・日なたの色相（黄緑）
+TEAL = (0.92, 0.98, 0.98)      # 樹冠の下・内側の色相（青緑）
+YELLOW = (0.82, 1.04, 1.00)    # 樹冠の上・日なた。暖かい太陽と ACES で黄へずれるのを打ち消し、葉は日なたでも緑（色相 ≈ 80°）を保つ。黄にするのは地面の草（E18）
 
 
 def crown_color(h, out=0.5, lo=0.42, hi=1.10):
@@ -710,7 +710,7 @@ def grass_tall_tuft(name, seed):
     return B.build(name)
 
 
-def smooth_rock(name, seed, size=(2.6, 1.8, 2.2), bulge=0.22, sub=4):
+def smooth_rock(name, seed, size=(2.6, 1.8, 2.2), bulge=0.22, sub=4, flat_top=True):
     """なめらかに膨らんだ岩（B03 の崖・D03 の岩）: 二十面体を細かく分け、大きな低い周波数のノイズで膨らませる。
     フラットシェーディングは使わない（多面体に見える）。割れ目と苔は実行時に三方向投影で貼る（rock_crack）"""
     R_ = random.Random(seed)
@@ -723,7 +723,7 @@ def smooth_rock(name, seed, size=(2.6, 1.8, 2.2), bulge=0.22, sub=4):
         n2 = noise.noise(d * 3.1 + off * 1.7) * bulge * 0.35
         # 上を少し平らに、角を丸く
         q = d * (0.5 + n1 + n2)
-        q.z = q.z if q.z < 0.28 else 0.28 + (q.z - 0.28) * 0.45
+        if flat_top: q.z = q.z if q.z < 0.28 else 0.28 + (q.z - 0.28) * 0.45
         v.co = Vector((q.x * size[0], q.y * size[1], q.z * size[2]))
     for v in bm.verts:
         if v.co.z < -size[2] * 0.25: v.co.z = -size[2] * 0.25
@@ -774,6 +774,9 @@ ASSETS = {
     'cliff_rock_a': lambda n: smooth_rock(n, 941),
     'cliff_rock_b': lambda n: smooth_rock(n, 942, size=(3.4, 2.2, 3.0), bulge=0.26),
     'boulder_a': lambda n: smooth_rock(n, 943, size=(1.3, 1.1, 0.9), bulge=0.18, sub=3),
+    # 崖の面を作る縦長の岩の柱（B03 の崖: 幅 1〜1.5m・高さ 3m 前後の膨らんだ柱が並び、すき間が暗い割れ目になる）
+    'cliff_col_a': lambda n: smooth_rock(n, 944, size=(1.5, 1.1, 4.6), bulge=0.14, flat_top=False),
+    'cliff_col_b': lambda n: smooth_rock(n, 945, size=(1.2, 0.95, 4.0), bulge=0.18, flat_top=False),
     'house_a': lambda n: house(n, 801),
     'house_b': lambda n: house(n, 802, w=9.0, d=5.5, h=5.4, roof_h=3.0),
     'lamp': lambda n: lamp(n, 811),

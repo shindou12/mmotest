@@ -406,6 +406,34 @@
   "colors": 1
  },
  {
+  "name": "cliff_col_a",
+  "tris": 1280,
+  "size": [
+   1.53,
+   1.16,
+   3.51
+  ],
+  "zmin": -0.34,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cliff_col_b",
+  "tris": 1280,
+  "size": [
+   1.2,
+   0.97,
+   3.22
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
   "name": "house_a",
   "tris": 74,
   "size": [

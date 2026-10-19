@@ -168,7 +168,7 @@ def grass_blades(n=256, seed=13):
         lean = r.normal(0, 0.22) * h
         w0 = r.uniform(6, 11)
         segs = 8
-        light = lerp((0.55, 0.66, 0.20), (0.86, 0.88, 0.42), r.random())
+        light = lerp((0.66, 0.68, 0.20), (0.92, 0.84, 0.34), r.random())   # 金色の先（第 2 バッチ）
         for s in range(segs):
             t0, t1 = s / segs, (s + 1) / segs
             p0 = (x0 + lean * t0 ** 1.6, n - h * t0); p1 = (x0 + lean * t1 ** 1.6, n - h * t1)

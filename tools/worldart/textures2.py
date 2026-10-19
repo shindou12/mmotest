@@ -15,6 +15,8 @@ from PIL import Image, ImageDraw, ImageFilter
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'public/worldart/tex'
 os.makedirs(OUT, exist_ok=True)
 SS = 2   # 描くときの倍率
+# 葉の色（暗・中・明）。暖かい太陽の下でも葉が緑（≈ 80°）に見えるよう、絵では青寄りの緑にしておく（E18）
+LEAF_DARK, LEAF_MID, LEAF_HI = (0.27, 0.38, 0.12), (0.38, 0.60, 0.24), (0.54, 0.80, 0.40)
 
 
 def rng(seed): return np.random.default_rng(seed)
@@ -97,7 +99,7 @@ def spray_clover(n=512, seed=102):
         k = 0.65 + 0.4 * max(0, min(1, h))
         for j in range(3):
             aa = a + j * 2 * math.pi / 3
-            for sc, c in [(1.0, (0.28, 0.42, 0.12)), (0.78, (0.48, 0.64, 0.20)), (0.5, (0.70, 0.82, 0.32))]:
+            for sc, c in [(1.0, LEAF_DARK), (0.78, LEAF_MID), (0.5, LEAF_HI)]:
                 # 先の広いハート形: 根元から先へ広がる 2 枚の葉片
                 for sd in (-0.28, 0.28):
                     d.polygon(lobe(x, y, aa + sd, L * 1.05 * sc, L * 0.42 * sc, 8), fill=col(np.array(c) * k))
@@ -114,8 +116,8 @@ def frond_fir(w=512, h=1024, seed=103):
         t = (i + 0.5) / P
         y = H * (0.98 - 0.94 * t)
         L = W * 0.46 * (1 - t) ** 0.7 * min(1.0, 0.55 + t * 3.0) + W * 0.04
-        base = lerp((0.20, 0.32, 0.10), (0.30, 0.44, 0.12), t); mid = lerp((0.40, 0.55, 0.18), (0.62, 0.74, 0.26), t)
-        hi = lerp((0.58, 0.70, 0.24), (0.84, 0.90, 0.42), t)
+        base = lerp((0.20, 0.30, 0.10), (0.28, 0.40, 0.12), t); mid = lerp((0.34, 0.52, 0.20), (0.50, 0.70, 0.26), t)
+        hi = lerp((0.46, 0.68, 0.30), (0.64, 0.88, 0.46), t)
         for side in (-1, 1):
             ang = -math.pi / 2 + side * math.radians(62 - 14 * t) + r.normal(0, 0.03)
             d.polygon(lobe(cx, y, ang, L, L * 0.26), fill=col(base))
@@ -143,8 +145,9 @@ def grass_tall(n=512, seed=104):
     blades.sort()
     for depth, x0, hgt, lean, w0 in blades:
         segs = 12
-        hi = lerp((0.62, 0.74, 0.24), (0.90, 0.92, 0.48), depth)
-        lo = lerp((0.22, 0.34, 0.10), (0.34, 0.46, 0.14), depth)
+        # 日なたの草は金色（見本 B03 の日なたの草 ≈ 56°/0.56/0.82）、根元は緑
+        hi = lerp((0.74, 0.72, 0.24), (0.94, 0.86, 0.36), depth)
+        lo = lerp((0.24, 0.36, 0.10), (0.36, 0.48, 0.14), depth)
         pl, pr = [], []
         for s in range(segs + 1):
             t = s / segs
@@ -173,8 +176,8 @@ def rock_crack(n=1024, seed=107):
     gy, gx = np.gradient(big)
     g = (-gx * 0.6 - gy * 0.8); shade = np.clip(0.5 + g / (np.abs(g).max() + 1e-9) * 0.6, 0, 1)
     tone = fn(n / 4, seed + 2)
-    base = lerp((0.50, 0.53, 0.50), (0.72, 0.74, 0.68), tone[..., None])
-    base *= (0.74 + 0.5 * shade[..., None])
+    base = lerp((0.62, 0.65, 0.58), (0.80, 0.82, 0.74), tone[..., None])
+    base *= (0.78 + 0.42 * shade[..., None])
     base *= (0.92 + 0.14 * fn(n / 120, seed + 3)[..., None])
     crack = np.zeros((n, n))
     for k, (sc, wdt) in enumerate([(n / 3.5, 0.014), (n / 6, 0.010)]):
@@ -224,11 +227,11 @@ def clump_maple(n=512, seed=108):
             depth = 0.55 * (0.5 - y / (2 * R0)) + 0.45 * (rad / R0) + r.uniform(-0.12, 0.12)
             items.append((depth, W / 2 + x, W / 2 + y, r.uniform(0, 2 * math.pi), W * r.uniform(0.17, 0.2) * (1.1 - 0.3 * rad / R0)))
     # 内側の暗い詰まり（葉の奥の陰）
-    d.ellipse([W / 2 - R0 * 0.6, W / 2 - R0 * 0.5, W / 2 + R0 * 0.6, W / 2 + R0 * 0.62], fill=col((0.30, 0.42, 0.14)))
+    d.ellipse([W / 2 - R0 * 0.6, W / 2 - R0 * 0.5, W / 2 + R0 * 0.6, W / 2 + R0 * 0.62], fill=col(np.array(LEAF_DARK) * 1.2))
     items.sort()
     for depth, x, y, a, L in items:
         k = 0.68 + 0.4 * max(0, min(1, depth))
-        base = np.array((0.30, 0.42, 0.13)) * k; mid = np.array((0.52, 0.66, 0.22)) * k; hi = np.array((0.74, 0.84, 0.36)) * k
+        base = np.array(LEAF_DARK) * k; mid = np.array(LEAF_MID) * k; hi = np.array(LEAF_HI) * k
         star_leaf(d, x, y, a, L, base, mid, hi, mid * 0.8)
     finish(img, n, n, 'clump_maple.png')
 
