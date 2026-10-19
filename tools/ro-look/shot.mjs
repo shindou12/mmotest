@@ -20,6 +20,6 @@ p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 2
 await p.goto(url);
 await p.waitForFunction(() => window.__ready, null, { timeout: 120000 }).catch(() => errs.push('timeout: window.__ready が立たない'));
 await p.waitForTimeout(3000); // 影・ポストエフェクトが落ち着くまで
-await p.screenshot({ path: out, timeout: 90000 });
+await p.screenshot({ path: out, timeout: 240000 });
 console.log(errs.join('\n') || 'no errors');
 await b.close();

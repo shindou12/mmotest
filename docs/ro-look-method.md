@@ -26,10 +26,12 @@ three.js r160（`public/vendor/three`）を使います。ブラウザで ES モ
 | `public/js/previews/foliage.js` | 葉の絵 `FOLIAGE_TEX`（broad・fern・frond・clover・grass・pine）、葉の材質、植物を組む `FoliageBuilder` |
 | `public/js/previews/ro-rock.js` | 岩肌の絵 `rockTexture()`、岩の材質 `roRockMaterial()`、岩の形 `blockGeometry()`・`rockGeometry()`、三方向投影の GLSL `ROCK_GLSL` |
 | `public/js/previews/ref-forest.js` | 見本の再現の場面一式。新しい場面を作るときの雛形にする |
-| `public/js/previews/ro-cottage.js` | 雛形から作った場面の例: 森の家（コテージ・石畳の前庭・崖の台地・分かれ道）。`ro-cottage.html` で開く。建物を置く場面の参考に |
+| `public/js/previews/ro-cottage.js` | 雛形から作った場面の例: 歩ける森の家（コテージ・石畳の前庭・崖の台地・池・菜園・分かれ道）。`ro-cottage.html` で開く（`?view=fixed` は固定の構図、`?blender=0` は Blender の形なし）。建物を置く場面の参考に |
 | `public/js/previews/graphics-lab.js` | 実験場。`setStyle(true)` が RO風の切り替え |
 | `public/js/toon.js` | 人物用のトゥーン材質・輪郭線・`gradientMap()`・手前を抜く `OCC` |
 | `tools/ro-look/shot.mjs` | ページを 1280×720 で撮る |
+| `tools/ro-look/export-models.mjs` | 場面のコードで組んだ形（`window.__models`）を GLB に書き出す。Blender で仕上げる元（3.10） |
+| `tools/blender/ro_cottage_refine.py` / `ro_props.py` | 森の家の形を Blender で仕上げる（面取り・AO）/ 瓦・石・蔦・小物を Blender で作る（3.10） |
 | `tools/ro-look/compare.py` | 見本と並べた画像・重ねた画像・場所ごとの平均色を出す（`--regions 場所.json` で場面ごとの場所を渡せる。例: `tools/ro-look/regions-ro-cottage.json`） |
 
 **新しい場面は `ref-forest.js` を複製して作るのがいちばん確実です。** レンダラー・光・仕上げ・配置の道具が全部入っています。
@@ -162,6 +164,15 @@ scene.add(F.build());
 
 人物は `toon()` と `outline()` のままにし、`gradientMap()` を複製して自分用の段を持たせます（背景用にグラデーションをなだらかにしても、人物はくっきりのまま）。
 
+### 3.10 Blender で形を仕上げる（頼まれたときだけ）
+
+形は場面のコードで組むのが基本です。「Blender で仕上げて」と頼まれたときは、コードの形を Blender に渡して戻します（森の家 `ro-cottage.js` の例）。材質は場面のコードの Lambert のままにし、Blender からは形と頂点の色だけを戻します。
+
+1. `?blender=0` で開いたページから `node tools/ro-look/export-models.mjs "<URL>?blender=0&post=0" out/ro-cottage/models-raw.glb`（名前は場面の名前のまま）
+2. `blender -b -P tools/blender/ro_cottage_refine.py -- out/ro-cottage/models-raw.glb`: 頂点をつなぎ、角で選ぶ面取り（家 0.035m・2段、岩 0.05m・1段）、なめらかな陰影（40° で角を立てる）、Cycles で AO を頂点の色へ焼く
+3. `blender -b -P tools/blender/ro_props.py`: 瓦・塔の石・蔦・金具と、庭の小物（井戸・樽・木箱・柵・提灯など）
+4. 場面は GLB を読み、同じ名前の形だけを差し替える。小物は場面が地面の高さに置き、当たり判定を足す
+
 ## 4. 見本の一枚を再現する手順
 
 1. 見本から UI の帯を切り落とす範囲を決める（例: 2556×1179 のスクリーンショットなら `230,0,2326,1179`）。
@@ -214,6 +225,12 @@ scene.add(F.build());
 | 見本より木が暗く緑が冷たい | 葉の色が 1 のまま | 木に (1.3, 1.22, 1.0)、もみに (1.45, 1.3, 1.2) を掛ける（明るさの比 0.79 → 0.87） |
 | 青みだけ見本より 2 割低い | 草の房・葉の色の青ではない（上げても変わらなかった） | 仕上げの色調か地面の絵の色が原因。全体の明るさが合っていれば深追いしない |
 
+| Blender で AO を焼くと面全体が暗くなる | 大きな三角形のまま焼くと、隣の箱に埋まった角の頂点の暗さが面全体に広がる | 長い辺を分けてから焼く（家 0.45m・小物 0.22m）。AO の届く距離は 0.35〜0.4m。開けた所（AO 0.75 以上）は暗くせず、溝だけ暗くする |
+| 樽が真っ黒 | 箍（たが）を蓋つきの円柱にした・板を重ねたので、中が AO で真っ黒 | 箍は蓋なしの輪、胴は1つのふくらんだ形にする |
+| 瓦を載せたら屋根と画面の上が暗い（上の比 0.94 → 0.72） | 瓦の段ごとに上の段の影が下の段に落ちる | 瓦は影を落とさない（`castShadow = false`）。家の影は下のコードの屋根が落とす（0.72 → 0.84） |
+| 歩けるマップの撮影が終わらない | 地面の分割が多い・場面が重い（三角形 約 84 万） | 地面の分割 440、撮影の待ちを 240 秒に |
+| 人物を動かして撮るとカメラが遅れて写る | カメラは人物をゆっくり追う | 撮る前にカメラを人物の位置へ合わせる（`__map.snap()`） |
+
 ## 7. 数値の早見表
 
 | 項目 | 値 |
@@ -232,6 +249,8 @@ scene.add(F.build());
 | 木の下の暗さ | 0.72 |
 | 建物（人物 12% の縮尺） | 実験場の家の 0.75 倍、屋根は暖色（`0xc4764e`） |
 | 見本に寄せる色の掛け算（森の家） | 草 (1.5, 1.12, 0.92)、木 (1.3, 1.22, 1.0)、もみ (1.45, 1.3, 1.2) |
+| Blender の仕上げ | 面取り 家 0.035m・2段・profile 0.6 / 岩 0.05m・1段、角 30° で選ぶ。陰影 40°。AO 距離 0.35〜0.4m、暗さ 0.38〜0.45（溝だけ）、瓦は影を落とさない |
+| 歩けるマップのカメラ | 高さ 24.8・後ろ 23.2（ホイールで 0.7〜1.35 倍） |
 
 ## 8. 仕上がりのチェックリスト
 
