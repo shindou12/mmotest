@@ -217,6 +217,195 @@
   "colors": 1
  },
  {
+  "name": "maple_a",
+  "tris": 488,
+  "size": [
+   4.14,
+   4.05,
+   5.49
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple_b",
+  "tris": 478,
+  "size": [
+   4.07,
+   3.98,
+   6.07
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple_c",
+  "tris": 478,
+  "size": [
+   3.89,
+   3.62,
+   4.96
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir2_a",
+  "tris": 910,
+  "size": [
+   3.22,
+   3.23,
+   7.14
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_firfrond"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir2_b",
+  "tris": 910,
+  "size": [
+   3.64,
+   3.64,
+   8.04
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_firfrond"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm2_a",
+  "tris": 210,
+  "size": [
+   2.27,
+   2.46,
+   3.59
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm2"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm2_b",
+  "tris": 210,
+  "size": [
+   2.56,
+   2.58,
+   4.23
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm2"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "clover_a",
+  "tris": 64,
+  "size": [
+   2.05,
+   1.99,
+   0.95
+  ],
+  "zmin": -0.35,
+  "mats": [
+   "leaf_clover"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "clover_b",
+  "tris": 64,
+  "size": [
+   2.55,
+   2.51,
+   1.03
+  ],
+  "zmin": -0.32,
+  "mats": [
+   "leaf_clover"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "grass_tall_a",
+  "tris": 10,
+  "size": [
+   0.66,
+   0.71,
+   0.56
+  ],
+  "zmin": -0.0,
+  "mats": [
+   "grass_tall"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cliff_rock_a",
+  "tris": 1280,
+  "size": [
+   2.82,
+   2.08,
+   1.5
+  ],
+  "zmin": -0.17,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cliff_rock_b",
+  "tris": 1280,
+  "size": [
+   3.84,
+   2.56,
+   1.95
+  ],
+  "zmin": -0.23,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "boulder_a",
+  "tris": 320,
+  "size": [
+   1.38,
+   1.14,
+   0.58
+  ],
+  "zmin": -0.07,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
   "name": "house_a",
   "tris": 74,
   "size": [

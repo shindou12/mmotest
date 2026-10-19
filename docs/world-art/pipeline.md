@@ -15,7 +15,7 @@ PORT=8091 node server.js &
 ## 1. 再生成できるもの / 手作業が要るもの
 | 物 | 再生成 | 入力 | 手作業 |
 |---|---|---|---|
-| テクスチャ | `python3 -I tools/worldart/textures.py` | 関数の中の色・数・シード | 新しい絵柄の関数を書く |
+| テクスチャ | `python3 -I tools/worldart/textures.py` と `textures2.py`（第 2 世代の葉・岩） | 関数の中の色・数・シード | 新しい絵柄の関数を書く |
 | アセット（GLB と assets.blend） | `blender -b --factory-startup --python tools/worldart/blender/build_assets.py` | `ASSETS` の表 | 新しい形の関数を書く。Blender で形を直したい場合は下の 4 |
 | 地形と配置 | `blender -b --factory-startup --python tools/worldart/blender/build_map.py -- <名>` | `public/worldart/maps/<名>.json` | 地図の JSON を書く（構図・道・崖・区域・小物） |
 | 実行画面 | 不要（ページを開くだけ） | 上の出力 | なし |
@@ -81,4 +81,8 @@ PORT=8091 node server.js &
 | F11 | 規則を足したら関係ない木の位置が変わった | 乱数を全規則で共有 | `rule_rng(名前)` で系列を分ける |
 | F12 | `const` の初期化前参照で画面が真っ黒 | `placeCamera()` が後で定義した `OCC` を使った | 共有の値はファイルの先頭で定義する |
 | F13 | もみがリュウゼツランの束に見える | シダの葉の絵が細長いひし形 | 根元の広い三角形 + とがった小羽片（`leaf_frond`） |
+| F15 | 絵を変えたのに画面が変わらない | GLB は書き出しの時点の絵を埋め込む | `textures*.py` のあと `build_assets.py` も実行する |
+| F16 | 画面の位置で置いた木が手前で巨大になる | 段差で注目点の地面が 0 でなくなり、高さ 0 前提の逆算がずれた | `build_map.py` が注目点の地面を 0 にそろえる。台地の上の木は `base` で高さを渡す |
+| F17 | 樹冠がすかすかのレース、枝が黒く透ける | 葉の絵の不透明な部分が 20〜30% | 葉の塊の絵（円の中 85%）にする |
+| F18 | 葉が地紋（雑音）に見える | アセットを縮めて置いた / 絵が細かすぎる | 実寸で作る。いちばん細かい形は画面で 3〜4px 以上 |
 | F14 | 石畳に星形の目地 | ボロノイの点がランダムで石の大きさがばらつく | ゆらぎのある格子の点（`voronoi(grid=True)`） |

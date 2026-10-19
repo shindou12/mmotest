@@ -88,17 +88,19 @@ const tex = (name, srgb = true) => {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 };
-const T = { grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
+const T = { crack: tex('rock_crack'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
 
 // ---------------------------------------------------------------- 地面の材質
 // 頂点色 R=土の道 G=砂/石畳 B=岩肌。境目は草の絵の明るさで崩してぎざぎざにする
 const GROUND = spec.ground || {};
 const altTex = GROUND.alt === 'cobble' ? T.cobble : T.sand;
+const rockTex = GROUND.rock === 'crack' ? T.crack : T.rock;   // 急な面の岩肌（crack: 第 2 世代、1.6m で貼る）
+const rockScale = GROUND.rock === 'crack' ? 1.6 : 4.5;
 function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
-      tGrass: { value: T.grass }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: T.rock },
+      tGrass: { value: T.grass }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale },
       uGrassTint: { value: new THREE.Color(...(GROUND.grassTint || [1, 1, 1])) },
       uDirtTint: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
       uAltScale: { value: GROUND.altScale || 6.0 },
@@ -109,7 +111,7 @@ function groundMaterial() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale; uniform vec2 uWater;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -121,7 +123,7 @@ function groundMaterial() {
         vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
         vec3 alt = texture2D(tAlt, wp / uAltScale).rgb;
         vec3 an = abs(vWN);
-        vec3 rock = texture2D(tRock, vW.zy / 4.5).rgb * an.x + texture2D(tRock, vW.xy / 4.5).rgb * an.z + texture2D(tRock, vW.xz / 4.5).rgb * an.y;
+        vec3 rock = texture2D(tRock, vW.zy / uRockScale).rgb * an.x + texture2D(tRock, vW.xy / uRockScale).rgb * an.z + texture2D(tRock, vW.xz / uRockScale).rgb * an.y;
         rock /= (an.x + an.y + an.z);
         float n = dot(g1, vec3(0.33)) - 0.33;
         float wd = smoothstep(0.4, 0.6, vSplat.r + n * 0.9);
@@ -172,6 +174,19 @@ function addDesat(sh) {
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAlbedoSat;')
     .replace('#include <color_fragment>', '#include <color_fragment>' + desatChunk);
 }
+// 岩（rock_crack）: 割れ目の絵を世界座標の三方向から貼り（1.6m で 1 回）、上を向いた面に苔（草の絵）をのせる
+function addRockTriplanar(sh) {
+  Object.assign(sh.uniforms, { tCrack: { value: T.crack }, tMoss: { value: T.grass } });
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vRW; varying vec3 vRN;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\nvRW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;\nvRN = normalize(mat3(modelMatrix * instanceMatrix) * objectNormal);');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tCrack, tMoss; varying vec3 vRW; varying vec3 vRN;')
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      vec3 an = pow(abs(vRN), vec3(3.0)); an /= (an.x + an.y + an.z);
+      vec3 rc = texture2D(tCrack, vRW.zy / 1.6).rgb * an.x + texture2D(tCrack, vRW.xy / 1.6).rgb * an.z + texture2D(tCrack, vRW.xz / 1.6).rgb * an.y;
+      vec3 moss = texture2D(tMoss, vRW.xz / 5.0).rgb * vec3(1.05, 1.08, 0.85);
+      float mk = smoothstep(0.55, 0.85, vRN.y + (texture2D(tMoss, vRW.xz / 2.3).g - 0.5) * 0.5);
+      diffuseColor.rgb *= mix(rc, moss, mk);`);
+}
 function fixMaterial(mesh) {
   const src = mesh.material;
   const isLeaf = /leaf|frond|grass/.test(src.name);
@@ -182,9 +197,12 @@ function fixMaterial(mesh) {
   m.name = src.name;
   if (isLeaf && FNORM_CARD) mesh.geometry.computeVertexNormals();   // 比較用: 板の向きの法線
   const isGrassMat = /grass/.test(src.name);
+  const isRock2 = src.name === 'rock_crack';
+  if (isRock2) { m.map = null; m.vertexColors = true; }
   m.onBeforeCompile = (sh) => {
     addDesat(sh);
     if (!isGrassMat) addOcc(sh);
+    if (isRock2) addRockTriplanar(sh);
     if (!isLeaf) return;
     // 葉: 裏面で法線を反転させない（房として丸く光らせる）
     {

@@ -115,6 +115,8 @@ for cl in TS.get('cliffs', []):
     H = H - cl['drop'] * smooth(-cl['width'] / 2, cl['width'] / 2, sd)
     CLIFF_LINES.append((poly, cl, ref))
 
+# 注目点（カメラの target）の地面を高さ 0 にそろえる。画面の位置からの逆算は高さ 0 を前提にしているため
+H = H - H[int(np.clip(round((T[2] - zs[0]) / cell), 0, n - 1)), int(np.clip(round((T[0] - xs[0]) / cell), 0, n - 1))]
 DIRT = np.zeros_like(H); ALT = np.zeros_like(H); GRASSP = []
 PATHS = []
 for p in SPEC.get('paths', []):
@@ -205,7 +207,8 @@ def build_terrain():
 # ------------------------------------------------------------ 配置
 PL = {}
 # 樹冠の中心の高さ（scale=1）。アセットの寸法から（assets_report.json の高さの約 0.65）
-CANOPY_H = {'tree_broad_a': 3.8, 'tree_broad_b': 4.4, 'pine_a': 3.5, 'pine_b': 4.3, 'bush_a': 0.6}
+CANOPY_H = {'tree_broad_a': 3.8, 'tree_broad_b': 4.4, 'pine_a': 3.5, 'pine_b': 4.3, 'bush_a': 0.6,
+            'maple_a': 3.5, 'maple_b': 3.9, 'maple_c': 3.0, 'fir2_a': 3.3, 'fir2_b': 3.8, 'palm_a': 4.2, 'palm_b': 4.8, 'palm2_a': 2.9, 'palm2_b': 3.4, 'clover_a': 0.4, 'clover_b': 0.4}
 def place(asset, x, z, rot=None, scale=1.0, y=None):
     hy = height_at(x, z) + (y or 0)
     PL.setdefault(asset, []).append([round(float(x), 3), round(hy, 3), round(float(z), 3),
@@ -245,6 +248,12 @@ def rule_rng(name):
 def scatter():
     x0, x1, z0, z1 = visible_box()
     rule_rng('zones')
+    fixed = []          # 決め打ちの木の位置（区域の木はここを避ける）
+    for t in SPEC.get('trees', []):
+        sc_ = t.get('scale', 1.0)
+        if 'canopy' in t: fx, fz = screen_to_world(*t['canopy'], h=CANOPY_H.get(t['asset'], 4.0) * sc_ + t.get('base', 0.0))[[0, 2]]
+        else: fx, fz = pt(t['screen']) if 'screen' in t else t['world']
+        fixed.append((fx, fz))
     trees = []
     for zn in SPEC.get('zones', []):
         poly = poly_of(zn)
@@ -252,6 +261,7 @@ def scatter():
         m = inside(P[:, 0], P[:, 1], poly)
         for x, z in P[m]:
             if path_dist(x, z) < 1.8 or not dry(x, z): continue
+            if any((x - fx) ** 2 + (z - fz) ** 2 < zn.get('clear', 3.0) ** 2 for fx, fz in fixed): continue
             a = zn['trees'][RNG.integers(len(zn['trees']))]
             sc0, sc1 = zn.get('scale', [0.85, 1.25])
             place(a, x, z, scale=RNG.uniform(sc0, sc1)); trees.append((x, z))
@@ -260,7 +270,7 @@ def scatter():
         # "canopy": [u, v] は樹冠の中心が画面のどこに見えるか。樹冠の高さで光線を切って幹の位置を逆算する
         sc_ = t.get('scale', 1.0)
         if 'canopy' in t:
-            hc = CANOPY_H.get(t['asset'], 4.0) * sc_
+            hc = CANOPY_H.get(t['asset'], 4.0) * sc_ + t.get('base', 0.0)   # base: 台地の上など、地面の高さ
             x, z = screen_to_world(*t['canopy'], h=hc)[[0, 2]]
         else:
             x, z = pt(t['screen']) if 'screen' in t else t['world']
@@ -273,7 +283,7 @@ def scatter():
         for x, z in jitter_grid(x0, x1, z0, z1, 2.2):
             dt = np.min(np.hypot(trees[:, 0] - x, trees[:, 1] - z))
             if b['edge'][0] < dt < b['edge'][1] + 1.5 and path_dist(x, z) > 0.8 and RNG.random() < b['prob'] and dry(x, z) and field_at(ALT, x, z) < 0.5:
-                place(b['asset'], x, z, scale=RNG.uniform(0.7, 1.3))
+                place(b['asset'], x, z, scale=RNG.uniform(*b.get('scale', [0.7, 1.3])))
     rule_rng('grass')
     if 'grass' in sc:
         g = sc['grass']
@@ -284,6 +294,17 @@ def scatter():
             edge = 1 - abs(dirt - 0.35) / 0.35 if dirt < 0.7 else 0
             p = ((1 - dirt) ** 2 * (0.35 + 0.65 * float(clus)) + g.get('edge_boost', 0) * max(0, edge)) * (1 - alt) ** 3
             if RNG.random() < p: place(g['asset'], x, z, scale=RNG.uniform(*g.get('scale', [0.75, 1.35])))
+    rule_rng('tall')
+    if 'tall' in sc:
+        # 背の高い草の房: 群れのノイズの高いところ、道の縁と崖の下に寄せる
+        tg = sc['tall']
+        for x, z in jitter_grid(x0, x1, z0, z1, tg.get('spacing', 0.6)):
+            dirt = field_at(DIRT, x, z); rock = field_at(ROCK, x, z)
+            if rock > 0.3 or field_at(ALT, x, z) > 0.4 or not dry(x, z, 0.1): continue
+            clus = float(N1(np.array(x * 1.9), np.array(z * 1.9), 4.0))
+            edge = max(0.0, 1 - abs(dirt - 0.3) / 0.3) if dirt < 0.6 else 0.0
+            p = (clus - 0.45) * 2.2 * (1 - dirt) ** 2 + edge * tg.get('edge', 0.5)
+            if RNG.random() < p * tg.get('prob', 1.0): place(tg['asset'], x, z, scale=RNG.uniform(*tg.get('scale', [0.8, 1.3])))
     rule_rng('flowers')
     if 'flowers' in sc:
         # 小花: 草の上に、群れのノイズの高いところだけ
@@ -337,7 +358,7 @@ def scatter():
                 off = (j / max(1, rk.get('rows', 2) - 1) - 0.4) * cl['width'] + RNG.uniform(-0.3, 0.3)
                 px, pz = np.array([x, z]) + lowdir * off
                 if height_at(px, pz) < TS.get('water', {}).get('level', -99) - 0.3: continue
-                place(rk['asset'], px, pz, scale=RNG.uniform(*rk.get('scale', [0.8, 1.4])), y=-0.3)
+                place(rk['asset'], px, pz, scale=RNG.uniform(*rk.get('scale', [0.8, 1.4])), y=-rk.get('sink', 0.3))
             s_ += rk.get('spacing', 1.6) * RNG.uniform(0.7, 1.2)
     rule_rng('props')
     for p in SPEC.get('props', []):

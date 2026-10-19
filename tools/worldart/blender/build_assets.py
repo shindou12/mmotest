@@ -67,6 +67,13 @@ M_WINDOW = lambda: material('window', 'window.png')
 M_BANNER = lambda: material('banner', 'banner.png')
 M_PAINT = lambda: material('paint', 'paint.png')
 M_SOIL = lambda: material('soil', 'ground_dirt.png')
+M_SPRAY = lambda: material('leaf_spray', 'spray_maple.png', alpha=True)
+M_CLUMP = lambda: material('leaf_clump', 'clump_maple.png', alpha=True)
+M_CLOVER = lambda: material('leaf_clover', 'spray_clover.png', alpha=True)
+M_FIRF = lambda: material('leaf_firfrond', 'frond_fir.png', alpha=True)
+M_GRASS2 = lambda: material('grass_tall', 'grass_tall.png', alpha=True)
+M_ROCK2 = lambda: material('rock_crack', 'rock_crack.png')
+M_PALM2 = lambda: material('leaf_palm2', 'frond_palm.png', alpha=True)
 M_FLOWER = lambda: material('leaf_flower', 'flowers.png', alpha=True)
 M_PALM = lambda: material('leaf_palm', 'leaf_palm.png', alpha=True)
 
@@ -548,6 +555,196 @@ def planter(name, seed, s=2.4):
     return B.build(name, smooth=False)
 
 
+# ------------------------------------------------------------ 第 2 世代（B03・B01 の拡大から。docs/world-art/observations.md「追加の見本」）
+TEAL = (0.78, 0.96, 1.10)      # 樹冠の下・内側の色相（青緑）
+YELLOW = (1.12, 1.04, 0.74)    # 樹冠の上・日なたの色相（黄緑）
+
+
+def crown_color(h, out=0.5, lo=0.42, hi=1.10):
+    """樹冠の中の高さ h(0=下 1=上) と外側への近さ out から頂点色。上ほど明るく黄、下ほど暗く青緑"""
+    b = lo + (hi - lo) * (h ** 0.9) * (0.75 + 0.25 * out)
+    t = [TEAL[i] + (YELLOW[i] - TEAL[i]) * h for i in range(3)]
+    return tuple(b * c for c in t)
+
+
+def card2(B, base, fwd, side, L, W, m, cols, nrm):
+    """根元 base から fwd へ長さ L、幅 W のカード。UV は v=0 が根元（絵の下端）"""
+    ps = [base - side * W / 2, base + side * W / 2, base + side * W / 2 + fwd * L, base - side * W / 2 + fwd * L]
+    idx = [B.add_v(p) for p in ps]
+    B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], [cols[0], cols[0], cols[1], cols[1]], [nrm] * 4, m)
+
+
+def strip2(B, pts, widths, side, m, cols, nrm, v_end=1.0):
+    """折れ線に沿った帯（垂れる葉）。pts[0] が根元。UV v は 0→v_end"""
+    n = len(pts); acc = [0.0]
+    for i in range(1, n): acc.append(acc[-1] + (pts[i] - pts[i - 1]).length)
+    rows = [(B.add_v(p - side * w / 2), B.add_v(p + side * w / 2)) for p, w in zip(pts, widths)]
+    for i in range(n - 1):
+        v0, v1 = acc[i] / acc[-1] * v_end, acc[i + 1] / acc[-1] * v_end
+        a, b = rows[i], rows[i + 1]
+        B.face([a[0], a[1], b[1], b[0]], [(0, v0), (1, v0), (1, v1), (0, v1)], [cols[i], cols[i], cols[i + 1], cols[i + 1]], [nrm] * 4, m)
+
+
+def maple(name, seed, width=3.4, height=4.8, base=1.6, clusters=11):
+    """広葉樹（B03 右・B01）。実寸で作る（置くときの倍率は 0.9〜1.1）。
+    樹冠 = 葉の塊（クラスター）を 3 段に積んだもの。塊は半径 0.5〜0.75m の小さな丸屋根で、spray_maple の房を
+    上向き・外向きに 9〜12 枚。塊ごとに上が明るく下が暗い（法線は塊の中心から外向き、頂点色も塊の中の高さで）。
+    塊のすき間から暗い内側と幹・枝が見える。"""
+    R_ = random.Random(seed); B = Builder()
+    rx = width / 2; ch = height - base
+    lean = Vector((R_.uniform(-.15, .15), R_.uniform(-.15, .15), 0))
+    trunk_top = Vector((0, 0, base + ch * 0.55)) + lean
+    tube(B, [Vector((0, 0, -0.3)), Vector((0, 0, 0)), Vector((0, 0, base * 0.6)) + lean * 0.3, Vector((0, 0, base)) + lean * 0.6, trunk_top],
+         [0.17, 0.16, 0.13, 0.11, 0.07], M_BARK(), sides=8, ao=(0.5, 0.8))
+    cents = []
+    tiers = [(0.18, 0.95, 4), (0.5, 0.85, 4), (0.78, 0.6, 3)]
+    for tz, tr, k in tiers:
+        a0 = R_.uniform(0, 6.28)
+        for j in range(k):
+            a = a0 + j * 2 * math.pi / k + R_.uniform(-.3, .3)
+            rr = rx * tr * R_.uniform(0.55, 0.8)
+            cents.append(Vector((math.cos(a) * rr, math.sin(a) * rr, base + ch * tz + R_.uniform(-.15, .15))) + lean * 0.5)
+    cents.append(Vector((0, 0, base + ch * 0.95)) + lean)
+    zmin = base - 0.3; zmax = height
+    for c in cents:
+        st = Vector((0, 0, min(c.z - 0.4, trunk_top.z))) + lean * 0.5
+        tube(B, [st, (st + c) / 2 + UP * 0.1, c], [0.06, 0.045, 0.025], M_BARK(), sides=5, ao=(0.5, 0.7))
+        cr = R_.uniform(0.5, 0.7)
+        for d in fib_sphere(R_.randint(9, 11), 1.0):
+            if d.z < -0.45: continue
+            p = c + Vector((d.x, d.y, d.z * 0.75)) * cr * R_.uniform(0.55, 0.9)
+            # 葉の塊のカード: 面は塊の外向き（上寄り）。カードの上（絵の上端）を世界の上へ向ける
+            nrm_card = (d + UP * 0.6).normalized()
+            hint_up = (UP - nrm_card * nrm_card.dot(UP)); hint_up = hint_up.normalized() if hint_up.length > 0.1 else Vector((1, 0, 0))
+            side = hint_up.cross(nrm_card).normalized()
+            L = R_.uniform(1.15, 1.35)   # 絵の中の塊は直径 ≈ 0.7（端で切れない余白）
+            hc = (d.z + 0.45) / 1.45; hg = (c.z - zmin) / (zmax - zmin)
+            h0 = max(0.0, min(1.0, 0.6 * hc + 0.4 * hg))
+            nrm = (d * 0.75 + UP * 0.35).normalized()
+            card2(B, p - hint_up * L * 0.5, hint_up, side, L, L, M_CLUMP(),
+                  [crown_color(max(0.0, h0 - 0.15), 0.6, 0.34, 1.12), crown_color(min(1.0, h0 + 0.1), 1.0, 0.34, 1.12)], nrm)
+    return B.build(name)
+
+
+def palm2(name, seed, height=3.2, frond=1.15, lean=0.6):
+    """ヤシ（B03 下・B01）。実寸で作る。細い弓なりの幹（節の段）と、14 枚の葉（frond_palm）が上へ立ってから外へ弧を描いて垂れる"""
+    R_ = random.Random(seed); B = Builder()
+    a = R_.uniform(0, 6.28); dv = Vector((math.cos(a), math.sin(a), 0))
+    pts = [Vector((0, 0, -0.3))] + [dv * lean * (t ** 2) + UP * height * t for t in [i / 8 for i in range(9)]]
+    tube(B, pts, [0.13] + [0.12 - 0.04 * (i / 8) for i in range(9)], M_BARK(), sides=7, ao=(1.0, 1.45))
+    top = pts[-1]
+    n = 14
+    for k in range(n):
+        b = 2 * math.pi * k / n + R_.uniform(-.15, .15)
+        out = Vector((math.cos(b), math.sin(b), 0)); side = out.cross(UP).normalized()
+        L = frond * R_.uniform(0.85, 1.1); rise = R_.uniform(0.25, 0.55); droop = R_.uniform(0.7, 1.1)
+        ps = [top + out * L * s + UP * L * (rise * s - droop * s * s) for s in (0.0, 0.3, 0.6, 1.0)]
+        ws = [L * 0.2, L * 0.42, L * 0.4, L * 0.22]
+        hcol = crown_color(0.9, 1.0, 0.5, 1.15)
+        cols = [crown_color(0.5, 0.5, 0.5, 1.0), hcol, hcol, crown_color(0.7, 1.0, 0.5, 1.05)]
+        strip2(B, ps, ws, side, M_PALM2(), cols, (out * 0.4 + UP * 0.8).normalized())
+    return B.build(name)
+
+
+def fir2(name, seed, height=6.4, width=2.0):
+    """もみ（B03 中央・E04）: 16 段の輪に、先の垂れる細長いシダの葉（frond_fir）。上ほど明るく黄、下ほど青緑"""
+    R_ = random.Random(seed); B = Builder()
+    tube(B, [Vector((0, 0, -0.3)), Vector((0, 0, 0)), Vector((0, 0, height * 0.55))], [0.16, 0.14, 0.05], M_BARK(), sides=7, ao=(0.3, 0.45))
+    tiers = 18
+    for i in range(tiers):
+        t = i / (tiers - 1)
+        hz = height * (0.12 + 0.84 * t)
+        L = 0.45 + width * 1.05 * (1 - t) ** 0.95
+        n = int(5 + 7 * (1 - t))
+        for k in range(n):
+            a = 2 * math.pi * k / n + i * 0.9 + R_.uniform(-.2, .2)
+            out = Vector((math.cos(a), math.sin(a), 0))
+            side = out.cross(UP).normalized()
+            rise = R_.uniform(0.15, 0.4); droop = R_.uniform(0.5, 0.95)
+            pts = [Vector((0, 0, hz)) + out * (L * s) + UP * (L * (rise * s - droop * s * s)) for s in (0.0, 0.33, 0.66, 1.0)]
+            ws = [L * 0.28, L * 0.36, L * 0.34, L * 0.24]
+            # 段ごとの明暗: 下の段ほど暗く青緑、上の段の先だけ明るく黄（B03 のもみ）
+            tb = t ** 1.3
+            c0 = crown_color(tb * 0.5, 0.0, 0.18, 0.6); c1 = crown_color(min(1.0, tb * 0.9 + 0.1), 1.0, 0.3 + 0.25 * tb, 0.55 + 0.6 * tb)
+            cols = [c0, tuple((a_ + b_) / 2 for a_, b_ in zip(c0, c1)), c1, c1]
+            nrm = (out * 0.55 + UP * 0.7).normalized()
+            strip2(B, pts, ws, side, M_FIRF(), cols, nrm)
+    for k in range(3):
+        a = k * 2.1
+        out = Vector((math.cos(a), math.sin(a), 0)) * 0.25
+        pts = [Vector((0, 0, height * 0.9)) + (out + UP) * s * 0.9 for s in (0, 0.5, 1)]
+        strip2(B, pts, [0.25, 0.3, 0.2], out.cross(UP).normalized() if out.length else Vector((1, 0, 0)), M_FIRF(), [crown_color(1.0, 1)] * 3, (out + UP).normalized())
+    return B.build(name)
+
+
+def clover_bush(name, seed, radius=0.8):
+    """クローバーの茂み（B03 左下・右）: 半球の面に spray_clover のカードを外向きに並べた小山"""
+    R_ = random.Random(seed); B = Builder()
+    for d in fib_sphere(56, 1.0):
+        if d.z < -0.15: continue
+        d = Vector((d.x, d.y, abs(d.z) * 0.75 + 0.05)).normalized()
+        p = Vector((d.x * radius, d.y * radius, d.z * radius * 0.7)) * R_.uniform(0.75, 1.0)
+        hint = (d * 0.8 + UP * 0.6).normalized()
+        a_ = hint.cross(Vector((0, 0, 1)) if abs(hint.z) < 0.95 else Vector((1, 0, 0))).normalized(); b_ = hint.cross(a_)
+        rot = R_.uniform(0, 6.28); sz = R_.uniform(0.55, 0.75)
+        ax = (a_ * math.cos(rot) + b_ * math.sin(rot)) * sz / 2; bx = (b_ * math.cos(rot) - a_ * math.sin(rot)) * sz / 2
+        ps = [p - ax - bx, p + ax - bx, p + ax + bx, p - ax + bx]
+        h = max(0.0, min(1.0, p.z / (radius * 0.7)))
+        c = crown_color(h, 0.8, 0.45, 1.05)
+        idx = [B.add_v(q) for q in ps]
+        B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], [c] * 4, [(d * 0.6 + UP * 0.6).normalized()] * 4, M_CLOVER())
+    return B.build(name)
+
+
+def grass_tall_tuft(name, seed):
+    """背の高い草の房: 根元の 1 点から外へ 15〜35° 倒した 5 枚（grass_tall）。法線は真上"""
+    R_ = random.Random(seed); B = Builder()
+    for k in range(5):
+        a = 2 * math.pi * k / 5 + R_.uniform(-.3, .3)
+        out = Vector((math.cos(a), math.sin(a), 0)); side = Vector((-out.y, out.x, 0))
+        tilt = math.radians(R_.uniform(15, 35)); h = R_.uniform(0.5, 0.7); w = R_.uniform(0.45, 0.6)
+        up = (UP * math.cos(tilt) + out * math.sin(tilt)) * h
+        ps = [-side * w / 2, side * w / 2, side * w / 2 + up, -side * w / 2 + up]
+        idx = [B.add_v(p) for p in ps]
+        B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], [(0.85,) * 3, (0.85,) * 3, (1.05,) * 3, (1.05,) * 3], [UP] * 4, M_GRASS2())
+    return B.build(name)
+
+
+def smooth_rock(name, seed, size=(2.6, 1.8, 2.2), bulge=0.22, sub=4):
+    """なめらかに膨らんだ岩（B03 の崖・D03 の岩）: 二十面体を細かく分け、大きな低い周波数のノイズで膨らませる。
+    フラットシェーディングは使わない（多面体に見える）。割れ目と苔は実行時に三方向投影で貼る（rock_crack）"""
+    R_ = random.Random(seed)
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=0.5)
+    off = Vector((R_.uniform(0, 100), R_.uniform(0, 100), R_.uniform(0, 100)))
+    for v in bm.verts:
+        p = v.co.copy(); d = p.normalized()
+        n1 = noise.noise(d * 1.3 + off) * bulge
+        n2 = noise.noise(d * 3.1 + off * 1.7) * bulge * 0.35
+        # 上を少し平らに、角を丸く
+        q = d * (0.5 + n1 + n2)
+        q.z = q.z if q.z < 0.28 else 0.28 + (q.z - 0.28) * 0.45
+        v.co = Vector((q.x * size[0], q.y * size[1], q.z * size[2]))
+    for v in bm.verts:
+        if v.co.z < -size[2] * 0.25: v.co.z = -size[2] * 0.25
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    for p in me.polygons: p.use_smooth = True
+    ob = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(ob)
+    bpy.context.view_layer.objects.active = ob; ob.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.cube_project(cube_size=2.0); bpy.ops.object.mode_set(mode='OBJECT')
+    me.materials.append(M_ROCK2())
+    ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+    for poly in me.polygons:
+        for l in poly.loop_indices:
+            z = me.vertices[me.loops[l].vertex_index].co.z
+            a = 0.62 + 0.38 * min(1, max(0, (z + size[2] * 0.25) / (size[2] * 0.6)))
+            ca.data[l].color = (a, a, a, 1)
+    ob.location.z = size[2] * 0.25 * 0.7
+    bpy.ops.object.transform_apply(location=True); ob.select_set(False)
+    return ob
+
+
 ASSETS = {
     'tree_broad_a': lambda n: tree_broad(n, 101),
     'tree_broad_b': lambda n: tree_broad(n, 102, height=5.0, crown=1.2),
@@ -564,6 +761,19 @@ ASSETS = {
     'rock_c': lambda n: rock(n, 503, size=(0.5, 0.4, 0.3), facet=0.2),
     'fence_spike': lambda n: fence_spike(n, 601),
     'crate': lambda n: crate(n),
+    'maple_a': lambda n: maple(n, 901),
+    'maple_b': lambda n: maple(n, 902, width=3.8, height=5.4, base=1.8, clusters=12),
+    'maple_c': lambda n: maple(n, 903, width=3.0, height=4.2, base=1.4),
+    'fir2_a': lambda n: fir2(n, 911, height=6.6, width=1.1),
+    'fir2_b': lambda n: fir2(n, 912, height=7.6, width=1.3),
+    'palm2_a': lambda n: palm2(n, 951),
+    'palm2_b': lambda n: palm2(n, 952, height=3.8, frond=1.3, lean=0.9),
+    'clover_a': lambda n: clover_bush(n, 921),
+    'clover_b': lambda n: clover_bush(n, 922, radius=1.1),
+    'grass_tall_a': lambda n: grass_tall_tuft(n, 931),
+    'cliff_rock_a': lambda n: smooth_rock(n, 941),
+    'cliff_rock_b': lambda n: smooth_rock(n, 942, size=(3.4, 2.2, 3.0), bulge=0.26),
+    'boulder_a': lambda n: smooth_rock(n, 943, size=(1.3, 1.1, 0.9), bulge=0.18, sub=3),
     'house_a': lambda n: house(n, 801),
     'house_b': lambda n: house(n, 802, w=9.0, d=5.5, h=5.4, roof_h=3.0),
     'lamp': lambda n: lamp(n, 811),
