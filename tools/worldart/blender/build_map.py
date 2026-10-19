@@ -271,6 +271,20 @@ def scatter():
             a = zn['trees'][RNG.integers(len(zn['trees']))]
             sc0, sc1 = zn.get('scale', [0.85, 1.25])
             place(a, x, z, scale=RNG.uniform(sc0, sc1)); trees.append((x, z))
+    rule_rng('groves')
+    # 木立: 中心のまわりに 2〜4 本を、樹冠が触れ合う距離（半径 radius）で寄せる。種類を混ぜる（B01・B02）
+    for gv in SPEC.get('groves', []):
+        for c in gv['centers']:
+            cxg, czg = (pt(c) if gv.get('space') == 'screen' else c)
+            k = int(RNG.integers(gv.get('count', [2, 4])[0], gv.get('count', [2, 4])[1] + 1))
+            a0 = RNG.uniform(0, 6.28)
+            for j in range(k):
+                r_ = 0 if j == 0 else gv.get('radius', 2.4) * RNG.uniform(0.8, 1.2)
+                a_ = a0 + j * 2 * math.pi / max(1, k - 1) + RNG.uniform(-0.4, 0.4)
+                x, z = cxg + math.cos(a_) * r_, czg + math.sin(a_) * r_
+                if path_dist(x, z) < 1.5 or not dry(x, z): continue
+                asset = gv['trees'][int(RNG.integers(len(gv['trees'])))]
+                place(asset, x, z, scale=RNG.uniform(*gv.get('scale', [0.9, 1.1]))); trees.append((x, z))
     rule_rng('trees')
     for t in SPEC.get('trees', []):
         # "canopy": [u, v] は樹冠の中心が画面のどこに見えるか。樹冠の高さで光線を切って幹の位置を逆算する

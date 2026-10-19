@@ -43,7 +43,9 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 - south_coast（同じ規則で作った別の地図・崖と海）: `art/shots/south_coast/v07.webp`、歩いたとき `walk_sheet.webp`
 - town_plaza（同じ規則で作った町の通り）: `art/shots/town_plaza/v03.webp`
 - 3 枚の並び: `art/shots/all_v.webp`
-- **forest_path（B03 の再現、第 2 世代のアセット）: `art/shots/forest_path/v27.webp`** ← いまの主な対象
+- **forest_path（B03 の再現、第 2 世代のアセット）: `art/shots/forest_path/v28.webp`** ← いまの主な対象
+- **palm_clearing（第 2 世代の規則で作った新しい地図、B02 が手がかり）: `art/shots/palm_clearing/v05.webp`**
+- まとめ: `art/shots/batch2_summary.webp`
 - 詳細と経緯は `experiments.md` の「履歴」。
 
 ## 残っている主な差（未完了）
