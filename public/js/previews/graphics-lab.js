@@ -1,6 +1,6 @@
 // グラフィック実験場: 森 → 小径 → 軽い坂 → 川の橋 → こみち → コテージ を一続きに置いた見本の場所
 //   ゲームと同じトゥーン・輪郭線・木と岩・草・仕上げ（ブルームと色）で描く。見え方を確かめるためのページ（lab.html）
-//   ?view=all|forest|river|bridge|lane|cottage|game / ?time=day|evening|night / ?post=0（仕上げを切る）
+//   ?view=all|forest|river|bridge|lane|cottage|walk|game / ?time=day|evening|night / ?post=0（仕上げを切る）
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -454,30 +454,96 @@ const VIEWS = {
   bridge: { name: '橋', pos: [20, 6, 14], tgt: [BRIDGE_X, 1.5, bz] },
   lane: { name: 'こみち', pos: [12, 7, -4], tgt: [-2, 1, -26] },
   cottage: { name: 'コテージ', pos: [2, 6, -27], tgt: [COTTAGE.x, 2.5, COTTAGE.z] },
-  game: { name: 'ゲーム視点で歩く', walk: true },
+  walk: { name: '自分で歩く', walk: 'free' },
+  game: { name: '自動で歩く', walk: 'auto' },
 };
 const ctl = new OrbitControls(camera, renderer.domElement);
 ctl.enableDamping = true; ctl.maxPolarAngle = Math.PI * 0.49;
-const state = { view: 'all', time: 'day', walk: false, s: 0, post: q.get('post') !== '0' };
+const state = { view: 'all', time: 'day', walk: null, s: 0, zoom: 1, post: q.get('post') !== '0' };
+const me = { x: 0, z: 70, dir: Math.PI, step: 0 }; // 自分で歩くときの人形
 function setView(key) {
-  const v = VIEWS[key]; state.view = key; state.walk = !!v.walk;
-  if (v.walk) { state.s = 0; walker.visible = true; }
+  const v = VIEWS[key]; state.view = key; state.walk = v.walk || null;
+  if (v.walk === 'auto') { state.s = 0; walker.visible = true; }
+  else if (v.walk === 'free') { walker.visible = true; Object.assign(me, { x: 0, z: 70, dir: Math.PI }); focus.set(me.x, heightAt(me.x, me.z) + 1.2, me.z); }
   else { camera.position.set(...v.pos); ctl.target.set(...v.tgt); walker.visible = key !== 'all'; if (walker.visible) { const p = routeAt(key === 'forest' ? 30 : key === 'bridge' ? 77 : key === 'lane' ? 105 : key === 'cottage' ? routeLen - 3 : 60); walker.position.set(p.x, walkY(p.x, p.z), p.z); walker.rotation.y = p.dir; } }
-  ctl.enabled = !v.walk; ctl.update(); refreshUI();
+  ctl.enabled = !v.walk; ctl.update(); stick.el.hidden = v.walk !== 'free'; refreshUI();
 }
 
+// ---- 画面の部品（スマホでも押しやすい大きさ。メニューは畳める） ----
+const css = document.createElement('style');
+css.textContent = `
+#ui{position:fixed;z-index:10;left:calc(8px + env(safe-area-inset-left,0px));top:calc(8px + env(safe-area-inset-top,0px));background:rgba(20,18,28,.62);color:#fff;padding:6px 8px;border-radius:8px;max-width:calc(100vw - 32px);font:13px system-ui,sans-serif;-webkit-user-select:none;user-select:none}
+#ui .row{margin:4px 0;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+#ui button{font:13px system-ui,sans-serif;min-height:30px;padding:4px 10px;border:1px solid rgba(255,255,255,.28);border-radius:6px;background:rgba(255,255,255,.1);color:#fff;cursor:pointer}
+#ui button.on{background:#ffd27a;border-color:#ffd27a;color:#2a2230}
+#ui button:focus-visible{outline:2px solid #ffd27a;outline-offset:1px}
+#ui .head{display:flex;gap:8px;align-items:center;justify-content:space-between}
+#ui .hint{opacity:.8;font-size:12px}
+#stick{position:fixed;z-index:10;left:calc(24px + env(safe-area-inset-left,0px));bottom:calc(24px + env(safe-area-inset-bottom,0px));width:132px;height:132px;border-radius:50%;background:rgba(20,18,28,.35);border:2px solid rgba(255,255,255,.45);touch-action:none}
+#stick i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.75)}
+canvas{touch-action:none}
+`;
+document.head.append(css);
 const ui = document.getElementById('ui');
+ui.textContent = '';
+const head = document.createElement('div'); head.className = 'head';
+const title = document.createElement('b'); title.textContent = 'グラフィック実験場';
+const fold = document.createElement('button'); fold.id = 'fold'; fold.textContent = 'たたむ';
+head.append(title, fold); ui.append(head);
+const body = document.createElement('div'); ui.append(body);
+const hint = document.createElement('div'); hint.className = 'hint'; body.append(hint);
+fold.onclick = () => { body.hidden = !body.hidden; fold.textContent = body.hidden ? 'メニュー' : 'たたむ'; };
+if (innerWidth < 600) fold.onclick();
 const rows = {};
 function row(label, items, cur, on) {
-  const d = document.createElement('div'); d.append(label + '：');
+  const d = document.createElement('div'); d.className = 'row'; d.append(label);
   for (const [k, name] of items) { const b = document.createElement('button'); b.textContent = name; b.dataset.k = k; b.onclick = () => on(k); d.append(b); }
-  ui.append(d); rows[label] = { d, cur };
+  body.append(d); rows[label] = { d, cur };
 }
 row('視点', Object.entries(VIEWS).map(([k, v]) => [k, v.name]), () => state.view, setView);
 row('時間', Object.entries(TIMES).map(([k, v]) => [k, v.name]), () => state.time, (k) => { setTime(k); refreshUI(); });
-row('仕上げ', [['on', 'ゲームと同じ（ブルーム・色）'], ['off', 'なし']], () => (state.post ? 'on' : 'off'), (k) => { state.post = k === 'on'; refreshUI(); });
-function refreshUI() { for (const { d, cur } of Object.values(rows)) for (const b of d.querySelectorAll('button')) b.classList.toggle('on', b.dataset.k === cur()); }
+row('仕上げ', [['on', 'ゲームと同じ'], ['off', 'なし']], () => (state.post ? 'on' : 'off'), (k) => { state.post = k === 'on'; refreshUI(); });
+function refreshUI() {
+  for (const { d, cur } of Object.values(rows)) for (const b of d.querySelectorAll('button')) b.classList.toggle('on', b.dataset.k === cur());
+  hint.textContent = state.walk === 'free' ? '左下のスティック（WASD・矢印キー）で歩く。2本指でつまむ・ホイールで寄る'
+    : state.walk ? '道に沿って歩きます。ゲームと同じカメラ'
+    : '1本指（ドラッグ）で回す・2本指で動かす・つまんで寄る';
+}
 
+// ---- スティック（自分で歩く）とキー ----
+const stick = { el: document.createElement('div'), x: 0, y: 0, id: null };
+{
+  const knob = document.createElement('i'); stick.el.id = 'stick'; stick.el.append(knob); stick.el.hidden = true; document.body.append(stick.el);
+  const move = (e) => {
+    const r = stick.el.getBoundingClientRect(), max = r.width / 2 - 14;
+    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const L = Math.hypot(dx, dy); if (L > max) { dx *= max / L; dy *= max / L; }
+    stick.x = dx / max; stick.y = dy / max; knob.style.transform = `translate(${dx}px,${dy}px)`;
+  };
+  const end = (e) => { if (e.pointerId !== stick.id) return; stick.id = null; stick.x = stick.y = 0; knob.style.transform = ''; };
+  stick.el.addEventListener('pointerdown', (e) => { stick.id = e.pointerId; stick.el.setPointerCapture(e.pointerId); move(e); e.preventDefault(); });
+  stick.el.addEventListener('pointermove', (e) => { if (e.pointerId === stick.id) move(e); });
+  stick.el.addEventListener('pointerup', end); stick.el.addEventListener('pointercancel', end);
+}
+const keys = new Set();
+addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
+addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+// 歩くときの寄り・引き（ホイール・2本指でつまむ）
+const clampZoom = (z) => Math.min(1.8, Math.max(0.5, z));
+renderer.domElement.addEventListener('wheel', (e) => { if (state.walk) state.zoom = clampZoom(state.zoom * Math.exp(e.deltaY * 0.001)); }, { passive: true });
+{
+  const pts = new Map(); let d0 = 0, z0 = 1;
+  const el = renderer.domElement;
+  el.addEventListener('pointerdown', (e) => { pts.set(e.pointerId, e); if (pts.size === 2) { const [a, b] = [...pts.values()]; d0 = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); z0 = state.zoom; } });
+  el.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, e);
+    if (state.walk && pts.size === 2 && d0 > 0) { const [a, b] = [...pts.values()]; state.zoom = clampZoom(z0 * d0 / Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY))); }
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, (e) => { pts.delete(e.pointerId); d0 = 0; });
+}
+
+const focus = new THREE.Vector3();
 setTime(TIMES[q.get('time')] ? q.get('time') : 'day');
 setView(VIEWS[q.get('view')] ? q.get('view') : 'all');
 
@@ -486,7 +552,9 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
 });
 
-const clock = new THREE.Clock(), focus = new THREE.Vector3();
+const clock = new THREE.Clock(), tmpF = new THREE.Vector3();
+// 歩く人形の向きをなめらかに変える
+const turn = (to, dt) => { walker.rotation.y += (((to - walker.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * (1 - Math.exp(-10 * dt)); };
 (function loop() {
   const dt = Math.min(0.05, clock.getDelta()), t = clock.elapsedTime;
   waterU.uTime.value = t; grass.U.uTime.value = t;
@@ -497,18 +565,34 @@ const clock = new THREE.Clock(), focus = new THREE.Vector3();
     m.scale.setScalar(0.6 + k * 2.4); m.material.opacity = Math.sin(Math.PI * k) * 0.55 * (state.time === 'night' ? 0.4 : 1);
   }
   if (state.walk) {
-    state.s += dt * 4.2; // 歩く速さ（m/s）
-    const p = routeAt(state.s), y = walkY(p.x, p.z);
-    walker.position.set(p.x, y + Math.abs(Math.sin(state.s * 2.2)) * 0.06, p.z);
-    walker.rotation.y += (((p.dir - walker.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * (1 - Math.exp(-8 * dt));
-    focus.lerp(new THREE.Vector3(p.x, y + 1.2, p.z), 1 - Math.exp(-6 * dt));
-    camera.position.set(focus.x, focus.y + 12.6, focus.z + 14.9); camera.lookAt(focus); // ゲームのカメラ（距離 19.5、標準のズーム）
-    grass.U.uPlayer.value.set(p.x, p.z);
+    let px, pz, bob;
+    if (state.walk === 'auto') {
+      state.s += dt * 4.2; // 歩く速さ（m/s）
+      const p = routeAt(state.s); px = p.x; pz = p.z; turn(p.dir, dt); bob = state.s;
+    } else {
+      // カメラは北（-z）を向いているので、スティックの上 = 北
+      let ix = stick.x, iz = stick.y;
+      if (keys.has('a') || keys.has('arrowleft')) ix -= 1; if (keys.has('d') || keys.has('arrowright')) ix += 1;
+      if (keys.has('w') || keys.has('arrowup')) iz -= 1; if (keys.has('s') || keys.has('arrowdown')) iz += 1;
+      const L = Math.hypot(ix, iz);
+      if (L > 0.12) {
+        const sp = 5.5 * Math.min(1, L) / Math.max(1, L);
+        const nx = me.x + ix * sp * dt, nz = me.z + iz * sp * dt;
+        if (Math.hypot(nx * 0.9, nz * 0.8) < 70) { me.x = nx; me.z = nz; }
+        me.dir = Math.atan2(ix, iz); me.step += Math.min(1, L) * sp * dt;
+      }
+      turn(me.dir, dt); px = me.x; pz = me.z; bob = me.step;
+    }
+    const y = walkY(px, pz);
+    walker.position.set(px, y + Math.abs(Math.sin(bob * 2.2)) * 0.06, pz);
+    focus.lerp(tmpF.set(px, y + 1.2, pz), 1 - Math.exp(-8 * dt));
+    camera.position.set(focus.x, focus.y + 12.6 * state.zoom, focus.z + 14.9 * state.zoom); camera.lookAt(focus); // ゲームのカメラ（距離 19.5、標準のズーム）
+    grass.U.uPlayer.value.set(px, pz);
   } else { ctl.update(); focus.copy(ctl.target); grass.U.uPlayer.value.set(walker.position.x, walker.position.z); }
-  // 影はいま見ている場所の周りに落とす
   // 全景は遠くから見るので霧を遠ざける
   const fk = state.view === 'all' ? 1.8 : 1, ft = TIMES[state.time];
   scene.fog.near = ft.near * fk; scene.fog.far = ft.far * fk;
+  // 影はいま見ている場所の周りに落とす
   sun.target.position.copy(focus); sun.position.copy(focus).add(sunOff);
   // ゲームと同じ近景の透過（カメラと注目点の間・カメラの近くを抜く）
   OCC.uOccCam.value.copy(camera.position); OCC.uOccTgt.value.copy(focus);
