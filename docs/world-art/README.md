@@ -38,5 +38,16 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 ```
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
-## 現在の状態
-`experiments.md` の「履歴」の最後の行が最良版。
+## 現在の状態（最良版）
+- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v08.webp`
+- south_coast（同じ規則で作った別の地図）: `art/shots/south_coast/v06.webp`、歩いたとき `walk_sheet.webp`
+- 詳細と経緯は `experiments.md` の「履歴」。
+
+## 次にやること（優先順）
+1. 町の地図（石畳・建物）: R06/R10/R18 の規則がこの体系で作れるか。建物のアセット（ドーム状の石の家 R04、木組みの家 R10）を Blender で作る。
+2. 葉の絵の質: もみのシダ状の葉をレース状に（R03）、ヤシの葉の中肋を消す。樹冠の明暗（日なたの黄色いハイライト）。
+3. 草の房を日陰で暗い星に見せない、道の縁に草を食い込ませる。
+4. 見本の R06〜R18 のファイルを受け取り、`refstats.py` で数値の目標を地図の種類ごとに取り直す（とくに R07 と R12）。
+5. 画角の再測定（町の建物の縦線で）。
+6. 重さ: 草の房の LOD（E05 で効果が小さいと確認済み）、葉の板の数。
+
