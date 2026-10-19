@@ -9,7 +9,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Batch, toon, glow, outline, OCC, gradientMap } from '../toon.js';
-import { roGroundMaterial } from './ro-style.js';
+import { roGroundMaterial, paintedTree } from './ro-style.js';
 import { seeded, local, I, noise2 } from '../env/kit.js';
 import { groundDetail, SURF } from '../env/textures.js';
 import { addTree, addPine, addRock } from '../env/flora.js';
@@ -128,6 +128,8 @@ function setTime(key) {
   windowMat.color.set(0xffd890).multiplyScalar(t.win);
   lampMat.color.set(0xffc870).multiplyScalar(t.win * 1.1);
   state.time = key;
+  for (const sp of treeSprites.children) sp.material.color.set(key === 'night' ? 0x5a6a9a : key === 'evening' ? 0xffd2a8 : 0xffffff);
+  blobShadows.material.opacity = key === 'night' ? 0.12 : 0.3;
 }
 
 // ======================================================================
@@ -214,21 +216,25 @@ function place(fn, tries, area, pad) {
   }
 }
 const SPECIES = ['oak', 'tall', 'young', 'twin', 'birch', 'old'];
+// 木は別の入れ物（RO風では絵の木に差し替えるので、まとめて隠せるように）。置いた場所を覚えておく
+const TB = new Batch({ chunk: 24 }), trees = [];
+const tree = (M, x, z, o) => { addTree(TB, M, R, o); trees.push({ x, z, kind: 'broad', size: o.size || 1, v: o.species === 'birch' || o.species === 'young' ? 2 : o.fruit && R() < 0.3 ? 1 : R() < 0.7 ? 0 : 2 }); };
+const pine = (M, x, z, o) => { addPine(TB, M, R, o); trees.push({ x, z, kind: 'pine', size: o.size || 1, v: Math.floor(R() * 2) }); };
 // 南の森（道の両側に密に、道から離れるほど針葉樹）
 place((x, z, M) => {
-  if (R() < 0.25 + smooth(10, 40, Math.abs(x)) * 0.4) addPine(B, M, R, { size: 0.9 + R() * 0.5 });
-  else addTree(B, M, R, { species: SPECIES[Math.floor(R() * SPECIES.length)], size: 0.85 + R() * 0.55, leaf: new THREE.Color(0x3f8f3a).offsetHSL((R() - 0.5) * 0.04, 0, (R() - 0.5) * 0.08).getHex() });
+  if (R() < 0.25 + smooth(10, 40, Math.abs(x)) * 0.4) pine(M, x, z, { size: 0.9 + R() * 0.5 });
+  else tree(M, x, z, { species: SPECIES[Math.floor(R() * SPECIES.length)], size: 0.85 + R() * 0.55, leaf: new THREE.Color(0x3f8f3a).offsetHSL((R() - 0.5) * 0.04, 0, (R() - 0.5) * 0.08).getHex() });
 }, 260, [-75, 75, 14, 85], 3.6);
 // 森の下草: 岩・キノコ・花
 place((x, z, M) => addRock(B, M, R, { moss: 0.8, size: 0.5 + R() * 0.7 }), 45, [-50, 50, 14, 75], 2.2);
 place((x, z, M) => makeProp(B, 'mushroom', M, R, 0xd04a3a, 0xf0e6d0, {}), 30, [-30, 30, 14, 70], 1.6);
 // 川の南岸の木（まばら）
-place((x, z, M) => addTree(B, M, R, { species: R() < 0.5 ? 'birch' : 'young', size: 0.8 + R() * 0.4 }), 40, [-70, 70, 4, 14], 3);
+place((x, z, M) => tree(M, x, z, { species: R() < 0.5 ? 'birch' : 'young', size: 0.8 + R() * 0.4 }), 40, [-70, 70, 4, 14], 3);
 // 北東の斜面: 針葉樹と岩
-place((x, z, M) => (R() < 0.6 ? addPine(B, M, R, { size: 0.9 + R() * 0.6 }) : addRock(B, M, R, { kind: R() < 0.5 ? 'slab' : 'boulder', moss: 0.5, size: 0.9 + R() * 1.2 })), 160, [16, 80, -80, -8], 2.5);
+place((x, z, M) => (R() < 0.6 ? pine(M, x, z, { size: 0.9 + R() * 0.6 }) : addRock(B, M, R, { kind: R() < 0.5 ? 'slab' : 'boulder', moss: 0.5, size: 0.9 + R() * 1.2 })), 160, [16, 80, -80, -8], 2.5);
 // 北西（コテージの裏）の木立
-place((x, z, M) => addTree(B, M, R, { species: SPECIES[Math.floor(R() * 6)], size: 0.9 + R() * 0.5, fruit: 0.3 }), 70, [-75, -2, -85, -52], 3);
-place((x, z, M) => addTree(B, M, R, { species: 'old', size: 1.2 }), 10, [-75, -25, -50, -20], 4);
+place((x, z, M) => tree(M, x, z, { species: SPECIES[Math.floor(R() * 6)], size: 0.9 + R() * 0.5, fruit: 0.3 }), 70, [-75, -2, -85, -52], 3);
+place((x, z, M) => tree(M, x, z, { species: 'old', size: 1.2 }), 10, [-75, -25, -50, -20], 4);
 // 川岸の石
 for (let i = 0; i < 70; i++) {
   const x = lerp(-80, 80, R()); if (Math.abs(x - BRIDGE_X) < 4) continue;
@@ -413,6 +419,19 @@ const smokeOrigin = new THREE.Vector3();
   }
 }
 scene.add(B.build());
+const treeGroup = TB.build(); scene.add(treeGroup);
+// RO風の木: 筆で描いた絵の板（いつもカメラを向く）と、足元の丸い影
+const treeSprites = new THREE.Group(); treeSprites.visible = false; scene.add(treeSprites);
+const blobShadows = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x1c2c18, transparent: true, opacity: 0.3, depthWrite: false }), trees.length);
+blobShadows.visible = false; blobShadows.renderOrder = 1; scene.add(blobShadows);
+for (const [i, t] of trees.entries()) {
+  const { tex, aspect } = paintedTree(t.kind, t.v), h = (t.kind === 'pine' ? 8.5 : 7.2) * t.size;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, alphaTest: 0.5, transparent: true }));
+  sp.center.set(0.5, 0.01); sp.scale.set(h * aspect, h, 1);
+  const y = heightAt(t.x, t.z) - 0.15; sp.position.set(t.x, y, t.z); sp.userData.h = h; treeSprites.add(sp);
+  const r = (t.kind === 'pine' ? 1.9 : 2.6) * t.size;
+  blobShadows.setMatrixAt(i, local(I, t.x, heightAt(t.x, t.z) + 0.06, t.z, 0, 0, 0, r, 1, r * 0.8));
+}
 {
   const fl = FB.build(), hulls = [];
   fl.traverse((o) => { if (o.userData.noOutline) hulls.push(o); });
@@ -574,6 +593,7 @@ function setStyle(ro, init = false) {
   ground.material = ro ? groundMats.ro : groundMats.toon;
   for (const h of hulls) h.visible = !ro;
   grass.mesh.visible = !ro;
+  treeGroup.visible = !ro; treeSprites.visible = ro; blobShadows.visible = ro;
   const gm = gradientMap(); gm.image.data.set(GRAD[ro ? 'ro' : 'now']);
   gm.magFilter = gm.minFilter = ro ? THREE.LinearFilter : THREE.NearestFilter; gm.needsUpdate = true;
   gradePass.uniforms.sat.value = ro ? 0.94 : 1.08; gradePass.uniforms.contrast.value = ro ? 0.9 : 1.04; gradePass.uniforms.vig.value = ro ? 0.1 : 0.22;
@@ -633,6 +653,20 @@ const turn = (to, dt) => { walker.rotation.y += (((to - walker.rotation.y + Math
     camera.position.set(focus.x, focus.y + cy * state.zoom, focus.z + cz * state.zoom); camera.lookAt(focus);
     grass.U.uPlayer.value.set(px, pz);
   } else { ctl.update(); focus.copy(ctl.target); grass.U.uPlayer.value.set(walker.position.x, walker.position.z); }
+  // RO風で歩くとき: 人形の手前にある絵の木を薄くする
+  if (state.ro) {
+    const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, sx = focus.x - cx, sy = focus.y - cy, sz = focus.z - cz, L2 = sx * sx + sy * sy + sz * sz;
+    for (const sp of treeSprites.children) {
+      let a = 1;
+      if (state.walk) {
+        const px = sp.position.x - cx, py = sp.position.y + sp.userData.h * 0.55 - cy, pz = sp.position.z - cz;
+        const t = Math.max(0, Math.min(1, (px * sx + py * sy + pz * sz) / L2));
+        const d = Math.hypot(px - sx * t, py - sy * t, pz - sz * t);
+        if (t < 0.97) a = 0.25 + 0.75 * smooth(sp.userData.h * 0.3, sp.userData.h * 0.55, d);
+      }
+      sp.material.opacity = a; sp.material.alphaTest = a < 1 ? 0.05 : 0.5;
+    }
+  }
   // 全景は遠くから見るので霧を遠ざける
   const fk = (state.view === 'all' ? 1.8 : 1) * (state.ro ? 1.5 : 1), ft = TIMES[state.time];
   scene.fog.near = ft.near * fk; scene.fog.far = ft.far * fk;
