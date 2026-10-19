@@ -1,0 +1,188 @@
+{
+  "name": "town_plaza",
+  "note": "汎化の確認 2: 町の通り（R10・R18 を手がかりに新しく構成）。地面は全面の石畳、両側に家、通りの縁に植え込みのもみ・街灯・旗・ベンチ。世界座標 [x, z]。カメラ・光・仕上げは同じ規則。",
+  "seed": 31,
+  "aspect": 1.7778,
+  "camera": {
+    "target": [0, 0, 0],
+    "yaw": 0,
+    "pitch": 52,
+    "dist": 22,
+    "fov": 25
+  },
+  "sun": {
+    "azimuth": 135,
+    "elevation": 32,
+    "color": "#ffe6b0",
+    "intensity": 4.6
+  },
+  "sky": {
+    "color": "#cfe0ee",
+    "light": "#b4c8de",
+    "ground": "#6a6448",
+    "intensity": 1.9
+  },
+  "albedoSat": 0.7,
+  "foliage": {
+    "wrap": 0.5,
+    "trans": 0.3,
+    "receiveShadow": false
+  },
+  "post": {
+    "sat": 1.0,
+    "contrast": 1.0,
+    "lift": [0, 0, 0],
+    "gain": [1, 1, 1],
+    "dof": 1.0
+  },
+  "ground": {
+    "alt": "cobble",
+    "altScale": 3.6,
+    "dirtTint": [1.0, 0.97, 0.74]
+  },
+  "terrain": {
+    "size": 90,
+    "cell": 0.5,
+    "ground": "alt",
+    "center": [0, -6],
+    "hills": {
+      "amp": 0.04,
+      "scale": 20
+    }
+  },
+  "paths": [
+    {
+      "world": [[-5.4, -30], [-5.4, 20]],
+      "width": 1.2,
+      "mat": "grass"
+    },
+    {
+      "world": [[5.4, -30], [5.4, 20]],
+      "width": 1.2,
+      "mat": "grass"
+    }
+  ],
+  "props": [
+    {
+      "asset": "house_a",
+      "world": [-9.6, -9.5],
+      "rot": 90
+    },
+    {
+      "asset": "house_b",
+      "world": [-9.6, 0.5],
+      "rot": 90
+    },
+    {
+      "asset": "house_a",
+      "world": [-9.6, 10.5],
+      "rot": 90
+    },
+    {
+      "asset": "house_b",
+      "world": [9.6, -11.0],
+      "rot": -90
+    },
+    {
+      "asset": "house_a",
+      "world": [9.6, -1.0],
+      "rot": -90
+    },
+    {
+      "asset": "house_b",
+      "world": [9.6, 9.0],
+      "rot": -90
+    },
+    {
+      "asset": "planter",
+      "world": [-4.2, -7.0]
+    },
+    {
+      "asset": "planter",
+      "world": [4.2, -14.0]
+    },
+    {
+      "asset": "lamp",
+      "world": [-3.6, -1.5]
+    },
+    {
+      "asset": "lamp",
+      "world": [3.6, -6.5]
+    },
+    {
+      "asset": "lamp",
+      "world": [-3.6, 7.5]
+    },
+    {
+      "asset": "banner_pole",
+      "world": [-3.6, -13.0],
+      "rot": 90
+    },
+    {
+      "asset": "banner_pole",
+      "world": [3.6, -13.0],
+      "rot": -90
+    },
+    {
+      "asset": "banner_pole",
+      "world": [3.6, 9.0],
+      "rot": -90
+    },
+    {
+      "asset": "bench",
+      "world": [-4.3, 2.5],
+      "rot": 90
+    },
+    {
+      "asset": "bench",
+      "world": [4.3, -2.0],
+      "rot": -90
+    },
+    {
+      "asset": "crate",
+      "world": [6.1, 4.6],
+      "rot": 20,
+      "scale": 1.3
+    },
+    {
+      "asset": "crate",
+      "world": [6.9, 5.3],
+      "rot": -15,
+      "scale": 1.3
+    }
+  ],
+  "trees": [
+    {
+      "asset": "pine_a",
+      "world": [-4.2, -7.0],
+      "scale": 0.9,
+      "y": 0.45
+    },
+    {
+      "asset": "pine_b",
+      "world": [4.2, -14.0],
+      "scale": 0.85,
+      "y": 0.45
+    },
+    {
+      "asset": "tree_broad_a",
+      "world": [7.5, -20.0],
+      "scale": 1.2
+    }
+  ],
+  "zones": [],
+  "lines": [],
+  "scatter": {
+    "grass": {
+      "asset": "grass_a",
+      "spacing": 0.3,
+      "edge_boost": 0.0,
+      "scale": [0.5, 0.8]
+    },
+    "flowers": {
+      "asset": "flowers_a",
+      "spacing": 0.9,
+      "prob": 0.8
+    }
+  }
+}

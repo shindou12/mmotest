@@ -42,7 +42,8 @@ PORT=8091 node server.js &
 2. 位置の書き方を選ぶ:
    - 見本の 1 枚を再現するなら `"screen": [u, v]`（画面の位置。カメラから地面へ投げる）。木は `"canopy": [u, v]` で樹冠の見える位置から置ける。
    - 歩き回る地図なら `"world": [x, z]`（x 右、z 手前、m）。
-3. 地形: `terrain.hills`（起伏）、`terrain.cliffs`（段差。`lowPoint` で低い側、`drop`・`width`・`jag`、`rocks` で崖に岩を張る）、
+3. 地面の種類: `terrain.ground` が `grass`（既定）/ `sand` / `alt`（全面を `ground.alt` の絵、例 `cobble`）。`paths` の `mat` は `dirt` / `sand` / `grass`（草の帯で他を抜く）。
+   地形: `terrain.hills`（起伏）、`terrain.cliffs`（段差。`lowPoint` で低い側、`drop`・`width`・`jag`、`rocks` で崖に岩を張る）、
    `terrain.bands`（高さで砂/土を塗る）、`terrain.water`（水面の高さと色）。
 4. 構図: 画面のどこに明るい通路、どこに影の塊（林）、どこに見せ場を置くかを先に決める。**背の高い木の樹冠を見せるなら根元を画面の下半分に。**
 5. `paths`（道）、`zones`（林・ヤシの区域）、`trees`（決めた位置の木）、`lines`（柵を線に沿って）、`props`（小物）、`scatter`（草・茂み・小石・浜の草）。
@@ -79,3 +80,5 @@ PORT=8091 node server.js &
 | F10 | 房の中まで真っ暗 | 葉が自分の影を受けている | 葉は影を受けない（落とすだけ） |
 | F11 | 規則を足したら関係ない木の位置が変わった | 乱数を全規則で共有 | `rule_rng(名前)` で系列を分ける |
 | F12 | `const` の初期化前参照で画面が真っ黒 | `placeCamera()` が後で定義した `OCC` を使った | 共有の値はファイルの先頭で定義する |
+| F13 | もみがリュウゼツランの束に見える | シダの葉の絵が細長いひし形 | 根元の広い三角形 + とがった小羽片（`leaf_frond`） |
+| F14 | 石畳に星形の目地 | ボロノイの点がランダムで石の大きさがばらつく | ゆらぎのある格子の点（`voronoi(grid=True)`） |

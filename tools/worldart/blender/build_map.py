@@ -115,7 +115,7 @@ for cl in TS.get('cliffs', []):
     H = H - cl['drop'] * smooth(-cl['width'] / 2, cl['width'] / 2, sd)
     CLIFF_LINES.append((poly, cl, ref))
 
-DIRT = np.zeros_like(H); ALT = np.zeros_like(H)
+DIRT = np.zeros_like(H); ALT = np.zeros_like(H); GRASSP = []
 PATHS = []
 for p in SPEC.get('paths', []):
     poly = poly_of(p); PATHS.append((poly, p['width']))
@@ -123,9 +123,12 @@ for p in SPEC.get('paths', []):
     jag = (N2(X * 3.1, Z * 3.1, 5) - 0.5) * 0.9 + (N1(X * 7, Z * 7, 5) - 0.5) * 0.4   # 筆でなぞったような縁
     w = 1 - smooth(p["width"] / 2 - 0.45, p["width"] / 2 + 0.45, d + jag)
     if p.get('mat', 'dirt') == 'dirt': DIRT = np.maximum(DIRT, w)
+    elif p['mat'] == 'grass': GRASSP.append(w)       # 草の帯（石畳・砂を抜く）。あとで適用
     else: ALT = np.maximum(ALT, w)
     H = H - 0.06 * w
-if TS.get('ground') == 'sand': ALT = np.maximum(ALT, 1.0 - DIRT)
+if TS.get('ground') in ('sand', 'alt'): ALT = np.maximum(ALT, 1.0 - DIRT)
+for w_ in GRASSP:
+    ALT = np.minimum(ALT, 1 - w_); DIRT = np.minimum(DIRT, 1 - w_)
 for band in TS.get('bands', []):
     # 高さで塗り分ける（例: 浜の砂は高さ below より下）
     edge = H + (N1(X * 2.3, Z * 2.3, 4) - 0.5) * 2 * band.get('noise', 0.4)
@@ -256,7 +259,7 @@ def scatter():
             x, z = screen_to_world(*t['canopy'], h=hc)[[0, 2]]
         else:
             x, z = pt(t['screen']) if 'screen' in t else t['world']
-        place(t['asset'], x, z, rot=t.get('rot'), scale=sc_); trees.append((x, z))
+        place(t['asset'], x, z, rot=t.get('rot'), scale=sc_, y=t.get('y')); trees.append((x, z))
     trees = np.array(trees) if trees else np.zeros((0, 2))
     sc = SPEC.get('scatter', {})
     rule_rng('bush')

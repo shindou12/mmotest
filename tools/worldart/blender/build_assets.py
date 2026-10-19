@@ -60,6 +60,13 @@ M_LEAF = lambda: material('leaf_broad', 'leaf_broad.png', alpha=True)
 M_FROND = lambda: material('leaf_frond', 'leaf_frond.png', alpha=True)
 M_GRASS = lambda: material('grass', 'grass_blades.png', alpha=True)
 M_ROCK = lambda: material('rock', 'rock.png')
+M_PLASTER = lambda: material('plaster', 'plaster_timber.png')
+M_STONE = lambda: material('stone', 'stone_wall.png')
+M_ROOF = lambda: material('roof', 'roof_tiles.png')
+M_WINDOW = lambda: material('window', 'window.png')
+M_BANNER = lambda: material('banner', 'banner.png')
+M_PAINT = lambda: material('paint', 'paint.png')
+M_SOIL = lambda: material('soil', 'ground_dirt.png')
 M_FLOWER = lambda: material('leaf_flower', 'flowers.png', alpha=True)
 M_PALM = lambda: material('leaf_palm', 'leaf_palm.png', alpha=True)
 
@@ -420,6 +427,127 @@ def crate(name, size=0.8):
     return ob
 
 
+# ------------------------------------------------------------ 町（R06・R10・R18）
+def quad_uv(ps, tile, origin=None):
+    """面の 2 辺を軸にしたメートル単位の UV"""
+    p0 = origin or ps[0]
+    u = (ps[1] - ps[0]).normalized(); v = (ps[-1] - ps[0]).normalized()
+    v = (v - u * v.dot(u)).normalized()
+    return [((p - p0).dot(u) / tile[0], (p - p0).dot(v) / tile[1]) for p in ps]
+
+
+def poly(B, ps, m, tile, ao=None):
+    idx = [B.add_v(p) for p in ps]
+    cols = [((ao(p),) * 3) if ao else (1.0, 1.0, 1.0) for p in ps]
+    B.face(idx, quad_uv(ps, tile), cols, None, m)
+
+
+def hexa(B, b, t, m, tile, ao=None, skip=()):
+    """下の 4 点（上から見て反時計回り）と上の 4 点の六面体。面ごとに UV"""
+    if 'bottom' not in skip: poly(B, [b[0], b[3], b[2], b[1]], m, tile, ao)
+    if 'top' not in skip: poly(B, [t[0], t[1], t[2], t[3]], m, tile, ao)
+    for i in range(4):
+        j = (i + 1) % 4
+        poly(B, [b[i], b[j], t[j], t[i]], m, tile, ao)
+
+
+def box(B, x0, y0, z0, x1, y1, z1, m, tile, ao=None, skip=()):
+    b = [Vector((x0, y0, z0)), Vector((x1, y0, z0)), Vector((x1, y1, z0)), Vector((x0, y1, z0))]
+    hexa(B, b, [p + Vector((0, 0, z1 - z0)) for p in b], m, tile, ao, skip)
+
+
+def house(name, seed, w=7.0, d=5.0, h=4.6, roof_h=2.6, ov=0.55):
+    """家: 石の土台、漆喰と木組みの壁、切妻の厚い瓦屋根、煙突、窓と扉。正面は -y（three.js では +z）"""
+    R_ = random.Random(seed); B = Builder()
+    ao = lambda p: 0.72 + 0.28 * min(1.0, max(0.0, p.z / 2.5))
+    box(B, -w / 2 - 0.1, -d / 2 - 0.1, -0.3, w / 2 + 0.1, d / 2 + 0.1, 0.9, M_STONE(), (2, 2), ao, skip=('bottom',))
+    box(B, -w / 2, -d / 2, 0.9, w / 2, d / 2, h, M_PLASTER(), (4, 4), ao, skip=('bottom', 'top'))
+    # 妻の三角（左右の端）
+    for sx in (-1, 1):
+        a = Vector((sx * w / 2, -d / 2, h)); b_ = Vector((sx * w / 2, d / 2, h)); c = Vector((sx * w / 2, 0, h + roof_h))
+        tri = [a, b_, c] if sx > 0 else [b_, a, c]
+        idx = [B.add_v(p) for p in tri]
+        B.face(idx, [((p.y + d / 2) / 4, (p.z - 0.9) / 4) for p in tri], [(1.0,) * 3] * 3, None, M_PLASTER())
+    # 屋根（2 枚の厚い板）
+    th = 0.24; x0, x1 = -w / 2 - 0.45, w / 2 + 0.45
+    slope = roof_h / (d / 2)
+    for sy in (-1, 1):
+        ye = sy * (d / 2 + ov); ze = h - ov * slope
+        if sy < 0: bq = [Vector((x0, ye, ze)), Vector((x1, ye, ze)), Vector((x1, 0, h + roof_h)), Vector((x0, 0, h + roof_h))]
+        else: bq = [Vector((x0, 0, h + roof_h)), Vector((x1, 0, h + roof_h)), Vector((x1, ye, ze)), Vector((x0, ye, ze))]
+        tq = [p + Vector((0, 0, th)) for p in bq]
+        hexa(B, bq, tq, M_ROOF(), (2, 2), lambda p: 0.85 + 0.15 * min(1, (p.z - h + 1) / 3))
+    # 煙突
+    cx, cy = w * 0.22, -d * 0.12
+    box(B, cx - 0.4, cy - 0.4, h + roof_h * 0.35, cx + 0.4, cy + 0.4, h + roof_h + 1.0, M_STONE(), (2, 2))
+    # 窓と扉（壁から 3cm 出す）
+    def front_quad(x, z0, ww, hh, y, m, flip=False):
+        ps = [Vector((x - ww / 2, y, z0)), Vector((x + ww / 2, y, z0)), Vector((x + ww / 2, y, z0 + hh)), Vector((x - ww / 2, y, z0 + hh))]
+        if flip: ps = [ps[1], ps[0], ps[3], ps[2]]
+        idx = [B.add_v(p) for p in ps]
+        B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], [(1.0,) * 3] * 4, None, m)
+    nwin = max(2, int(w / 2.3))
+    for k in range(nwin):
+        x = -w / 2 + (k + 0.5) * w / nwin
+        front_quad(x, 2.9, 0.95, 1.05, -d / 2 - 0.03, M_WINDOW())
+        front_quad(x, 2.9, 0.95, 1.05, d / 2 + 0.03, M_WINDOW(), flip=True)
+        if k != nwin // 2: front_quad(x, 1.3, 0.85, 0.95, -d / 2 - 0.03, M_WINDOW())
+    front_quad(-w / 2 + (nwin // 2 + 0.5) * w / nwin, 0.9, 1.2, 1.9, -d / 2 - 0.03, M_CRATE())
+    return B.build(name, smooth=False)
+
+
+def tinted_box(B, x0, y0, z0, x1, y1, z1, m, tint, tile=(1, 1)):
+    box(B, x0, y0, z0, x1, y1, z1, m, tile, lambda p: 1.0)
+    # 直前の 6 面の頂点色を tint に
+    for k in range(1, 7): B.col[-k] = [tint] * len(B.col[-k])
+
+
+def lamp(name, seed, h=3.4):
+    """街灯: 濃い緑の鉄の柱と、青緑のガラスのランタン（R06）"""
+    B = Builder(); g = (0.22, 0.34, 0.27)
+    tube(B, [Vector((0, 0, -0.2)), Vector((0, 0, h))], [0.08, 0.06], M_PAINT(), sides=8, ao=(0.25, 0.3))
+    for k in range(len(B.col)): B.col[k] = [tuple(c * gg for c, gg in zip((1, 1, 1), g))] * 4
+    tinted_box(B, -0.22, -0.22, h, 0.22, 0.22, h + 0.45, M_PAINT(), (0.55, 0.95, 1.0))
+    tinted_box(B, -0.3, -0.3, h + 0.45, 0.3, 0.3, h + 0.55, M_PAINT(), g)
+    tinted_box(B, -0.4, -0.4, -0.05, 0.4, 0.4, 0.35, M_PAINT(), g)
+    return B.build(name, smooth=False)
+
+
+def banner_pole(name, seed, h=4.2):
+    B = Builder()
+    tube(B, [Vector((0, 0, -0.2)), Vector((0, 0, h))], [0.07, 0.06], M_WOOD(), sides=8, ao=(0.5, 0.9))
+    tube(B, [Vector((0, -0.05, h - 0.3)), Vector((0, -0.95, h - 0.3))], [0.04, 0.04], M_WOOD(), sides=6, ao=(0.8, 0.8))
+    for flip in (False, True):
+        ps = [Vector((0.01 * (1 if flip else -1), -0.15, h - 2.0)), Vector((0.01 * (1 if flip else -1), -0.95, h - 2.0)),
+              Vector((0.01 * (1 if flip else -1), -0.95, h - 0.32)), Vector((0.01 * (1 if flip else -1), -0.15, h - 0.32))]
+        if flip: ps = [ps[1], ps[0], ps[3], ps[2]]
+        idx = [B.add_v(p) for p in ps]
+        uv = [(0, 0), (1, 0), (1, 1), (0, 1)] if not flip else [(1, 0), (0, 0), (0, 1), (1, 1)]
+        B.face(idx, uv, [(1.0,) * 3] * 4, None, M_BANNER())
+    return B.build(name, smooth=False)
+
+
+def bench(name, seed):
+    B = Builder(); g = (0.36, 0.52, 0.40)
+    for k in range(3):
+        tinted_box(B, -1.0, -0.25 + k * 0.17, 0.45, 1.0, -0.12 + k * 0.17, 0.52, M_CRATE(), g, (2, 2))
+    tinted_box(B, -1.0, 0.2, 0.55, 1.0, 0.26, 0.95, M_CRATE(), g, (2, 2))
+    for sx in (-0.85, 0.85):
+        tinted_box(B, sx - 0.05, -0.28, 0.0, sx + 0.05, 0.28, 0.45, M_PAINT(), (0.2, 0.22, 0.2))
+    return B.build(name, smooth=False)
+
+
+def planter(name, seed, s=2.4):
+    B = Builder()
+    ao = lambda p: 0.75 + 0.25 * min(1, p.z / 0.6)
+    for (x0, y0, x1, y1) in [(-s / 2, -s / 2, s / 2, -s / 2 + 0.3), (-s / 2, s / 2 - 0.3, s / 2, s / 2),
+                             (-s / 2, -s / 2 + 0.3, -s / 2 + 0.3, s / 2 - 0.3), (s / 2 - 0.3, -s / 2 + 0.3, s / 2, s / 2 - 0.3)]:
+        box(B, x0, y0, -0.2, x1, y1, 0.6, M_STONE(), (2, 2), ao, skip=('bottom',))
+    poly(B, [Vector((-s / 2 + 0.3, -s / 2 + 0.3, 0.45)), Vector((s / 2 - 0.3, -s / 2 + 0.3, 0.45)),
+             Vector((s / 2 - 0.3, s / 2 - 0.3, 0.45)), Vector((-s / 2 + 0.3, s / 2 - 0.3, 0.45))], M_SOIL(), (3, 3), lambda p: 0.6)
+    return B.build(name, smooth=False)
+
+
 ASSETS = {
     'tree_broad_a': lambda n: tree_broad(n, 101),
     'tree_broad_b': lambda n: tree_broad(n, 102, height=5.0, crown=1.2),
@@ -436,6 +564,12 @@ ASSETS = {
     'rock_c': lambda n: rock(n, 503, size=(0.5, 0.4, 0.3), facet=0.2),
     'fence_spike': lambda n: fence_spike(n, 601),
     'crate': lambda n: crate(n),
+    'house_a': lambda n: house(n, 801),
+    'house_b': lambda n: house(n, 802, w=9.0, d=5.5, h=5.4, roof_h=3.0),
+    'lamp': lambda n: lamp(n, 811),
+    'banner_pole': lambda n: banner_pole(n, 812),
+    'bench': lambda n: bench(n, 813),
+    'planter': lambda n: planter(n, 814),
 }
 
 

@@ -215,5 +215,100 @@
    "crate"
   ],
   "colors": 1
+ },
+ {
+  "name": "house_a",
+  "tris": 74,
+  "size": [
+   7.9,
+   6.1,
+   8.5
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "stone",
+   "plaster",
+   "roof",
+   "window",
+   "crate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "house_b",
+  "tris": 74,
+  "size": [
+   9.9,
+   6.6,
+   9.7
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "stone",
+   "plaster",
+   "roof",
+   "window",
+   "crate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "lamp",
+  "tris": 52,
+  "size": [
+   0.8,
+   0.8,
+   4.15
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "banner_pole",
+  "tris": 32,
+  "size": [
+   0.14,
+   1.02,
+   4.4
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "wood",
+   "banner"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "bench",
+  "tris": 72,
+  "size": [
+   2.0,
+   0.56,
+   0.95
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate",
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "planter",
+  "tris": 42,
+  "size": [
+   2.4,
+   2.4,
+   0.8
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "stone",
+   "soil"
+  ],
+  "colors": 1
  }
 ]

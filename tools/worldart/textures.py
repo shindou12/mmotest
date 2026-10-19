@@ -127,33 +127,33 @@ def leaf_broad(n=512, seed=11):
 
 
 def leaf_frond(n=512, seed=12):
-    """シダ状の葉（2回羽状）。下から上へ伸びる。R03 のもみ"""
+    """シダ状の葉（2回羽状）。根元が広い三角形で、羽片ごとに丸い小羽片が並ぶレース状。R03 のもみ。
+    （細長いひし形だとリュウゼツランに見える: 失敗 F13）"""
     r = rng(seed)
     img = Image.new('RGBA', (n, n), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     cx = n / 2
-    rach = [(cx, n * 0.98), (cx, n * 0.04)]
-    pinnae = 15
-    for i in range(pinnae):
-        t = (i + 0.5) / pinnae               # 0=根元 1=先
-        y = n * (0.95 - 0.88 * t)
-        Lp = n * 0.40 * math.sin(math.pi * (0.15 + 0.85 * (1 - t) * 0.9 + 0.05)) * (1 - 0.7 * t) + n * 0.04
+    P = 13
+    for i in range(P):
+        t = (i + 0.4) / P                     # 0=根元 1=先
+        y = n * (0.96 - 0.9 * t)
+        Lp = n * 0.47 * (1 - t) ** 0.85 + n * 0.03
         for side in (-1, 1):
-            ang = math.radians(-90 + side * (62 - 18 * t)) + r.normal(0, 0.05)
-            x0, y0 = cx, y + side * 4
-            dark = lerp((0.16, 0.26, 0.07), (0.26, 0.38, 0.09), t)
-            light = lerp((0.44, 0.54, 0.16), (0.72, 0.78, 0.30), t)
-            # 小羽片
-            sub = 7
-            for j in range(sub):
-                s = (j + 0.6) / sub
-                px = x0 + math.cos(ang) * Lp * s; py = y0 + math.sin(ang) * Lp * s
-                Ls = Lp * 0.26 * (1 - 0.7 * s)
-                for sd in (-1, 1):
-                    a2 = ang + sd * 1.0
-                    d.polygon(leaflet_poly(px, py, a2, Ls, Ls * 0.32), fill=col(lerp(dark, light, 0.35 + 0.65 * s)))
-            d.polygon(leaflet_poly(x0, y0, ang, Lp * 1.04, Lp * 0.05), fill=col(lerp(dark, light, 0.5)))
-    d.line(rach, fill=col((0.24, 0.30, 0.10)), width=4)
+            ang = math.radians(-90 + side * (70 - 25 * t)) + r.normal(0, 0.04)
+            dark = lerp((0.17, 0.27, 0.07), (0.27, 0.40, 0.10), t)
+            light = lerp((0.48, 0.58, 0.18), (0.78, 0.82, 0.34), t)
+            k = max(3, int(9 * (1 - t) + 3))
+            for j in range(k):
+                sj = (j + 0.7) / (k + 0.4)
+                px = cx + math.cos(ang) * Lp * sj; py = y + math.sin(ang) * Lp * sj
+                rr = n * 0.028 * (1 - 0.6 * sj) * (1.15 - 0.5 * t)
+                for sd in (-1, 1):   # 小羽片（先のとがった小さな葉を、羽片の先の向きへ倒して重ねる）
+                    a2 = ang + sd * r.uniform(0.7, 1.0)
+                    c = lerp(dark, light, 0.25 + 0.75 * (1 - sj) * 0.4 + 0.45 * t + r.uniform(-.06, .06))
+                    d.polygon(leaflet_poly(px, py, a2, rr * 2.6, rr * 0.75, 0.3, r, 8), fill=col(c))
+                    d.polygon(leaflet_poly(px + math.cos(a2) * rr * 0.6, py + math.sin(a2) * rr * 0.6, a2, rr * 1.6, rr * 0.35), fill=col(lerp(c, light, 0.45)))
+            d.line([(cx, y), (cx + math.cos(ang) * Lp, y + math.sin(ang) * Lp)], fill=col(dark), width=2)
+    d.line([(cx, n * 0.99), (cx, n * 0.05)], fill=col((0.24, 0.30, 0.10)), width=4)
     save_rgba(img, 'leaf_frond.png')
 
 
@@ -265,10 +265,15 @@ def ground_sand(n=1024, seed=41):
     save_rgb(base, 'ground_sand.png')
 
 
-def voronoi(n, cells, seed):
-    """端がつながるボロノイ: (最寄り距離, 2番目との差, セルID)"""
+def voronoi(n, cells, seed, grid=False):
+    """端がつながるボロノイ: (最寄り距離, 2番目との差, セルID)。grid=True でゆらぎのある格子の点（大きさがそろう）"""
     r = rng(seed)
-    pts = r.uniform(0, n, (cells, 2))
+    if grid:
+        k = int(round(math.sqrt(cells))); step = n / k
+        pts = np.array([((i + 0.5 + r.uniform(-0.3, 0.3)) * step, (j + 0.5 + r.uniform(-0.3, 0.3)) * step + (i % 2) * step * 0.5)
+                        for i in range(k) for j in range(k)]) % n
+    else:
+        pts = r.uniform(0, n, (cells, 2))
     yy, xx = np.mgrid[0:n, 0:n].astype(np.float32)
     d1 = np.full((n, n), 1e9, np.float32); d2 = np.full((n, n), 1e9, np.float32); idx = np.zeros((n, n), np.int32)
     for i, (px, py) in enumerate(pts):
@@ -283,16 +288,16 @@ def voronoi(n, cells, seed):
 
 def ground_cobble(n=1024, seed=51):
     """石畳: 石の一つずつ、暗い目地、石ごとの明暗"""
-    d1, edge, idx = voronoi(n, 260, seed)
+    d1, edge, idx = voronoi(n, 324, seed, grid=True)
     r = rng(seed + 1)
     tone = r.uniform(0.0, 1.0, idx.max() + 1)[idx]
-    stone = lerp((0.52, 0.53, 0.52), (0.74, 0.74, 0.70), tone[..., None])
-    # 石の中央ほど少し明るい（ふくらみ）
-    bulge = np.clip(edge / 14, 0, 1) ** 0.5
+    stone = lerp((0.60, 0.60, 0.57), (0.80, 0.79, 0.74), tone[..., None])
+    # 石の中央ほど少し明るい（ふくらみ）。d1 も使って角を丸く
+    bulge = np.clip(edge / 14, 0, 1) ** 0.5 * np.clip(1.2 - d1 / 40, 0.6, 1)
     stone *= (0.86 + 0.18 * bulge[..., None])
     stone *= (0.92 + 0.12 * fnoise(n, 0.01 * n, seed + 2)[..., None])
-    grout = lerp((0.26, 0.27, 0.24), (0.36, 0.38, 0.30), fnoise(n, 0.05 * n, seed + 3)[..., None])
-    m = np.clip((edge - 2.0) / 2.5, 0, 1)[..., None]
+    grout = lerp((0.40, 0.40, 0.36), (0.50, 0.50, 0.44), fnoise(n, 0.05 * n, seed + 3)[..., None])
+    m = np.clip((edge - 4.0) / 3.0, 0, 1)[..., None]
     save_rgb(lerp(grout, stone, m), 'ground_cobble.png')
 
 
@@ -362,7 +367,98 @@ def crate_tex(n=512, seed=72):
     img.save(os.path.join(OUT, 'crate.png'))
 
 
+def plaster_timber(n=512, seed=81):
+    """漆喰の壁と木組み（512px = 横 4m × 縦 4m、横につながる）。R10・R18 の家"""
+    g = fnoise(n, 0.08 * n, seed, 2)
+    base = lerp((0.80, 0.74, 0.62), (0.93, 0.89, 0.78), g[..., None])
+    img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB').convert('RGBA')
+    def beams(d, n):
+        dark = col((0.30, 0.20, 0.13)) + (255,); hi = col((0.52, 0.38, 0.25)) + (255,)
+        w = int(n * 0.045)
+        for off in (0, n):   # 横につながるよう 2 回
+            for y in (int(n * 0.04), int(n * 0.52), n - w):
+                d.rectangle([n + 0, n + y, 2 * n, n + y + w], fill=dark)
+            for x in (0, n // 3, 2 * n // 3):
+                d.rectangle([n + x, n, n + x + w, 2 * n], fill=dark)
+                d.line([(n + x + w, n + int(n * 0.52)), (n + x + n // 3, n + int(n * 0.06))], fill=dark, width=w)
+            for y in (int(n * 0.04), int(n * 0.52)):
+                d.line([(n, n + y + 2), (2 * n, n + y + 2)], fill=hi, width=2)
+    img = Image.alpha_composite(img, tiled_draw(n, beams))
+    img.convert('RGB').save(os.path.join(OUT, 'plaster_timber.png'))
+
+
+def stone_wall(n=512, seed=82):
+    """切り石の積み（512px = 2m 角）。土台・植え込みの縁"""
+    r = rng(seed)
+    base = np.zeros((n, n, 3))
+    rows = 6; h = n // rows
+    img = Image.new('RGB', (n, n), col((0.30, 0.30, 0.28)))
+    d = ImageDraw.Draw(img)
+    for i in range(rows):
+        x = -r.uniform(0, n * 0.3)
+        while x < n:
+            w = r.uniform(0.18, 0.34) * n
+            t = r.uniform(0, 1)
+            c = lerp((0.55, 0.55, 0.52), (0.74, 0.72, 0.66), t)
+            for dx in (0, n, -n):
+                d.rounded_rectangle([x + dx + 3, i * h + 3, x + dx + w - 3, i * h + h - 3], radius=6, fill=col(c))
+                d.line([(x + dx + 5, i * h + 5), (x + dx + w - 6, i * h + 5)], fill=col(c * 1.15), width=3)
+            x += w
+    a = np.asarray(img).astype(float) / 255 * (0.9 + 0.2 * fnoise(n, 0.03 * n, seed + 1)[..., None])
+    save_rgb(a, 'stone_wall.png')
+
+
+def roof_tiles(n=512, seed=83):
+    """瓦（512px = 2m 角、横の列が重なる）。赤茶。R10・R18"""
+    r = rng(seed)
+    img = Image.new('RGB', (n, n), col((0.30, 0.13, 0.08)))
+    d = ImageDraw.Draw(img)
+    rows = 8; h = n / rows; w = n / 10
+    for i in range(rows):
+        off = (i % 2) * w / 2
+        for j in range(-1, 11):
+            x = j * w + off; y = i * h
+            c = lerp((0.58, 0.26, 0.16), (0.76, 0.40, 0.26), r.uniform(0, 1))
+            d.rounded_rectangle([x + 2, y, x + w - 2, y + h * 1.15], radius=int(w * 0.45), fill=col(c))
+            d.line([(x + w * 0.3, y + 4), (x + w * 0.3, y + h * 0.9)], fill=col(c * 1.2), width=3)
+            d.line([(x + 2, y + h * 1.1), (x + w - 2, y + h * 1.1)], fill=col((0.28, 0.12, 0.08)), width=3)
+    img.save(os.path.join(OUT, 'roof_tiles.png'))
+
+
+def window_tex(n=256, seed=84):
+    """窓: 青灰の枠と、暗い格子のガラス。R04・R18"""
+    img = Image.new('RGB', (n, n), col((0.36, 0.42, 0.52)))
+    d = ImageDraw.Draw(img)
+    m = int(n * 0.12)
+    d.rectangle([m, m, n - m, n - m], fill=col((0.10, 0.13, 0.20)))
+    for k in (1, 2):
+        x = m + (n - 2 * m) * k / 3; d.line([(x, m), (x, n - m)], fill=col((0.36, 0.42, 0.52)), width=8)
+    d.line([(m, n / 2), (n - m, n / 2)], fill=col((0.36, 0.42, 0.52)), width=8)
+    d.line([(m + 6, m + 6), (n * 0.45, n * 0.4)], fill=col((0.35, 0.45, 0.6)), width=6)
+    d.rectangle([2, 2, n - 3, n - 3], outline=col((0.62, 0.68, 0.76)), width=4)
+    img.save(os.path.join(OUT, 'window.png'))
+
+
+def banner_tex(n=256, seed=85):
+    """旗: 紺地に金の縁と紋（盾）。R10"""
+    img = Image.new('RGB', (n, n), col((0.16, 0.24, 0.48)))
+    d = ImageDraw.Draw(img)
+    d.rectangle([6, 6, n - 7, n - 7], outline=col((0.86, 0.72, 0.36)), width=8)
+    cx, cy = n / 2, n * 0.45
+    d.polygon([(cx - 50, cy - 50), (cx + 50, cy - 50), (cx + 50, cy + 10), (cx, cy + 60), (cx - 50, cy + 10)], fill=col((0.72, 0.76, 0.86)))
+    d.polygon([(cx - 36, cy - 38), (cx + 36, cy - 38), (cx + 36, cy + 6), (cx, cy + 44), (cx - 36, cy + 6)], fill=col((0.20, 0.30, 0.58)))
+    d.line([(cx, cy - 30), (cx, cy + 30)], fill=col((0.86, 0.72, 0.36)), width=10)
+    d.line([(cx - 25, cy - 5), (cx + 25, cy - 5)], fill=col((0.86, 0.72, 0.36)), width=10)
+    img.save(os.path.join(OUT, 'banner.png'))
+
+
+def paint(n=128, seed=86):
+    """塗装・鉄など色を頂点色で付ける物の下地（明るい灰のむら）"""
+    save_rgb(lerp((0.80, 0.80, 0.80), (0.95, 0.95, 0.95), fnoise(n, 0.1 * n, seed)[..., None]), 'paint.png')
+
+
 if __name__ == '__main__':
     leaf_broad(); leaf_frond(); leaf_palm(); grass_blades(); flowers()
     ground_grass(); ground_dirt(); ground_sand(); ground_cobble(); rock(); wood(); crate_tex()
+    plaster_timber(); stone_wall(); roof_tiles(); window_tex(); banner_tex(); paint()
     print('textures ->', OUT, sorted(os.listdir(OUT)))

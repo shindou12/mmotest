@@ -39,13 +39,15 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
 ## 現在の状態（最良版）
-- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v10.webp`
-- south_coast（同じ規則で作った別の地図）: `art/shots/south_coast/v06.webp`、歩いたとき `walk_sheet.webp`
+- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v11.webp`
+- south_coast（同じ規則で作った別の地図・崖と海）: `art/shots/south_coast/v07.webp`、歩いたとき `walk_sheet.webp`
+- town_plaza（同じ規則で作った町の通り）: `art/shots/town_plaza/v03.webp`
+- 3 枚の並び: `art/shots/all_v.webp`
 - 詳細と経緯は `experiments.md` の「履歴」。
 
 ## 次にやること（優先順）
-1. 町の地図（石畳・建物）: R06/R10/R18 の規則がこの体系で作れるか。建物のアセット（ドーム状の石の家 R04、木組みの家 R10）を Blender で作る。
-2. 葉の絵の質: もみのシダ状の葉をレース状に（R03）、ヤシの葉の中肋を消す。樹冠の明暗（日なたの黄色いハイライト）。
+1. 町を見本の密度に: 手すり・花箱・屋台・ドーマー窓、R04 のドーム状の石の家。家の当たり判定（今は歩いて通り抜けられる）。
+2. 葉の絵の質: もみの上の段が細い、ヤシの葉の中肋。樹冠の日なたの黄色いハイライト。
 3. 草の房を日陰で暗い星に見せない、道の縁に草を食い込ませる。
 4. 見本の R06〜R18 のファイルを受け取り、`refstats.py` で数値の目標を地図の種類ごとに取り直す（とくに R07 と R12）。
 5. 画角の再測定（町の建物の縦線で）。
