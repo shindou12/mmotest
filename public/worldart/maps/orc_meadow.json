@@ -1,0 +1,177 @@
+{
+  "name": "orc_meadow",
+  "note": "R01（オーク村の草地の分かれ道）の再現。位置は見本の画面上の座標 [u, v]（u: 左0〜右1, v: 上0〜下1）で書き、カメラから地面へ投げて世界座標にする。",
+  "seed": 7,
+  "aspect": 1.7778,
+  "camera": {
+    "target": [0, 0, 0],
+    "yaw": 0,
+    "pitch": 52,
+    "dist": 22,
+    "fov": 25
+  },
+  "sun": {
+    "azimuth": 135,
+    "elevation": 32,
+    "color": "#ffe6b0",
+    "intensity": 4.6
+  },
+  "sky": {
+    "color": "#cfe0ee",
+    "light": "#b4c8de",
+    "ground": "#6a6448",
+    "intensity": 1.9
+  },
+  "terrain": {
+    "size": 110,
+    "cell": 0.5,
+    "ground": "grass",
+    "hills": {
+      "amp": 0.5,
+      "scale": 16
+    },
+    "cliffs": [
+      {
+        "screen": [[-0.6, -0.32], [0.3, -0.26], [0.62, -0.06], [0.8, -0.01], [1.6, 0.0]],
+        "drop": 7,
+        "width": 2.0,
+        "low": "far"
+      }
+    ],
+    "water": {
+      "level": -4.5,
+      "color": "#3f86b8"
+    }
+  },
+  "paths": [
+    {
+      "screen": [[0.6, 1.25], [0.6, 0.85], [0.55, 0.68], [0.5, 0.55], [0.47, 0.42], [0.52, 0.28], [0.6, 0.15], [0.62, 0.0]],
+      "width": 3.4,
+      "mat": "dirt"
+    },
+    {
+      "screen": [[0.47, 0.42], [0.35, 0.37], [0.2, 0.34], [-0.1, 0.32]],
+      "width": 2.4,
+      "mat": "dirt"
+    }
+  ],
+  "lines": [
+    {
+      "asset": "fence_spike",
+      "screen": [[0.74, 0.02], [0.73, 0.25], [0.76, 0.5], [0.79, 0.75], [0.84, 1.1]],
+      "step": 5.0,
+      "scale": 1.8
+    }
+  ],
+  "props": [
+    {
+      "asset": "crate",
+      "screen": [0.845, 0.37],
+      "rot": 20,
+      "scale": 1.4
+    },
+    {
+      "asset": "crate",
+      "screen": [0.87, 0.42],
+      "rot": -10,
+      "scale": 1.4
+    },
+    {
+      "asset": "crate",
+      "screen": [0.84, 0.425],
+      "rot": 35,
+      "y": 0.8,
+      "scale": 1.4
+    },
+    {
+      "asset": "rock_a",
+      "screen": [0.33, 0.72],
+      "rot": 30
+    },
+    {
+      "asset": "rock_c",
+      "screen": [0.39, 0.8],
+      "rot": 0
+    }
+  ],
+  "zones": [
+    {
+      "kind": "forest",
+      "screen": [[-0.3, -0.3], [0.42, -0.3], [0.4, 0.22], [0.25, 0.36], [-0.3, 0.42]],
+      "trees": ["tree_broad_a", "tree_broad_b"],
+      "spacing": 4.0,
+      "scale": [0.9, 1.3]
+    },
+    {
+      "kind": "forest",
+      "screen": [[0.86, -0.3], [1.4, -0.3], [1.4, 0.45], [0.95, 0.4]],
+      "trees": ["tree_broad_a"],
+      "spacing": 4.0,
+      "scale": [0.9, 1.3]
+    },
+    {
+      "kind": "forest",
+      "screen": [[-0.3, 0.8], [0.12, 0.9], [0.14, 1.3], [-0.3, 1.3]],
+      "trees": ["tree_broad_a"],
+      "spacing": 4.0,
+      "scale": [0.9, 1.3]
+    }
+  ],
+  "scatter": {
+    "grass": {
+      "asset": "grass_a",
+      "spacing": 0.3,
+      "edge_boost": 0.6,
+      "scale": [0.5, 0.85]
+    },
+    "bush": {
+      "asset": "bush_a",
+      "edge": [1.0, 4.0],
+      "prob": 0.35
+    },
+    "pebble": {
+      "asset": "rock_c",
+      "prob": 0.03
+    }
+  },
+  "albedoSat": 0.7,
+  "post": {
+    "sat": 1.0,
+    "contrast": 1.0,
+    "lift": [0, 0, 0],
+    "gain": [1, 1, 1],
+    "dof": 1.0
+  },
+  "trees": [
+    {
+      "asset": "tree_broad_b",
+      "canopy": [0.06, -0.04],
+      "scale": 1.25
+    },
+    {
+      "asset": "tree_broad_a",
+      "canopy": [0.3, -0.12],
+      "scale": 1.2
+    },
+    {
+      "asset": "tree_broad_b",
+      "canopy": [0.58, -0.14],
+      "scale": 1.3
+    },
+    {
+      "asset": "tree_broad_a",
+      "canopy": [0.94, -0.02],
+      "scale": 1.1
+    },
+    {
+      "asset": "tree_broad_a",
+      "canopy": [0.0, 0.95],
+      "scale": 1.1
+    }
+  ],
+  "foliage": {
+    "wrap": 0.5,
+    "trans": 0.3,
+    "receiveShadow": false
+  }
+}
