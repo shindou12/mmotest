@@ -4,13 +4,14 @@
   python3 tools/ro-look/compare.py <見本.png> <再現.png> <出力フォルダ> [--crop x0,y0,x1,y1]
 
   --crop: 見本から UI の帯などを切り落とす範囲（見本の元の画素で）。切ったあと 1280×720 にそろえる
+  --regions: 比べる場所を JSON ファイルで渡す（{"名前": [x0, y0, x1, y1], ...}。1280×720 の画素）。省くと下の REGIONS
 出力:
   side.png    上が見本、下が再現（1280×1440）
   overlay.png 半分ずつ重ねた画像（位置と大きさのずれを見る）
   標準出力   場所ごとの平均色（REGIONS を場面に合わせて書き換える）
 必要: Pillow（python3 -m pip install pillow）
 """
-import sys, os
+import sys, os, json
 from PIL import Image
 
 # 比べる場所（1280×720 の画素で x0, y0, x1, y1）。場面ごとに、道・崖・木の茂り・草・主役の木などを選ぶ
@@ -27,6 +28,9 @@ REGIONS = {
 def main():
     args = sys.argv[1:]
     crop = None
+    regions = REGIONS
+    if '--regions' in args:
+        i = args.index('--regions'); regions = json.load(open(args[i + 1], encoding='utf-8')); del args[i:i + 2]
     if '--crop' in args:
         i = args.index('--crop'); crop = tuple(int(v) for v in args[i + 1].split(',')); del args[i:i + 2]
     ref_p, ours_p, out = args
@@ -40,7 +44,7 @@ def main():
     Image.blend(ref, ours, 0.5).save(os.path.join(out, 'overlay.png'))
     avg = lambda im, box: im.crop(box).resize((1, 1), Image.BOX).getpixel((0, 0))
     print(f"{'場所':14s} {'見本':>18s} {'再現':>18s}  明るさの比")
-    for name, box in REGIONS.items():
+    for name, box in regions.items():
         a, b = avg(ref, box), avg(ours, box)
         ratio = (sum(b) + 1) / (sum(a) + 1)
         print(f'{name:14s} {str(a):>18s} {str(b):>18s}  {ratio:.2f}')
