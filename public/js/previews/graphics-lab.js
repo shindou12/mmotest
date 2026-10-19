@@ -1,6 +1,6 @@
 // グラフィック実験場: 森 → 小径 → 軽い坂 → 川の橋 → こみち → コテージ を一続きに置いた見本の場所
 //   ゲームと同じトゥーン・輪郭線・木と岩・草・仕上げ（ブルームと色）で描く。見え方を確かめるためのページ（lab.html）
-//   ?view=all|forest|river|bridge|lane|cottage|walk|game / ?time=day|evening|night / ?post=0（仕上げを切る）
+//   ?view=all|forest|river|bridge|lane|cottage|walk|game / ?style=ro（RO風: 手描き風の地面・背景の線なし・やわらかい陰影・望遠の見下ろし） / ?time=day|evening|night / ?post=0（仕上げを切る）
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -8,7 +8,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { Batch, toon, glow, outline, OCC } from '../toon.js';
+import { Batch, toon, glow, outline, OCC, gradientMap } from '../toon.js';
+import { roGroundMaterial } from './ro-style.js';
 import { seeded, local, I, noise2 } from '../env/kit.js';
 import { groundDetail, SURF } from '../env/textures.js';
 import { addTree, addPine, addRock } from '../env/flora.js';
@@ -89,14 +90,15 @@ const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight)
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 const gradePass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, sat: { value: 1.08 }, contrast: { value: 1.04 }, vig: { value: 0.22 } },
+  uniforms: { tDiffuse: { value: null }, sat: { value: 1.08 }, contrast: { value: 1.04 }, vig: { value: 0.22 }, lift: { value: new THREE.Vector3() } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vig; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vig; uniform vec3 lift; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
       c.rgb = mix(vec3(l), c.rgb, sat);
       c.rgb = (c.rgb - 0.5) * contrast + 0.5;
+      c.rgb += lift * (1.0 - l); // 暗いところを色で持ち上げる（影を黒でなく青紫に）
       vec2 d = vUv - 0.5; d.x *= 1.3;
       c.rgb *= 1.0 - vig * smoothstep(0.35, 0.85, length(d));
       gl_FragColor = vec4(clamp(c.rgb, 0.0, 1.0), c.a);
@@ -119,8 +121,8 @@ function setTime(key) {
   const t = TIMES[key];
   sky.material.uniforms.top.value.set(t.skyTop); sky.material.uniforms.bot.value.set(t.skyBot); sky.material.uniforms.sunC.value.set(t.sunC);
   scene.fog = new THREE.Fog(t.fog, t.near, t.far);
-  hemi.color.set(t.hemiS); hemi.groundColor.set(t.hemiG); hemi.intensity = t.hemiI;
-  sun.intensity = t.sunI; sun.color.set(key === 'night' ? 0x8aa0e0 : t.sunC);
+  hemi.color.set(t.hemiS); hemi.groundColor.set(t.hemiG); hemi.intensity = t.hemiI * (state.ro ? 1.45 : 1);
+  sun.intensity = t.sunI * (state.ro ? 0.6 : 1); sun.color.set(key === 'night' ? 0x8aa0e0 : t.sunC);
   sunOff.set(...t.sunP);
   renderer.toneMappingExposure = t.exp;
   windowMat.color.set(0xffd890).multiplyScalar(t.win);
@@ -132,12 +134,14 @@ function setTime(key) {
 // 地面（頂点色: 草・森の土・道・川岸・斜面の岩肌）
 // ======================================================================
 const SIZE = 220, SEG = 220;
+const groundMats = {};
+let ground;
 {
   const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG); g.rotateX(-Math.PI / 2);
   const pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i)));
   g.computeVertexNormals();
-  const nrm = g.attributes.normal, cols = new Float32Array(pos.count * 3);
+  const nrm = g.attributes.normal, cols = new Float32Array(pos.count * 3), splat = new Float32Array(pos.count * 3), shade = new Float32Array(pos.count * 3);
   const grass1 = new THREE.Color(0x5f9a45), grass2 = new THREE.Color(0x86b44e), forest = new THREE.Color(0x3f6c34),
     dirt = new THREE.Color(0x9a7a52), bank = new THREE.Color(0x857458), rock = new THREE.Color(0x7d7a6c), c = new THREE.Color();
   const Rg = seeded(77);
@@ -149,14 +153,22 @@ const SIZE = 220, SEG = 220;
     c.lerp(rock, smooth(0.86, 0.7, nrm.getY(i)) * 0.8); // 急な面は岩肌
     const d = Math.abs(z - riverZ(x));
     c.lerp(bank, smooth(7.5, 5, d) * 0.8);
-    if (y < WATER_Y + 0.25) c.lerp(new THREE.Color(0x5a5a48), 0.5);
+    if (y < WATER_Y + 0.25 && d < 8) c.lerp(new THREE.Color(0x5a5a48), 0.5);
     const pd = pathDist(x, z);
     c.lerp(dirt, smooth(2.4, 1.2, pd) * (0.75 + Rg() * 0.15));
     cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
+    // RO風の地面: 模様の割合（草・土・岸）と色の掛け算
+    const steep = smooth(0.86, 0.7, nrm.getY(i)), forestK = smooth(14, 26, z);
+    splat[i * 3] = 1; splat[i * 3 + 1] = smooth(2.6, 1.2, pd); splat[i * 3 + 2] = Math.max(smooth(7, 5, d), smooth(0.8, 0.62, nrm.getY(i)), y < WATER_Y + 0.3 && d < 8 ? 1 : 0);
+    const sh = (0.94 + k * 0.1) * (1 - forestK * 0.2) * (y < WATER_Y + 0.25 && d < 8 ? 0.75 : 1);
+    shade[i * 3] = sh * (1 - forestK * 0.05); shade[i * 3 + 1] = sh; shade[i * 3 + 2] = sh * (1 + forestK * 0.04);
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  g.setAttribute('splat', new THREE.BufferAttribute(splat, 3)); g.setAttribute('shade', new THREE.BufferAttribute(shade, 3));
   const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * SIZE / 7, uv.getY(i) * SIZE / 7);
-  const ground = new THREE.Mesh(g, toon(0xffffff, { vertexColors: true, noOcc: true, map: groundDetail() }));
+  groundMats.toon = toon(0xffffff, { vertexColors: true, noOcc: true, map: groundDetail() });
+  groundMats.ro = roGroundMaterial();
+  ground = new THREE.Mesh(g, groundMats.toon);
   ground.receiveShadow = true; scene.add(ground);
 }
 
@@ -432,6 +444,9 @@ const walker = new THREE.Group();
   walker.add(body, head, hair, cape);
   walker.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   outline(walker, 1);
+  // 人形は RO風でも段の陰影のまま（背景だけやわらかくする）
+  const own = gradientMap().clone(); own.image = { data: new Uint8Array(gradientMap().image.data), width: 4, height: 1 }; own.needsUpdate = true;
+  walker.traverse((o) => { if (o.isMesh && o.material.isMeshToonMaterial) { o.material = o.material.clone(); o.material.gradientMap = own; } });
   scene.add(walker);
 }
 const route = [...southPath.getSpacedPoints(200), ...northPath.getSpacedPoints(140)];
@@ -459,13 +474,13 @@ const VIEWS = {
 };
 const ctl = new OrbitControls(camera, renderer.domElement);
 ctl.enableDamping = true; ctl.maxPolarAngle = Math.PI * 0.49;
-const state = { view: 'all', time: 'day', walk: null, s: 0, zoom: 1, post: q.get('post') !== '0' };
+const state = { view: 'all', time: 'day', walk: null, s: 0, zoom: 1, post: q.get('post') !== '0', ro: false };
 const me = { x: 0, z: 70, dir: Math.PI, step: 0 }; // 自分で歩くときの人形
 function setView(key) {
   const v = VIEWS[key]; state.view = key; state.walk = v.walk || null;
   if (v.walk === 'auto') { state.s = 0; walker.visible = true; }
   else if (v.walk === 'free') { walker.visible = true; Object.assign(me, { x: 0, z: 70, dir: Math.PI }); focus.set(me.x, heightAt(me.x, me.z) + 1.2, me.z); }
-  else { camera.position.set(...v.pos); ctl.target.set(...v.tgt); walker.visible = key !== 'all'; if (walker.visible) { const p = routeAt(key === 'forest' ? 30 : key === 'bridge' ? 77 : key === 'lane' ? 105 : key === 'cottage' ? routeLen - 3 : 60); walker.position.set(p.x, walkY(p.x, p.z), p.z); walker.rotation.y = p.dir; } }
+  else { camera.position.set(...v.pos); ctl.target.set(...v.tgt); if (state.ro) camera.position.sub(ctl.target).multiplyScalar(FOV_K).add(ctl.target); walker.visible = key !== 'all'; if (walker.visible) { const p = routeAt(key === 'forest' ? 30 : key === 'bridge' ? 77 : key === 'lane' ? 105 : key === 'cottage' ? routeLen - 3 : 60); walker.position.set(p.x, walkY(p.x, p.z), p.z); walker.rotation.y = p.dir; } }
   ctl.enabled = !v.walk; ctl.update(); stick.el.hidden = v.walk !== 'free'; refreshUI();
 }
 
@@ -502,6 +517,7 @@ function row(label, items, cur, on) {
 }
 row('視点', Object.entries(VIEWS).map(([k, v]) => [k, v.name]), () => state.view, setView);
 row('時間', Object.entries(TIMES).map(([k, v]) => [k, v.name]), () => state.time, (k) => { setTime(k); refreshUI(); });
+row('スタイル', [['now', '今の見た目'], ['ro', 'RO風']], () => (state.ro ? 'ro' : 'now'), (k) => setStyle(k === 'ro'));
 row('仕上げ', [['on', 'ゲームと同じ'], ['off', 'なし']], () => (state.post ? 'on' : 'off'), (k) => { state.post = k === 'on'; refreshUI(); });
 function refreshUI() {
   for (const { d, cur } of Object.values(rows)) for (const b of d.querySelectorAll('button')) b.classList.toggle('on', b.dataset.k === cur());
@@ -544,8 +560,34 @@ renderer.domElement.addEventListener('wheel', (e) => { if (state.walk) state.zoo
 }
 
 const focus = new THREE.Vector3();
+
+// ---- スタイルの切替: 今の見た目 / RO風 ----
+//   RO風: 地面は手描き風の模様、背景の輪郭線を消し、陰影をやわらかく、3D の草を消す、
+//   カメラは望遠（画角 30°）で高い角度から、色は淡く明るく、影を青紫に
+const hulls = [];
+scene.traverse((o) => { if (o.isMesh && o.userData.noOutline && o.material.side === THREE.BackSide && !walker.getObjectById(o.id)) hulls.push(o); });
+const RO_FOV = 30, FOV = 50, FOV_K = Math.tan(FOV / 2 * Math.PI / 180) / Math.tan(RO_FOV / 2 * Math.PI / 180);
+const GRAD = { now: [70, 150, 215, 255], ro: [150, 188, 222, 255] };
+function setStyle(ro, init = false) {
+  if (ro === state.ro && !init) return;
+  const was = state.ro; state.ro = ro;
+  ground.material = ro ? groundMats.ro : groundMats.toon;
+  for (const h of hulls) h.visible = !ro;
+  grass.mesh.visible = !ro;
+  const gm = gradientMap(); gm.image.data.set(GRAD[ro ? 'ro' : 'now']);
+  gm.magFilter = gm.minFilter = ro ? THREE.LinearFilter : THREE.NearestFilter; gm.needsUpdate = true;
+  gradePass.uniforms.sat.value = ro ? 0.94 : 1.08; gradePass.uniforms.contrast.value = ro ? 0.9 : 1.04; gradePass.uniforms.vig.value = ro ? 0.1 : 0.22;
+  gradePass.uniforms.lift.value.set(...(ro ? [0.035, 0.03, 0.09] : [0, 0, 0]));
+  bloomPass.strength = ro ? 0.25 : 0.5;
+  // 画角を変えても同じ範囲が映るように、注目点からの距離を変える
+  camera.fov = ro ? RO_FOV : FOV; camera.updateProjectionMatrix();
+  if (!state.walk && was !== ro) camera.position.sub(ctl.target).multiplyScalar(ro ? FOV_K : 1 / FOV_K).add(ctl.target);
+  ctl.maxDistance = ro ? 400 : 250;
+  setTime(state.time); refreshUI();
+}
 setTime(TIMES[q.get('time')] ? q.get('time') : 'day');
 setView(VIEWS[q.get('view')] ? q.get('view') : 'all');
+setStyle(q.get('style') === 'ro', true);
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -586,17 +628,19 @@ const turn = (to, dt) => { walker.rotation.y += (((to - walker.rotation.y + Math
     const y = walkY(px, pz);
     walker.position.set(px, y + Math.abs(Math.sin(bob * 2.2)) * 0.06, pz);
     focus.lerp(tmpF.set(px, y + 1.2, pz), 1 - Math.exp(-8 * dt));
-    camera.position.set(focus.x, focus.y + 12.6 * state.zoom, focus.z + 14.9 * state.zoom); camera.lookAt(focus); // ゲームのカメラ（距離 19.5、標準のズーム）
+    // ゲームのカメラ（距離 19.5、標準のズーム）。RO風は望遠で遠くから、高い角度（約 55°）で見下ろす
+    const [cy, cz] = state.ro ? [27.8, 19.5] : [12.6, 14.9];
+    camera.position.set(focus.x, focus.y + cy * state.zoom, focus.z + cz * state.zoom); camera.lookAt(focus);
     grass.U.uPlayer.value.set(px, pz);
   } else { ctl.update(); focus.copy(ctl.target); grass.U.uPlayer.value.set(walker.position.x, walker.position.z); }
   // 全景は遠くから見るので霧を遠ざける
-  const fk = state.view === 'all' ? 1.8 : 1, ft = TIMES[state.time];
+  const fk = (state.view === 'all' ? 1.8 : 1) * (state.ro ? 1.5 : 1), ft = TIMES[state.time];
   scene.fog.near = ft.near * fk; scene.fog.far = ft.far * fk;
   // 影はいま見ている場所の周りに落とす
   sun.target.position.copy(focus); sun.position.copy(focus).add(sunOff);
   // ゲームと同じ近景の透過（カメラと注目点の間・カメラの近くを抜く）
   OCC.uOccCam.value.copy(camera.position); OCC.uOccTgt.value.copy(focus);
-  OCC.uOccR.value = 2.6; OCC.uOccNear.value = Math.min(6, camera.position.distanceTo(focus) * 0.5);
+  OCC.uOccR.value = state.walk ? 2.6 : 0; // 歩くときだけ、人形の手前を抜く OCC.uOccNear.value = Math.min(state.ro ? 4 : 6, camera.position.distanceTo(focus) * 0.5);
   if (state.post) composer.render(); else renderer.render(scene, camera);
   requestAnimationFrame(loop);
 })();
