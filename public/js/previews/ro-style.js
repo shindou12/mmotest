@@ -35,8 +35,8 @@ function pebbles(g, S, R, n, r0, r1, cols) {
 export const PAINT = {
   // 草: 明暗のまだらの上に、根元が暗く先が明るい草の房を筆で置き、ところどころに小花
   grass: () => paint('ro-grass', 512, (g, S, R) => {
-    g.fillStyle = '#79ad52'; g.fillRect(0, 0, S, S);
-    blobs(g, S, R, 70, 40, 90, ['#5f9443', '#8cbd5c', '#9cc46a', '#6a9a46'], '66');
+    g.fillStyle = '#84b84c'; g.fillRect(0, 0, S, S);
+    blobs(g, S, R, 70, 40, 90, ['#6a9e40', '#9cc85a', '#acd066', '#76a644'], '66');
     for (let i = 0; i < 1100; i++) {
       const x = R() * S, y = R() * S, n = 3 + Math.floor(R() * 3), h = 6 + R() * 7, light = R();
       const base = light < 0.5 ? '#4e8237' : '#5d923f', tip = light < 0.3 ? '#8fc35e' : light < 0.8 ? '#a5d070' : '#c2e08a';
@@ -60,8 +60,8 @@ export const PAINT = {
   }),
   // 土の道: 暖かい黄土色に、踏み固めた明るいすじと小石
   dirt: () => paint('ro-dirt', 512, (g, S, R) => {
-    g.fillStyle = '#c29a68'; g.fillRect(0, 0, S, S);
-    blobs(g, S, R, 60, 30, 80, ['#b08658', '#d4ae7c', '#a87e52'], '70');
+    g.fillStyle = '#d2b47c'; g.fillRect(0, 0, S, S);
+    blobs(g, S, R, 60, 30, 80, ['#c0a068', '#e2c890', '#b89660'], '70');
     for (let i = 0; i < 500; i++) {
       const x = R() * S, y = R() * S, L = 8 + R() * 22, c = R() < 0.6 ? 'rgba(232,206,160,0.45)' : 'rgba(150,110,70,0.35)';
       wrap(S, x, y, L, (px, py) => { g.strokeStyle = c; g.lineWidth = 1.5 + R() * 2; g.lineCap = 'round'; g.beginPath(); g.moveTo(px, py); g.lineTo(px + L, py + (R() - 0.5) * 4); g.stroke(); });
@@ -96,70 +96,4 @@ export function roGroundMaterial() {
       diffuseColor.rgb *= col * vShade;`);
   };
   return m;
-}
-
-// 絵の木（板の木）: 筆の点を重ねて描いた木の絵。光は左上から。kind: 'broad'（広葉樹）| 'pine'（針葉樹）
-//   返す texture は下端が根元。aspect = 幅 / 高さ
-const TREE_PAL = {
-  broad: [['#2c5a2c', '#3c7434', '#549440', '#74b04e', '#9ccc68', '#c4e286'], ['#3a5e28', '#4e7a30', '#6a983c', '#8cb44c', '#b2cc66', '#d6e48a'], ['#24543a', '#326c44', '#468a52', '#62a662', '#8cc47a', '#b6dc98']],
-  pine: [['#183a2e', '#22503a', '#2e6646', '#447e54', '#62986a', '#86b47e'], ['#1c3c34', '#285446', '#366c54', '#4c8462', '#6c9e74', '#92ba8c']],
-};
-export function paintedTree(kind, variant = 0) {
-  const W = kind === 'pine' ? 192 : 256, H = 320;
-  const key = `ro-tree-${kind}-${variant}`;
-  if (cache[key]) return { tex: cache[key], aspect: W / H };
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  const g = cv.getContext('2d'), R = seeded(variant * 7919 + (kind === 'pine' ? 31 : 7));
-  const pal = TREE_PAL[kind][variant % TREE_PAL[kind].length];
-  const shadeAt = (x, y, cx, cy, rad) => { // 左上が明るく、右下と下側が暗い
-    const t = (-(x - cx) * 0.6 - (y - cy) * 0.8) / rad;
-    return Math.max(0, Math.min(pal.length - 1, Math.round((t * 0.5 + 0.5) * (pal.length - 1.6) + (R() - 0.3) * 1.6)));
-  };
-  // 幹
-  const trunk = (x0, y0, x1, y1, w0, w1) => {
-    const ang = Math.atan2(y1 - y0, x1 - x0) + Math.PI / 2, c = Math.cos(ang), s = Math.sin(ang);
-    const poly = (k0, k1, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(x0 + c * w0 * k0, y0 + s * w0 * k0); g.lineTo(x1 + c * w1 * k0, y1 + s * w1 * k0); g.lineTo(x1 + c * w1 * k1, y1 + s * w1 * k1); g.lineTo(x0 + c * w0 * k1, y0 + s * w0 * k1); g.fill(); };
-    poly(-1, 1, '#6a4a2e'); poly(0.25, 1, '#4c3420'); poly(-1, -0.45, '#8c6844');
-  };
-  if (kind === 'broad') {
-    const cx = W / 2, cy = 118, rad = 100;
-    trunk(cx, H - 2, cx + (R() - 0.5) * 10, 170, 15, 8);
-    trunk(cx, 215, cx - 34, 160, 6, 3); trunk(cx + 2, 200, cx + 38, 150, 6, 3);
-    // 地面に落ちる影（根元）
-    g.fillStyle = 'rgba(30,50,20,0.35)'; g.beginPath(); g.ellipse(cx + 6, H - 4, 34, 6, 0, 0, 7); g.fill();
-    // 茂みの形: 丸を数個重ねる
-    const lobes = [[cx, cy, 70]];
-    for (let i = 0; i < 6; i++) { const a = R() * Math.PI * 2; lobes.push([cx + Math.cos(a) * (40 + R() * 22), cy + Math.sin(a) * (34 + R() * 18) * 0.85, 40 + R() * 22]); }
-    const inside = (x, y) => lobes.some(([lx, ly, lr]) => (x - lx) ** 2 + (y - ly) ** 2 < lr * lr);
-    g.fillStyle = pal[0]; for (const [lx, ly, lr] of lobes) { g.beginPath(); g.arc(lx + 3, ly + 5, lr + 3, 0, 7); g.fill(); }
-    g.fillStyle = pal[1]; for (const [lx, ly, lr] of lobes) { g.beginPath(); g.arc(lx, ly, lr, 0, 7); g.fill(); }
-    for (let i = 0; i < 1600; i++) {
-      const x = cx + (R() - 0.5) * 2 * rad * 1.15, y = cy + (R() - 0.5) * 2 * rad;
-      if (!inside(x, y)) continue;
-      g.fillStyle = pal[shadeAt(x, y, cx, cy - 10, rad)];
-      g.beginPath(); g.ellipse(x, y, 5 + R() * 6, 3.5 + R() * 3, R() * 3.14, 0, 7); g.fill();
-    }
-    if (variant === 1) for (let i = 0; i < 14; i++) { // 実
-      const x = cx + (R() - 0.5) * 150, y = cy + (R() - 0.3) * 120; if (!inside(x, y)) continue;
-      g.fillStyle = '#c8402e'; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); g.fillStyle = '#ff9a7a'; g.beginPath(); g.arc(x - 1.2, y - 1.2, 1.4, 0, 7); g.fill();
-    }
-  } else {
-    const cx = W / 2;
-    trunk(cx, H - 2, cx, 230, 10, 7);
-    g.fillStyle = 'rgba(20,40,20,0.35)'; g.beginPath(); g.ellipse(cx + 6, H - 4, 26, 5, 0, 0, 7); g.fill();
-    const tiers = 5;
-    for (let t = 0; t < tiers; t++) {
-      const yb = 262 - t * 46, yt = yb - 92, hw = 82 - t * 13;
-      const tri = (dx, dy, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(cx + dx, yt + dy); g.quadraticCurveTo(cx - hw * 0.5 + dx, yb - 30 + dy, cx - hw + dx, yb + dy); g.quadraticCurveTo(cx + dx, yb - 14 + dy, cx + hw + dx, yb + dy); g.quadraticCurveTo(cx + hw * 0.5 + dx, yb - 30 + dy, cx + dx, yt + dy); g.fill(); };
-      tri(3, 5, pal[0]); tri(0, 0, pal[1]);
-      for (let i = 0; i < 260; i++) {
-        const v = R(), y = yt + (yb - yt) * Math.sqrt(v), w = hw * Math.sqrt(v) * 0.92, x = cx + (R() - 0.5) * 2 * w;
-        g.fillStyle = pal[shadeAt(x, y, cx, (yt + yb) / 2, hw)];
-        g.beginPath(); g.ellipse(x, y, 5 + R() * 4, 2.5 + R() * 2, (x < cx ? 0.5 : -0.5) + (R() - 0.5) * 0.4, 0, 7); g.fill();
-      }
-    }
-  }
-  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-  cache[key] = t;
-  return { tex: t, aspect: W / H };
 }

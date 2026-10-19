@@ -9,7 +9,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Batch, toon, glow, outline, OCC, gradientMap } from '../toon.js';
-import { roGroundMaterial, paintedTree } from './ro-style.js';
+import { roGroundMaterial } from './ro-style.js';
+import { FoliageBuilder, FOLIAGE_U } from './foliage.js';
 import { seeded, local, I, noise2 } from '../env/kit.js';
 import { groundDetail, SURF } from '../env/textures.js';
 import { addTree, addPine, addRock } from '../env/flora.js';
@@ -90,21 +91,41 @@ const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight)
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 const gradePass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, sat: { value: 1.08 }, contrast: { value: 1.04 }, vig: { value: 0.22 }, lift: { value: new THREE.Vector3() } },
+  uniforms: { tDiffuse: { value: null }, sat: { value: 1.08 }, contrast: { value: 1.04 }, vig: { value: 0.22 }, lift: { value: new THREE.Vector3() }, gain: { value: new THREE.Vector3(1, 1, 1) } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vig; uniform vec3 lift; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vig; uniform vec3 lift; uniform vec3 gain; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
       c.rgb = mix(vec3(l), c.rgb, sat);
       c.rgb = (c.rgb - 0.5) * contrast + 0.5;
       c.rgb += lift * (1.0 - l); // 暗いところを色で持ち上げる（影を黒でなく青紫に）
+      c.rgb *= mix(vec3(1.0), gain, smoothstep(0.2, 0.8, l)); // 明るいところを暖色に
       vec2 d = vUv - 0.5; d.x *= 1.3;
       c.rgb *= 1.0 - vig * smoothstep(0.35, 0.85, length(d));
       gl_FragColor = vec4(clamp(c.rgb, 0.0, 1.0), c.a);
     }`,
 });
 composer.addPass(gradePass);
+// 画面の上下をぼかす（ミニチュアのような奥行き。RO風だけ）
+const tiltPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, res: { value: new THREE.Vector2(innerWidth, innerHeight) }, amount: { value: 3.5 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 res; uniform float amount; varying vec2 vUv;
+    void main(){
+      float k = smoothstep(0.22, 0.5, abs(vUv.y - 0.48)) * amount;
+      if (k < 0.05) { gl_FragColor = texture2D(tDiffuse, vUv); return; }
+      vec4 acc = vec4(0.0); float wsum = 0.0;
+      for (int i = 0; i < 12; i++) {
+        float a = float(i) * 2.399, r = sqrt(float(i) + 0.5) / 3.5;
+        vec2 o = vec2(cos(a), sin(a)) * r * k / res;
+        acc += texture2D(tDiffuse, vUv + o); wsum += 1.0;
+      }
+      gl_FragColor = acc / wsum;
+    }`,
+});
+tiltPass.enabled = false;
+composer.addPass(tiltPass);
 
 // 時間帯: 空・霧・光・窓明かり
 const TIMES = {
@@ -121,15 +142,13 @@ function setTime(key) {
   const t = TIMES[key];
   sky.material.uniforms.top.value.set(t.skyTop); sky.material.uniforms.bot.value.set(t.skyBot); sky.material.uniforms.sunC.value.set(t.sunC);
   scene.fog = new THREE.Fog(t.fog, t.near, t.far);
-  hemi.color.set(t.hemiS); hemi.groundColor.set(t.hemiG); hemi.intensity = t.hemiI * (state.ro ? 1.45 : 1);
-  sun.intensity = t.sunI * (state.ro ? 0.6 : 1); sun.color.set(key === 'night' ? 0x8aa0e0 : t.sunC);
+  hemi.color.set(t.hemiS); hemi.groundColor.set(state.ro ? 0x24483e : t.hemiG); hemi.intensity = t.hemiI * (state.ro ? 1.05 : 1);
+  sun.intensity = t.sunI * (state.ro ? 1.05 : 1); sun.color.set(key === 'night' ? 0x8aa0e0 : state.ro && key === 'day' ? 0xffe6b8 : t.sunC);
   sunOff.set(...t.sunP);
   renderer.toneMappingExposure = t.exp;
   windowMat.color.set(0xffd890).multiplyScalar(t.win);
   lampMat.color.set(0xffc870).multiplyScalar(t.win * 1.1);
   state.time = key;
-  for (const sp of treeSprites.children) sp.material.color.set(key === 'night' ? 0x5a6a9a : key === 'evening' ? 0xffd2a8 : 0xffffff);
-  blobShadows.material.opacity = key === 'night' ? 0.12 : 0.3;
 }
 
 // ======================================================================
@@ -162,7 +181,8 @@ let ground;
     // RO風の地面: 模様の割合（草・土・岸）と色の掛け算
     const steep = smooth(0.86, 0.7, nrm.getY(i)), forestK = smooth(14, 26, z);
     splat[i * 3] = 1; splat[i * 3 + 1] = smooth(2.6, 1.2, pd); splat[i * 3 + 2] = Math.max(smooth(7, 5, d), smooth(0.8, 0.62, nrm.getY(i)), y < WATER_Y + 0.3 && d < 8 ? 1 : 0);
-    const sh = (0.94 + k * 0.1) * (1 - forestK * 0.2) * (y < WATER_Y + 0.25 && d < 8 ? 0.75 : 1);
+    const mac = 0.5 + 0.5 * Math.sin(x * 0.11 + Math.cos(z * 0.13) * 2.5) * Math.sin(z * 0.09 - x * 0.05);
+    const sh = (0.84 + k * 0.12 + mac * 0.12) * (1 - forestK * 0.2) * (y < WATER_Y + 0.25 && d < 8 ? 0.75 : 1);
     shade[i * 3] = sh * (1 - forestK * 0.05); shade[i * 3 + 1] = sh; shade[i * 3 + 2] = sh * (1 + forestK * 0.04);
   }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -420,18 +440,55 @@ const smokeOrigin = new THREE.Vector3();
 }
 scene.add(B.build());
 const treeGroup = TB.build(); scene.add(treeGroup);
-// RO風の木: 筆で描いた絵の板（いつもカメラを向く）と、足元の丸い影
-const treeSprites = new THREE.Group(); treeSprites.visible = false; scene.add(treeSprites);
-const blobShadows = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x1c2c18, transparent: true, opacity: 0.3, depthWrite: false }), trees.length);
-blobShadows.visible = false; blobShadows.renderOrder = 1; scene.add(blobShadows);
-for (const [i, t] of trees.entries()) {
-  const { tex, aspect } = paintedTree(t.kind, t.v), h = (t.kind === 'pine' ? 8.5 : 7.2) * t.size;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, alphaTest: 0.5, transparent: true }));
-  sp.center.set(0.5, 0.01); sp.scale.set(h * aspect, h, 1);
-  const y = heightAt(t.x, t.z) - 0.15; sp.position.set(t.x, y, t.z); sp.userData.h = h; treeSprites.add(sp);
-  const r = (t.kind === 'pine' ? 1.9 : 2.6) * t.size;
-  blobShadows.setMatrixAt(i, local(I, t.x, heightAt(t.x, t.z) + 0.06, t.z, 0, 0, 0, r, 1, r * 0.8));
-}
+// RO風の植物: 葉の板を重ねた木・針葉樹・茂み・シダ・草の房（木漏れ日の影を落とす）
+const roPlants = (() => {
+  const F = new FoliageBuilder(), Rf = seeded(4242);
+  const LEAF = [0xffffff, 0xf4ffd8, 0xe4f4ec, 0xfff4d4]; // 葉の色味（絵の緑に掛ける）
+  const occupied = [];
+  for (const t of trees) {
+    const y = heightAt(t.x, t.z);
+    const r = t.kind === 'pine' ? F.pine(t.x, y, t.z, Rf, { size: t.size * 0.9 }) : F.tree(t.x, y, t.z, Rf, { size: t.size * 0.95, leaf: LEAF[Math.floor(Rf() * LEAF.length)] });
+    occupied.push({ x: t.x, z: t.z, r: r.r });
+  }
+  const shadeOf = (x, z) => occupied.some((o) => (o.x - x) ** 2 + (o.z - z) ** 2 < o.r * o.r);
+  const okGround = (x, z, pathPad) => pathDist(x, z) > pathPad && riverD(x, z) > 5.4 && !nearCottage(x, z, -4) && heightAt(x, z) < 6;
+  // 茂み: 木の根元のまわりと、道の縁
+  for (let i = 0; i < 900; i++) {
+    const o = occupied[Math.floor(Rf() * occupied.length)], a = Rf() * 6.28, d = o.r * (0.5 + Rf() * 0.9);
+    const x = o.x + Math.cos(a) * d, z = o.z + Math.sin(a) * d;
+    if (Rf() < 0.45 && okGround(x, z, 2.2)) F.bush(x, heightAt(x, z), z, Rf, { size: 0.8 + Rf() * 0.6 });
+  }
+  for (const p of pathPts) {
+    if (Rf() > 0.35) continue;
+    const side = Rf() < 0.5 ? -1 : 1, x = p.x + side * (2.6 + Rf() * 2.5), z = p.z + (Rf() - 0.5) * 2;
+    if (okGround(x, z, 2.3)) (Rf() < 0.6 ? F.bush(x, heightAt(x, z), z, Rf, { size: 0.6 + Rf() * 0.5 }) : F.fern(x, heightAt(x, z), z, Rf, { size: 0.8 + Rf() * 0.4 }));
+  }
+  // シダ: 森の日陰
+  for (let i = 0; i < 700; i++) {
+    const x = lerp(-70, 70, Rf()), z = lerp(-85, 80, Rf());
+    if (okGround(x, z, 2) && (shadeOf(x, z) || Rf() < 0.08)) F.fern(x, heightAt(x, z), z, Rf, { size: 0.7 + Rf() * 0.6 });
+  }
+  // 草の房: 道の縁に多く、日なたにまばら
+  const sun = new THREE.Color(0xfff8e0), shade = new THREE.Color(0xc8d8c0);
+  for (let i = 0; i < 34000; i++) {
+    const x = lerp(-80, 80, Rf()), z = lerp(-85, 85, Rf()), pd = pathDist(x, z);
+    if (!okGround(x, z, 1.3)) continue;
+    const edge = smooth(5, 2, pd), clump = 0.5 + 0.5 * Math.sin(x * 0.3 + Math.sin(z * 0.23) * 2) * Math.cos(z * 0.27), keep = 0.06 + clump * 0.18 + edge * 0.6 + (shadeOf(x, z) ? 0.12 : 0);
+    if (Rf() > keep) continue;
+    F.tuft(x, heightAt(x, z), z, Rf, { size: 0.8 + Rf() * 0.6 + edge * 0.3, col: shadeOf(x, z) ? shade : sun });
+  }
+  const g = F.build(); g.visible = false; scene.add(g);
+  // 木の下の地面を暗くする（RO風の地面の色の掛け算に入れる）
+  const gp = ground.geometry.attributes.position, gs = ground.geometry.attributes.shade;
+  for (let i = 0; i < gp.count; i++) {
+    const x = gp.getX(i), z = gp.getZ(i);
+    let k = 1;
+    for (const o of occupied) { const d2 = (o.x - x) ** 2 + (o.z - z) ** 2; if (d2 < o.r * o.r * 1.3) k = Math.min(k, 0.72 + 0.28 * smooth(0, o.r * o.r * 1.3, d2)); }
+    if (k < 1) gs.setXYZ(i, gs.getX(i) * k, gs.getY(i) * k, gs.getZ(i) * k * 1.04);
+  }
+  gs.needsUpdate = true;
+  return { group: g, occupied };
+})();
 {
   const fl = FB.build(), hulls = [];
   fl.traverse((o) => { if (o.userData.noOutline) hulls.push(o); });
@@ -593,12 +650,13 @@ function setStyle(ro, init = false) {
   ground.material = ro ? groundMats.ro : groundMats.toon;
   for (const h of hulls) h.visible = !ro;
   grass.mesh.visible = !ro;
-  treeGroup.visible = !ro; treeSprites.visible = ro; blobShadows.visible = ro;
+  treeGroup.visible = !ro; roPlants.group.visible = ro;
   const gm = gradientMap(); gm.image.data.set(GRAD[ro ? 'ro' : 'now']);
   gm.magFilter = gm.minFilter = ro ? THREE.LinearFilter : THREE.NearestFilter; gm.needsUpdate = true;
-  gradePass.uniforms.sat.value = ro ? 0.94 : 1.08; gradePass.uniforms.contrast.value = ro ? 0.9 : 1.04; gradePass.uniforms.vig.value = ro ? 0.1 : 0.22;
-  gradePass.uniforms.lift.value.set(...(ro ? [0.035, 0.03, 0.09] : [0, 0, 0]));
-  bloomPass.strength = ro ? 0.25 : 0.5;
+  gradePass.uniforms.sat.value = ro ? 1.12 : 1.08; gradePass.uniforms.contrast.value = ro ? 1.02 : 1.04; gradePass.uniforms.vig.value = ro ? 0.2 : 0.22;
+  gradePass.uniforms.lift.value.set(...(ro ? [0.0, 0.025, 0.04] : [0, 0, 0]));
+  gradePass.uniforms.gain.value.set(...(ro ? [1.05, 1.02, 0.9] : [1, 1, 1]));
+  bloomPass.strength = ro ? 0.35 : 0.5; tiltPass.enabled = ro;
   // 画角を変えても同じ範囲が映るように、注目点からの距離を変える
   camera.fov = ro ? RO_FOV : FOV; camera.updateProjectionMatrix();
   if (!state.walk && was !== ro) camera.position.sub(ctl.target).multiplyScalar(ro ? FOV_K : 1 / FOV_K).add(ctl.target);
@@ -611,7 +669,7 @@ setStyle(q.get('style') === 'ro', true);
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); tiltPass.uniforms.res.value.set(innerWidth, innerHeight);
 });
 
 const clock = new THREE.Clock(), tmpF = new THREE.Vector3();
@@ -619,7 +677,7 @@ const clock = new THREE.Clock(), tmpF = new THREE.Vector3();
 const turn = (to, dt) => { walker.rotation.y += (((to - walker.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * (1 - Math.exp(-10 * dt)); };
 (function loop() {
   const dt = Math.min(0.05, clock.getDelta()), t = clock.elapsedTime;
-  waterU.uTime.value = t; grass.U.uTime.value = t;
+  waterU.uTime.value = t; grass.U.uTime.value = t; FOLIAGE_U.uTime.value = t;
   if (state0.orb) { state0.orb.rotation.y = t * 1.2; }
   for (const m of smoke) {
     m.userData.t = (m.userData.t + dt * 0.12) % 1; const k = m.userData.t;
@@ -653,20 +711,6 @@ const turn = (to, dt) => { walker.rotation.y += (((to - walker.rotation.y + Math
     camera.position.set(focus.x, focus.y + cy * state.zoom, focus.z + cz * state.zoom); camera.lookAt(focus);
     grass.U.uPlayer.value.set(px, pz);
   } else { ctl.update(); focus.copy(ctl.target); grass.U.uPlayer.value.set(walker.position.x, walker.position.z); }
-  // RO風で歩くとき: 人形の手前にある絵の木を薄くする
-  if (state.ro) {
-    const cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, sx = focus.x - cx, sy = focus.y - cy, sz = focus.z - cz, L2 = sx * sx + sy * sy + sz * sz;
-    for (const sp of treeSprites.children) {
-      let a = 1;
-      if (state.walk) {
-        const px = sp.position.x - cx, py = sp.position.y + sp.userData.h * 0.55 - cy, pz = sp.position.z - cz;
-        const t = Math.max(0, Math.min(1, (px * sx + py * sy + pz * sz) / L2));
-        const d = Math.hypot(px - sx * t, py - sy * t, pz - sz * t);
-        if (t < 0.97) a = 0.25 + 0.75 * smooth(sp.userData.h * 0.3, sp.userData.h * 0.55, d);
-      }
-      sp.material.opacity = a; sp.material.alphaTest = a < 1 ? 0.05 : 0.5;
-    }
-  }
   // 全景は遠くから見るので霧を遠ざける
   const fk = (state.view === 'all' ? 1.8 : 1) * (state.ro ? 1.5 : 1), ft = TIMES[state.time];
   scene.fog.near = ft.near * fk; scene.fog.far = ft.far * fk;
