@@ -1,4 +1,5 @@
-// 手続き生成オーディオ: BGM / 環境音 / 効果音 すべて WebAudio で合成
+// 手続き生成オーディオ: BGM / 環境音 / 効果音 すべて WebAudio で合成（音声ファイルの効果音は sample-sfx.js）
+import { SampleBank } from './sample-sfx.js';
 const MODES = {
   major: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
@@ -25,6 +26,7 @@ export class AudioEngine {
     this.master.connect(comp).connect(ctx.destination);
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = this.level('music'); this.musicBus.connect(this.master);
     this.sfxBus = ctx.createGain(); this.sfxBus.gain.value = this.level('sfx'); this.sfxBus.connect(this.master);
+    this.samples = new SampleBank(this);
     this.ambBus = ctx.createGain(); this.ambBus.gain.value = this.level('amb'); this.ambBus.connect(this.master);
     this.master.gain.value = this.level('master');
 
@@ -424,11 +426,20 @@ export class AudioEngine {
         n.f.frequency.exponentialRampToValueAtTime(opt.heavy ? 500 : 2500, t + 0.15);
         break;
       }
-      case 'hit':
-        tone('sine', 220, 70, 0.12, 0.5);
-        this.noiseHit(t, 0.35, 'bandpass', opt.crit ? 3500 : 2000, 0.08, B);
+      case 'hit': {
+        // hitSound（デバッグ部屋で選ぶ）が音声ファイルなら、そちらを鳴らす。読み込み前は合成音
+        const h = this.hitSound;
+        const per = h && h.per[h.pick];
+        const usedSample = h && h.pick !== 'synth' && this.samples?.play(h.pick, { ...per, pitch: h.pitch, vol: h.vol, voice: h.voice, when: t, bus: B });
+        // 低音だけの音は輪郭が出ないので、合成音のアタック（ノイズ）を per.click の分だけ重ねる
+        if (usedSample === true && per.click > 0) this.noiseHit(t, 0.35 * per.click, 'bandpass', 2000, 0.08, B);
+        if (!usedSample) {
+          tone('sine', 220, 70, 0.12, 0.5);
+          this.noiseHit(t, 0.35, 'bandpass', opt.crit ? 3500 : 2000, 0.08, B);
+        }
         if (opt.crit) { const g = tone('triangle', 1800, 1200, 0.25, 0.12); g.connect(this.revSend); tone('square', 900, 400, 0.1, 0.08); }
         break;
+      }
       case 'skill': {
         const g = tone('sawtooth', 300, 1200, 0.3, 0.12); g.connect(this.revSend);
         tone('sine', 600, 2400, 0.25, 0.15, 0.02).connect(this.delaySend);
