@@ -39,6 +39,7 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
 ## 現在の状態（最良版）
+- **全 5 枚を第 2 世代の規則で作り直した（G04）。触れるページ: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ 、並び `art/shots/g2_all_v03.webp`**
 - orc_meadow（R01 の再現）: `art/shots/orc_meadow/v13.webp`
 - south_coast（同じ規則で作った別の地図・崖と海）: `art/shots/south_coast/v07.webp`、歩いたとき `walk_sheet.webp`
 - town_plaza（同じ規則で作った町の通り）: `art/shots/town_plaza/v03.webp`

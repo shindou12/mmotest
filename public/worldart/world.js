@@ -101,6 +101,7 @@ function groundMaterial() {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
+      uAltTint: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) },
       uLushTint: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmt: { value: num('lush', GROUND.lushAmt ?? 0) },
       uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
       uDirtTint: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
@@ -112,7 +113,7 @@ function groundMaterial() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint; uniform float uLushAmt;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -126,7 +127,7 @@ function groundMaterial() {
         float lush = smoothstep(0.42, 0.6, nz3.r * 0.55 + nz3.g * 0.3 + nz3.b * 0.15);
         grass *= mix(vec3(1.0), uLushTint, lush * uLushAmt);
         vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
-        vec3 alt = texture2D(tAlt, wp / uAltScale).rgb;
+        vec3 alt = texture2D(tAlt, wp / uAltScale).rgb * uAltTint;
         vec3 an = abs(vWN);
         vec3 rock = texture2D(tRock, vW.zy / uRockScale).rgb * an.x + texture2D(tRock, vW.xy / uRockScale).rgb * an.z + texture2D(tRock, vW.xz / uRockScale).rgb * an.y;
         rock /= (an.x + an.y + an.z);

@@ -394,7 +394,7 @@ def fence_spike(name, seed, length=3.0):
         base = Vector((0, y, hc)) + d * 0.1
         body = base + d * L
         tip = body + d * R_.uniform(0.45, 0.6)
-        tube(B, [base, body], [r, r * 0.95], M_WOOD(), sides=6, ao=(0.6, 1.0))
+        tube(B, [base, body], [r, r * 0.95], M_WOOD(), sides=6, ao=(0.9, 1.35))
         tube(B, [body, tip], [r * 0.95, 0.01], M_WOOD(), sides=5, ao=(1.0, 1.1), u0=0.5, u1=1.0)
     for sgn in (-1, 1):
         p0 = Vector((sgn * 0.5, y0 + 0.2, 0.1)); p1 = Vector((sgn * 0.5, y1 - 0.2, 1.05))

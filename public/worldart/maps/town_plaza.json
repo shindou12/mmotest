@@ -11,34 +11,42 @@
     "fov": 25
   },
   "sun": {
+    "color": "#fff0d4",
+    "intensity": 4.4,
     "azimuth": 135,
-    "elevation": 32,
-    "color": "#ffe6b0",
-    "intensity": 4.6
+    "elevation": 35
   },
   "sky": {
     "color": "#cfe0ee",
-    "light": "#b4c8de",
-    "ground": "#6a6448",
-    "intensity": 1.9
+    "light": "#c4ccc8",
+    "ground": "#8a8050",
+    "intensity": 1.8
   },
-  "albedoSat": 0.7,
+  "albedoSat": 0.9,
   "foliage": {
     "wrap": 0.5,
     "trans": 0.3,
-    "receiveShadow": false
+    "receiveShadow": false,
+    "sat": 0.72,
+    "lift": 0.12
   },
   "post": {
-    "sat": 1.0,
+    "sat": 1.02,
     "contrast": 1.0,
     "lift": [0, 0, 0],
     "gain": [1, 1, 1],
     "dof": 1.0
   },
   "ground": {
+    "grassTint": [2.2, 1.6, 0.62],
+    "dirtTint": [0.92, 1.0, 0.42],
+    "rockTint": [0.92, 0.98, 0.88],
+    "rock": "crack",
+    "lushTint": [0.55, 0.92, 0.95],
+    "lushAmt": 1.3,
+    "tuftTint": [1.12, 1.05, 0.8],
     "alt": "cobble",
-    "altScale": 3.6,
-    "dirtTint": [1.0, 0.97, 0.74]
+    "altScale": 3.6
   },
   "terrain": {
     "size": 90,
@@ -153,21 +161,21 @@
   ],
   "trees": [
     {
-      "asset": "pine_a",
+      "asset": "fir2_a",
       "world": [-4.2, -7.0],
-      "scale": 0.9,
+      "scale": 0.85,
       "y": 0.45
     },
     {
-      "asset": "pine_b",
+      "asset": "fir2_b",
       "world": [4.2, -14.0],
       "scale": 0.85,
       "y": 0.45
     },
     {
-      "asset": "tree_broad_a",
+      "asset": "maple_a",
       "world": [7.5, -20.0],
-      "scale": 1.2
+      "scale": 1.0
     }
   ],
   "zones": [],
@@ -184,5 +192,15 @@
       "spacing": 0.9,
       "prob": 0.8
     }
-  }
+  },
+  "groves": [
+    {
+      "space": "screen",
+      "centers": [[0.5, -0.05], [0.98, 1.0], [0.02, 1.0]],
+      "trees": ["maple_a", "fir2_a"],
+      "count": [2, 3],
+      "radius": 2.2,
+      "scale": [0.95, 1.1]
+    }
+  ]
 }
