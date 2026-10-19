@@ -22,6 +22,8 @@ const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
 const flag = (k, d = true) => (q.has(k) ? q.get(k) !== '0' : d);
 const MAP = q.get('map') || 'orc_meadow';
 const BASE = './';
+// 手前を抜く範囲（カメラ・注目点・半径）。placeCamera が更新する
+const OCC = { cam: { value: new THREE.Vector3() }, tgt: { value: new THREE.Vector3() }, r: { value: num('occR', 2.2) } };
 
 const spec = await (await fetch(`${BASE}maps/${MAP}.json`)).json();
 const placed = await (await fetch(`${BASE}maps/${MAP}/placements.json`)).json();
@@ -50,6 +52,7 @@ function placeCamera() {
   camera.position.set(target.x + camState.dist * Math.sin(y) * Math.cos(p), target.y + camState.dist * Math.sin(p), target.z + camState.dist * Math.cos(y) * Math.cos(p));
   camera.lookAt(target);
   camera.updateMatrixWorld();
+  OCC.cam.value.copy(camera.position); OCC.tgt.value.copy(target); OCC.tgt.value.y += 0.9;
 }
 placeCamera();
 
@@ -99,13 +102,14 @@ function groundMaterial() {
       uGrassTint: { value: new THREE.Color(...(GROUND.grassTint || [1, 1, 1])) },
       uDirtTint: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
       uAltScale: { value: GROUND.altScale || 6.0 },
+      uWater: { value: new THREE.Vector2(spec.terrain.water?.level ?? 0, spec.terrain.water ? 1 : 0) },
     });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale; uniform vec2 uWater;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -126,6 +130,10 @@ function groundMaterial() {
         vec3 col = mix(grass, dirt, wd);
         col = mix(col, alt, wa);
         col = mix(col, rock, wr);
+        if (uWater.y > 0.5) {
+          float wet = smoothstep(0.55, 0.05, vW.y - uWater.x);
+          col *= mix(vec3(1.0), vec3(0.72, 0.74, 0.76), wet);
+        }
         diffuseColor.rgb *= col;
 `);
     addDesat(sh);
@@ -136,6 +144,25 @@ function groundMaterial() {
 // ---------------------------------------------------------------- 葉・アセットの材質
 const FNORM_CARD = q.get('fnorm') === 'card';
 // 地色（albedo）の彩度。光で色を作るため、絵そのものの彩度をここで抑える
+// カメラと注目点の間にある物を点描（4x4 のディザ）で抜く。草は抜かない
+const occChunk = `
+  { vec3 ab = uOccTgt - uOccCam; float L = length(ab); vec3 d = ab / L;
+    float t = dot(vOccW - uOccCam, d);
+    if (t > 0.0 && t < L - 1.0) {
+      float r = length(vOccW - (uOccCam + d * t));
+      float k = 1.0 - smoothstep(uOccR * 0.6, uOccR, r);
+      vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+      float bay = mod(q.x * 4.0 + q.y * 7.0 + q.x * q.y * 3.0, 16.0) / 16.0;
+      if (k * 1.2 > bay + 0.02) discard;
+    } }
+`;
+function addOcc(sh) {
+  Object.assign(sh.uniforms, { uOccCam: OCC.cam, uOccTgt: OCC.tgt, uOccR: OCC.r });
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vOccW;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\nvOccW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uOccCam, uOccTgt; uniform float uOccR; varying vec3 vOccW;')
+    .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>' + occChunk);
+}
 const LEAF = { wrap: { value: num('wrap', spec.foliage?.wrap ?? 0.0) }, trans: { value: num('trans', spec.foliage?.trans ?? 0.0) },
   receive: flag('leafShadow', spec.foliage?.receiveShadow ?? true) };
 const ALBEDO_SAT = { value: num('asat', spec.albedoSat ?? 1.0) };
@@ -154,8 +181,10 @@ function fixMaterial(mesh) {
   });
   m.name = src.name;
   if (isLeaf && FNORM_CARD) mesh.geometry.computeVertexNormals();   // 比較用: 板の向きの法線
+  const isGrassMat = /grass/.test(src.name);
   m.onBeforeCompile = (sh) => {
     addDesat(sh);
+    if (!isGrassMat) addOcc(sh);
     if (!isLeaf) return;
     // 葉: 裏面で法線を反転させない（房として丸く光らせる）
     {
@@ -173,6 +202,39 @@ function fixMaterial(mesh) {
   return m;
 }
 
+// ---------------------------------------------------------------- 水
+// 高さマップから深さを出し、浅瀬の色・深い色・波打ち際の泡を決める
+const W = spec.terrain.water || null;
+const TM = placed.terrain || null;
+const heightTex = (W && TM) ? texLoader.load(`${BASE}maps/${MAP}/height.png`) : null;
+const TIME = { value: 0 };
+function waterMaterial() {
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { tH: { value: heightTex }, tN: { value: T.sand }, uTime: TIME,
+      uT: { value: new THREE.Vector4(TM.x0, TM.z0, TM.size, 0) }, uHR: { value: new THREE.Vector3(TM.hmin, TM.hmax, W.level) },
+      uShallow: { value: new THREE.Color(W.shallow || '#5fb8b0') }, uDeep: { value: new THREE.Color(W.color || '#2f6f9a') } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvW = (modelMatrix * vec4(position,1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      uniform sampler2D tH, tN; uniform vec4 uT; uniform vec3 uHR, uShallow, uDeep; uniform float uTime; varying vec3 vW;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      vec2 huv = vec2((vW.x - uT.x) / uT.z, 1.0 - (vW.z - uT.y) / uT.z);
+      float th = mix(uHR.x, uHR.y, texture2D(tH, huv).r);
+      float depth = uHR.z - th;
+      float nz = texture2D(tN, vW.xz / 9.0 + uTime * 0.01).r;
+      vec3 wc = mix(uShallow, uDeep, smoothstep(0.1, 2.2, depth + (nz - 0.5) * 0.6));
+      // 泡: 岸の帯 + 寄せる波の線（時間で動く）
+      float band = smoothstep(0.32, 0.0, depth + (nz - 0.5) * 0.35);
+      float wave = fract(depth * 1.6 - uTime * 0.25 + nz * 0.5);
+      float line = smoothstep(0.12, 0.0, abs(wave - 0.5)) * smoothstep(1.4, 0.2, depth);
+      float foam = clamp(band + line * step(0.55, nz), 0.0, 1.0);
+      diffuseColor.rgb = mix(wc, vec3(0.95, 0.97, 0.95), foam);
+      diffuseColor.a = mix(0.62, 0.95, smoothstep(0.0, 1.2, depth)) + foam * 0.3;`);
+  };
+  return m;
+}
+
 // ---------------------------------------------------------------- 読み込み
 const gltf = new GLTFLoader();
 const load = (url) => new Promise((res, rej) => gltf.load(url, res, undefined, rej));
@@ -181,8 +243,7 @@ const terrain = await load(`${BASE}maps/${MAP}/terrain.glb`);
 terrain.scene.traverse((o) => {
   if (!o.isMesh) return;
   if (o.name.startsWith('water') || o.material.name === 'water') {
-    o.material = new THREE.MeshPhongMaterial({ color: new THREE.Color(spec.terrain.water?.color || '#3f86b8'), shininess: 60, specular: 0x8899aa });
-    o.receiveShadow = true;
+    o.material = waterMaterial(); o.receiveShadow = true; o.renderOrder = 2;
   } else {
     o.material = groundMaterial(); o.receiveShadow = true;
   }
@@ -260,13 +321,16 @@ if (flag('post')) { composer.addPass(grade); if (flag('dof')) composer.addPass(d
 const keys = new Set();
 addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+const groundMeshes = [];
+terrain.scene.traverse((o) => { if (o.isMesh && !/water/.test(o.name)) groundMeshes.push(o); });
+const WATER_LV = spec.terrain.water ? spec.terrain.water.level : -1e9;
 const marker = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.7, 12), new THREE.MeshLambertMaterial({ color: 0xc04030 }));
 marker.castShadow = true; marker.visible = flag('marker', false) || flag('walk', false);
 scene.add(marker);
 const ray = new THREE.Raycaster();
 const groundY = (x, z) => {
   ray.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0));
-  const hit = ray.intersectObject(terrain.scene, true)[0];
+  const hit = ray.intersectObjects(groundMeshes, false)[0];
   return hit ? hit.point.y : 0;
 };
 marker.position.set(target.x, groundY(target.x, target.z) + 0.85, target.z);
@@ -278,15 +342,23 @@ function tick(now) {
       (keys.has('s') || keys.has('arrowdown')) - (keys.has('w') || keys.has('arrowup')));
     if (v.lengthSq()) {
       v.normalize().multiplyScalar(5 * dt).applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(camState.yaw));
-      target.add(v); target.y = groundY(target.x, target.z);
+      const nx = target.x + v.x, nz = target.z + v.z;
+      if (groundY(nx, nz) > WATER_LV - 0.3) { target.x = nx; target.z = nz; }   // 深い水へは入らない
+      target.y = groundY(target.x, target.z);
       marker.position.set(target.x, target.y + 0.85, target.z);
       placeCamera(); fitShadow();
     }
   }
+  TIME.value = now / 1000;
   if (!window.__pause) composer.render();
   requestAnimationFrame(tick);
 }
 // 撮影用: ループを止めて1回だけ描く（ソフトウェア描画で重いとき）
+// 撮影・確認用: 注目点を動かす（歩いたときと同じ処理）
+window.__moveTo = (x, z) => {
+  target.set(x, groundY(x, z), z); marker.position.set(x, target.y + 0.85, z);
+  placeCamera(); fitShadow(); return [target.x, target.y, target.z];
+};
 window.__renderOnce = () => { window.__pause = true; composer.render(); return true; };
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);

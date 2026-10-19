@@ -1,11 +1,11 @@
 [
  {
   "name": "tree_broad_a",
-  "tris": 1030,
+  "tris": 714,
   "size": [
-   5.31,
-   5.77,
-   5.73
+   5.56,
+   5.96,
+   6.16
   ],
   "zmin": -0.3,
   "mats": [
@@ -16,11 +16,11 @@
  },
  {
   "name": "tree_broad_b",
-  "tris": 1022,
+  "tris": 690,
   "size": [
-   6.21,
-   6.64,
-   6.59
+   6.06,
+   7.28,
+   6.89
   ],
   "zmin": -0.3,
   "mats": [
@@ -61,14 +61,59 @@
  },
  {
   "name": "bush_a",
-  "tris": 132,
+  "tris": 84,
   "size": [
-   2.54,
-   2.29,
-   2.02
+   2.66,
+   2.82,
+   2.38
   ],
-  "zmin": -0.51,
+  "zmin": -0.65,
   "mats": [
+   "leaf_broad"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm_a",
+  "tris": 186,
+  "size": [
+   3.2,
+   2.9,
+   5.61
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm_b",
+  "tris": 186,
+  "size": [
+   3.11,
+   3.41,
+   6.41
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "tree_broad_y",
+  "tris": 636,
+  "size": [
+   6.2,
+   6.19,
+   6.83
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
    "leaf_broad"
   ],
   "colors": 1

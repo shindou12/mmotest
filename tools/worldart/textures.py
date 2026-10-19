@@ -99,10 +99,10 @@ def leaf_broad(n=512, seed=11):
     # 小枝の軸
     stem = (0.30, 0.24, 0.12, 1)
     leaves = []
-    for k in range(26):
-        a = r.uniform(0, 2 * math.pi); rad = (r.uniform(0.0, 1.0) ** 0.6) * 0.32 * n
+    for k in range(13):
+        a = r.uniform(0, 2 * math.pi); rad = (r.uniform(0.0, 1.0) ** 0.6) * 0.27 * n
         cx = n / 2 + math.cos(a) * rad; cy = n / 2 + math.sin(a) * rad
-        leaves.append((cx, cy, r.uniform(0.13, 0.19) * n, r.uniform(0, 2 * math.pi), r.uniform(0, 1)))
+        leaves.append((cx, cy, r.uniform(0.19, 0.25) * n, r.uniform(0, 2 * math.pi), r.uniform(0, 1)))
         d.line([(n / 2, n / 2), (cx, cy)], fill=col(stem), width=3)
     # 下の葉ほど暗く（奥行き）、明るい葉を後で上に重ねる
     leaves.sort(key=lambda l: l[4])
@@ -173,9 +173,30 @@ def grass_blades(n=256, seed=13):
             t0, t1 = s / segs, (s + 1) / segs
             p0 = (x0 + lean * t0 ** 1.6, n - h * t0); p1 = (x0 + lean * t1 ** 1.6, n - h * t1)
             w = w0 * (1 - t0)
-            c = lerp((0.14, 0.22, 0.06), light, t1 ** 0.8)
+            c = lerp((0.30, 0.40, 0.12), light, t1 ** 0.8)
             d.line([p0, p1], fill=col(c), width=max(1, int(round(w))))
     save_rgba(img, 'grass_blades.png')
+
+
+def leaf_palm(n=512, seed=14):
+    """ヤシの葉（1枚の長い羽状の葉。根元が下、先が上）。R02 左・R07 左・R12 のヤシ"""
+    r = rng(seed)
+    img = Image.new('RGBA', (n, n), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    cx = n / 2
+    for i in range(44):
+        t = (i + 0.5) / 44
+        y = n * (0.97 - 0.92 * t)
+        L = n * 0.46 * math.sin(math.pi * (0.1 + 0.9 * t) ** 0.8) * (1.05 - 0.6 * t) + 6
+        for side in (-1, 1):
+            ang = math.radians(-90 + side * (58 + 18 * t)) + r.normal(0, 0.06)
+            dark = lerp((0.18, 0.28, 0.08), (0.28, 0.40, 0.10), t)
+            light = lerp((0.50, 0.60, 0.18), (0.74, 0.80, 0.32), r.random() * 0.5 + 0.5 * t)
+            x0 = cx + side * 2
+            d.polygon(leaflet_poly(x0, y, ang, L, L * 0.06), fill=col(dark))
+            d.polygon(leaflet_poly(x0 + math.cos(ang) * L * 0.35, y + math.sin(ang) * L * 0.35 - 1, ang, L * 0.6, L * 0.03), fill=col(light))
+    d.line([(cx, n), (cx, n * 0.04)], fill=col((0.26, 0.30, 0.10)), width=3)
+    save_rgba(img, 'leaf_palm.png')
 
 
 # ---------------------------------------------------------------- 地面
@@ -257,15 +278,35 @@ def ground_cobble(n=1024, seed=51):
 
 
 def rock(n=512, seed=61):
-    """岩肌: 平らな面ごとの明暗 + 細い割れ目 + 面の縁の明るい描き込み"""
-    d1, edge, idx = voronoi(n, 40, seed)
-    r = rng(seed + 1)
-    tone = r.uniform(0, 1, idx.max() + 1)[idx]
-    base = lerp((0.44, 0.45, 0.40), (0.66, 0.66, 0.58), tone[..., None])
-    base *= (0.85 + 0.25 * fnoise(n, 0.08 * n, seed + 2, 2)[..., None])
-    crack = np.clip(1 - edge / 2.2, 0, 1)[..., None]
-    rim = np.clip(1 - np.abs(edge - 5) / 3, 0, 1)[..., None] * 0.12
-    base = base * (1 - 0.45 * crack) + rim
+    """岩肌: 横に走る層（厚みが不ぞろい）と、層の中の縦の割れ目。層の上面は明るく、下の縁は暗い。
+    ボロノイの網目は敷石に見えるので使わない（v04 の失敗）"""
+    r = rng(seed)
+    y = np.arange(n)[:, None].astype(float); x = np.arange(n)[None, :].astype(float)
+    warp = (fnoise(n, 0.12 * n, seed) - 0.5) * 0.10 * n
+    yy = (y + warp) % n
+    # 層の境目（端がつながるよう n を割り切る位置に）
+    cuts = np.sort(r.choice(np.arange(8, n, 8), 7, replace=False)).astype(float)
+    cuts = np.concatenate([cuts, [cuts[0] + n]])
+    layer = np.zeros((n, n)); edge = np.full((n, n), 1e9); tone = np.zeros((n, n))
+    tones = r.uniform(0, 1, len(cuts))
+    for i in range(len(cuts) - 1):
+        a0, a1 = cuts[i], cuts[i + 1]
+        m = ((yy >= a0) & (yy < a1)) | ((yy + n >= a0) & (yy + n < a1))
+        t = np.where(yy >= a0, yy - a0, yy + n - a0) / (a1 - a0)
+        layer = np.where(m, t, layer); tone = np.where(m, tones[i], tone)
+    base = lerp((0.50, 0.52, 0.44), (0.70, 0.70, 0.60), tone[..., None])
+    base *= (0.86 + 0.24 * fnoise(n, 0.05 * n, seed + 2, 2)[..., None])
+    # 層の上は明るく（日が当たる棚）、下の縁は暗い（えぐれ）
+    base *= (1.12 - 0.35 * layer[..., None] ** 2)[..., :]
+    top_edge = np.clip(1 - layer / 0.06, 0, 1)[..., None]
+    base = base * (1 - 0.35 * top_edge)
+    # 縦の割れ目（層ごとに位置が変わる）
+    cr = fnoise(n, 0.015 * n, seed + 3)
+    crack = np.clip(1 - np.abs(np.sin((x / n * 9 + tone * 3.1) * math.pi + cr * 6)) / 0.06, 0, 1) * (layer > 0.15)
+    base *= (1 - 0.3 * crack[..., None])
+    # 苔のむら（緑がかる）
+    moss = np.clip((fnoise(n, 0.1 * n, seed + 4) - 0.55) * 3, 0, 1)[..., None]
+    base = lerp(base, base * np.array([0.82, 0.98, 0.62]), moss * 0.6)
     save_rgb(base, 'rock.png')
 
 
@@ -276,13 +317,13 @@ def wood(n=512, seed=71):
     x = np.linspace(0, 1, w)[None, :]; y = np.linspace(0, 1, h)[:, None]
     grain = fnoise(n, 0.01 * n, seed)[:, :w]
     stretch = np.repeat(fnoise(n, 0.006 * n, seed + 1)[:1, :w], h, 0)
-    bark = lerp((0.30, 0.20, 0.12), (0.52, 0.38, 0.24), (0.6 * stretch + 0.4 * grain)[..., None])
-    cut = lerp((0.70, 0.56, 0.38), (0.90, 0.78, 0.58), fnoise(n, 0.05 * n, seed + 2)[:, :w][..., None])
+    bark = lerp((0.46, 0.34, 0.22), (0.68, 0.53, 0.36), (0.6 * stretch + 0.4 * grain)[..., None])
+    cut = lerp((0.84, 0.72, 0.54), (0.96, 0.88, 0.70), fnoise(n, 0.05 * n, seed + 2)[:, :w][..., None])
     out = np.concatenate([bark, cut], 1)
     save_rgb(out, 'wood.png')
 
 
 if __name__ == '__main__':
-    leaf_broad(); leaf_frond(); grass_blades()
+    leaf_broad(); leaf_frond(); leaf_palm(); grass_blades()
     ground_grass(); ground_dirt(); ground_sand(); ground_cobble(); rock(); wood()
     print('textures ->', OUT, sorted(os.listdir(OUT)))

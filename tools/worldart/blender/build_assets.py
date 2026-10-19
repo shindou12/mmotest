@@ -59,6 +59,7 @@ M_LEAF = lambda: material('leaf_broad', 'leaf_broad.png', alpha=True)
 M_FROND = lambda: material('leaf_frond', 'leaf_frond.png', alpha=True)
 M_GRASS = lambda: material('grass', 'grass_blades.png', alpha=True)
 M_ROCK = lambda: material('rock', 'rock.png')
+M_PALM = lambda: material('leaf_palm', 'leaf_palm.png', alpha=True)
 
 
 # ------------------------------------------------------------ メッシュの組み立て
@@ -201,7 +202,7 @@ def tree_broad(name, seed, height=4.2, crown=1.0):
         for k in range(3):
             off = Vector((R_.uniform(-.6, .6), R_.uniform(-.6, .6), R_.uniform(-.2, .5))) * crown
             Rc = R_.uniform(0.85, 1.15) * crown
-            leaf_clump(B, e + off, Rc, R_, M_LEAF(), cards=int(22 * Rc * Rc) + 8, size=1.15 * crown)
+            leaf_clump(B, e + off, Rc, R_, M_LEAF(), cards=int(13 * Rc * Rc) + 6, size=1.6 * crown)
     return B.build(name)
 
 
@@ -248,11 +249,44 @@ def pine(name, seed, height=6.0, width=2.1):
     return B.build(name)
 
 
+def palm(name, seed, height=4.4, lean=1.1):
+    """ヤシ: 弓なりの幹（節の段を明暗で）と、てっぺんから放射状に垂れる長い葉。葉は frond_strip（もみと同じ規則）"""
+    R_ = random.Random(seed); B = Builder()
+    a = R_.uniform(0, 6.28); d = Vector((math.cos(a), math.sin(a), 0))
+    pts = [Vector((0, 0, -0.3))] + [d * lean * (t ** 2) + UP * height * t for t in [i / 8 for i in range(9)]]
+    radii = [0.26] + [0.24 - 0.1 * (i / 8) for i in range(9)]
+    tube(B, pts, radii, M_BARK(), sides=7, ao=(0.55, 0.95))
+    top = pts[-1]
+    n = 11
+    for k in range(n):
+        b = 2 * math.pi * k / n + R_.uniform(-.2, .2)
+        out = Vector((math.cos(b), math.sin(b), R_.uniform(0.1, 0.45))).normalized()
+        L = R_.uniform(1.45, 1.75)
+        frond_strip(B, top, out, L, L * 0.45, R_.uniform(0.55, 0.85), R_.uniform(0.8, 1.0), M_PALM(), lift=0.25)
+    for k in range(4):                       # 上へ立つ若い葉
+        b = 2 * math.pi * k / 4 + 0.4
+        out = Vector((math.cos(b) * 0.4, math.sin(b) * 0.4, 1)).normalized()
+        frond_strip(B, top, out, 1.1, 0.45, 0.1, 1.0, M_PALM())
+    return B.build(name)
+
+
+def tint_variant(src_fn, name, tint):
+    """同じ形で葉の色だけ変える（頂点色に掛ける）"""
+    ob = src_fn(name)
+    me = ob.data; ca = me.color_attributes['Col']
+    leaf_idx = [i for i, m in enumerate(me.materials) if m.name.startswith('leaf')]
+    for poly in me.polygons:
+        if poly.material_index in leaf_idx:
+            for l in poly.loop_indices:
+                c = ca.data[l].color; ca.data[l].color = (c[0] * tint[0], c[1] * tint[1], c[2] * tint[2], 1)
+    return ob
+
+
 def bush(name, seed, size=1.0):
     R_ = random.Random(seed); B = Builder()
     for k in range(3):
         c = Vector((R_.uniform(-.5, .5) * size, R_.uniform(-.5, .5) * size, 0.45 * size))
-        leaf_clump(B, c, 0.75 * size, R_, M_LEAF(), cards=22, size=0.95 * size, squash=0.7, ao_floor=0.35)
+        leaf_clump(B, c, 0.75 * size, R_, M_LEAF(), cards=14, size=1.25 * size, squash=0.7, ao_floor=0.35)
     return B.build(name)
 
 
@@ -271,7 +305,7 @@ def grass(name, seed):
         base = out * 0.04
         ps = [base - side * w / 2, base + side * w / 2, base + side * w / 2 + up, base - side * w / 2 + up]
         idx = [B.add_v(p) for p in ps]
-        lo = (0.75,) * 3; hi = (1.05,) * 3
+        lo = (0.9,) * 3; hi = (1.05,) * 3
         B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], [lo, lo, hi, hi], [UP] * 4, M_GRASS())
     return B.build(name)
 
@@ -368,6 +402,9 @@ ASSETS = {
     'pine_a': lambda n: pine(n, 201),
     'pine_b': lambda n: pine(n, 202, height=7.5, width=2.5),
     'bush_a': lambda n: bush(n, 301),
+    'palm_a': lambda n: palm(n, 701),
+    'palm_b': lambda n: palm(n, 702, height=5.2, lean=1.6),
+    'tree_broad_y': lambda n: tint_variant(lambda m: tree_broad(m, 103, height=4.6, crown=1.1), n, (1.35, 1.15, 0.55)),
     'grass_a': lambda n: grass(n, 401),
     'rock_a': lambda n: rock(n, 501),
     'rock_b': lambda n: rock(n, 502, size=(2.2, 1.6, 1.4), facet=0.14),

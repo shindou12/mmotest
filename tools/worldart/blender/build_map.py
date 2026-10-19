@@ -95,19 +95,25 @@ def smooth(a, b, x):
 # ------------------------------------------------------------ 地形
 TS = SPEC['terrain']; size = TS['size']; cell = TS['cell']
 n = int(size / cell) + 1
-cx, cz = T[0], T[2] - 6
+cx, cz = (TS['center'] if 'center' in TS else (T[0], T[2] - 6))
 xs = cx - size / 2 + np.arange(n) * cell; zs = cz - size / 2 + np.arange(n) * cell
 X, Z = np.meshgrid(xs, zs)          # [iz, ix]
 H = (N1(X, Z, TS['hills']['scale']) - 0.5) * 2 * TS['hills']['amp']
 camxz = C[[0, 2]]
+CLIFF_LINES = []
 for cl in TS.get('cliffs', []):
+    # 段差: 折れ線の片側を drop だけ下げる。低い側は "lowPoint": [x, z]（その点のある側）か "low": "far"（カメラの反対側）
     poly = poly_of(cl)
     d, s = seg_dist(X, Z, poly)
-    _, cam_side = seg_dist(np.array(camxz[0]), np.array(camxz[1]), poly)
-    low = (s != cam_side) if cl.get('low', 'far') == 'far' else (s == cam_side)
-    sd = np.where(low, d, -d) + (N2(X, Z, 6) - 0.5) * 2.4      # 縁をでこぼこに
+    ref = np.array(cl['lowPoint'], float) if 'lowPoint' in cl else None
+    if ref is not None:
+        _, ref_side = seg_dist(np.array(ref[0]), np.array(ref[1]), poly); low = (s == ref_side)
+    else:
+        _, cam_side = seg_dist(np.array(camxz[0]), np.array(camxz[1]), poly)
+        low = (s != cam_side) if cl.get('low', 'far') == 'far' else (s == cam_side)
+    sd = np.where(low, d, -d) + (N2(X, Z, 6) - 0.5) * 2 * cl.get('jag', 1.2)      # 縁をでこぼこに
     H = H - cl['drop'] * smooth(-cl['width'] / 2, cl['width'] / 2, sd)
-    if 'plateau' in cl: H = H + np.where(low, 0, cl['plateau'])
+    CLIFF_LINES.append((poly, cl, ref))
 
 DIRT = np.zeros_like(H); ALT = np.zeros_like(H)
 PATHS = []
@@ -120,6 +126,12 @@ for p in SPEC.get('paths', []):
     else: ALT = np.maximum(ALT, w)
     H = H - 0.06 * w
 if TS.get('ground') == 'sand': ALT = np.maximum(ALT, 1.0 - DIRT)
+for band in TS.get('bands', []):
+    # 高さで塗り分ける（例: 浜の砂は高さ below より下）
+    edge = H + (N1(X * 2.3, Z * 2.3, 4) - 0.5) * 2 * band.get('noise', 0.4)
+    w = 1 - smooth(band['below'] - 0.25, band['below'] + 0.25, edge)
+    if band['mat'] == 'dirt': DIRT = np.maximum(DIRT, w)
+    else: ALT = np.maximum(ALT, w)
 
 # 法線と傾き → 岩肌
 gz, gx = np.gradient(H, cell)
@@ -192,6 +204,12 @@ def place(asset, x, z, rot=None, scale=1.0, y=None):
                                      round(float(rot if rot is not None else RNG.uniform(0, 6.283)), 3), round(float(scale), 3)])
 
 
+WATER_LV = TS.get('water', {}).get('level', None)
+def dry(x, z, margin=0.35):
+    """乾いた地面か（水がない地図ではいつも真）"""
+    return WATER_LV is None or height_at(x, z) > WATER_LV + margin
+
+
 def path_dist(x, z):
     best = 1e9
     for poly, w in PATHS:
@@ -210,18 +228,26 @@ def visible_box(margin=8):
     return corners[:, 0].min() - margin, corners[:, 0].max() + margin, corners[:, 1].min() - margin, corners[:, 1].max() + margin
 
 
+def rule_rng(name):
+    """規則ごとに独立した乱数（規則を足しても、他の規則の配置が動かない）"""
+    global RNG
+    RNG = np.random.default_rng([SPEC.get('seed', 1), sum(ord(c) * (i + 1) for i, c in enumerate(name))])
+
+
 def scatter():
     x0, x1, z0, z1 = visible_box()
+    rule_rng('zones')
     trees = []
     for zn in SPEC.get('zones', []):
         poly = poly_of(zn)
         P = jitter_grid(x0, x1, z0, z1, zn.get('spacing', 4.5))
         m = inside(P[:, 0], P[:, 1], poly)
         for x, z in P[m]:
-            if path_dist(x, z) < 1.8 or height_at(x, z) < -1.0: continue
+            if path_dist(x, z) < 1.8 or not dry(x, z): continue
             a = zn['trees'][RNG.integers(len(zn['trees']))]
             sc0, sc1 = zn.get('scale', [0.85, 1.25])
             place(a, x, z, scale=RNG.uniform(sc0, sc1)); trees.append((x, z))
+    rule_rng('trees')
     for t in SPEC.get('trees', []):
         # "canopy": [u, v] は樹冠の中心が画面のどこに見えるか。樹冠の高さで光線を切って幹の位置を逆算する
         sc_ = t.get('scale', 1.0)
@@ -233,26 +259,40 @@ def scatter():
         place(t['asset'], x, z, rot=t.get('rot'), scale=sc_); trees.append((x, z))
     trees = np.array(trees) if trees else np.zeros((0, 2))
     sc = SPEC.get('scatter', {})
+    rule_rng('bush')
     if 'bush' in sc and len(trees):
         b = sc['bush']
         for x, z in jitter_grid(x0, x1, z0, z1, 2.2):
             dt = np.min(np.hypot(trees[:, 0] - x, trees[:, 1] - z))
-            if b['edge'][0] < dt < b['edge'][1] + 1.5 and path_dist(x, z) > 0.8 and RNG.random() < b['prob'] and height_at(x, z) > -1:
+            if b['edge'][0] < dt < b['edge'][1] + 1.5 and path_dist(x, z) > 0.8 and RNG.random() < b['prob'] and dry(x, z) and field_at(ALT, x, z) < 0.5:
                 place(b['asset'], x, z, scale=RNG.uniform(0.7, 1.3))
+    rule_rng('grass')
     if 'grass' in sc:
         g = sc['grass']
         for x, z in jitter_grid(x0, x1, z0, z1, g['spacing']):
-            dirt = field_at(DIRT, x, z); rock = field_at(ROCK, x, z)
-            if rock > 0.4 or height_at(x, z) < -1: continue
+            dirt = field_at(DIRT, x, z); rock = field_at(ROCK, x, z); alt = field_at(ALT, x, z)
+            if rock > 0.4 or not dry(x, z, 0.1): continue
             clus = N2(np.array(x), np.array(z), 3.0)
             edge = 1 - abs(dirt - 0.35) / 0.35 if dirt < 0.7 else 0
-            p = (1 - dirt) ** 2 * (0.35 + 0.65 * float(clus)) + g.get('edge_boost', 0) * max(0, edge)
+            p = ((1 - dirt) ** 2 * (0.35 + 0.65 * float(clus)) + g.get('edge_boost', 0) * max(0, edge)) * (1 - alt) ** 3
             if RNG.random() < p: place(g['asset'], x, z, scale=RNG.uniform(*g.get('scale', [0.75, 1.35])))
+    rule_rng('beachgrass')
+    if 'beachgrass' in sc:
+        # 砂の上の草: 崖の下（崖の線から near m 以内）に群れて生える
+        bg = sc['beachgrass']
+        for x, z in jitter_grid(x0, x1, z0, z1, 0.6):
+            if field_at(ALT, x, z) < 0.5 or not dry(x, z, 0.6): continue
+            dc = min(float(seg_dist(np.array(x), np.array(z), poly)[0]) for poly, _, _ in CLIFF_LINES[:1]) if CLIFF_LINES else 99
+            clus = float(N2(np.array(x * 1.7), np.array(z * 1.7), 3.0))
+            if dc < bg.get('near', 4) and RNG.random() < bg['prob'] * (1 - dc / bg.get('near', 4)) * clus * 2:
+                place(bg['asset'], x, z, scale=RNG.uniform(0.7, 1.2))
+    rule_rng('pebble')
     if 'pebble' in sc:
         for x, z in jitter_grid(x0, x1, z0, z1, 1.0):
             d = field_at(DIRT, x, z)
             if 0.2 < d < 0.8 and RNG.random() < sc['pebble']['prob'] * 4:
                 place(sc['pebble']['asset'], x, z, scale=RNG.uniform(0.5, 1.2))
+    rule_rng('lines')
     for ln in SPEC.get('lines', []):
         poly = poly_of(ln); step = ln.get('step', 3.0)
         segL = np.hypot(*np.diff(poly, axis=0).T); total = segL.sum(); s = step / 2
@@ -263,6 +303,27 @@ def scatter():
             x, z = a + (b - a) * t; dx, dz = b - a
             place(ln['asset'], x, z, rot=math.atan2(dx, dz) + RNG.uniform(-0.08, 0.08), scale=ln.get('scale', 1.0))
             s += step
+    rule_rng('cliffrocks')
+    for poly, cl, ref in CLIFF_LINES:
+        rk = cl.get('rocks')
+        if not rk: continue
+        # 崖の面に岩の塊を並べる（崖は「地形の急な面」と「張りついた岩」の2層で作る）
+        segL = np.hypot(*np.diff(poly, axis=0).T); s_ = 0.0
+        while s_ < segL.sum():
+            k = 0; acc = 0
+            while acc + segL[k] < s_: acc += segL[k]; k += 1
+            a, b = poly[k], poly[k + 1]; t = (s_ - acc) / segL[k]
+            x, z = a + (b - a) * t
+            nrm = np.array([-(b - a)[1], (b - a)[0]]) / segL[k]
+            if ref is not None: lowdir = nrm if np.dot(ref - np.array([x, z]), nrm) > 0 else -nrm
+            else: lowdir = -nrm if np.dot(camxz - np.array([x, z]), nrm) > 0 else nrm      # far: カメラの反対側
+            for j in range(rk.get('rows', 2)):
+                off = (j / max(1, rk.get('rows', 2) - 1) - 0.4) * cl['width'] + RNG.uniform(-0.3, 0.3)
+                px, pz = np.array([x, z]) + lowdir * off
+                if height_at(px, pz) < TS.get('water', {}).get('level', -99) - 0.3: continue
+                place(rk['asset'], px, pz, scale=RNG.uniform(*rk.get('scale', [0.8, 1.4])), y=-0.3)
+            s_ += rk.get('spacing', 1.6) * RNG.uniform(0.7, 1.2)
+    rule_rng('props')
     for p in SPEC.get('props', []):
         x, z = pt(p['screen']) if 'screen' in p else p['world']
         place(p['asset'], x, z, rot=math.radians(p.get('rot', 0)), scale=p.get('scale', 1.0), y=p.get('y'))
@@ -316,7 +377,14 @@ if __name__ == '__main__':
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUTD, 'terrain.glb'), export_format='GLB', use_selection=True,
                               export_yup=True, export_normals=True, export_vertex_color='ACTIVE', export_materials='PLACEHOLDER')
     scatter()
-    meta = dict(name=NAME, camera=cam, center=[float(cx), float(cz)], size=size,
+    # 高さマップ（水の深さ・泡に使う）。8bit、範囲は meta に
+    hmin, hmax = float(H.min()), float(H.max())
+    img = bpy.data.images.new('height', n, n, alpha=False, float_buffer=False)
+    g = ((H - hmin) / max(hmax - hmin, 1e-6)).astype(np.float32)[::-1]          # 画像の下が z の大きい側
+    img.pixels.foreach_set((np.repeat(g.ravel(), 4) * np.tile([1, 1, 1, 0], n * n) + np.tile([0, 0, 0, 1], n * n)).astype(np.float32))
+    img.filepath_raw = os.path.join(OUTD, 'height.png'); img.file_format = 'PNG'; img.save()
+    meta_terrain = dict(x0=float(xs[0]), z0=float(zs[0]), size=float(xs[-1] - xs[0]), hmin=hmin, hmax=hmax)
+    meta = dict(name=NAME, camera=cam, center=[float(cx), float(cz)], size=size, terrain=meta_terrain,
                 counts={k: len(v) for k, v in PL.items()}, assets=PL)
     json.dump(meta, open(os.path.join(OUTD, 'placements.json'), 'w'))
     print('PLACED', meta['counts'])
