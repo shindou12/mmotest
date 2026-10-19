@@ -182,7 +182,12 @@ def build_terrain():
     sep = m.node_tree.nodes.new('ShaderNodeSeparateColor')
     m.node_tree.links.new(vc.outputs['Color'], sep.inputs[0]); m.node_tree.links.new(sep.outputs[0], mix.inputs['Factor'])
     mix.inputs[6].default_value = (0.25, 0.38, 0.09, 1); mix.inputs[7].default_value = (0.62, 0.5, 0.3, 1)
-    m.node_tree.links.new(mix.outputs[2], bsdf.inputs['Base Color'])
+    # G（砂・石畳）も混ぜる。色は地面の種類から
+    mix2 = m.node_tree.nodes.new('ShaderNodeMix'); mix2.data_type = 'RGBA'
+    m.node_tree.links.new(sep.outputs[1], mix2.inputs['Factor']); m.node_tree.links.new(mix.outputs[2], mix2.inputs[6])
+    alt_kind = SPEC.get('ground', {}).get('alt', 'sand')
+    mix2.inputs[7].default_value = (0.55, 0.55, 0.52, 1) if alt_kind == 'cobble' else (0.78, 0.66, 0.45, 1)
+    m.node_tree.links.new(mix2.outputs[2], bsdf.inputs['Base Color'])
     bsdf.inputs['Roughness'].default_value = 1.0; bsdf.inputs['Specular IOR Level'].default_value = 0
     me.materials.append(m)
     ob = bpy.data.objects.new('terrain', me); bpy.context.scene.collection.objects.link(ob)

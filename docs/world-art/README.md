@@ -39,11 +39,17 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
 ## 現在の状態（最良版）
-- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v11.webp`
+- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v13.webp`
 - south_coast（同じ規則で作った別の地図・崖と海）: `art/shots/south_coast/v07.webp`、歩いたとき `walk_sheet.webp`
 - town_plaza（同じ規則で作った町の通り）: `art/shots/town_plaza/v03.webp`
 - 3 枚の並び: `art/shots/all_v.webp`
 - 詳細と経緯は `experiments.md` の「履歴」。
+
+## 残っている主な差（未完了）
+- orc_meadow と R01: 輝度比 2.65（見本 3.08）、日なたの草の色相 61°（見本 67°・彩度 0.38 対 0.49）、
+  見本の上端の海と大きな暗い樹冠、拒馬の杭の明るい木口が白すぎる、オークの村の小物（骨の山・杭・樽）がない。
+- R06〜R18 はファイルがなく数値で比べていない（海辺と町は目視の規則のみ）。洞窟（R14〜R17）は手を付けていない。
+- 実機の FPS は未計測。家に当たり判定がない（通り抜けられる）。
 
 ## 次にやること（優先順）
 1. 町を見本の密度に: 手すり・花箱・屋台・ドーマー窓、R04 のドーム状の石の家。家の当たり判定（今は歩いて通り抜けられる）。

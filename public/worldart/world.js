@@ -359,7 +359,7 @@ window.__moveTo = (x, z) => {
   target.set(x, groundY(x, z), z); marker.position.set(x, target.y + 0.85, z);
   placeCamera(); fitShadow(); return [target.x, target.y, target.z];
 };
-window.__renderOnce = () => { window.__pause = true; composer.render(); return true; };
+window.__renderOnce = () => { window.__pause = true; renderer.info.autoReset = false; renderer.info.reset(); composer.render(); window.__info = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }; return true; };
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); dof.uniforms.uRes.value.set(innerWidth, innerHeight);

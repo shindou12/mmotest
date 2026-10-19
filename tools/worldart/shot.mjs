@@ -18,5 +18,6 @@ await p.evaluate(() => { window.__pause = true; });
 await p.waitForTimeout(500);
 await p.evaluate(() => window.__renderOnce());
 await p.screenshot({ path: out, timeout: 600000 });
-console.log(`${out} ${((Date.now() - t0) / 1000).toFixed(1)}s ${errs.join(' | ') || 'no errors'}`);
+const info = await p.evaluate(() => window.__info);
+console.log(`${out} ${((Date.now() - t0) / 1000).toFixed(1)}s calls=${info?.calls} tris=${info?.triangles} ${errs.join(' | ') || 'no errors'}`);
 await b.close();
