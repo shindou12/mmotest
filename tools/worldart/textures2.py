@@ -16,7 +16,7 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else 'public/worldart/tex'
 os.makedirs(OUT, exist_ok=True)
 SS = 2   # 描くときの倍率
 # 葉の色（暗・中・明）。暖かい太陽の下でも葉が緑（≈ 80°）に見えるよう、絵では青寄りの緑にしておく（E18）
-LEAF_DARK, LEAF_MID, LEAF_HI = (0.27, 0.38, 0.12), (0.38, 0.60, 0.24), (0.54, 0.80, 0.40)
+LEAF_DARK, LEAF_MID, LEAF_HI = (0.31, 0.36, 0.20), (0.50, 0.61, 0.26), (0.74, 0.84, 0.36)   # L04: 日なたの葉は黄緑（見本② B01/B02 の木 65〜70°）
 
 
 def rng(seed): return np.random.default_rng(seed)
@@ -245,6 +245,91 @@ def noise_soft(n=256, seed=109):
     Image.fromarray((np.stack(chans, -1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'noise_soft.png'))
 
 
+def canvas_beige(n=512, seed=110):
+    """円錐の天幕の布（B01 右下・B02 左下）: ベージュ、縦の縫い目とたるみの陰、こげ茶の渦巻き模様。u=周、v=高さ"""
+    r = rng(seed)
+    x = np.linspace(0, 1, n)[None, :]; y = np.linspace(0, 1, n)[:, None]
+    fold = 0.5 + 0.5 * np.sin(x * 2 * math.pi * 8)
+    base = lerp((0.70, 0.62, 0.44), (0.88, 0.82, 0.64), (0.55 + 0.45 * fold)[..., None] * np.ones((n, 1, 1)))
+    base = base * (0.94 + 0.06 * rng(seed).standard_normal((n, n, 1)).clip(-1, 1) * 0.5)
+    img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB'); d = ImageDraw.Draw(img)
+    for k in range(8):
+        cx = (k + 0.5) / 8 * n; cy = n * 0.62
+        pts = [(cx + math.cos(t) * t * 3.2, cy + math.sin(t) * t * 3.2) for t in np.linspace(0, 4.2 * math.pi, 80)]
+        d.line(pts, fill=(118, 92, 60), width=5)
+        d.line([(k / 8 * n, 0), (k / 8 * n, n)], fill=(150, 128, 90), width=3)
+    d.rectangle([0, n - 34, n, n - 26], fill=(120, 96, 64))
+    img.save(os.path.join(OUT, 'canvas_beige.png'))
+
+
+def canvas_blue(n=512, seed=111):
+    """布の天幕の布（B01 左下）: 青みの灰、しわの陰、縁のかがり"""
+    r = rng(seed)
+    w = r.standard_normal((n, n)); f = np.sqrt(np.fft.fftfreq(n)[:, None] ** 2 + np.fft.fftfreq(n)[None, :] ** 2)
+    v = np.real(np.fft.ifft2(np.fft.fft2(w) * np.exp(-(f * n / 24) ** 2))); v = (v - v.min()) / (v.max() - v.min())
+    base = lerp((0.66, 0.66, 0.84), (0.84, 0.84, 0.96), v[..., None])   # 薄い藤色（B01）
+    img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB'); d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, n, 10], fill=(120, 124, 140)); d.rectangle([0, n - 10, n, n], fill=(120, 124, 140))
+    img.save(os.path.join(OUT, 'canvas_blue.png'))
+
+
+def lavender(n=256, seed=112):
+    """ラベンダーの株（B01・B02）: 細い茎の先に紫の穂。下端が根元"""
+    r = rng(seed); W = n * SS
+    img = canvas(n, n); d = ImageDraw.Draw(img)
+    for k in range(9):
+        x0 = W / 2 + r.normal(0, W * 0.08); lean = r.normal(0, 0.18) * W; h = r.uniform(0.6, 0.95) * W
+        d.line([(x0, W), (x0 + lean, W - h)], fill=col((0.36, 0.48, 0.22)), width=int(W * 0.012))
+        for j in range(10):
+            t = 0.62 + 0.38 * j / 9; px, py = x0 + lean * t, W - h * t
+            rr = W * 0.022 * (1.1 - 0.5 * j / 9)
+            c = lerp((0.46, 0.36, 0.72), (0.74, 0.64, 0.92), r.random())
+            d.ellipse([px - rr, py - rr * 1.3, px + rr, py + rr * 1.3], fill=col(c))
+    finish(img, n, n, 'lavender.png')
+
+
+def flagstone(n=1024, seed=113):
+    """切り石の敷石（B04 右）: 横長の長方形（1 枚 ≈ 0.75×0.45m、絵 1 枚 = 3m）、目地に苔、石ごとの明暗"""
+    r = rng(seed)
+    img = Image.new('RGB', (n, n), (84, 96, 70)); d = ImageDraw.Draw(img)
+    rows = 7; h = n / rows
+    for i in range(rows):
+        x = -r.uniform(0, n * 0.25)
+        while x < n:
+            w = r.uniform(0.2, 0.32) * n
+            t = r.uniform(0, 1); c = lerp((0.62, 0.62, 0.60), (0.80, 0.80, 0.77), t)
+            for dx in (0, n, -n):
+                d.rectangle([x + dx + 4, i * h + 4, x + dx + w - 4, i * h + h - 4], fill=col(c))
+                d.line([(x + dx + 6, i * h + 6), (x + dx + w - 7, i * h + 6)], fill=col(c * 1.08), width=4)
+                d.line([(x + dx + 6, i * h + h - 6), (x + dx + w - 7, i * h + h - 6)], fill=col(c * 0.85), width=4)
+            x += w
+    a = np.asarray(img).astype(float) / 255
+    def fn(scale, s_):
+        w_ = rng(s_).standard_normal((n, n)); f = np.sqrt(np.fft.fftfreq(n)[:, None] ** 2 + np.fft.fftfreq(n)[None, :] ** 2)
+        v = np.real(np.fft.ifft2(np.fft.fft2(w_) * np.exp(-(f * scale) ** 2))); return (v - v.min()) / (v.max() - v.min())
+    a *= (0.9 + 0.18 * fn(n / 30, seed + 1)[..., None])
+    moss = np.clip((fn(n / 10, seed + 2) - 0.6) * 4, 0, 1)[..., None] * 0.6
+    a = lerp(a, a * np.array([0.78, 0.98, 0.6]), moss)
+    save = Image.fromarray((np.clip(a, 0, 1) * 255).astype(np.uint8), 'RGB'); save.save(os.path.join(OUT, 'ground_flagstone.png'))
+
+
+def meander(n=512, seed=114):
+    """台座の石（B04）: 明るい灰の石に、帯状の雷文（ギリシャの鍵模様）。上下に帯、中は切り石"""
+    img = Image.new('RGB', (n, n), (176, 178, 170)); d = ImageDraw.Draw(img)
+    for k in range(4):
+        y = k * n / 4 + n / 8
+        d.line([(0, y), (n, y)], fill=(140, 142, 134), width=3)
+    band = (int(n * 0.36), int(n * 0.64)); d.rectangle([0, band[0], n, band[1]], fill=(186, 188, 180))
+    step = n / 8; y0, y1 = band[0] + 14, band[1] - 14
+    for k in range(8):
+        x = k * step
+        pts = [(x + 8, y1), (x + 8, y0), (x + step - 8, y0), (x + step - 8, y1 - 26), (x + 34, y1 - 26), (x + 34, y0 + 26), (x + step - 34, y0 + 26)]
+        d.line(pts, fill=(118, 120, 112), width=7)
+    d.rectangle([0, band[0], n, band[0] + 4], fill=(128, 130, 122)); d.rectangle([0, band[1] - 4, n, band[1]], fill=(128, 130, 122))
+    img.save(os.path.join(OUT, 'stone_meander.png'))
+
+
 if __name__ == '__main__':
     spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
+    canvas_beige(); canvas_blue(); lavender(); flagstone(); meander()
     print('textures2 ->', OUT)

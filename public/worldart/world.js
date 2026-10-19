@@ -34,7 +34,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = flag('shadow');
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = { pcfsoft: THREE.PCFSoftShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap }[q.get('smap') || spec.shadowMap || 'pcfsoft'];
 renderer.toneMapping = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping }[q.get('tone') || spec.tone || 'aces'];
 renderer.toneMappingExposure = num('exposure', P.exposure);
 document.body.appendChild(renderer.domElement);
@@ -43,14 +43,32 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(spec.sky?.color || '#cfe0ee');
 
 // ---------------------------------------------------------------- カメラ
-const C = spec.camera;
-const camera = new THREE.PerspectiveCamera(num('fov', C.fov), innerWidth / innerHeight, 1, 400);
+// 固定ビュー: ?view=<名前> で地図の views（見本の基準カメラ）か、標準ビュー（oblique/side/top/walker/near/far）を選ぶ。
+//   標準ビューは基準ビュー（?base= か地図の camera）の注目点のまわりに、同じ光・同じ解像度で置く
+const STD_VIEWS = {
+  oblique: { yaw: 45, pitch: 40, dist: 26 },
+  side: { yaw: 90, pitch: 18, dist: 30 },
+  top: { yaw: 0, pitch: 85, dist: 40 },
+  walker: { yaw: 20, pitch: 6, dist: 9, ty: 1.6 },
+  near: { yaw: 0, pitch: 45, dist: 9 },
+  far: { yaw: 0, pitch: 52, dist: 60 },
+};
+function resolveView(v, base) {
+  const baseCam = (spec.views && spec.views[base]) || spec.camera;
+  if (v && spec.views && spec.views[v]) return { ...spec.camera, ...spec.views[v] };
+  if (v && STD_VIEWS[v]) return { ...baseCam, ...STD_VIEWS[v], yaw: baseCam.yaw + STD_VIEWS[v].yaw };
+  return baseCam;
+}
+const C = resolveView(q.get('view'), q.get('base'));
+const camera = new THREE.PerspectiveCamera(num('fov', C.fov), innerWidth / innerHeight, 0.3, 600);
 const target = new THREE.Vector3(...C.target);
+let TY = num('ty', C.ty ?? 0);   // 注目点を地面から上げる（歩行者の目線）
 const camState = { yaw: num('yaw', C.yaw), pitch: num('pitch', C.pitch), dist: num('dist', C.dist) };
 function placeCamera() {
   const y = THREE.MathUtils.degToRad(camState.yaw), p = THREE.MathUtils.degToRad(camState.pitch);
-  camera.position.set(target.x + camState.dist * Math.sin(y) * Math.cos(p), target.y + camState.dist * Math.sin(p), target.z + camState.dist * Math.cos(y) * Math.cos(p));
-  camera.lookAt(target);
+  const tgt = target.clone(); tgt.y += TY;
+  camera.position.set(tgt.x + camState.dist * Math.sin(y) * Math.cos(p), tgt.y + camState.dist * Math.sin(p), tgt.z + camState.dist * Math.cos(y) * Math.cos(p));
+  camera.lookAt(tgt);
   camera.updateMatrixWorld();
   OCC.cam.value.copy(camera.position); OCC.tgt.value.copy(target); OCC.tgt.value.y += 0.9;
 }
@@ -68,11 +86,12 @@ const sunDir = new THREE.Vector3();
 sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
-sun.shadow.radius = 2;
+sun.shadow.radius = num('srad', spec.shadowRadius ?? 2); sun.shadow.blurSamples = 16;
 scene.add(hemi, sun, sun.target);
 function fitShadow() {
   // 影の範囲: 画面に映る地面を覆う
-  const half = camState.dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * 1.9 + 8;
+  let half = camState.dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * 1.9 + 8;
+  if (camState.pitch < 30) half = Math.max(half, 45);   // 低いビューは奥まで影を出す
   sun.target.position.copy(target).add(new THREE.Vector3(0, 0, -2));
   sun.position.copy(sun.target.position).addScaledVector(sunDir, 80);
   Object.assign(sun.shadow.camera, { left: -half * 1.3, right: half * 1.3, top: half, bottom: -half, near: 1, far: 200 });
@@ -88,12 +107,12 @@ const tex = (name, srgb = true) => {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 };
-const T = { noise: tex('noise_soft', false), crack: tex('rock_crack'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
+const T = { flag: tex('ground_flagstone'), noise: tex('noise_soft', false), crack: tex('rock_crack'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
 
 // ---------------------------------------------------------------- 地面の材質
 // 頂点色 R=土の道 G=砂/石畳 B=岩肌。境目は草の絵の明るさで崩してぎざぎざにする
 const GROUND = spec.ground || {};
-const altTex = GROUND.alt === 'cobble' ? T.cobble : T.sand;
+const altTex = GROUND.alt === 'cobble' ? T.cobble : GROUND.alt === 'flagstone' ? T.flag : T.sand;
 const rockTex = GROUND.rock === 'crack' ? T.crack : T.rock;   // 急な面の岩肌（crack: 第 2 世代、1.6m で貼る）
 const rockScale = GROUND.rock === 'crack' ? 1.6 : 4.5;
 function groundMaterial() {
@@ -102,7 +121,7 @@ function groundMaterial() {
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
       uAltTint: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) },
-      uLushTint: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmt: { value: num('lush', GROUND.lushAmt ?? 0) },
+      uLushTint: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmt: { value: num('lush', GROUND.lushAmt ?? 0) }, uLushBias: { value: num('lushBias', GROUND.lushBias ?? 0) },
       uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
       uDirtTint: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
       uAltScale: { value: GROUND.altScale || 6.0 },
@@ -113,7 +132,7 @@ function groundMaterial() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -124,7 +143,7 @@ function groundMaterial() {
         grass *= mix(0.86, 1.1, smoothstep(0.25, 0.6, big));
         // 草地の色むら（20m 前後）: 金色の草原 ↔ 茂った緑の草。見本 B03 の地面の大きな黄緑/深緑の斑
         vec3 nz3 = texture2D(tNoise, wp / 28.0).rgb;
-        float lush = smoothstep(0.42, 0.6, nz3.r * 0.55 + nz3.g * 0.3 + nz3.b * 0.15);
+        float lush = smoothstep(0.42 - uLushBias, 0.6 - uLushBias, nz3.r * 0.55 + nz3.g * 0.3 + nz3.b * 0.15);
         grass *= mix(vec3(1.0), uLushTint, lush * uLushAmt);
         vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
         vec3 alt = texture2D(tAlt, wp / uAltScale).rgb * uAltTint;
@@ -197,13 +216,13 @@ function addRockTriplanar(sh) {
 // 草の房も地面と同じ色むら（lush）に従う
 function addLushToGrass(sh) {
   Object.assign(sh.uniforms, { tNoiseG: { value: T.noise }, uLushTintG: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) },
-    uLushAmtG: { value: num('lush', GROUND.lushAmt ?? 0) }, uGrassTintG: { value: new THREE.Color(...(GROUND.tuftTint || [1, 1, 1])) } });
+    uLushAmtG: { value: num('lush', GROUND.lushAmt ?? 0) }, uLushBiasG: { value: num('lushBias', GROUND.lushBias ?? 0) }, uGrassTintG: { value: new THREE.Color(...(GROUND.tuftTint || [1, 1, 1])) } });
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vGW;')
     .replace('#include <project_vertex>', '#include <project_vertex>\nvGW = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;');
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tNoiseG; uniform vec3 uLushTintG, uGrassTintG; uniform float uLushAmtG; varying vec2 vGW;')
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D tNoiseG; uniform vec3 uLushTintG, uGrassTintG; uniform float uLushAmtG, uLushBiasG; varying vec2 vGW;')
     .replace('#include <color_fragment>', `#include <color_fragment>
       vec3 nzg = texture2D(tNoiseG, vGW / 28.0).rgb;
-      float lushg = smoothstep(0.42, 0.6, nzg.r * 0.55 + nzg.g * 0.3 + nzg.b * 0.15);
+      float lushg = smoothstep(0.42 - uLushBiasG, 0.6 - uLushBiasG, nzg.r * 0.55 + nzg.g * 0.3 + nzg.b * 0.15);
       diffuseColor.rgb *= uGrassTintG * mix(vec3(1.0), uLushTintG, lushg * uLushAmtG);`);
 }
 function fixMaterial(mesh) {
@@ -324,9 +343,9 @@ composer.addPass(new OutputPass());   // トーンマップと sRGB をここで
 const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 const grade = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uSat: { value: num('sat', P.sat) }, uCon: { value: num('contrast', P.contrast) },
-    uLift: { value: new THREE.Vector3(...P.lift) }, uGain: { value: new THREE.Vector3(...P.gain) } },
+    uLift: { value: new THREE.Vector3(...P.lift) }, uGain: { value: new THREE.Vector3(...P.gain) }, uVig: { value: 0 }, uTopDark: { value: 0 } },
   vertexShader: VS,
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat, uCon; uniform vec3 uLift, uGain; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat, uCon, uVig, uTopDark; uniform vec3 uLift, uGain; varying vec2 vUv;
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -334,6 +353,8 @@ const grade = new ShaderPass({
       c.rgb = (c.rgb - 0.5) * uCon + 0.5;
       c.rgb += uLift * (1.0 - l);
       c.rgb *= mix(vec3(1.0), uGain, smoothstep(0.2, 0.8, l));
+      c.rgb *= 1.0 - uVig * smoothstep(0.3, 0.85, length((vUv - 0.5) * vec2(1.25, 1.0)));
+      c.rgb *= 1.0 - uTopDark * smoothstep(0.62, 1.0, vUv.y);
       gl_FragColor = vec4(clamp(c.rgb, 0.0, 1.0), 1.0);
     }`,
 });
@@ -359,6 +380,15 @@ const dof = new ShaderPass({
 });
 if (flag('post')) { composer.addPass(grade); if (flag('dof')) composer.addPass(dof); }
 
+// ビューの照明の上書き（見本のカットシーンなど、カメラ演出が違う見本に合わせる）
+const LIGHT0 = { sun: sun.intensity, hemi: hemi.intensity, exposure: renderer.toneMappingExposure, sat: grade.uniforms.uSat.value };
+function applyLight(L = {}) {
+  sun.intensity = LIGHT0.sun * (L.sun ?? 1); hemi.intensity = LIGHT0.hemi * (L.hemi ?? 1);
+  renderer.toneMappingExposure = LIGHT0.exposure * (L.exposure ?? 1); grade.uniforms.uSat.value = LIGHT0.sat * (L.sat ?? 1);
+  grade.uniforms.uVig.value = L.vignette ?? 0; grade.uniforms.uTopDark.value = L.topDark ?? 0;
+}
+applyLight(C.light);
+
 // ---------------------------------------------------------------- 動かす（walk=1）
 const keys = new Set();
 addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
@@ -375,6 +405,7 @@ const groundY = (x, z) => {
   const hit = ray.intersectObjects(groundMeshes, false)[0];
   return hit ? hit.point.y : 0;
 };
+if (spec.views) { target.y = groundY(target.x, target.z); placeCamera(); fitShadow(); }   // 区画のある地図: 注目点を地面に置く
 marker.position.set(target.x, groundY(target.x, target.z) + 0.85, target.z);
 let last = performance.now();
 function tick(now) {
@@ -400,6 +431,16 @@ function tick(now) {
 window.__moveTo = (x, z) => {
   target.set(x, groundY(x, z), z); marker.position.set(x, target.y + 0.85, z);
   placeCamera(); fitShadow(); return [target.x, target.y, target.z];
+};
+// 撮影用: 読み込み済みのまま別のビューへ切り替える（views.mjs が使う）
+window.__setView = (v, base) => {
+  const c = resolveView(v, base);
+  applyLight(c.light);
+  target.set(...c.target); target.y = groundY(target.x, target.z);
+  Object.assign(camState, { yaw: c.yaw, pitch: c.pitch, dist: c.dist }); TY = c.ty ?? 0;
+  camera.fov = c.fov; camera.updateProjectionMatrix();
+  marker.position.set(target.x, target.y + 0.85, target.z);
+  placeCamera(); fitShadow(); return true;
 };
 window.__renderOnce = () => { window.__pause = true; renderer.info.autoReset = false; renderer.info.reset(); composer.render(); window.__info = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }; return true; };
 addEventListener('resize', () => {

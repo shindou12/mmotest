@@ -293,10 +293,10 @@
  },
  {
   "name": "palm2_a",
-  "tris": 210,
+  "tris": 246,
   "size": [
-   2.27,
-   2.46,
+   2.44,
+   2.34,
    3.59
   ],
   "zmin": -0.3,
@@ -308,10 +308,10 @@
  },
  {
   "name": "palm2_b",
-  "tris": 210,
+  "tris": 246,
   "size": [
-   2.56,
-   2.58,
+   2.6,
+   2.69,
    4.23
   ],
   "zmin": -0.3,
@@ -430,6 +430,198 @@
   "zmin": -0.3,
   "mats": [
    "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "teepee",
+  "tris": 95,
+  "size": [
+   3.89,
+   3.89,
+   3.88
+  ],
+  "zmin": -0.02,
+  "mats": [
+   "canvas_beige",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "tarp_tent",
+  "tris": 196,
+  "size": [
+   4.26,
+   3.56,
+   1.76
+  ],
+  "zmin": -0.06,
+  "mats": [
+   "crate",
+   "canvas_blue",
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "barrel",
+  "tris": 156,
+  "size": [
+   0.76,
+   0.76,
+   0.9
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cart_frame",
+  "tris": 204,
+  "size": [
+   1.92,
+   1.37,
+   0.96
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "stump",
+  "tris": 70,
+  "size": [
+   1.33,
+   1.26,
+   0.65
+  ],
+  "zmin": -0.08,
+  "mats": [
+   "bark",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "lavender",
+  "tris": 12,
+  "size": [
+   0.77,
+   0.76,
+   0.74
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "leaf_lavender"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "stone_steps",
+  "tris": 168,
+  "size": [
+   2.82,
+   4.05,
+   2.29
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "flagstone",
+   "stone"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "statue",
+  "tris": 11932,
+  "size": [
+   2.44,
+   2.36,
+   3.57
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "stone",
+   "stone_meander",
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "stone_lantern",
+  "tris": 68,
+  "size": [
+   0.84,
+   0.84,
+   2.02
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "stone"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "curb",
+  "tris": 12,
+  "size": [
+   0.3,
+   3.0,
+   0.35
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "stone"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "rail_fence",
+  "tris": 48,
+  "size": [
+   0.12,
+   3.0,
+   1.1
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple_big",
+  "tris": 378,
+  "size": [
+   5.3,
+   5.88,
+   7.9
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm2_low",
+  "tris": 246,
+  "size": [
+   1.79,
+   1.78,
+   0.87
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm2"
   ],
   "colors": 1
  },

@@ -74,6 +74,11 @@ M_FIRF = lambda: material('leaf_firfrond', 'frond_fir.png', alpha=True)
 M_GRASS2 = lambda: material('grass_tall', 'grass_tall.png', alpha=True)
 M_ROCK2 = lambda: material('rock_crack', 'rock_crack.png')
 M_PALM2 = lambda: material('leaf_palm2', 'frond_palm.png', alpha=True)
+M_CANVAS_B = lambda: material('canvas_beige', 'canvas_beige.png')
+M_CANVAS_BL = lambda: material('canvas_blue', 'canvas_blue.png')
+M_LAVENDER = lambda: material('leaf_lavender', 'lavender.png', alpha=True)
+M_MEANDER = lambda: material('stone_meander', 'stone_meander.png')
+M_FLAG = lambda: material('flagstone', 'ground_flagstone.png')
 M_FLOWER = lambda: material('leaf_flower', 'flowers.png', alpha=True)
 M_PALM = lambda: material('leaf_palm', 'leaf_palm.png', alpha=True)
 
@@ -633,7 +638,7 @@ def palm2(name, seed, height=3.2, frond=1.15, lean=0.6):
     pts = [Vector((0, 0, -0.3))] + [dv * lean * (t ** 2) + UP * height * t for t in [i / 8 for i in range(9)]]
     tube(B, pts, [0.13] + [0.12 - 0.04 * (i / 8) for i in range(9)], M_BARK(), sides=7, ao=(1.0, 1.45))
     top = pts[-1]
-    n = 14
+    n = 20
     for k in range(n):
         b = 2 * math.pi * k / n + R_.uniform(-.15, .15)
         out = Vector((math.cos(b), math.sin(b), 0)); side = out.cross(UP).normalized()
@@ -745,6 +750,246 @@ def smooth_rock(name, seed, size=(2.6, 1.8, 2.2), bulge=0.22, sub=4, flat_top=Tr
     return ob
 
 
+# ------------------------------------------------------------ 見本②（南パヨン）の小物と石の構造物
+def teepee(name, seed, r=1.7, h=3.1):
+    """円錐の天幕（B01 右下・B02 左下）: 10 角の円錐の布（canvas_beige、u=周 v=高さ）、入口の三角の切れ目、
+    てっぺんから突き出た 6 本の木の支柱、裾の張り綱"""
+    R_ = random.Random(seed); B = Builder(); n = 10
+    top = Vector((0, 0, h)); door = 0
+    for i in range(n):
+        a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+        p0 = Vector((math.cos(a0) * r, math.sin(a0) * r, 0)); p1 = Vector((math.cos(a1) * r, math.sin(a1) * r, 0))
+        if i == door:     # 入口: 下 45% を開ける
+            q0 = p0.lerp(top, 0.45); q1 = p1.lerp(top, 0.45)
+            idx = [B.add_v(q) for q in (q0, q1, top)]
+            B.face(idx, [(i / n, 0.45), ((i + 1) / n, 0.45), ((i + 0.5) / n, 1.0)], [(0.95,) * 3] * 3, None, M_CANVAS_B())
+            continue
+        idx = [B.add_v(q) for q in (p0, p1, top)]
+        B.face(idx, [(i / n, 0.0), ((i + 1) / n, 0.0), ((i + 0.5) / n, 1.0)], [(0.8,) * 3, (0.8,) * 3, (1.05,) * 3], None, M_CANVAS_B())
+    # 内側（暗い）: 入口から見える
+    idx = [B.add_v(q) for q in (Vector((r * 0.95, 0, 0.02)), Vector((-r * 0.95, 0.2, 0.02)), top * 0.98)]
+    B.face(idx, [(0, 0), (1, 0), (0.5, 1)], [(0.25,) * 3] * 3, None, M_CANVAS_B())
+    for k in range(6):
+        a = 2 * math.pi * k / 6 + 0.3
+        base = Vector((math.cos(a) * r * 0.92, math.sin(a) * r * 0.92, 0))
+        d = (top - base).normalized()
+        tube(B, [base, top + d * R_.uniform(0.55, 0.85)], [0.055, 0.045], M_WOOD(), sides=5, ao=(0.9, 1.3), u0=0.5, u1=1.0)
+    for k in range(4):
+        a = 2 * math.pi * k / 4 + 0.8
+        tube(B, [Vector((math.cos(a) * r * 0.8, math.sin(a) * r * 0.8, h * 0.35)), Vector((math.cos(a) * (r + 1.0), math.sin(a) * (r + 1.0), 0.0))],
+             [0.012, 0.012], M_WOOD(), sides=3, ao=(0.8, 0.8))
+    return B.build(name, smooth=False)
+
+
+def tarp_tent(name, seed):
+    """布をかけた荷の山（B01 左下、L03 で作り直し）: 2 段の木の荷箱に、薄い藤色の布を上からかぶせて四隅を外へ引く。
+    布は 7x7 の面で、荷の上は平ら、縁は垂れ、四隅は斜めの金属の杭へ引かれる"""
+    R_ = random.Random(seed); B = Builder()
+    L, W = 2.1, 1.6
+    box(B, -L / 2, -W / 2, 0.0, L / 2, W / 2, 0.75, M_CRATE(), (0.8, 0.8), lambda p: 0.7 + 0.3 * p.z / 0.75)
+    box(B, -L / 2 + 0.15, -W / 2 + 0.1, 0.75, L / 2 - 0.1, W / 2 - 0.15, 1.45, M_CRATE(), (0.8, 0.8), lambda p: 0.75 + 0.25 * (p.z - 0.75) / 0.7)
+    box(B, L / 2 - 0.05, -W / 2 - 0.1, 0.0, L / 2 + 0.55, W / 2 - 0.2, 0.9, M_CRATE(), (0.8, 0.8), lambda p: 0.7 + 0.3 * p.z / 0.9)   # 横の箱（布の外）
+    N = 7; HT = 1.55
+    grid = []
+    for j in range(N):
+        row = []
+        for i in range(N):
+            u, v = i / (N - 1), j / (N - 1)
+            x = (u - 0.5) * (L + 0.5); y = (v - 0.5) * (W + 0.5)
+            inside_ = abs(x) < L / 2 - 0.05 and abs(y) < W / 2 - 0.05
+            edge = max(abs(x) / (L / 2 + 0.25), abs(y) / (W / 2 + 0.25))
+            z = HT - (0.0 if inside_ else (edge - 0.82) * 6.0)          # 縁で垂れる
+            corner = abs(abs(x) - (L / 2 + 0.25)) < 0.05 and abs(abs(y) - (W / 2 + 0.25)) < 0.05
+            if corner: z = HT + 0.12                                     # 四隅は杭に引かれて持ち上がる
+            z += R_.uniform(-0.03, 0.03) - 0.05 * math.sin(math.pi * u) * math.sin(math.pi * v)
+            row.append(B.add_v(Vector((x, y, max(0.35, z)))))
+        grid.append(row)
+    for j in range(N - 1):
+        for i in range(N - 1):
+            B.face([grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]],
+                   [(i / (N - 1), j / (N - 1)), ((i + 1) / (N - 1), j / (N - 1)), ((i + 1) / (N - 1), (j + 1) / (N - 1)), (i / (N - 1), (j + 1) / (N - 1))],
+                   [(1.0,) * 3] * 4, None, M_CANVAS_BL())
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            c = Vector((sx * (L / 2 + 0.25), sy * (W / 2 + 0.25), HT + 0.12))
+            g = Vector((sx * (L / 2 + 1.0), sy * (W / 2 + 0.9), -0.05))
+            tube(B, [c, g], [0.035, 0.03], M_PAINT(), sides=5, ao=(0.55, 0.45))
+            box(B, g.x - 0.08, g.y - 0.08, -0.05, g.x + 0.08, g.y + 0.08, 0.1, M_PAINT(), (0.3, 0.3), lambda p: 0.5)
+    return B.build(name, smooth=False)
+
+
+def barrel(name, seed, r=0.38, h=0.9):
+    """樽: ふくらんだ胴（12 角）と 3 本の暗い帯、明るい木口のふた"""
+    B = Builder(); n = 12; rings = []
+    zs = [0, 0.12, 0.3, 0.5, 0.7, 0.88, 1.0]
+    for z in zs:
+        rr = r * (0.86 + 0.14 * math.sin(math.pi * z))
+        rings.append([B.add_v(Vector((math.cos(2 * math.pi * i / n) * rr, math.sin(2 * math.pi * i / n) * rr, z * h))) for i in range(n + 1)])
+    band = lambda z: abs(z - 0.12) < 0.07 or abs(z - 0.88) < 0.07 or abs(z - 0.5) < 0.05
+    for j in range(len(zs) - 1):
+        for i in range(n):
+            zc = (zs[j] + zs[j + 1]) / 2
+            c = (0.45,) * 3 if band(zc) else (0.95,) * 3
+            B.face([rings[j][i], rings[j][i + 1], rings[j + 1][i + 1], rings[j + 1][i]],
+                   [(i / n * 0.5, zs[j]), ((i + 1) / n * 0.5, zs[j]), ((i + 1) / n * 0.5, zs[j + 1]), (i / n * 0.5, zs[j + 1])], [c] * 4, None, M_WOOD())
+    top = rings[-1]; cidx = B.add_v(Vector((0, 0, h)))
+    for i in range(n):
+        B.face([top[i], top[i + 1], cidx], [(0.6, 0.2), (0.9, 0.2), (0.75, 0.6)], [(1.1,) * 3] * 3, None, M_WOOD())
+    return B.build(name, smooth=True)
+
+
+def cart_frame(name, seed):
+    """木の荷車の枠（B01 中央）: 床板と、すき間のある板の囲い（四辺）、角の柱"""
+    B = Builder(); L, W, H = 1.8, 1.25, 0.95
+    ao = lambda p: 0.72 + 0.35 * min(1, p.z / H)
+    box(B, -L / 2, -W / 2, 0.25, L / 2, W / 2, 0.33, M_CRATE(), (1.2, 1.2), ao)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            box(B, sx * L / 2 - 0.06, sy * W / 2 - 0.06, 0.0, sx * L / 2 + 0.06, sy * W / 2 + 0.06, H, M_WOOD(), (0.6, 0.6), ao)
+    for k, z in enumerate((0.45, 0.65, 0.85)):
+        for sy in (-1, 1):
+            box(B, -L / 2, sy * W / 2 - 0.03, z, L / 2, sy * W / 2 + 0.03, z + 0.11, M_CRATE(), (1.2, 1.2), ao)
+        for sx in (-1, 1):
+            box(B, sx * L / 2 - 0.03, -W / 2, z, sx * L / 2 + 0.03, W / 2, z + 0.11, M_CRATE(), (1.2, 1.2), ao)
+    return B.build(name, smooth=False)
+
+
+def stump(name, seed, r=0.42, h=0.55):
+    """切り株（B01・B02）: 根の張り出した低い胴（樹皮）と、明るい木口の上面"""
+    R_ = random.Random(seed); B = Builder(); n = 10
+    rings = []
+    for z, sc in ((0.0, 1.45), (0.12, 1.15), (0.35, 1.0), (1.0, 0.96)):
+        rings.append([B.add_v(Vector((math.cos(2 * math.pi * i / n) * r * sc * (1 + (0.18 if (i % 3 == 0 and z == 0) else 0)),
+                                       math.sin(2 * math.pi * i / n) * r * sc * (1 + (0.18 if (i % 3 == 0 and z == 0) else 0)), z * h - (0.08 if z == 0 else 0)))) for i in range(n + 1)])
+    for j in range(3):
+        for i in range(n):
+            B.face([rings[j][i], rings[j][i + 1], rings[j + 1][i + 1], rings[j + 1][i]],
+                   [(i / n * 0.5, j / 3), ((i + 1) / n * 0.5, j / 3), ((i + 1) / n * 0.5, (j + 1) / 3), (i / n * 0.5, (j + 1) / 3)],
+                   [(0.6 + 0.15 * j,) * 3] * 4, None, M_BARK())
+    c = B.add_v(Vector((0, 0, h + 0.02)))
+    for i in range(n):
+        B.face([rings[3][i], rings[3][i + 1], c], [(0.55, 0.1), (0.95, 0.1), (0.75, 0.9)], [(1.2,) * 3] * 3, None, M_WOOD())
+    return B.build(name)
+
+
+def lavender_bush(name, seed):
+    """ラベンダーの株: 6 枚の縦のカードを放射状に（下端が根元）。法線は外向き + 上"""
+    R_ = random.Random(seed); B = Builder()
+    for k in range(6):
+        a = k * math.pi / 6 + R_.uniform(-.2, .2)
+        side = Vector((math.cos(a), math.sin(a), 0)); out = side.cross(UP)
+        card2(B, Vector((0, 0, 0)), (UP + out * 0.15).normalized(), side, 0.75, 0.75, M_LAVENDER(), [(0.85,) * 3, (1.1,) * 3], (out * 0.4 + UP).normalized())
+    return B.build(name)
+
+
+def stone_steps(name, seed, w=2.6, steps=12, rise=0.17, run=0.3):
+    """石段 1 列（B04 奥、L03 で作り直し）: 浅い段がたくさん、踏み面は明るく蹴上げは暗い（頂点色）。
+    列の間は細い角柱の手すり（幅 0.22m、段の高さ + 0.15m）。袖の厚い壁は付けない"""
+    B = Builder()
+    for i in range(steps):
+        z1 = (i + 1) * rise; y0 = i * run
+        hexa(B, [Vector((-w / 2, y0, -0.1)), Vector((w / 2, y0, -0.1)), Vector((w / 2, steps * run + 0.4, -0.1)), Vector((-w / 2, steps * run + 0.4, -0.1))],
+             [Vector((-w / 2, y0, z1)), Vector((w / 2, y0, z1)), Vector((w / 2, steps * run + 0.4, z1)), Vector((-w / 2, steps * run + 0.4, z1))],
+             M_FLAG(), (3, 3), lambda p: 0.82 + 0.18 * min(1, p.z / (steps * rise)))
+        # 蹴上げを暗く（直前の 6 面のうち前の面 = 3 番目の側面）
+        B.col[-4] = [(0.62,) * 3] * 4
+    for sx in (-1, 1):
+        x0 = sx * w / 2
+        pts_b = [Vector((x0 - 0.11, -0.05, -0.1)), Vector((x0 + 0.11, -0.05, -0.1)), Vector((x0 + 0.11, steps * run + 0.4, -0.1)), Vector((x0 - 0.11, steps * run + 0.4, -0.1))]
+        pts_t = [Vector((x0 - 0.11, -0.05, 0.32)), Vector((x0 + 0.11, -0.05, 0.32)), Vector((x0 + 0.11, steps * run + 0.4, steps * rise + 0.15)), Vector((x0 - 0.11, steps * run + 0.4, steps * rise + 0.15))]
+        hexa(B, pts_b, pts_t, M_STONE(), (1.5, 1.5), lambda p: 0.85)
+    return B.build(name, smooth=False)
+
+
+def pedestal_statue(name, seed):
+    """台座と座った戦士の石像（B04）: 台座 = 雷文の帯のある四角。像は球・円柱を組んでボクセルで溶かし、なめらかにした塊
+    （見本は鎧の戦士。細部は再現しない: 大きさ・シルエット・苔の色を合わせる）"""
+    R_ = random.Random(seed); B = Builder()
+    pw, pd, ph = 2.2, 1.9, 1.0
+    box(B, -pw / 2 - 0.12, -pd / 2 - 0.12, -0.2, pw / 2 + 0.12, pd / 2 + 0.12, 0.18, M_STONE(), (2, 2), lambda p: 0.8)
+    box(B, -pw / 2, -pd / 2, 0.18, pw / 2, pd / 2, ph, M_MEANDER(), (pw, ph), lambda p: 0.85 + 0.15 * p.z / ph, skip=('bottom',))
+    base_ob = B.build(name + '_base', smooth=False)
+    parts = []
+    def add(prim, loc, scale, rot=(0, 0, 0)):
+        if prim == 'sphere': bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=loc, segments=16, ring_count=10)
+        else: bpy.ops.mesh.primitive_cylinder_add(radius=1, depth=2, location=loc, vertices=14)
+        o = bpy.context.object; o.scale = scale; o.rotation_euler = rot; parts.append(o)
+    z = ph
+    add('cyl', (0, 0.1, z + 0.35), (0.75, 0.6, 0.35))                       # 腰掛け（岩）
+    add('sphere', (0, 0.15, z + 1.25), (0.62, 0.48, 0.72))                  # 胴
+    add('sphere', (0, 0.12, z + 2.05), (0.3, 0.3, 0.33))                    # 頭
+    add('sphere', (-0.62, 0.15, z + 1.62), (0.32, 0.3, 0.28))               # 肩当て
+    add('sphere', (0.62, 0.15, z + 1.62), (0.32, 0.3, 0.28))
+    add('cyl', (-0.75, -0.05, z + 1.1), (0.16, 0.16, 0.45), (0.25, 0, 0))   # 腕
+    add('cyl', (0.75, -0.05, z + 1.1), (0.16, 0.16, 0.45), (0.25, 0, 0))
+    add('cyl', (-0.32, -0.35, z + 0.72), (0.2, 0.2, 0.42), (1.35, 0, 0))    # もも
+    add('cyl', (0.32, -0.35, z + 0.72), (0.2, 0.2, 0.42), (1.35, 0, 0))
+    add('cyl', (-0.34, -0.75, z + 0.35), (0.17, 0.17, 0.38))                # すね
+    add('cyl', (0.34, -0.75, z + 0.35), (0.17, 0.17, 0.38))
+    add('sphere', (-0.34, -0.85, z + 0.06), (0.2, 0.3, 0.1))                # 足
+    add('sphere', (0.34, -0.85, z + 0.06), (0.2, 0.3, 0.1))
+    add('cyl', (0.0, -0.55, z + 1.0), (0.07, 0.07, 0.8), (0.0, 0, 0))       # 剣（ひざの間に立てる）
+    add('sphere', (0.0, -0.55, z + 1.85), (0.22, 0.06, 0.05))               # 鍔
+    for k in range(5):                                                        # 草摺（腰から垂れる板）
+        a = -0.9 + k * 0.45
+        add('cyl', (math.sin(a) * 0.55, -0.15 - math.cos(a) * 0.45, z + 0.78), (0.2, 0.05, 0.3), (0.25, 0, -a))
+    add('sphere', (-0.36, -0.95, z + 0.1), (0.24, 0.36, 0.14))                # 大きな足（指先が台座の縁に）
+    add('sphere', (0.36, -0.95, z + 0.1), (0.24, 0.36, 0.14))
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts: o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]; bpy.ops.object.join()
+    st = bpy.context.object; st.name = name + '_fig'
+    md = st.modifiers.new('rm', 'REMESH'); md.mode = 'VOXEL'; md.voxel_size = 0.07; bpy.ops.object.modifier_apply(modifier='rm')
+    md = st.modifiers.new('sm', 'SMOOTH'); md.factor = 0.6; md.iterations = 6; bpy.ops.object.modifier_apply(modifier='sm')
+    md = st.modifiers.new('dc', 'DECIMATE'); md.ratio = 0.35; bpy.ops.object.modifier_apply(modifier='dc')
+    for p_ in st.data.polygons: p_.use_smooth = True
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.cube_project(cube_size=2.0); bpy.ops.object.mode_set(mode='OBJECT')
+    st.data.materials.append(M_ROCK2())
+    ca = st.data.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+    for poly_ in st.data.polygons:
+        for l in poly_.loop_indices:
+            zz = st.data.vertices[st.data.loops[l].vertex_index].co.z
+            a = 0.7 + 0.35 * min(1, max(0, (zz - ph) / 2.2)); ca.data[l].color = (a * 0.92, a, a * 0.85, 1)
+    bpy.ops.object.select_all(action='DESELECT'); st.select_set(True); base_ob.select_set(True)
+    bpy.context.view_layer.objects.active = base_ob; bpy.ops.object.join()
+    ob = bpy.context.object; ob.name = name; ob.data.name = name; ob.select_set(False)
+    return ob
+
+
+def stone_lantern(name, seed):
+    """石の灯籠（B04）: 台・柱・火袋・笠・宝珠"""
+    B = Builder(); ao = lambda p: 0.75 + 0.3 * min(1, p.z / 1.8)
+    box(B, -0.32, -0.32, -0.1, 0.32, 0.32, 0.18, M_STONE(), (1, 1), ao)
+    tube(B, [Vector((0, 0, 0.18)), Vector((0, 0, 1.05))], [0.13, 0.11], M_STONE(), sides=8, ao=(0.8, 0.95))
+    box(B, -0.26, -0.26, 1.05, 0.26, 0.26, 1.12, M_STONE(), (1, 1), ao)
+    box(B, -0.19, -0.19, 1.12, 0.19, 0.19, 1.45, M_STONE(), (1, 1), lambda p: 0.55)
+    # 笠（四角錐）
+    tp = Vector((0, 0, 1.78))
+    cs = [Vector((-0.42, -0.42, 1.45)), Vector((0.42, -0.42, 1.45)), Vector((0.42, 0.42, 1.45)), Vector((-0.42, 0.42, 1.45))]
+    for i in range(4):
+        idx = [B.add_v(q) for q in (cs[i], cs[(i + 1) % 4], tp)]
+        B.face(idx, [(0, 0), (1, 0), (0.5, 1)], [(0.9,) * 3, (0.9,) * 3, (1.05,) * 3], None, M_STONE())
+    tube(B, [Vector((0, 0, 1.75)), Vector((0, 0, 1.92))], [0.07, 0.02], M_STONE(), sides=6, ao=(1, 1))
+    return B.build(name, smooth=False)
+
+
+def curb(name, seed, L=3.0):
+    """低い石の縁石（B04 の草地と敷石・台地の縁）: 長さ 3m、幅 0.3m、高さ 0.25m"""
+    B = Builder()
+    box(B, -0.15, -L / 2, -0.1, 0.15, L / 2, 0.25, M_STONE(), (1.5, 1.5), lambda p: 0.8 + 0.2 * min(1, p.z / 0.25))   # 長さは Y（lines の向き）
+    return B.build(name, smooth=False)
+
+
+def rail_fence(name, seed, L=3.0):
+    """木の柵（B04 奥）: 柱 2 本と横木 2 本"""
+    B = Builder()
+    for y in (-L / 2 + 0.1, L / 2 - 0.1):
+        box(B, -0.06, y - 0.06, -0.1, 0.06, y + 0.06, 1.0, M_WOOD(), (0.5, 0.5), lambda p: 0.7)
+    for z in (0.45, 0.85):
+        box(B, -0.04, -L / 2, z, 0.04, L / 2, z + 0.09, M_WOOD(), (1.5, 1.5), lambda p: 0.75)
+    return B.build(name, smooth=False)
+
+
 ASSETS = {
     'tree_broad_a': lambda n: tree_broad(n, 101),
     'tree_broad_b': lambda n: tree_broad(n, 102, height=5.0, crown=1.2),
@@ -777,6 +1022,19 @@ ASSETS = {
     # 崖の面を作る縦長の岩の柱（B03 の崖: 幅 1〜1.5m・高さ 3m 前後の膨らんだ柱が並び、すき間が暗い割れ目になる）
     'cliff_col_a': lambda n: smooth_rock(n, 944, size=(1.5, 1.1, 4.6), bulge=0.14, flat_top=False),
     'cliff_col_b': lambda n: smooth_rock(n, 945, size=(1.2, 0.95, 4.0), bulge=0.18, flat_top=False),
+    'teepee': lambda n: teepee(n, 1001),
+    'tarp_tent': lambda n: tarp_tent(n, 1002),
+    'barrel': lambda n: barrel(n, 1003),
+    'cart_frame': lambda n: cart_frame(n, 1004),
+    'stump': lambda n: stump(n, 1005),
+    'lavender': lambda n: lavender_bush(n, 1006),
+    'stone_steps': lambda n: stone_steps(n, 1007),
+    'statue': lambda n: pedestal_statue(n, 1008),   # 置くときに 1.6 倍（見本の像は台座からはみ出す大きさ）
+    'stone_lantern': lambda n: stone_lantern(n, 1009),
+    'curb': lambda n: curb(n, 1010),
+    'rail_fence': lambda n: rail_fence(n, 1011),
+    'maple_big': lambda n: maple(n, 904, width=5.6, height=7.5, base=2.4),
+    'palm2_low': lambda n: palm2(n, 953, height=0.5, frond=0.9, lean=0.1),
     'house_a': lambda n: house(n, 801),
     'house_b': lambda n: house(n, 802, w=9.0, d=5.5, h=5.4, roof_h=3.0),
     'lamp': lambda n: lamp(n, 811),

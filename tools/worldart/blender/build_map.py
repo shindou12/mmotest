@@ -50,6 +50,56 @@ def poly_of(item):
     return np.array(item['world'], float)
 
 
+# ------------------------------------------------------------ 区画（sections）: 見本ごとのカメラで画面の位置を書く
+# "sections": [{"name": "B01", "camera": {...}, "ground_h": 0, "paths": [...], "trees": [...], ...}]
+# 区画の中の screen / canopy / 画面の木立 / low:far|near は、その区画のカメラで世界座標に直してから全体の一覧に足す。
+CANOPY_H0 = {'maple_a': 3.5, 'maple_b': 3.9, 'maple_c': 3.0, 'maple_big': 5.2, 'fir2_a': 3.3, 'fir2_b': 3.8, 'palm2_a': 3.3, 'palm2_b': 3.9,
+             'clover_a': 0.4, 'clover_b': 0.4}
+
+
+def cam_frame(c):
+    t = np.array(c['target'], float); yw, pc = math.radians(c['yaw']), math.radians(c['pitch'])
+    cp = t + c['dist'] * np.array([math.sin(yw) * math.cos(pc), math.sin(pc), math.cos(yw) * math.cos(pc)])
+    f = (t - cp) / np.linalg.norm(t - cp); r = np.cross(f, [0, 1, 0]); r /= np.linalg.norm(r); u = np.cross(r, f)
+    return cp, f, r, u, math.tan(math.radians(c['fov']) / 2), c.get('aspect', SPEC.get('aspect', 16 / 9))
+
+
+def s2w(fr, uu, vv, h=0.0):
+    cp, f, r, u, th, asp = fr
+    d = f + r * (2 * uu - 1) * th * asp + u * (1 - 2 * vv) * th
+    return cp + d * ((h - cp[1]) / d[1])
+
+
+SECTION_FRAMES = []
+for sec in SPEC.get('sections', []):
+    fr = cam_frame(sec['camera']); SECTION_FRAMES.append(fr); gh = sec.get('ground_h', 0.0)
+    W2 = lambda p, h=0.0: [float(x) for x in s2w(fr, p[0], p[1], gh + h)[[0, 2]]]
+    def conv_poly(item):
+        if 'screen' in item: item['world'] = [W2(q) for q in item.pop('screen')]
+        return item
+    for k in ('paths', 'zones', 'lines'):
+        for it in sec.get(k, []): SPEC.setdefault(k, []).append(conv_poly(it))
+    for cl in sec.get('cliffs', []):
+        conv_poly(cl)
+        if 'lowPoint' not in cl and cl.get('low') in ('far', 'near'):
+            pl = np.array(cl['world']); mid = pl[len(pl) // 2]; camxz_ = fr[0][[0, 2]]
+            away = (mid - camxz_) / np.linalg.norm(mid - camxz_)
+            cl['lowPoint'] = [float(x) for x in (mid + away * 3 if cl['low'] == 'far' else mid - away * 3)]
+        SPEC.setdefault('terrain', {}).setdefault('cliffs', []).append(cl)
+    for it in sec.get('trees', []):
+        sc_ = it.get('scale', 1.0)
+        if 'canopy' in it: it['world'] = W2(it.pop('canopy'), CANOPY_H0.get(it['asset'], 4.0) * sc_ + it.get('base', 0.0))
+        elif 'screen' in it: it['world'] = W2(it.pop('screen'))
+        SPEC.setdefault('trees', []).append(it)
+    for k in ('props', 'shadow_casters'):
+        for it in sec.get(k, []):
+            if 'screen' in it: it['world'] = W2(it.pop('screen'))
+            SPEC.setdefault(k, []).append(it)
+    for gv in sec.get('groves', []):
+        if gv.get('space') == 'screen': gv['centers'] = [W2(c) for c in gv['centers']]; gv.pop('space')
+        SPEC.setdefault('groves', []).append(gv)
+
+
 # ------------------------------------------------------------ ノイズと距離
 def make_noise(seed, n=14):
     r = np.random.default_rng(seed)
@@ -112,7 +162,13 @@ for cl in TS.get('cliffs', []):
         _, cam_side = seg_dist(np.array(camxz[0]), np.array(camxz[1]), poly)
         low = (s != cam_side) if cl.get('low', 'far') == 'far' else (s == cam_side)
     sd = np.where(low, d, -d) + (N2(X, Z, 6) - 0.5) * 2 * cl.get('jag', 1.2)      # 縁をでこぼこに
-    H = H - cl['drop'] * smooth(-cl['width'] / 2, cl['width'] / 2, sd)
+    step = smooth(-cl['width'] / 2, cl['width'] / 2, sd)
+    if 'radius' in cl:   # 線のまわり radius m だけに効かせる（区画のある地図で他の区画を動かさない）
+        fade = 1 - smooth(cl['radius'] * 0.6, cl['radius'], d)
+    else:
+        fade = 1.0
+    if cl.get('raise'): H = H + cl['drop'] * (1 - step) * fade       # 高い側を持ち上げる（低い側は 0 のまま）
+    else: H = H - cl['drop'] * step * fade
     CLIFF_LINES.append((poly, cl, ref))
 
 # 注目点（カメラの target）の地面を高さ 0 にそろえる。画面の位置からの逆算は高さ 0 を前提にしているため
@@ -123,8 +179,9 @@ PATHS = []
 for p in SPEC.get('paths', []):
     poly = poly_of(p); PATHS.append((poly, p['width']))
     d, _ = seg_dist(X, Z, poly)
-    jag = (N2(X * 3.1, Z * 3.1, 5) - 0.5) * 0.9 + (N1(X * 7, Z * 7, 5) - 0.5) * 0.4   # 筆でなぞったような縁
-    w = 1 - smooth(p["width"] / 2 - 0.45, p["width"] / 2 + 0.45, d + jag)
+    jag = ((N2(X * 3.1, Z * 3.1, 5) - 0.5) * 0.9 + (N1(X * 7, Z * 7, 5) - 0.5) * 0.4) * p.get('jag', 1.0)   # 筆でなぞったような縁
+    sf = p.get('soft', 0.45)
+    w = 1 - smooth(p["width"] / 2 - sf, p["width"] / 2 + sf, d + jag)
     if p.get('mat', 'dirt') == 'dirt': DIRT = np.maximum(DIRT, w)
     elif p['mat'] == 'grass': GRASSP.append(w)       # 草の帯（石畳・砂を抜く）。あとで適用
     else: ALT = np.maximum(ALT, w)
@@ -215,7 +272,17 @@ except Exception:
 # 樹冠の中心の高さ（scale=1）。アセットの寸法から（assets_report.json の高さの約 0.65）
 CANOPY_H = {'tree_broad_a': 3.8, 'tree_broad_b': 4.4, 'pine_a': 3.5, 'pine_b': 4.3, 'bush_a': 0.6,
             'maple_a': 3.5, 'maple_b': 3.9, 'maple_c': 3.0, 'fir2_a': 3.3, 'fir2_b': 3.8, 'palm_a': 4.2, 'palm_b': 4.8, 'palm2_a': 2.9, 'palm2_b': 3.4, 'clover_a': 0.4, 'clover_b': 0.4}
+SMALL = {'grass_a', 'grass_tall_a', 'flowers_a', 'rock_c'}
+FOOT = []    # 区画のある地図: 細かい散らし物は、どれかのビューの足元の範囲の中だけに置く（数を抑える）
+for fr in SECTION_FRAMES:
+    FOOT.append(np.array([s2w(fr, u, v)[[0, 2]] for u, v in ((-0.45, -0.7), (1.45, -0.7), (1.45, 1.6), (-0.45, 1.6))]))
+
+
+CORE = [np.array([s2w(fr, u, v)[[0, 2]] for u, v in ((-0.08, -0.15), (1.08, -0.15), (1.08, 1.12), (-0.08, 1.12))]) for fr in SECTION_FRAMES]
+
+
 def place(asset, x, z, rot=None, scale=1.0, y=None):
+    if FOOT and asset in SMALL and not any(bool(inside(np.array(x), np.array(z), f)) for f in FOOT): return
     hy = height_at(x, z) + (y or 0)
     PL.setdefault(asset, []).append([round(float(x), 3), round(hy, 3), round(float(z), 3),
                                      round(float(rot if rot is not None else RNG.uniform(0, 6.283)), 3), round(float(scale), 3)])
@@ -241,7 +308,10 @@ def jitter_grid(x0, x1, z0, z1, sp):
 
 
 def visible_box(margin=8):
-    corners = np.array([screen_to_world(u, v)[[0, 2]] for u in (-0.15, 1.15) for v in (-0.25, 1.25)])
+    corners = [screen_to_world(u, v)[[0, 2]] for u in (-0.15, 1.15) for v in (-0.25, 1.25)]
+    for fr in SECTION_FRAMES: corners += [s2w(fr, u, v)[[0, 2]] for u in (-0.15, 1.15) for v in (-0.25, 1.25)]
+    if 'scatter_box' in SPEC: return tuple(SPEC['scatter_box'])
+    corners = np.array(corners)
     return corners[:, 0].min() - margin, corners[:, 0].max() + margin, corners[:, 1].min() - margin, corners[:, 1].max() + margin
 
 
@@ -267,6 +337,7 @@ def scatter():
         m = inside(P[:, 0], P[:, 1], poly)
         for x, z in P[m]:
             if path_dist(x, z) < 1.8 or not dry(x, z): continue
+            if zn.get('outside_views') and any(bool(inside(np.array(x), np.array(z), f)) for f in CORE): continue
             if any((x - fx) ** 2 + (z - fz) ** 2 < zn.get('clear', 3.0) ** 2 for fx, fz in fixed): continue
             a = zn['trees'][RNG.integers(len(zn['trees']))]
             sc0, sc1 = zn.get('scale', [0.85, 1.25])
@@ -401,7 +472,7 @@ def scatter():
     az, el = math.radians(SPEC['sun']['azimuth']), math.radians(SPEC['sun']['elevation'])
     sdir = np.array([math.sin(az), math.cos(az)]) / math.tan(el)       # 地面 1m あたりの水平のずれ（太陽の方向）
     for c in SPEC.get('shadow_casters', []):
-        gx, gz = pt(c['screen'])
+        gx, gz = pt(c['screen']) if 'screen' in c else c['world']
         hc = CANOPY_H.get(c['asset'], 4.0) * c.get('scale', 1.0)
         place(c['asset'] + '@shadow', gx + sdir[0] * hc, gz + sdir[1] * hc, scale=c.get('scale', 1.0))
     rule_rng('props')
