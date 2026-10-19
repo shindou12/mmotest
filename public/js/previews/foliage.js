@@ -61,6 +61,36 @@ export const FOLIAGE_TEX = {
     g.strokeStyle = '#4a7a30'; g.lineWidth = 3; g.beginPath();
     for (let t = 0; t <= 1; t += 0.05) { const [x, y] = P(t); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   }),
+  // ヤシ・ソテツの葉: まっすぐな軸の両側に、細長い小葉がびっしり（先ほど短く明るい）
+  frond: () => atlas('frond', 256, (g, S, R, v) => {
+    const C = ['#4a8a34', '#5c9c3c', '#70b046', '#88c252', '#a2d260', '#bcde74'];
+    const cx = S / 2, y0 = S * 0.98, len = S * 0.95;
+    for (let i = 0; i < 40; i++) {
+      const t = 0.04 + i / 40 * 0.94, y = y0 - t * len, x = cx + Math.sin(t * 2.5) * S * 0.02 * (v - 1.5), L = S * 0.36 * Math.sin(Math.PI * Math.min(1, 0.25 + t * 0.85)) * (0.85 + R() * 0.2);
+      const c = C[Math.min(5, Math.max(0, Math.round(1 + t * 3.5 + (R() - 0.5) * 1.2)))];
+      for (const sd of [-1, 1]) {
+        g.save(); g.translate(x, y); g.rotate(sd * (Math.PI / 2 - 0.5) - Math.PI / 2 * 0 + Math.PI); g.fillStyle = c;
+        g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(sd * L * 0.12, L * 0.5, sd * L * 0.06, L); g.quadraticCurveTo(-sd * L * 0.02, L * 0.5, 0, 0); g.fill(); g.restore();
+      }
+    }
+    g.strokeStyle = '#5a7a34'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, y0); g.lineTo(cx, y0 - len); g.stroke();
+  }),
+  // クローバーの房: 丸い3枚葉（ハート形の小葉）を丸く集める。茂み・下草用
+  clover: () => atlas('clover', 256, (g, S, R) => {
+    const C = ['#3a7430', '#4a8a36', '#5ca03e', '#72b448', '#8cc656', '#a8d468'];
+    for (let i = 0; i < 30; i++) {
+      const a = R() * Math.PI * 2, d = Math.sqrt(R()) * S * 0.32, x = S / 2 + Math.cos(a) * d, y = S / 2 + Math.sin(a) * d;
+      const sh = Math.min(5, Math.max(0, Math.round(2.2 - (y - S / 2) / S * 5 + i / 30 * 2 + (R() - 0.5) * 1.4))), r = 13 + R() * 8, rot = R() * 6.28;
+      g.save(); g.translate(x, y); g.rotate(rot);
+      for (let k = 0; k < 3; k++) { // ハート形の小葉3枚
+        g.save(); g.rotate(k * 2.094); g.fillStyle = C[sh];
+        g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-r * 0.9, -r * 0.3, -r * 0.7, -r * 1.2, 0, -r * 0.85); g.bezierCurveTo(r * 0.7, -r * 1.2, r * 0.9, -r * 0.3, 0, 0); g.fill();
+        g.strokeStyle = 'rgba(225,250,190,0.35)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -r * 0.75); g.stroke();
+        g.restore();
+      }
+      g.restore();
+    }
+  }),
   // 草の房: 根元から扇形に広がる細い葉。根元は暗く先は明るい
   grass: () => atlas('grass', 128, (g, S, R, v) => {
     for (let i = 0; i < 26; i++) {
@@ -216,9 +246,9 @@ export class FoliageBuilder {
     }
   }
   // 広葉樹: 幹と2〜4本の枝、それぞれの先に茂みの塊
-  tree(x, y, z, R, { size = 1, leaf = 0xffffff, bark = 0x7a5838 } = {}) {
+  tree(x, y, z, R, { size = 1, leaf = 0xffffff, bark = 0x7a5838, trunk = 1 } = {}) {
     this._y0 = y;
-    const H = (3.2 + R() * 1.2) * size, base = V(x, y, z), top = V(x + (R() - 0.5) * 0.6 * size, y + H, z + (R() - 0.5) * 0.6 * size);
+    const H = (3.2 + R() * 1.2) * size * trunk, base = V(x, y, z), top = V(x + (R() - 0.5) * 0.6 * size, y + H, z + (R() - 0.5) * 0.6 * size);
     const bc = new THREE.Color(bark).offsetHSL(0, 0, (R() - 0.5) * 0.05), lc = new THREE.Color(leaf).multiplyScalar(0.92 + R() * 0.12);
     this.limb(base.clone().add(V(0, -0.3, 0)), top, 0.32 * size, 0.16 * size, bc);
     for (let k = 0; k < 4; k++) { const a = k * 1.57 + R(); this.limb(base, base.clone().add(V(Math.cos(a) * 0.7 * size, 0.25, Math.sin(a) * 0.7 * size)), 0.18 * size, 0.04 * size, bc); } // 根の張り
@@ -276,6 +306,25 @@ export class FoliageBuilder {
       const side = V(-Math.sin(a), 0, Math.cos(a));
       const nrm = d.clone().cross(side).normalize(); if (nrm.y < 0) nrm.negate();
       this.card('fern', V(x, y, z), nrm, L * 0.8, 0, nrm.clone().add(V(0, 0.8, 0)).normalize(), col.clone().multiplyScalar(0.9 + R() * 0.15), Math.floor(R() * 4), 0.8, { up: true, h: L });
+    }
+  }
+  // クローバーの茂み: 低く横に広い塊
+  cloverBush(x, y, z, R, { size = 1, leaf = 0xf0fae0 } = {}) {
+    const r = (0.7 + R() * 0.4) * size;
+    this.clump('clover', V(x, y + r * 0.45, z), r * 1.25, r * 0.6, Math.round(18 * r * r) + 8, R, new THREE.Color(leaf).multiplyScalar(0.9 + R() * 0.15), { size: 1.0 * size, sway: 0.6, light: 0.5 });
+  }
+  // ソテツ（低いヤシ）: 短い幹の先から、弓なりの大きな葉が放射状に
+  cycad(x, y, z, R, { size = 1, trunk = 0.6 } = {}) {
+    this._y0 = y;
+    const top = V(x, y + trunk * size, z);
+    this.limb(V(x, y - 0.2, z), top, 0.2 * size, 0.15 * size, 0x6a5236);
+    const n = 12 + Math.floor(R() * 4), col = new THREE.Color(0xf4ffe4);
+    for (let i = 0; i < n; i++) {
+      // 葉は1枚の長い板。根元を少し持ち上げて外へ広げる（上から見ると羽根の星形）
+      const a = i / n * Math.PI * 2 + R() * 0.4, L = (1.5 + R() * 0.5) * size, tilt = 0.95 + R() * 0.4;
+      const d = V(Math.cos(a) * Math.sin(tilt), Math.cos(tilt), Math.sin(a) * Math.sin(tilt));
+      const side = V(-Math.sin(a), 0, Math.cos(a)), nrm = d.clone().cross(side).normalize(); if (nrm.y < 0) nrm.negate();
+      this.card('frond', top, nrm, L * 0.36, 0, nrm.clone().add(V(0, 0.9, 0)).normalize(), col.clone().multiplyScalar(0.92 + R() * 0.12), Math.floor(R() * 4), 0.7, { up: true, h: L });
     }
   }
   // 草の房: 十字に組んだ2枚の板
