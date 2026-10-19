@@ -142,7 +142,7 @@ function setTime(key) {
   const t = TIMES[key];
   sky.material.uniforms.top.value.set(t.skyTop); sky.material.uniforms.bot.value.set(t.skyBot); sky.material.uniforms.sunC.value.set(t.sunC);
   scene.fog = new THREE.Fog(t.fog, t.near, t.far);
-  hemi.color.set(t.hemiS); hemi.groundColor.set(state.ro ? 0x24483e : t.hemiG); hemi.intensity = t.hemiI * (state.ro ? 1.05 : 1);
+  hemi.color.set(t.hemiS); hemi.groundColor.set(state.ro ? 0x3a5634 : t.hemiG); hemi.intensity = t.hemiI * (state.ro ? 1.05 : 1);
   sun.intensity = t.sunI * (state.ro ? 1.05 : 1); sun.color.set(key === 'night' ? 0x8aa0e0 : state.ro && key === 'day' ? 0xffe6b8 : t.sunC);
   sunOff.set(...t.sunP);
   renderer.toneMappingExposure = t.exp;
@@ -475,7 +475,7 @@ const roPlants = (() => {
     if (!okGround(x, z, 1.3)) continue;
     const edge = smooth(5, 2, pd), clump = 0.5 + 0.5 * Math.sin(x * 0.3 + Math.sin(z * 0.23) * 2) * Math.cos(z * 0.27), keep = 0.06 + clump * 0.18 + edge * 0.6 + (shadeOf(x, z) ? 0.12 : 0);
     if (Rf() > keep) continue;
-    F.tuft(x, heightAt(x, z), z, Rf, { size: 0.8 + Rf() * 0.6 + edge * 0.3, col: shadeOf(x, z) ? shade : sun });
+    F.tuft(x, heightAt(x, z), z, Rf, { size: 1.1 + Rf() * 0.8 + edge * 0.4, col: shadeOf(x, z) ? shade : sun });
   }
   const g = F.build(); g.visible = false; scene.add(g);
   // 木の下の地面を暗くする（RO風の地面の色の掛け算に入れる）
@@ -653,9 +653,9 @@ function setStyle(ro, init = false) {
   treeGroup.visible = !ro; roPlants.group.visible = ro;
   const gm = gradientMap(); gm.image.data.set(GRAD[ro ? 'ro' : 'now']);
   gm.magFilter = gm.minFilter = ro ? THREE.LinearFilter : THREE.NearestFilter; gm.needsUpdate = true;
-  gradePass.uniforms.sat.value = ro ? 1.12 : 1.08; gradePass.uniforms.contrast.value = ro ? 1.02 : 1.04; gradePass.uniforms.vig.value = ro ? 0.2 : 0.22;
-  gradePass.uniforms.lift.value.set(...(ro ? [0.0, 0.025, 0.04] : [0, 0, 0]));
-  gradePass.uniforms.gain.value.set(...(ro ? [1.05, 1.02, 0.9] : [1, 1, 1]));
+  gradePass.uniforms.sat.value = ro ? 1.06 : 1.08; gradePass.uniforms.contrast.value = ro ? 1.02 : 1.04; gradePass.uniforms.vig.value = ro ? 0.2 : 0.22;
+  gradePass.uniforms.lift.value.set(...(ro ? [0.02, 0.03, 0.01] : [0, 0, 0]));
+  gradePass.uniforms.gain.value.set(...(ro ? [1.07, 1.04, 0.86] : [1, 1, 1]));
   bloomPass.strength = ro ? 0.35 : 0.5; tiltPass.enabled = ro;
   // 画角を変えても同じ範囲が映るように、注目点からの距離を変える
   camera.fov = ro ? RO_FOV : FOV; camera.updateProjectionMatrix();
@@ -706,8 +706,8 @@ const turn = (to, dt) => { walker.rotation.y += (((to - walker.rotation.y + Math
     const y = walkY(px, pz);
     walker.position.set(px, y + Math.abs(Math.sin(bob * 2.2)) * 0.06, pz);
     focus.lerp(tmpF.set(px, y + 1.2, pz), 1 - Math.exp(-8 * dt));
-    // ゲームのカメラ（距離 19.5、標準のズーム）。RO風は望遠で遠くから、高い角度（約 55°）で見下ろす
-    const [cy, cz] = state.ro ? [27.8, 19.5] : [12.6, 14.9];
+    // ゲームのカメラ（距離 19.5、標準のズーム）。RO風は望遠で遠くから、高い角度（約 47°）で見下ろす
+    const [cy, cz] = state.ro ? [24.8, 23.2] : [12.6, 14.9];
     camera.position.set(focus.x, focus.y + cy * state.zoom, focus.z + cz * state.zoom); camera.lookAt(focus);
     grass.U.uPlayer.value.set(px, pz);
   } else { ctl.update(); focus.copy(ctl.target); grass.U.uPlayer.value.set(walker.position.x, walker.position.z); }
@@ -718,7 +718,9 @@ const turn = (to, dt) => { walker.rotation.y += (((to - walker.rotation.y + Math
   sun.target.position.copy(focus); sun.position.copy(focus).add(sunOff);
   // ゲームと同じ近景の透過（カメラと注目点の間・カメラの近くを抜く）
   OCC.uOccCam.value.copy(camera.position); OCC.uOccTgt.value.copy(focus);
-  OCC.uOccR.value = state.walk ? 2.6 : 0; // 歩くときだけ、人形の手前を抜く OCC.uOccNear.value = Math.min(state.ro ? 4 : 6, camera.position.distanceTo(focus) * 0.5);
+  // 歩くときは人形の手前を抜く。RO風は望遠で遠くから見るので、決まった視点でも注目点の手前の木を抜く
+  OCC.uOccR.value = state.walk ? 2.6 : 0; FOLIAGE_U.uOccR.value = state.walk ? 2.6 : state.ro && state.view !== 'all' ? 4 : 0;
+  FOLIAGE_U.uOccNear.value = !state.walk && state.ro && state.view !== 'all' ? camera.position.distanceTo(focus) * 0.55 : 0;
   if (state.post) composer.render(); else renderer.render(scene, camera);
   requestAnimationFrame(loop);
 })();

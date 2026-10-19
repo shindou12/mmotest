@@ -65,32 +65,50 @@ export const FOLIAGE_TEX = {
   grass: () => atlas('grass', 128, (g, S, R, v) => {
     for (let i = 0; i < 26; i++) {
       const bx = S * (0.35 + R() * 0.3), a = (R() - 0.5) * 1.3, L = S * (0.55 + R() * 0.4), ex = bx + Math.sin(a) * L, ey = S - Math.cos(a) * L;
-      const gr = g.createLinearGradient(bx, S, ex, ey); gr.addColorStop(0, '#3a6a28'); gr.addColorStop(1, v === 3 ? '#c8d880' : R() < 0.5 ? '#9ccc5c' : '#b4d86c');
+      const gr = g.createLinearGradient(bx, S, ex, ey); gr.addColorStop(0, '#5a8434'); gr.addColorStop(1, v === 3 ? '#c8d880' : R() < 0.5 ? '#9ccc5c' : '#b4d86c');
       g.fillStyle = gr; g.beginPath(); g.moveTo(bx - 2.5, S); g.quadraticCurveTo(bx + Math.sin(a) * L * 0.5 - 1, S - Math.cos(a) * L * 0.5, ex, ey); g.quadraticCurveTo(bx + Math.sin(a) * L * 0.5 + 1, S - Math.cos(a) * L * 0.5, bx + 2.5, S); g.fill();
     }
     if (v === 2) for (let i = 0; i < 6; i++) { g.fillStyle = R() < 0.5 ? '#fff4c0' : '#ffe060'; g.beginPath(); g.arc(S * (0.3 + R() * 0.4), S * (0.15 + R() * 0.3), 3, 0, 7); g.fill(); }
   }),
-  // 針葉の枝: シダのような形の枝（上から見ると星形に広がる、もみの木の枝）
+  // 針葉の段: 上から見たもみの枝の一段。中心から羽のような枝が放射状に垂れる（先ほど明るい）
   pine: () => atlas('pine', 256, (g, S, R, v) => {
-    const PAL = ['#2c5a40', '#386c4a', '#4a8256', '#5e9862', '#78ae72'];
-    const P = (t) => [S * 0.5 + Math.sin(t * 2.2) * S * 0.06 * (v - 1.5), S * 0.03 + t * S * 0.94];
-    for (let i = 0; i < 30; i++) {
-      const t = 0.04 + i / 30 * 0.94, [x, y] = P(t), L = S * 0.26 * Math.sin(Math.PI * Math.min(1, 0.15 + t * 0.95));
-      for (const s of [-1, 1]) {
-        const c = PAL[Math.min(4, Math.max(0, Math.round(3.2 - t * 2 + (R() - 0.5) * 1.6)))];
-        g.save(); g.translate(x, y); g.rotate(s * (Math.PI / 2 - 0.55) + Math.PI / 2 * 0); g.fillStyle = c;
-        g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(s * L * 0.5, L * 0.12 - 3, s * L, L * 0.38); g.quadraticCurveTo(s * L * 0.5, L * 0.18 + 3, 0, 4); g.fill(); g.restore();
+    const PAL = ['#2e5a3a', '#3c7044', '#4e874e', '#66a058', '#86b866', '#a8cc78'];
+    const cx = S / 2, cy = S / 2, nb = 8 + v;
+    for (let layer = 0; layer < 2; layer++) for (let i = 0; i < nb; i++) {
+      const a = (i + layer * 0.5) / nb * Math.PI * 2 + (R() - 0.5) * 0.3, L = S * (layer ? 0.36 : 0.47) * (0.85 + R() * 0.15);
+      for (let j = 0; j < 16; j++) {
+        const t = j / 16, x = cx + Math.cos(a) * L * t, y = cy + Math.sin(a) * L * t, nl = S * 0.075 * Math.sin(Math.PI * Math.min(1, 0.2 + t)) ;
+        const ci = Math.min(5, Math.max(0, Math.round(t * 4 + layer * 1.2 + (R() - 0.5) * 1.4)));
+        for (const sd of [-1, 1]) {
+          const b2 = a + sd * 0.9 + 0.25 * sd;
+          g.strokeStyle = PAL[ci]; g.lineWidth = 2.6; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(b2) * nl, y + Math.sin(b2) * nl); g.stroke();
+        }
       }
+      g.strokeStyle = '#3e6234'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * L * 0.95, cy + Math.sin(a) * L * 0.95); g.stroke();
     }
-    g.strokeStyle = '#3a3226'; g.lineWidth = 3; g.beginPath();
-    for (let t = 0; t <= 1; t += 0.05) { const [x, y] = P(t); t ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
   }),
 };
 
 // ---------------------------------------------------------------------------
 // 材質: 抜き・やわらかい陰影（裏面でも暗くしない）・風の揺れ。影も抜きの形で落とす
 // ---------------------------------------------------------------------------
-export const FOLIAGE_U = { uTime: { value: 0 } };
+// uOccR は葉と幹だけの抜く半径（toon.js の OCC とは別に決められる）
+export const FOLIAGE_U = { uTime: { value: 0 }, uOccR: { value: 0 }, uOccNear: { value: 0 } }; // uOccNear: カメラからこの距離までの葉も抜く
+// カメラと注目点の間はディザで抜く（カメラと注目点は toon.js の近景の透過と同じ）。葉と幹で共通
+function addOcc(sh) {
+  Object.assign(sh.uniforms, { uOccCam: OCC.uOccCam, uOccTgt: OCC.uOccTgt, uOccR: FOLIAGE_U.uOccR, uOccNear: FOLIAGE_U.uOccNear });
+  sh.vertexShader = 'varying vec3 vOccW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vOccW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+  sh.fragmentShader = `uniform vec3 uOccCam; uniform vec3 uOccTgt; uniform float uOccR; uniform float uOccNear; varying vec3 vOccW;\n` + sh.fragmentShader.replace('void main() {', `void main() {
+    if (uOccR > 0.0) {
+      vec3 seg = uOccTgt - uOccCam; float t = clamp(dot(vOccW - uOccCam, seg) / max(dot(seg, seg), 1e-4), 0.0, 1.0);
+      float k = smoothstep(uOccR * 1.6, uOccR * 0.6, length(vOccW - (uOccCam + seg * t))) * smoothstep(0.95, 0.8, t);
+      if (uOccNear > 0.0) k = max(k, smoothstep(uOccNear, uOccNear * 0.88, distance(vOccW, uOccCam)));
+      vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+      float th = (mod(q.x, 2.0) * 2.0 + mod(q.y, 2.0) + floor(q.x / 2.0) * 0.5 + floor(q.y / 2.0) * 0.25) / 4.0 + 0.06;
+      if (k * 1.2 > th) discard; // 芯は全部抜く（薄い膜が残らないように）
+    }`);
+}
+
 const matCache = {};
 export function foliageMaterial(kind, { sway = 0.05 } = {}) {
   const key = kind + sway;
@@ -106,17 +124,7 @@ export function foliageMaterial(kind, { sway = 0.05 } = {}) {
     Object.assign(sh.uniforms, FOLIAGE_U);
     sh.vertexShader = 'uniform float uTime; attribute float swayK;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n float uv2y = swayK;' + swayV);
     sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal);');
-    // カメラと自キャラの間の葉はディザで抜く（toon.js の近景の透過と同じ uniform）
-    Object.assign(sh.uniforms, OCC);
-    sh.vertexShader = 'varying vec3 vOccW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vOccW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = `uniform vec3 uOccCam; uniform vec3 uOccTgt; uniform float uOccR; varying vec3 vOccW;\n` + sh.fragmentShader.replace('void main() {', `void main() {
-      if (uOccR > 0.0) {
-        vec3 seg = uOccTgt - uOccCam; float t = clamp(dot(vOccW - uOccCam, seg) / max(dot(seg, seg), 1e-4), 0.0, 1.0);
-        float k = smoothstep(uOccR * 1.6, uOccR * 0.6, length(vOccW - (uOccCam + seg * t))) * smoothstep(0.95, 0.8, t);
-        vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
-        float th = (mod(q.x, 2.0) * 2.0 + mod(q.y, 2.0) + floor(q.x / 2.0) * 0.5 + floor(q.y / 2.0) * 0.25) / 4.0 + 0.06;
-        if (k * 0.9 > th) discard;
-      }`);
+    if (kind !== 'grass' && kind !== 'fern') addOcc(sh); // 低い草とシダは視線をさえぎらないので抜かない
   };
   m.customProgramCacheKey = () => 'foliage' + key;
   const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.45, side: THREE.DoubleSide });
@@ -177,7 +185,8 @@ export class FoliageBuilder {
       group.add(mesh);
     }
     if (this.bark.length) {
-      const mesh = new THREE.Mesh(mergeGeometries(this.bark), new THREE.MeshLambertMaterial({ vertexColors: true }));
+      const bm = new THREE.MeshLambertMaterial({ vertexColors: true }); bm.onBeforeCompile = addOcc;
+      const mesh = new THREE.Mesh(mergeGeometries(this.bark), bm);
       mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
     }
     return group;
@@ -193,7 +202,7 @@ export class FoliageBuilder {
     this.solid(g, color);
   }
   // 茂みの塊: 中心 c、半径 rx/ry、板の数 n。法線は塊の中心から外向き（少し上向き）
-  clump(kind, c, rx, ry, n, R, base, { size = 1.6, sway = 1, light = 0.35 } = {}) {
+  clump(kind, c, rx, ry, n, R, base, { size = 1.6, sway = 1, light = 0.5 } = {}) {
     const col = new THREE.Color();
     for (let i = 0; i < n; i++) {
       const u = R() * 2 - 1, a = R() * Math.PI * 2, s = Math.sqrt(1 - u * u), rr = 0.55 + Math.sqrt(R()) * 0.45;
@@ -220,27 +229,37 @@ export class FoliageBuilder {
       this.limb(from, to, 0.13 * size, 0.05 * size, bc);
       heads.push({ p: to, r: (1.3 + R() * 0.5) * size });
     }
-    for (const h of heads) this.clump('broad', h.p, h.r * 1.15, h.r * 0.85, Math.round(20 * h.r * h.r / (size * size)) + 8, R, lc, { size: 2.0 * size, sway: 1 });
+    // 枝先ごとに小さな塊を3〜4つ寄せる（丸一つより輪郭がでこぼこし、塊の間に陰ができる）
+    for (const h of heads) {
+      const m = 3 + Math.floor(R() * 2);
+      for (let j = 0; j < m; j++) {
+        const a = j / m * Math.PI * 2 + R(), o = j === 0 ? V(0, h.r * 0.35, 0) : V(Math.cos(a) * h.r * 0.55, (R() - 0.4) * h.r * 0.4, Math.sin(a) * h.r * 0.55);
+        const r = h.r * (j === 0 ? 0.75 : 0.62 + R() * 0.12);
+        this.clump('broad', h.p.clone().add(o), r * 1.15, r * 0.85, Math.round(14 * r * r / (size * size)) + 3, R, lc, { size: 1.9 * size, sway: 1 });
+      }
+    }
     return { r: 3.2 * size, h: H };
   }
   // 針葉樹: まっすぐな幹に、垂れる枝の板を段々に
   pine(x, y, z, R, { size = 1, leaf = 0xf4fbe8 } = {}) {
     this._y0 = y;
     const H = (6 + R() * 2.5) * size, lc = new THREE.Color(leaf).multiplyScalar(0.92 + R() * 0.12);
-    this.limb(V(x, y - 0.3, z), V(x, y + H, z), 0.26 * size, 0.05 * size, 0x6a4c34);
-    const col = new THREE.Color(), tiers = 9;
+    this.limb(V(x, y - 0.3, z), V(x, y + H * 0.85, z), 0.26 * size, 0.05 * size, 0x6a4c34);
+    // 段ごとに、水平な大きい一段と、外へ垂れる小さい段を数枚。上の段ほど小さく明るい
+    const col = new THREE.Color(), tiers = 8;
     for (let t = 0; t < tiers; t++) {
-      const k = t / tiers, yy = y + H * (0.22 + k * 0.78), rad = (2.3 * (1 - k) + 0.35) * size, n = Math.round(9 - k * 5);
+      const k = t / tiers, yy = y + H * (0.2 + k * 0.8), rad = (2.4 * (1 - k) + 0.45) * size;
+      const nf = (q) => V(q.x - x, (q.y - yy) * 0.5 + rad * 0.9, q.z - z).normalize();
+      col.copy(lc).multiplyScalar(0.88 + k * 0.25 + (R() - 0.5) * 0.08);
+      this.card('pine', V(x, yy, z), V((R() - 0.5) * 0.1, 1, (R() - 0.5) * 0.1), rad * 2.3, R() * 6.28, nf, col, Math.floor(R() * 4), 0.4);
+      const n = Math.max(3, Math.round(6 - k * 3));
       for (let i = 0; i < n; i++) {
-        const a = i / n * Math.PI * 2 + t * 0.7 + R() * 0.4, d = V(Math.cos(a), -0.15, Math.sin(a));
-        col.copy(lc).multiplyScalar(0.8 + k * 0.3 + (R() - 0.5) * 0.1);
-        const c = V(x + d.x * rad * 0.5, yy - 0.2 * size, z + d.z * rad * 0.5);
-        const nf = (q) => V(q.x - x, (q.y - yy) * 0.6 + 0.7, q.z - z).normalize();
-        // 外へ垂れる枝: 板の面を斜め下向きに倒す
-        this.card('pine', c, V(d.x * 0.35, 1, d.z * 0.35), rad * 1.2, a + Math.PI / 2, nf, col, Math.floor(R() * 4), 0.6);
-        this.card('pine', c.clone().add(V(0, 0.15, 0)), V(-d.z, 0.25, d.x), rad * 1.0, 0, nf, col.clone().multiplyScalar(0.92), Math.floor(R() * 4), 0.6);
+        const a = i / n * Math.PI * 2 + t * 0.9 + R() * 0.5, d = V(Math.cos(a), 0, Math.sin(a));
+        const c = V(x + d.x * rad * 0.55, yy - rad * 0.22, z + d.z * rad * 0.55);
+        this.card('pine', c, V(d.x * 0.8, 1, d.z * 0.8), rad * 1.3, R() * 6.28, nf, col.clone().multiplyScalar(0.92), Math.floor(R() * 4), 0.6);
       }
     }
+    this.card('pine', V(x, y + H + 0.2 * size, z), V(0.3, 0.4, 0), 0.9 * size, 0, V(0, 1, 0), lc, 0, 0.3);
     return { r: 2.4 * size, h: H };
   }
   // 茂み（低木）

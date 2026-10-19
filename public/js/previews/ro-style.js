@@ -37,9 +37,9 @@ export const PAINT = {
   grass: () => paint('ro-grass', 512, (g, S, R) => {
     g.fillStyle = '#84b84c'; g.fillRect(0, 0, S, S);
     blobs(g, S, R, 70, 40, 90, ['#6a9e40', '#9cc85a', '#acd066', '#76a644'], '66');
-    for (let i = 0; i < 1100; i++) {
-      const x = R() * S, y = R() * S, n = 3 + Math.floor(R() * 3), h = 6 + R() * 7, light = R();
-      const base = light < 0.5 ? '#4e8237' : '#5d923f', tip = light < 0.3 ? '#8fc35e' : light < 0.8 ? '#a5d070' : '#c2e08a';
+    for (let i = 0; i < 1700; i++) {
+      const x = R() * S, y = R() * S, n = 3 + Math.floor(R() * 4), h = 8 + R() * 10, light = R();
+      const base = light < 0.5 ? '#4e8237' : '#5d923f', tip = light < 0.3 ? '#94c460' : light < 0.75 ? '#b0d474' : '#d2e692';
       wrap(S, x, y, h + 4, (px, py) => {
         for (let k = 0; k < n; k++) {
           const a = -Math.PI / 2 + (k - (n - 1) / 2) * 0.32 + (R() - 0.5) * 0.25, L = h * (0.7 + R() * 0.4);
@@ -92,6 +92,11 @@ export function roGroundMaterial() {
       vec3 b = texture2D(tBank, vWXZ / 6.5).rgb;
       float n = (texture2D(tGrass, vWXZ / 3.1).g - 0.45) * 0.9; // 境目を草の模様で崩す
       float wd = smoothstep(0.35, 0.65, vSplat.y + n), wb = smoothstep(0.35, 0.65, vSplat.z + n * 0.8);
+      // 大きなむら: 日なたの黄みがかった明るい所と、深い緑の所
+      vec2 q = vWXZ * 0.045; vec2 qi = floor(q), qf = fract(q); qf = qf * qf * (3.0 - 2.0 * qf);
+      #define H2(v) fract(sin(dot(v, vec2(127.1, 311.7))) * 43758.5)
+      float mac = mix(mix(H2(qi), H2(qi + vec2(1, 0)), qf.x), mix(H2(qi + vec2(0, 1)), H2(qi + vec2(1, 1)), qf.x), qf.y);
+      g *= mix(vec3(0.86, 0.92, 0.8), vec3(1.1, 1.08, 0.9), mac);
       vec3 col = mix(mix(g, b, wb), d, wd);
       diffuseColor.rgb *= col * vShade;`);
   };
