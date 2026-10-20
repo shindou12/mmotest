@@ -167,6 +167,9 @@ for cl in TS.get('cliffs', []):
         fade = 1 - smooth(cl['radius'] * 0.6, cl['radius'], d)
     else:
         fade = 1.0
+    for gp in cl.get('gaps', []):   # 切れ目（f1_field の出口）: 線 world のまわり r m は段差を付けない。外へ続く道の谷になる
+        gd, _ = seg_dist(X, Z, np.array(gp['world'], float))
+        fade = fade * smooth(gp['r'], gp['r'] + gp.get('soft', 3.0), gd + (N1(X * 1.7, Z * 1.7, 5) - 0.5) * 2 * cl.get('jag', 1.2))
     if cl.get('raise'): H = H + cl['drop'] * (1 - step) * fade       # 高い側を持ち上げる（低い側は 0 のまま）
     else: H = H - cl['drop'] * step * fade
     face = np.clip(step * (1 - step) * 4, 0, 1) * fade                # 崖の面（中ほどで 1）
@@ -293,8 +296,12 @@ for sec, fr in zip(SPEC.get('sections', []), SECTION_FRAMES):
 CORE = [np.array([s2w(fr, u, v)[[0, 2]] for u, v in ((-0.08, -0.15), (1.08, -0.15), (1.08, 1.12), (-0.08, 1.12))]) for fr in SECTION_FRAMES]
 
 
+WITHIN = inside(X, Z, np.array(SPEC['scatter_within'], float)).astype(np.float32) if 'scatter_within' in SPEC else None   # 細かい散らし物を置く範囲（歩ける地図で数を抑える）
+
+
 def place(asset, x, z, rot=None, scale=1.0, y=None):
     if FOOT and asset in SMALL and not any(bool(inside(np.array(x), np.array(z), f)) for f in FOOT): return
+    if WITHIN is not None and asset in SMALL and field_at(WITHIN, x, z) < 0.5: return
     if any(asset in off and bool(inside(np.array(x), np.array(z), poly)) for off, poly in OFF): return
     hy = height_at(x, z) + (y or 0)
     PL.setdefault(asset, []).append([round(float(x), 3), round(hy, 3), round(float(z), 3),
@@ -348,8 +355,10 @@ def scatter():
         poly = poly_of(zn)
         P = jitter_grid(x0, x1, z0, z1, zn.get('spacing', 4.5))
         m = inside(P[:, 0], P[:, 1], poly)
+        if 'exclude' in zn: m = m & ~inside(P[:, 0], P[:, 1], np.array(zn['exclude'], float))   # 除く多角形（輪の形の区域。f1_field の外周の林）
         for x, z in P[m]:
             if path_dist(x, z) < 1.8 or not dry(x, z): continue
+            if zn.get('noRock') and field_at(ROCK, x, z) > 0.3: continue      # 崖の面には立てない
             if zn.get('outside_views') and any(bool(inside(np.array(x), np.array(z), f)) for f in CORE): continue
             if any((x - fx) ** 2 + (z - fz) ** 2 < zn.get('clear', 3.0) ** 2 for fx, fz in fixed): continue
             a = zn['trees'][RNG.integers(len(zn['trees']))]

@@ -69,7 +69,19 @@ for m in MAPS2:
         shutil.copy(os.path.join(src, mm + '.json'), os.path.join(OUT, 'M', m, 'maps', mm + '.json'))
         for f in ('placements.json', 'height.png'): shutil.copy(os.path.join(src, mm, f), os.path.join(d, f))
         open(os.path.join(d, 'terrain.glb.b64.txt'), 'w').write(base64.b64encode(open(os.path.join(src, mm, 'terrain.glb'), 'rb').read()).decode())
+# ゲームのエリアを第 3 世代で作り直した地図（L25、tools/worldart/maps/make_<名>.py）。比べる相手はゲームの撮影（art/shots/<名>/game）
+MAPS3 = ['f1_field']
+for m in MAPS3:
+    d = os.path.join(OUT, 'M', m, 'maps', m); os.makedirs(d, exist_ok=True)
+    src = os.path.join(ROOT, 'public/worldart/maps')
+    shutil.copy(os.path.join(src, m + '.json'), os.path.join(OUT, 'M', m, 'maps', m + '.json'))
+    for f in ('placements.json', 'height.png'): shutil.copy(os.path.join(src, m, f), os.path.join(d, f))
+    open(os.path.join(d, 'terrain.glb.b64.txt'), 'w').write(base64.b64encode(open(os.path.join(src, m, 'terrain.glb'), 'rb').read()).decode())
+    sheet = os.path.join(ROOT, 'art/shots', m, 'compare_game.webp')
+    if os.path.exists(sheet): shutil.copy(sheet, os.path.join(OUT, 'M', m, 'compare_game.webp'))
 names = set()
+for m in MAPS3:
+    names |= {n.replace('@shadow', '') for n in json.load(open(os.path.join(OUT, 'M', m, 'maps', m, 'placements.json')))['assets']}
 for m in MAPS2:
     for mm in (m, m + '_g3'):
         names |= {n.replace('@shadow', '') for n in json.load(open(os.path.join(OUT, 'M', m, 'maps', mm, 'placements.json')))['assets']}

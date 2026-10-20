@@ -60,6 +60,15 @@ PORT=8091 node server.js &
    ```
 9. 確認点: 数値は rulebook の 13.2（見本と同じ道具 refstats・rulecheck で測った値。第 2 世代の「輝度比 2.9〜3.4・彩度 ≈0.4」は R 系列の動画から取った値で、撮り方で変わる）。樹冠が画面に入っている、影の塊がある、手前の物が人物を隠さない、歩いて水に入らない。
 
+## 3c. ゲームのエリアを第 3 世代で作り直す（L25、f1_field）
+1. `node tools/worldart/maps/dump_area.mjs <エリア>` でゲームの形（輪郭・出口・当たり判定・宝箱・出現位置・ワープポイント）を書き出す。
+2. `tools/worldart/maps/make_f1_field.py` を手本に `make_<エリア>.py` を書く。位置は `world`、遊びの物は動かさない。歩ける広い地図用の書き方:
+   - `terrain.cliffs[].gaps`: 段差を切る線（`world`・`r`）。出口の谷。閉じた輪郭を崖の線にし、`lowPoint` を中心に、`raise: true`。
+   - `zones[].exclude`（除く多角形、輪の形の林）・`zones[].noRock`（崖の面に木を立てない）。
+   - `scatter_box`（散らす範囲を地形の全体に。既定はカメラに映る範囲だけ）・`scatter_within`（草の房・小花を置く多角形。数を抑える）。
+3. 撮る: `views.mjs`（作り直し）と `gameshot.mjs <エリア> <地図> <出力>`（ゲーム本体の今の絵。人物を地図の views の注目点へ置き、板を隠して撮る）。並べる: `pairsheet.py`。
+4. 比較ページ: `tools/worldart/compare/build.py` の `MAPS3` と `index.html` の `MAPS.<名>.areas`（固定ビューを選ぶ）。
+
 ## 3b. 第 2 世代の地図を第 3 世代の規則へ移す
 `python3 -I tools/worldart/maps/to_gen3.py <名> …` → `<名>_g3.json`（元は残す。手で直さず、元の地図か規則か to_gen3.py を直す）→ `build_map.py -- <名>_g3`。アセットの置き換え（maple2・fir3・rock_s）も to_gen3.py の REP。アセットを足したら `build_assets.py` を全部実行し直す（決定的なので、変わるのは直した物だけ。変わった GLB を一覧で確かめる）。
 

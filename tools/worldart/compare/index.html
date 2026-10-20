@@ -211,6 +211,16 @@ for (const [m, nm] of [['orc_meadow', 'オーク村の草地'], ['south_coast', 
     ideas: '01・04・05・10・17 を導入。02 は使わない。', status: I.g3 || '—', issues: I.g3issues || [] };
 }
 const AREAS = { B01: '道と野営地', B02: '草原とヤシ', B03: '林と崖', B04: '神殿前の広場' };
+MAPS.mihon2.areas = AREAS;
+// ゲームの第 1 層「ひだまりの草原」を第 3 世代で作り直した地図（L25、tools/worldart/maps/make_f1_field.py）。エリアの代わりに固定ビュー F01〜F07
+MAPS.f1_field = { name: 'ひだまりの草原（ゲーム 第1層）', def: 'f1_field__g3',
+  areas: { F01: '街からの入口', F02: '中心の広場', F03: '西の林（古井戸へ）', F04: '北の大岩', F05: '東の柵（イノシシの丘へ）', F06: '宝箱', F07: '迷宮区への出口' } };
+VERSIONS.f1_field__g3 = { map: 'f1_field', name: '第 3 世代で作り直し', sub: 'L25・ゲームの形のまま', module: 'world_now.js', data: 'M/f1_field/', mapName: 'f1_field', extra: '',
+  restore: 'ゲームの f1_field（public/shared/areas.js）の輪郭・出口 4 つ・当たり判定の木 11 本と岩 1 つ・宝箱 2 つ・出現位置をそのまま使い、見た目だけを規則集（rulebook.md）で作り直した地図です。ゲームの今の絵との並べた比較は <a href="M/f1_field/compare_game.webp" target="_blank">こちらの画像</a>。',
+  changes: ['外周: 輪郭のすぐ外を 3m の段の岩肌（上に草が垂れる）にし、その上を林で埋めた。出口は段を切った谷で、道が林の奥へ続く', '道はゲームと同じ曲がり方。中心の土の広場に道しるべ・切り株・倒木', '西（古井戸の洞窟へ）は暗い林、北は当たり判定の大岩に岩の組、東（イノシシの丘へ）は柵と切り株、南（街へ）は花の多い草地', 'Blender で新しく作ったアセット: 宝箱 chest_s、道しるべ signpost、出口の門 waygate、倒木 log_fallen、大岩 outcrop_a/b', '光・階調・仕上げ・地面の色は規則集のまま（L23）'],
+  ideas: '01・04・05・10・17 を導入。02 は使わない。',
+  status: '7 ビューの撮影（L25c）: 明暗比 2.36 / 1.59 / 2.50 / 2.92 / 2.57 / 2.54 / 2.42（F01〜F07、草地の見本 2.4〜3.9）、暗い所 12 / 2 / 11 / 20 / 16 / 20 / 13%（目標 13〜17%）。草の日陰/日なた 0.48〜0.58、青の寄り 1.12〜1.21。',
+  issues: ['中心の広場（F02）は開けたまま（ワープポイントのある集まる場所）: 明暗比 1.59・暗い所 2%', '東の柵が道ばたの木の幹を突き抜ける所がある', '道しるべの板が細く、枯れ枝に見える', 'ゲームの実際の歩く高さ（ゲームの heightAt）とは別の地形（見た目の段・起伏）。ゲームへの組み込みは未'] };
 const CAMS = { game: 'ゲーム', near: '近く', low: '足元' };
 const CAM_SET = { near: [11, 36], low: [7, 28] };
 const IDEAS = [
@@ -289,7 +299,7 @@ function applyCam() {
 window.__cmpZoomed = (dist, pitch) => { state.cam = 'free'; state.free = { dist, pitch }; mark('cam'); };
 window.__cmpOnReady = (a, w) => {
   api = a; frameWin = w;
-  api.setView(state.map === 'mihon2' ? state.area : 'cam');   // この版のそのエリアのカメラと光（ほかの地図は地図のカメラ）
+  api.setView(MAPS[state.map].areas ? state.area : 'cam');   // この版のそのエリアのカメラと光（エリアのない地図は地図のカメラ）
   const p0 = api.pose(); state.gameCam = { dist: p0.dist, pitch: p0.pitch, fov: p0.fov };
   if (state.pose) { api.moveTo(state.pose.x, state.pose.z); api.setYaw(state.pose.yaw); }
   applyCam(); focusStage();
@@ -319,7 +329,8 @@ function pickCam(k) { state.cam = k; mark('cam'); applyCam(); }
 
 function renderVers() {
   chips($('vers'), Object.fromEntries(Object.entries(VERSIONS).filter(([, v]) => (v.map || 'mihon2') === state.map)), 'ver', pickVer, (k, v) => `${v.name}<small>${v.sub}</small>`);
-  $('areas-grp').hidden = state.map !== 'mihon2';
+  const A = MAPS[state.map].areas; $('areas-grp').hidden = !A;
+  if (A) { if (!A[state.area]) state.area = Object.keys(A)[0]; chips($('areas'), A, 'area', pickArea); }
 }
 function pickMap(m) {
   if (m === state.map) return;
@@ -329,7 +340,6 @@ function pickMap(m) {
 }
 chips($('maps'), Object.fromEntries(Object.entries(MAPS).map(([k, v]) => [k, v.name])), 'map', pickMap);
 renderVers();
-chips($('areas'), AREAS, 'area', pickArea);
 chips($('cams'), CAMS, 'cam', pickCam);
 renderInfo(); renderIdeas();
 for (const [b, p] of [['tab-ver', 'pane-ver'], ['tab-ideas', 'pane-ideas']]) {

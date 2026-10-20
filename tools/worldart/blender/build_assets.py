@@ -1212,6 +1212,142 @@ def temple_wall(name, seed, L=6.0, H=3.6):
     return B.build(name, smooth=False)
 
 
+# ------------------------------------------------------------ 第 1 層 ひだまりの草原（f1_field、L25）の小物
+def tint_last(B, k, tint):
+    """直前の k 面の頂点色に tint を掛ける"""
+    for j in range(1, k + 1): B.col[-j] = [tuple(c * t for c, t in zip(cc, tint)) for cc in B.col[-j]]
+
+
+def chest_s(name, seed, w=0.9, d=0.6, h=0.42):
+    """小さな宝箱（ゲームの屋外の宝箱）: 木の箱と、かまぼこ形のふた、鉄の帯（暗い頂点色）、金の錠前。正面は -y（three.js では +z）"""
+    B = Builder(); ao = lambda p: 0.7 + 0.3 * min(1, max(0, p.z / (h + 0.3)))
+    box(B, -w / 2, -d / 2, 0, w / 2, d / 2, h, M_CRATE(), (0.9, 0.9), ao)
+    # ふた: 半円の断面を x に押し出す（8 分割）
+    n = 8; rr = d / 2; sides = []
+    for sx in (-w / 2, w / 2):
+        sides.append([Vector((sx, -math.cos(math.pi * i / n) * rr, h + math.sin(math.pi * i / n) * rr * 0.62)) for i in range(n + 1)])
+    for i in range(n):
+        ps = [sides[0][i], sides[1][i], sides[1][i + 1], sides[0][i + 1]]
+        idx = [B.add_v(q) for q in ps]
+        B.face(idx, [(0, i / n), (1, i / n), (1, (i + 1) / n), (0, (i + 1) / n)], [(1.05,) * 3] * 4, None, M_WOOD())
+    for k, sx in enumerate((-w / 2, w / 2)):
+        c = B.add_v(Vector((sx, 0, h)))
+        for i in range(n):
+            tri = [sides[k][i], sides[k][i + 1], c] if k else [sides[k][i + 1], sides[k][i], c]
+            B.face([B.add_v(q) if isinstance(q, Vector) else q for q in tri[:2]] + [c], [(0, 0), (1, 0), (0.5, 0.5)], [(0.9,) * 3] * 3, None, M_WOOD())
+    # 鉄の帯（箱とふたに 2 本ずつ。少し外へ出した暗い板）
+    for bx in (-w * 0.32, w * 0.32):
+        box(B, bx - 0.035, -d / 2 - 0.012, 0, bx + 0.035, d / 2 + 0.012, h, M_STONE(), (1, 1), lambda p: 0.42)
+        for i in range(n):
+            a0, a1 = math.pi * i / n, math.pi * (i + 1) / n
+            q0 = Vector((bx, -math.cos(a0) * (rr + 0.012), h + math.sin(a0) * (rr + 0.012) * 0.62)); q1 = Vector((bx, -math.cos(a1) * (rr + 0.012), h + math.sin(a1) * (rr + 0.012) * 0.62))
+            ps = [q0 + Vector((-0.035, 0, 0)), q0 + Vector((0.035, 0, 0)), q1 + Vector((0.035, 0, 0)), q1 + Vector((-0.035, 0, 0))]
+            B.face([B.add_v(q) for q in ps], [(0, 0), (1, 0), (1, 1), (0, 1)], [(0.42,) * 3] * 4, None, M_STONE())
+    # 錠前（金）
+    tinted_box(B, -0.08, -d / 2 - 0.04, h - 0.16, 0.08, -d / 2 + 0.005, h + 0.05, M_PAINT(), (1.35, 1.0, 0.38))
+    return B.build(name, smooth=False)
+
+
+def signpost(name, seed, h=2.3):
+    """道しるべ（分かれ道）: 細い角柱と、矢羽の形の板 3 枚（向きを変えて高さをずらす）、柱の頭に小さな笠"""
+    R_ = random.Random(seed); B = Builder()
+    box(B, -0.1, -0.1, -0.25, 0.1, 0.1, h, M_WOOD(), (0.6, 0.6), lambda p: 0.62 + 0.3 * min(1, max(0, p.z / h)))
+    for k, (ang, z) in enumerate(((10, 1.85), (125, 1.55), (-110, 1.25))):
+        a = math.radians(ang + R_.uniform(-6, 6)); dx, dy = math.cos(a), math.sin(a); nx, ny = -dy, dx
+        L, W, T = 1.05, 0.3, 0.06
+        def P(u, v, t): return Vector((dx * u + nx * t, dy * u + ny * t, z + v))
+        pts = [(0.05, -W / 2), (L - 0.14, -W / 2), (L, 0), (L - 0.14, W / 2), (0.05, W / 2)]
+        for t, flip in ((-T / 2, True), (T / 2, False)):
+            ring = [P(u, v, t) for u, v in pts]
+            if flip: ring = ring[::-1]
+            idx = [B.add_v(q) for q in ring]
+            B.face(idx, [((u) / L, (v + W / 2) / W * 0.3) for u, v in (pts[::-1] if flip else pts)], [(1.25, 1.18, 1.05)] * 5, None, M_CRATE())
+        for i in range(5):
+            j = (i + 1) % 5
+            ps = [P(*pts[i], -T / 2), P(*pts[j], -T / 2), P(*pts[j], T / 2), P(*pts[i], T / 2)]
+            B.face([B.add_v(q) for q in ps], [(0, 0), (1, 0), (1, 0.05), (0, 0.05)], [(0.75,) * 3] * 4, None, M_WOOD())
+    tp = Vector((0, 0, h + 0.22)); cs = [Vector((sx * 0.17, sy * 0.17, h)) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    for i in range(4):
+        B.face([B.add_v(q) for q in (cs[i], cs[(i + 1) % 4], tp)], [(0, 0), (1, 0), (0.5, 1)], [(0.85,) * 3] * 3, None, M_WOOD())
+    return B.build(name, smooth=False)
+
+
+def waygate(name, seed, span=4.6, h=3.3):
+    """出口の門（エリアの出口）: 道の両側の太い丸太の柱、上に反った横木 2 本、中央に吊るした札。幅は X（道を横切る向き）"""
+    R_ = random.Random(seed); B = Builder()
+    for sx in (-1, 1):
+        x = sx * span / 2
+        tube(B, [Vector((x, 0, -0.3)), Vector((x + sx * 0.04, 0, h * 0.5)), Vector((x, 0, h + 0.15))], [0.2, 0.17, 0.16], M_BARK(), sides=9, ao=(0.5, 0.95))
+        # 柱の根元の石（3 個）
+        for k in range(3):
+            a = k * 2.1 + R_.uniform(-.3, .3)
+            box(B, x + math.cos(a) * 0.32 - 0.13, math.sin(a) * 0.32 - 0.11, -0.1, x + math.cos(a) * 0.32 + 0.13, math.sin(a) * 0.32 + 0.11, 0.16, M_STONE(), (1, 1), lambda p: 0.7)
+    def beam(z, over, sag, r):
+        pts = [Vector((u * (span / 2 + over), 0, z + sag * (abs(u) ** 2))) for u in (-1, -0.5, 0, 0.5, 1)]
+        tube(B, pts, [r * 0.9, r, r, r, r * 0.9], M_WOOD(), sides=8, ao=(0.85, 0.85))
+    beam(h - 0.05, 0.55, 0.22, 0.13)       # 上の横木（端が反り上がる）
+    beam(h - 0.75, 0.05, 0.0, 0.09)
+    # 札（2 本の短い縄 + 板）
+    for sx in (-0.28, 0.28): tube(B, [Vector((sx, 0, h - 0.82)), Vector((sx, 0, h - 1.05))], [0.015, 0.015], M_WOOD(), sides=4, ao=(0.5, 0.5))
+    box(B, -0.48, -0.04, h - 1.55, 0.48, 0.04, h - 1.05, M_CRATE(), (0.9, 0.9), lambda p: 1.0)
+    return B.build(name, smooth=True)
+
+
+def log_fallen(name, seed, L=3.4, r=0.3):
+    """倒木: 横たわる丸太（少し曲がる）と、折れた枝の短い突起、明るい木口。苔は実行時の三方向投影ではなく頂点色の上側を緑に"""
+    R_ = random.Random(seed); B = Builder()
+    pts = [Vector((-L / 2 + L * t, 0.08 * math.sin(t * 3 + 1), r * 0.8 + 0.04 * math.sin(t * 5))) for t in (0, 0.2, 0.4, 0.6, 0.8, 1.0)]
+    rings = tube(B, pts, [r * 1.05, r, r * 0.97, r * 0.95, r * 0.9, r * 0.86], M_BARK(), sides=10, ao=(0.75, 0.75))
+    # 上側を苔の緑に、下側を暗く
+    nf = 5 * 10
+    for j in range(1, nf + 1):
+        f = B.f[-j]; cols = []
+        for vi in f:
+            x_, y_, z = B.v[vi]; k = min(1, max(0, (z - r * 1.05) / (r * 0.6)))      # 苔は上面だけ、まだらに
+            k *= 0.5 + 0.5 * max(0.0, noise.noise(Vector((x_ * 1.3, y_ * 1.3, z * 1.3)) + Vector((seed % 97, 3.1, 7.7))) * 2 + 0.3)
+            k = min(1.0, k)
+            g = 0.6 + 0.4 * min(1, max(0, z / (r * 1.6)))
+            cols.append((g * (1 - 0.3 * k), g * (1 + 0.1 * k), g * (1 - 0.5 * k)))
+        B.col[-j] = cols
+    for end, rr in ((0, r * 1.05), (len(pts) - 1, r * 0.86)):
+        c = B.add_v(pts[end]); ring = rings[end]
+        for s in range(10):
+            tri = [ring[s], ring[s + 1], c] if end else [ring[s + 1], ring[s], c]
+            B.face(tri, [(0.6, 0.2), (0.9, 0.2), (0.75, 0.6)], [(1.15, 1.05, 0.85)] * 3, None, M_WOOD())
+    for k in range(3):
+        t = R_.uniform(0.25, 0.8); base = pts[0].lerp(pts[-1], t) + Vector((0, 0, r * 0.6))
+        tip = base + Vector((R_.uniform(-.25, .25), R_.uniform(-.35, .35), R_.uniform(0.3, 0.5)))
+        tube(B, [base, tip], [r * 0.3, r * 0.12], M_BARK(), sides=6, ao=(0.7, 0.9))
+    return B.build(name, smooth=True)
+
+
+
+def waystone(name, seed):
+    """ワープポイント（ゲームの waypointOf、エリアの中央）: 六角の 2 段の石の台、短い石柱、上に浮く細長い水晶（淡い水色の頂点色）"""
+    B = Builder()
+    def prism(r0, r1, z0, z1, m, ao, n=6, rot=0.0):
+        b = [Vector((math.cos(rot + 2 * math.pi * i / n) * r0, math.sin(rot + 2 * math.pi * i / n) * r0, z0)) for i in range(n)]
+        t = [Vector((math.cos(rot + 2 * math.pi * i / n) * r1, math.sin(rot + 2 * math.pi * i / n) * r1, z1)) for i in range(n)]
+        for i in range(n):
+            j = (i + 1) % n; ps = [b[i], b[j], t[j], t[i]]
+            B.face([B.add_v(q) for q in ps], [(i / n, 0), ((i + 1) / n, 0), ((i + 1) / n, (z1 - z0)), (i / n, (z1 - z0))], [(ao[0],) * 3] * 2 + [(ao[1],) * 3] * 2, None, m)
+        c = B.add_v(Vector((0, 0, z1)))
+        for i in range(n):
+            B.face([B.add_v(t[i]), B.add_v(t[(i + 1) % n]), c], [(0, 0), (1, 0), (0.5, 1)], [(ao[1] * 1.08,) * 3] * 3, None, m)
+    prism(1.45, 1.35, -0.2, 0.22, M_FLAG(), (0.7, 0.9))
+    prism(0.95, 0.88, 0.22, 0.45, M_FLAG(), (0.8, 0.95), rot=math.pi / 6)
+    prism(0.3, 0.24, 0.45, 1.25, M_STONE(), (0.8, 0.95), rot=math.pi / 6)
+    prism(0.4, 0.4, 1.25, 1.35, M_STONE(), (0.9, 1.0), rot=math.pi / 6)
+    # 水晶（上下にとがった八面体を縦に伸ばす）
+    top, bot, mid = Vector((0, 0, 2.75)), Vector((0, 0, 1.55)), 2.05
+    ring = [Vector((math.cos(2 * math.pi * i / 6) * 0.26, math.sin(2 * math.pi * i / 6) * 0.26, mid)) for i in range(6)]
+    for i in range(6):
+        j = (i + 1) % 6
+        B.face([B.add_v(q) for q in (ring[i], ring[j], top)], [(0, 0), (1, 0), (0.5, 1)], [(0.75, 1.15, 1.3)] * 2 + [(0.95, 1.3, 1.4)], None, M_PAINT())
+        B.face([B.add_v(q) for q in (ring[j], ring[i], bot)], [(0, 0), (1, 0), (0.5, 1)], [(0.55, 0.85, 1.05)] * 3, None, M_PAINT())
+    return B.build(name, smooth=False)
+
+
 ASSETS = {
     'tree_broad_a': lambda n: tree_broad(n, 101),
     'tree_broad_b': lambda n: tree_broad(n, 102, height=5.0, crown=1.2),
@@ -1277,6 +1413,14 @@ ASSETS = {
     'banner_pole': lambda n: banner_pole(n, 812),
     'bench': lambda n: bench(n, 813),
     'planter': lambda n: planter(n, 814),
+    # 第 1 層 ひだまりの草原（f1_field、L25）
+    'chest_s': lambda n: chest_s(n, 1101),
+    'waystone': lambda n: waystone(n, 1107),
+    'signpost': lambda n: signpost(n, 1102),
+    'waygate': lambda n: waygate(n, 1103),
+    'log_fallen': lambda n: log_fallen(n, 1104),
+    'outcrop_a': lambda n: smooth_rock(n, 1105, size=(5.6, 4.6, 3.9), bulge=0.24, sub=4),     # 岩の障害物（半径 2.9m）の大岩
+    'outcrop_b': lambda n: smooth_rock(n, 1106, size=(2.8, 2.3, 2.4), bulge=0.24, sub=4),
 }
 
 

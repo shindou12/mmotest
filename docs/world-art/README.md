@@ -13,6 +13,7 @@ Blender でのアセット制作から three.js の画面まで、一貫して�
 | **`docs/world-art/rulebook.md`** | **第 3 世代の規則集（いま使う規則・数値・判断基準・検証の目標・落とし穴）。最優先** |
 | `docs/world-art/templates/map-gen3.json` | 新しい地図の雛形（第 3 世代の光・階調・仕上げ・地面の色入り。組み立てて撮れることを確認済み） |
 | `docs/world-art/rules/` | 見本 23 枚の調査（camera-scale・lighting-post・ground-alpha）、アイデア 18 項目の状態（ideas.md）、入／切の比較（ab-L22.md） |
+| `docs/world-art/goal-f1_field.md` | ゲームの第 1 層「ひだまりの草原」を遊びの形のまま第 3 世代で作り直した記録（L25） |
 | `docs/world-art/goal-mihon2.md` | 見本②の再現のループの記録（L01〜L22）・評価表・差分一覧・不足している参照 |
 | `.claude/skills/world-art/SKILL.md` | 作業の手順の要約（スキル） |
 | `docs/world-art/observations.md` | 参考画像の ID・観察・計測・未解決の問い |
@@ -31,6 +32,8 @@ Blender でのアセット制作から three.js の画面まで、一貫して�
 | `tools/worldart/rulecheck.py` | 撮り方に左右されない比（材質ごとの日陰/日なた・青の寄り・階調・上の帯の彩度） |
 | `tools/worldart/abshoot.sh` / `abcompare.py` | アイデアの入／切を同じ条件で撮る / 数値と差の大きい所の拡大 |
 | `tools/worldart/maps/make_mihon2.py` | 見本②の地図の JSON を作る（区画ごとの見本のカメラ・画面の位置で書く） |
+| `tools/worldart/maps/dump_area.mjs` / `make_f1_field.py` | ゲームのエリアの形（輪郭・出口・当たり判定・宝箱）を書き出す / それから f1_field の地図を書く |
+| `tools/worldart/gameshot.mjs` / `pairsheet.py` | ゲーム本体の今の絵を地図のビューの位置で撮る / 2 つのフォルダを左右に並べる |
 | `tools/worldart/compare/` | 歩ける比較ページ（Artifact「見本② 版くらべ」）の組み立て。過去の版は git から取り出す |
 | `art/shots/` | 撮影と比較の画像（webp） |
 
@@ -54,6 +57,8 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 - 歩ける比較ページ: https://claude.ai/artifact/A31scCgQs9tWLQ1dhMAgZQ （L20・L21・L21 修正・L22 を同じ場所で切り替え、アイデア 01・02・04・05 の入／切）。
 - 第 2 世代の地図（orc_meadow・south_coast・town_plaza・forest_path・palm_clearing）に第 3 世代の規則を当てた `<名>_g3` を作った（`tools/worldart/maps/to_gen3.py`、L24、結果は `rules/gen3-maps-L24.md`）。元の地図は残している（試遊: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ ）。比較ページで第 2 世代と第 3 世代を同じ場所で切り替えられる。
 - 詳細と経緯は `goal-mihon2.md`（L01〜L22）と `experiments.md`（E01〜E34）。
+
+- **ゲームの第 1 層「ひだまりの草原」（`f1_field`）** を第 3 世代で作り直した（L25、`goal-f1_field.md`）。ゲームの今の絵との比較は `art/shots/f1_field/compare_game.webp`、比較ページの地図「ひだまりの草原」で歩ける。
 
 ## 次にやること（優先順）
 rulebook.md の「16. 未解決・未検証」が正。要約:
