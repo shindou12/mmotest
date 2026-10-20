@@ -1,14 +1,20 @@
 # ワールドアート研究（参考画像のアートスタイルを再現・展開する）
 
-再開するときは、このファイル → `experiments.md` の最後 → 「次にやること」の順に読む。
+再開するときは **`rulebook.md`（第 3 世代の規則集）→ このファイル → `goal-mihon2.md` の最新のループ** の順に読む。
 
 ## 目標
 参考画像（Ragnarok Online 3 のキャプチャ、`art/ref/` と `observations.md`）のワールドマップの見た目を解明し、
 Blender でのアセット制作から three.js の画面まで、一貫して作れる制作体系にする。人物と製品用 UI は対象外。
+**見本の再現は規則を測る手段で、目的は「どの地図にも使える規則」を得ること**（判断基準は rulebook の 1）。
 
 ## ファイルの地図
 | 場所 | 中身 |
 |---|---|
+| **`docs/world-art/rulebook.md`** | **第 3 世代の規則集（いま使う規則・数値・判断基準・検証の目標・落とし穴）。最優先** |
+| `docs/world-art/templates/map-gen3.json` | 新しい地図の雛形（第 3 世代の光・階調・仕上げ・地面の色入り。組み立てて撮れることを確認済み） |
+| `docs/world-art/rules/` | 見本 23 枚の調査（camera-scale・lighting-post・ground-alpha）、アイデア 18 項目の状態（ideas.md）、入／切の比較（ab-L22.md） |
+| `docs/world-art/goal-mihon2.md` | 見本②の再現のループの記録（L01〜L22）・評価表・差分一覧・不足している参照 |
+| `.claude/skills/world-art/SKILL.md` | 作業の手順の要約（スキル） |
 | `docs/world-art/observations.md` | 参考画像の ID・観察・計測・未解決の問い |
 | `docs/world-art/hypotheses.md` | 仮説と競合仮説、先行研究（`docs/ro-look-method.md`）の検証状態 |
 | `docs/world-art/experiments.md` | 実験 ID ごとの変更・固定条件・結果・結論、履歴 |
@@ -21,6 +27,11 @@ Blender でのアセット制作から three.js の画面まで、一貫して�
 | `public/worldart/maps/<名>.json` | 地図の仕様（カメラ・光・地形・道・区域・配置・仕上げ）。手で書く唯一の入力 |
 | `public/worldart/world.js` + `index.html` | 実行環境（three.js r160） |
 | `tools/worldart/shot.mjs` / `compare.py` / `refstats.py` | 撮影・見本との比較・色の計測 |
+| `tools/worldart/views.mjs` / `viewsheet.py` | 固定ビューを同じ条件で撮る（1 回の読み込みで全ビュー）/ 比較シート |
+| `tools/worldart/rulecheck.py` | 撮り方に左右されない比（材質ごとの日陰/日なた・青の寄り・階調・上の帯の彩度） |
+| `tools/worldart/abshoot.sh` / `abcompare.py` | アイデアの入／切を同じ条件で撮る / 数値と差の大きい所の拡大 |
+| `tools/worldart/maps/make_mihon2.py` | 見本②の地図の JSON を作る（区画ごとの見本のカメラ・画面の位置で書く） |
+| `tools/worldart/compare/` | 歩ける比較ページ（Artifact「見本② 版くらべ」）の組み立て。過去の版は git から取り出す |
 | `art/shots/` | 撮影と比較の画像（webp） |
 
 ## 実行方法
@@ -38,28 +49,16 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 ```
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
-## 現在の状態（最良版）
-- **全 5 枚を第 2 世代の規則で作り直した（G04）。触れるページ: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ 、並び `art/shots/g2_all_v03.webp`**
-- orc_meadow（R01 の再現）: `art/shots/orc_meadow/v13.webp`
-- south_coast（同じ規則で作った別の地図・崖と海）: `art/shots/south_coast/v07.webp`、歩いたとき `walk_sheet.webp`
-- town_plaza（同じ規則で作った町の通り）: `art/shots/town_plaza/v03.webp`
-- 3 枚の並び: `art/shots/all_v.webp`
-- **forest_path（B03 の再現、第 2 世代のアセット）: `art/shots/forest_path/v28.webp`** ← いまの主な対象
-- **palm_clearing（第 2 世代の規則で作った新しい地図、B02 が手がかり）: `art/shots/palm_clearing/v05.webp`**
-- まとめ: `art/shots/batch2_summary.webp`
-- 詳細と経緯は `experiments.md` の「履歴」。
-
-## 残っている主な差（未完了）
-- orc_meadow と R01: 輝度比 2.65（見本 3.08）、日なたの草の色相 61°（見本 67°・彩度 0.38 対 0.49）、
-  見本の上端の海と大きな暗い樹冠、拒馬の杭の明るい木口が白すぎる、オークの村の小物（骨の山・杭・樽）がない。
-- R06〜R18 はファイルがなく数値で比べていない（海辺と町は目視の規則のみ）。洞窟（R14〜R17）は手を付けていない。
-- 実機の FPS は未計測。家に当たり判定がない（通り抜けられる）。
+## 現在の状態（L22）
+- **見本②（`mihon2`）**: 区画つきの地図で B01〜B04 を再現（`art/shots/mihon2/L22/sheet.webp`）。輝度・彩度・明部は見本に近く、B04 は構図・数値ともほぼ一致。残りは明暗比の浅さと日なたの色相（rulebook 16）。
+- 歩ける比較ページ: https://claude.ai/artifact/A31scCgQs9tWLQ1dhMAgZQ （L20・L21・L21 修正・L22 を同じ場所で切り替え、アイデア 01・02・04・05 の入／切）。
+- 第 2 世代の地図（orc_meadow・south_coast・town_plaza・forest_path・palm_clearing）は第 2 世代の規則のまま（試遊: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ ）。第 3 世代の規則（カメラ・階調・MSAA）はまだ入れていない。
+- 詳細と経緯は `goal-mihon2.md`（L01〜L22）と `experiments.md`（E01〜E34）。
 
 ## 次にやること（優先順）
-1. 町を見本の密度に: 手すり・花箱・屋台・ドーマー窓、R04 のドーム状の石の家。家の当たり判定（今は歩いて通り抜けられる）。
-2. 葉の絵の質: もみの上の段が細い、ヤシの葉の中肋。樹冠の日なたの黄色いハイライト。
-3. 草の房を日陰で暗い星に見せない、道の縁に草を食い込ませる。
-4. 見本の R06〜R18 のファイルを受け取り、`refstats.py` で数値の目標を地図の種類ごとに取り直す（とくに R07 と R12）。
-5. 画角の再測定（町の建物の縦線で）。
-6. 重さ: 草の房の LOD（E05 で効果が小さいと確認済み）、葉の板の数。
-
+rulebook.md の「16. 未解決・未検証」が正。要約:
+1. 日なたの色相が緑寄り（≈75°、見本 ≈68°）→ 葉・草の地色を黄へ。
+2. 明暗比が浅く暗部が明るい（2.2 対 2.4〜2.8）→ 葉の持ち上げ・草の房・地面の暗部を切り分け。
+3. アイデア01 を草の房だけに絞って入／切、05 の値。
+4. 第 2 世代の地図を第 3 世代の規則へ移し、全部撮り直す（規則が場面をまたいで成り立つかの確認）。
+5. 町・砂漠・洞窟を規則だけで作る。

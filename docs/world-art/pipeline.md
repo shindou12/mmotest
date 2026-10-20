@@ -1,6 +1,6 @@
 # 新しいアセットと地図を作って画面に出す手順
 
-規則と数値は `style-spec.md`。ここは操作の順番・確認点・よくある失敗です。
+規則と数値は **`rulebook.md`（第 3 世代）**。ここは操作の順番・確認点・よくある失敗です。新しい地図は `templates/map-gen3.json` から始めます（下の 3 の「既存の JSON を複製」の代わり）。
 
 ## 0. 準備（初回だけ）
 ```sh
@@ -58,9 +58,17 @@ PORT=8091 node server.js &
    node tools/worldart/walktest.mjs "http://localhost:8091/worldart/index.html?map=<名>" art/shots/<名>/walk "x,z" "x,z"
    python3 -I tools/worldart/pack_shots.py
    ```
-9. 確認点: 輝度比 2.9〜3.4・彩度 ≈ 0.4（草地）、樹冠が画面に入っている、影の塊がある、手前の物が人物を隠さない、歩いて水に入らない。
+9. 確認点: 数値は rulebook の 13.2（見本と同じ道具 refstats・rulecheck で測った値。第 2 世代の「輝度比 2.9〜3.4・彩度 ≈0.4」は R 系列の動画から取った値で、撮り方で変わる）。樹冠が画面に入っている、影の塊がある、手前の物が人物を隠さない、歩いて水に入らない。
 
-## 4. 実験のしかた
+## 4. 検証のループ（第 3 世代、見本②で使った手順）
+1. `node tools/worldart/views.mjs <地図> art/shots/<地図>/Lnn <ビュー,…>`（見本のカメラ B01… と固定ビュー oblique/side/top/walker/near/far@基準。1 回の読み込みで撮る。サーバーがなければ立てる）
+2. `python3 -I tools/worldart/viewsheet.py art/shots/<地図>/Lnn art/shots/<地図>/Lnn/sheet.png`
+3. `python3 -I tools/worldart/refstats.py <撮影> <見本>` と `python3 -I tools/worldart/rulecheck.py <撮影> <見本>`（同じ道具で両方を測る）
+4. 入／切: `sh tools/worldart/abshoot.sh art/shots/ab` → `python3 -I tools/worldart/abcompare.py <切> <入> <拡大.png>`
+5. 記録: `goal-<地図>.md`・`rules/ideas.md`・この文書の 5・`rulebook.md`。`python3 -I tools/worldart/pack_shots.py <フォルダ>` で webp に。
+6. 歩ける比較: `python3 -I tools/worldart/compare/build.py <出力> [L22 のコミット]` → 出力の index.html を Artifact のページに、残りを files に。
+
+## 4b. 実験のしかた
 - URL の引数で 1 つだけ変える（`fov pitch dist sunEl sunAz sun hemi skyC gndC sunC asat sat exposure wrap trans leafShadow grass dof post shadow fnorm`）。
 - 3 本まで並べて撮れる（4 コア。swiftshader は 1 枚 20〜120 秒）。
 - 結果は `experiments.md` に ID・変更・固定条件・画像・数値・判定を書く。効いた数値は地図の JSON と `style-spec.md` に入れる。
@@ -73,11 +81,11 @@ PORT=8091 node server.js &
 | F3 | カメラの前に巨木が立って画面をふさぐ | 木を 2 倍にし、樹冠の画面位置から幹を逆算した | 木は 0.9〜1.3 倍。小物の誇張を木に使わない |
 | F4 | ある木が 1 本も置かれない | 置く条件に地図専用の判定（高さ < −1 は崖の向こう）が残っていた | `dry()`（水面より上か）で判定する |
 | F5 | 幹だけが柱のように並び、樹冠が見えない | 根元を画面の上端近くに置いた | 根元を下半分に / 樹冠の位置で置く（`canopy`） |
-| F6 | 崖が敷石・タイルに見える | 岩肌の絵がボロノイの網目 | 横の層 + 縦の割れ目の絵 |
+| F6 | 崖が敷石・タイルに見える | 岩肌の絵がボロノイの網目（同じ大きさの閉じた網目） | 横の層 + 縦の割れ目の絵。第 3 世代の rock_face は縦に伸ばした大小の板・途切れる割れ目・大きなむらで敷石に見せない（rulebook 7.1） |
 | F7 | 水の面にひびの線 | 水のノイズに岩肌の絵を流用 | なめらかな絵（砂）をノイズに使う |
 | F8 | 地面が「×」の模様 | 十字の縦の草カード | 外へ倒した 5 枚の房 |
 | F9 | 全体がくすんで灰色 | 仕上げで全体の彩度を下げた | 地色の彩度と光の色で作る |
-| F10 | 房の中まで真っ暗 | 葉が自分の影を受けている | 葉は影を受けない（落とすだけ） |
+| F10 | 房の中まで真っ暗 | 葉が自分の影を受けている | 第 2 世代の丸い房の木は、葉は影を受けない（落とすだけ）。第 3 世代の段の房の木（maple2）は受ける方がよい（rulebook 4.3） |
 | F11 | 規則を足したら関係ない木の位置が変わった | 乱数を全規則で共有 | `rule_rng(名前)` で系列を分ける |
 | F12 | `const` の初期化前参照で画面が真っ黒 | `placeCamera()` が後で定義した `OCC` を使った | 共有の値はファイルの先頭で定義する |
 | F13 | もみがリュウゼツランの束に見える | シダの葉の絵が細長いひし形 | 根元の広い三角形 + とがった小羽片（`leaf_frond`） |

@@ -14,7 +14,7 @@
 
 ## ワールドマップの見た目（参考画像からの研究・Blender の制作体系）
 
-参考画像（Ragnarok Online 3 のキャプチャ）に合わせたワールドマップを作る・直すときは、`docs/world-art/README.md` から読む。
+参考画像（Ragnarok Online 3 のキャプチャ）に合わせたワールドマップを作る・直すときは、**まず `docs/world-art/rulebook.md`（第 3 世代の規則集。規則・数値・判断基準・検証の目標）を読む**。全体の地図は `docs/world-art/README.md`。手順はスキル `.claude/skills/world-art` にもまとめてある。
 上の `docs/ro-look-method.md` は先行研究で、そのうち光の強さ・彩度の数値は実験で棄却した（`docs/world-art/hypotheses.md`）。
-- 規則と数値: `docs/world-art/style-spec.md`、手順: `docs/world-art/pipeline.md`、実験の記録: `docs/world-art/experiments.md`
+- 規則と数値: `docs/world-art/rulebook.md`（`style-spec.md` は第 2 世代までの記録。食い違えば rulebook が優先）、新しい地図の雛形: `docs/world-art/templates/map-gen3.json`、手順: `docs/world-art/pipeline.md`、実験の記録: `docs/world-art/experiments.md`
 - アセットと地形は Blender で作る（`tools/worldart/blender/`）。実行画面は `public/worldart/index.html?map=<名>`
