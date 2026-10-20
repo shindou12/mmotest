@@ -4,15 +4,19 @@ python3 -I tools/worldart/compare/build.py <出力フォルダ>
 版:
   L20  = コミット 8b3708e の world.js と mihon2 の地図データ（L21 より前の基準。git から正確に戻す）
   L21  = コミット d342f95 の world.js と地図データ（撮影したときのまま。材質のシェーダーの取り違えを含む）
-  L21f = 今の world.js（シェーダーのキャッシュの修正 + アイデア01 の仕組み）を 01 なしで、L21 と同じ地図データ
+  L21f = コミット 60877e3 の world.js（シェーダーのキャッシュの修正 + アイデア01 の仕組み）を 01 なしで、L21 と同じ地図データ
   L21g = L21f にアイデア01（gblend=1）だけを足したもの（コード・地図・カメラ・光は L21f と同じ）
+  L22  = <L22 の版>（既定 HEAD）の world.js と地図データ（B04 の画角 25°、線形の階調 + 露出 1.25、空の光 2.1、彩度 1.0、
+         OutputPass の修正）。アイデア 01・02・04・05 はページで入／切（URL の引数 1 つだけを変える）
 アセットとテクスチャは L20〜L21 で同じなので共有する。GLB は Artifact で配られないため base64 のテキストにする。
 world.js への書き換えはすべての版に同じ置換を当てる（版の違いを混ぜない）。"""
 import sys, os, json, base64, shutil, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 OUT = os.path.abspath(sys.argv[1])
 git = lambda rev, path: subprocess.check_output(['git', '-C', ROOT, 'show', f'{rev}:{path}'])
-VERS = {'L20': '8b3708e', 'L21': 'd342f95'}
+L22REV = sys.argv[2] if len(sys.argv) > 2 else 'HEAD'
+VERS = {'L20': '8b3708e', 'L21': 'd342f95', 'L22': L22REV}            # 地図データ
+WORLDS = {'L20': '8b3708e', 'L21': 'd342f95', 'L21f': '60877e3', 'L22': L22REV}   # world.js
 
 REPL = [
     ("const q = new URLSearchParams(location.search);", "const q = new URLSearchParams('walk=1&' + (window.__CMP?.extra || ''));"),
@@ -41,14 +45,14 @@ def patch(src):
     return src
 
 os.makedirs(OUT, exist_ok=True)
-for v, rev in VERS.items():
+for v, rev in WORLDS.items():
     open(os.path.join(OUT, f'world_{v}.js'), 'w').write(patch(git(rev, 'public/worldart/world.js').decode()))
+for v, rev in VERS.items():
     d = os.path.join(OUT, v, 'maps', 'mihon2'); os.makedirs(d, exist_ok=True)
     open(os.path.join(OUT, v, 'maps', 'mihon2.json'), 'wb').write(git(rev, 'public/worldart/maps/mihon2.json'))
     open(os.path.join(d, 'placements.json'), 'wb').write(git(rev, 'public/worldart/maps/mihon2/placements.json'))
     open(os.path.join(d, 'height.png'), 'wb').write(git(rev, 'public/worldart/maps/mihon2/height.png'))
     open(os.path.join(d, 'terrain.glb.b64.txt'), 'w').write(base64.b64encode(git(rev, 'public/worldart/maps/mihon2/terrain.glb')).decode())
-open(os.path.join(OUT, 'world_L22.js'), 'w').write(patch(open(os.path.join(ROOT, 'public/worldart/world.js')).read()))
 names = set()
 for v in VERS:
     names |= {n.replace('@shadow', '') for n in json.load(open(os.path.join(OUT, v, 'maps', 'mihon2', 'placements.json')))['assets']}

@@ -35,7 +35,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = flag('shadow');
 renderer.shadowMap.type = { pcfsoft: THREE.PCFSoftShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap }[q.get('smap') || spec.shadowMap || 'pcfsoft'];
-// lum（L21）: 輝度だけを圧縮し R:G:B の比を保つ。ACES は明るい所を白へ寄せて彩度を落とすため、日なたが日陰より青く見え
+// lum（L21、L22 で不採用）: 輝度だけを圧縮し R:G:B の比を保つ。L22 で効かせて測ると明暗比 1.9〜2.0・明部 180〜194 と見本（2.4〜2.8・217〜231）から遠ざかったため、見本②は linear（露出を掛けて切るだけ）にした。ACES は明るい所を白へ寄せて彩度を落とすため、日なたが日陰より青く見え
 // （日陰が暖かく見える）、見本の「同じ材質の日なたと日陰で R:G:B の比がほぼ同じ、日陰はやや青」と逆になった（rules/lighting-post-survey.md）
 THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(
   'vec3 CustomToneMapping( vec3 color ) { return color; }',
@@ -421,7 +421,16 @@ await Promise.all(assetNames.map(async (name) => {
 // 縁のなめらかさ（L21）: 仕上げの描画先に MSAA を持たせる。EffectComposer の既定の描画先は MSAA なしで、葉・草の切り抜きと物の輪郭がぎざぎざになっていた
 const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: MSAA }));
 composer.addPass(new RenderPass(scene, camera));
-composer.addPass(new OutputPass());   // トーンマップと sRGB をここで済ませ、以降は表示の色で扱う
+const outPass = new OutputPass();   // トーンマップと sRGB をここで済ませ、以降は表示の色で扱う
+if (renderer.toneMapping === THREE.CustomToneMapping) {
+  // r160 の OutputPass は CustomToneMapping の定義を作らない（L22 で発見: L21 の tone "lum" は効いておらず、階調の圧縮も露出もない
+  // 「0〜1 で切るだけ」になっていた）。分岐を足し、定義を固定して作り直させない
+  outPass.material.fragmentShader = outPass.material.fragmentShader.replace('#ifdef LINEAR_TONE_MAPPING',
+    '#ifdef CUSTOM_TONE_MAPPING\n\t\t\t\tgl_FragColor.rgb = CustomToneMapping( gl_FragColor.rgb );\n\t\t\t#elif defined( LINEAR_TONE_MAPPING )');
+  outPass._toneMapping = renderer.toneMapping; outPass._outputColorSpace = renderer.outputColorSpace;
+  outPass.material.defines = { SRGB_TRANSFER: '', CUSTOM_TONE_MAPPING: '' }; outPass.material.needsUpdate = true;
+}
+composer.addPass(outPass);
 const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 const grade = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uSat: { value: num('sat', P.sat) }, uCon: { value: num('contrast', P.contrast) },
