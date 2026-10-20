@@ -150,7 +150,7 @@ xs = cx - size / 2 + np.arange(n) * cell; zs = cz - size / 2 + np.arange(n) * ce
 X, Z = np.meshgrid(xs, zs)          # [iz, ix]
 H = (N1(X, Z, TS['hills']['scale']) - 0.5) * 2 * TS['hills']['amp']
 camxz = C[[0, 2]]
-CLIFF_LINES = []
+CLIFF_LINES = []; DRAPE = []
 for cl in TS.get('cliffs', []):
     # 段差: 折れ線の片側を drop だけ下げる。低い側は "lowPoint": [x, z]（その点のある側）か "low": "far"（カメラの反対側）
     poly = poly_of(cl)
@@ -169,6 +169,12 @@ for cl in TS.get('cliffs', []):
         fade = 1.0
     if cl.get('raise'): H = H + cl['drop'] * (1 - step) * fade       # 高い側を持ち上げる（低い側は 0 のまま）
     else: H = H - cl['drop'] * step * fade
+    face = np.clip(step * (1 - step) * 4, 0, 1) * fade                # 崖の面（中ほどで 1）
+    if cl.get('relief'):   # 岩肌の凹凸（L15）: 面の中だけに細かい起伏。割れ目と出っ張りの陰を作る
+        H = H + cl['relief'] * face * ((N2(X * 1.9, Z * 1.9, 7) - 0.5) * 2 + (N1(X * 4.3, Z * 4.3, 8) - 0.5) * 0.8)
+    if cl.get('drape'):    # 岩肌の上半分に草が乗る（L15、見本 B03: 岩肌の一部に草が乗っているだけ）
+        upper = 1 - smooth(0.3, 0.65, step if cl.get('raise') else 1 - step)
+        DRAPE.append(face * upper * smooth(0.5 - cl['drape'] * 0.3, 0.6 - cl['drape'] * 0.3, N1(X * 0.9, Z * 0.9, 9)))
     CLIFF_LINES.append((poly, cl, ref))
 
 # 注目点（カメラの target）の地面を高さ 0 にそろえる。画面の位置からの逆算は高さ 0 を前提にしているため
@@ -200,6 +206,7 @@ for band in TS.get('bands', []):
 gz, gx = np.gradient(H, cell)
 ny = 1 / np.sqrt(1 + gx * gx + gz * gz)
 ROCK = smooth(0.82, 0.62, ny)
+for w_ in DRAPE: ROCK = ROCK * (1 - w_)
 
 
 def height_at(x, z):
@@ -461,6 +468,18 @@ def scatter():
                 # 上端を台地の縁（高い側）の高さ − top_gap にそろえる。縁の草が柱の頭にかぶさる
                 hx, hz = np.array([x, z]) - lowdir * (cl['width'] * 0.8)
                 top = height_at(hx, hz) - rk.get('top_gap', 0.25) + RNG.uniform(-0.3, 0.1)
+                if rk.get('stack'):
+                    # 積む（L15、B03）: 平たい岩を足元から台地の縁まで、少しずつ奥へずらして段に積む。割れた岩の層に見せる
+                    g0 = height_at(px, pz) - 0.3; lv = 0
+                    while g0 < top - 0.15 and lv < 12:
+                        a_ = assets[int(RNG.integers(len(assets)))]; sc_ = RNG.uniform(*rk.get('scale', [0.8, 1.2]))
+                        h_ = ASSET_H.get(a_, 0.6) * sc_
+                        back = -lowdir * (lv * rk.get('step_back', 0.12)) + RNG.uniform(-0.15, 0.15)
+                        place(a_, px + back[0], pz + back[1], rot=math.atan2(*(b - a)) + math.pi / 2 + RNG.uniform(-0.4, 0.4),
+                              scale=sc_, y=min(g0, top - h_) - height_at(px + back[0], pz + back[1]))
+                        g0 += h_ * RNG.uniform(0.7, 0.9); lv += 1
+                    s_ += rk.get('spacing', 1.1) * RNG.uniform(0.8, 1.15)
+                    continue
                 y_off = top - ASSET_H.get(a_, 3.0) * sc_ - height_at(px, pz)
                 place(a_, px, pz, rot=math.atan2(*(b - a)) + math.pi / 2 + RNG.uniform(-0.25, 0.25), scale=sc_, y=y_off)
                 s_ += rk.get('spacing', 1.1) * RNG.uniform(0.8, 1.15)

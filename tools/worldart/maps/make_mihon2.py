@@ -114,7 +114,7 @@ for t in B03['trees']:          # 台地の上の木: 持ち上げた高さで�
 # L14: 見本の B03 の崖は割れた小さな岩が苔に覆われる（こちらは大きな灰色の柱の壁）→ 岩を小さく密に。
 # 広葉樹は B01 と同じ小さく詰まった木、もみは見本の幅 0.19・下端 0.55 に合わせて 0.85
 for c in B03['cliffs']:
-    c['rocks'].update(scale=[0.5, 0.68], spacing=0.72)
+    c.pop('rocks', None); c.update(relief=0.45, drape=0.5, width=c['width'] * 1.4)   # L15（ユーザーの指摘）: 見本の崖は岩肌の一部に草が乗っているだけ。置いた岩（柱・積んだ板）はやめ、地形の岩肌で作る
 for t in B03['trees']:
     t['asset'] = {'maple_a': 'maple2_t', 'maple_b': 'maple2_t', 'maple_c': 'maple2_s'}.get(t['asset'], t['asset'])
     if t['asset'] == 'fir2_a': t['scale'] = 0.85
@@ -148,7 +148,7 @@ spec = {
   "albedoSat": 0.9, "shadowMap": "vsm", "shadowRadius": 6,
   "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
   "post": {"exposure": 1.04, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
-  "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.98, 0.88], "rock": "crack",
+  "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.94, 0.78], "rock": "face",   # L15: 見本 B03 の岩肌（明るさ 0.55、苔で黄緑寄り）
              "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 5.0},
   "terrain": {"size": 150, "cell": 0.5, "ground": "grass", "center": [-8, -22], "hills": {"amp": 0.25, "scale": 16}},
   "paths": [  # 区画どうしをつなぐ道（推測）

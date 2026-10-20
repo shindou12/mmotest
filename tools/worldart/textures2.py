@@ -290,6 +290,38 @@ def canvas_hide(n=512, seed=113):
     img.save(os.path.join(OUT, 'canvas_hide.png'))
 
 
+def rock_face(n=1024, seed=114):
+    """崖の岩肌（B03、L15）: 縦に少し長い角ばった板（ボロノイの胞）。板ごとに明るさが違い（面の向き）、上の縁が明るく下の縁が暗い（面取り）、
+    板の境目は真っすぐな暗い割れ目。灰に少し黄緑。継ぎ目なしに繰り返す"""
+    r = rng(seed); k = 46
+    pts = r.random((k, 2)); val = r.uniform(0.72, 1.05, k)
+    yy, xx = np.mgrid[0:n, 0:n] / n
+    d1 = np.full((n, n), 9.0); d2 = np.full((n, n), 9.0); idx = np.zeros((n, n), int)
+    for i, (px, py) in enumerate(pts):
+        for ox in (-1, 0, 1):
+            for oy in (-1, 0, 1):
+                dx = xx - (px + ox); dy = (yy - (py + oy)) * 0.7      # 縦に長い板
+                d = np.sqrt(dx * dx + dy * dy)
+                m = d < d1; d2 = np.where(m, d1, np.minimum(d2, d)); idx = np.where(m, i, idx); d1 = np.where(m, d, d1)
+    edge = d2 - d1
+    shade = val[idx]
+    # 面取り: 胞の中心より上（画像の上 = 岩の上）は明るく、下は暗い
+    cy = pts[idx, 1]; up = np.clip((cy - yy) * 6, -1, 1)
+    shade = shade * (1 + 0.12 * up)
+    crack = np.clip(edge / 0.010, 0, 1) ** 0.7
+    def soft(sc, sd):       # 継ぎ目なしのやわらかいノイズ 0〜1
+        w = rng(sd).standard_normal((n, n)); f = np.sqrt(np.fft.fftfreq(n)[:, None] ** 2 + np.fft.fftfreq(n)[None, :] ** 2)
+        v = np.real(np.fft.ifft2(np.fft.fft2(w) * np.exp(-(f * n / sc) ** 2))); return (v - v.min()) / (v.max() - v.min())
+    keep = np.clip((soft(10, seed + 1) - 0.42) * 6, 0, 1)        # 割れ目の半分ほどは途切れる（敷石に見せない）
+    crack = 1 - (1 - crack) * keep
+    big = soft(4, seed + 2); streak = soft(18, seed + 3)
+    shade = shade * (0.8 + 0.35 * big) * (0.92 + 0.16 * streak)
+    base = np.array([0.60, 0.62, 0.54])[None, None, :] * shade[..., None]
+    base = base * (0.35 + 0.65 * crack[..., None])
+    base = base * (0.94 + 0.06 * r.standard_normal((n, n, 1)).clip(-1, 1))
+    Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'rock_face.png'))
+
+
 def lavender(n=256, seed=112):
     """ラベンダーの株（B01・B02）: 細い茎の先に紫の穂。下端が根元"""
     r = rng(seed); W = n * SS
@@ -370,5 +402,5 @@ def plate_maple(n=512, seed=115):
 
 if __name__ == '__main__':
     spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
-    plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); lavender(); flagstone(); meander()
+    plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); rock_face(); lavender(); flagstone(); meander()
     print('textures2 ->', OUT)

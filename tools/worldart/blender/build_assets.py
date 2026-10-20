@@ -1127,6 +1127,8 @@ ASSETS = {
     'cliff_col_b': lambda n: smooth_rock(n, 945, size=(1.2, 0.95, 4.0), bulge=0.18, flat_top=False),
     'teepee': lambda n: teepee(n, 1001),
     'teepee2': lambda n: teepee2(n, 1011),
+    'slab_a': lambda n: rock(n, 1021, size=(1.7, 1.2, 0.75), facet=0.24),   # 崖の面に積む平たい岩（B03、L15）
+    'slab_b': lambda n: rock(n, 1022, size=(1.3, 1.0, 0.65), facet=0.24),
     'tarp_tent': lambda n: tarp_tent(n, 1002),
     'barrel': lambda n: barrel(n, 1003),
     'cart_frame': lambda n: cart_frame(n, 1004),

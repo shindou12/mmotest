@@ -1,16 +1,29 @@
 [
  {
-  "name": "teepee2",
-  "tris": 513,
+  "name": "slab_a",
+  "tris": 76,
   "size": [
-   7.93,
-   7.93,
-   3.33
+   1.71,
+   1.22,
+   0.66
   ],
-  "zmin": -0.03,
+  "zmin": -0.09,
   "mats": [
-   "canvas_hide",
-   "wood"
+   "rock"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "slab_b",
+  "tris": 76,
+  "size": [
+   1.37,
+   1.17,
+   0.6
+  ],
+  "zmin": -0.08,
+  "mats": [
+   "rock"
   ],
   "colors": 1
  }
