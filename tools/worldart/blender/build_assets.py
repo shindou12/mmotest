@@ -71,6 +71,7 @@ M_SPRAY = lambda: material('leaf_spray', 'spray_maple.png', alpha=True)
 M_PLATE = lambda: material('leaf_plate', 'plate_maple.png', alpha=True)
 M_CLUMP = lambda: material('leaf_clump', 'clump_maple.png', alpha=True)
 M_CLOVER = lambda: material('leaf_clover', 'spray_clover.png', alpha=True)
+M_FIR3 = lambda: material('leaf_fir3', 'frond_fir3.png', alpha=True)
 M_FIRF = lambda: material('leaf_firfrond', 'frond_fir.png', alpha=True)
 M_GRASS2 = lambda: material('grass_tall', 'grass_tall.png', alpha=True)
 M_ROCK2 = lambda: material('rock_crack', 'rock_crack.png')
@@ -684,6 +685,40 @@ def fir2(name, seed, height=6.4, width=2.0):
     return B.build(name)
 
 
+def fir3(name, seed, height=6.6, width=3.2):
+    """もみ 第 3 世代（L24、見本 B03・R03）: 円錐に詰まった短い小枝（frond_fir3、長さ 0.7〜1.3m）を、幹から外へ下向きに垂らして段に重ねる。
+    輪郭は先のとがった円錐（幅 ≈ 高さの 0.5、Hc で幅 ≈2・高さ 3〜5）。小枝の間に隙間をほとんど作らない（見本の樹冠は閉じる）。
+    法線は円錐の軸から外向き + 上（アイデア04）。頂点色は下・内側ほど暗い青緑、上・外側の先ほど明るい黄緑（アイデア08）"""
+    R_ = random.Random(seed); B = Builder()
+    tube(B, [Vector((0, 0, -0.3)), Vector((0, 0, 0)), Vector((0, 0, height * 0.7))], [0.17, 0.15, 0.05], M_BARK(), sides=7, ao=(0.3, 0.45))
+    tiers = 22
+    base = height * 0.1
+    for i in range(tiers):
+        t = i / (tiers - 1)
+        hz = base + (height * 0.97 - base) * t
+        R = width / 2 * (1 - t) ** 0.95 + 0.15            # この高さの円錐の半径
+        L = max(0.55, min(1.35, R * 0.75 + 0.35))           # 小枝の長さ
+        n = max(4, int(round(2 * math.pi * R / 0.42)))      # 周りを隙間なく埋める本数
+        for k in range(n):
+            a = 2 * math.pi * k / n + i * 0.61 + R_.uniform(-.15, .15)
+            out = Vector((math.cos(a), math.sin(a), 0)); side = out.cross(UP).normalized()
+            r0 = max(0.0, R - L * 0.85)                      # 付け根（幹寄り）
+            droop = R_.uniform(0.35, 0.6)
+            pts = [Vector((0, 0, hz)) + out * (r0 + L * s) + UP * (-L * droop * s * s + 0.12 * s) for s in (0.0, 0.5, 1.0)]
+            ws = [L * 0.55, L * 0.8, L * 0.55]
+            tb = t ** 1.2
+            c0 = crown_color(tb * 0.45, 0.0, 0.3, 0.68); c1 = crown_color(min(1.0, tb * 0.85 + 0.15), 1.0, 0.42 + 0.2 * tb, 0.75 + 0.45 * tb)
+            cols = [c0, tuple((p_ + q_) / 2 for p_, q_ in zip(c0, c1)), c1]
+            nrm = (out * 0.65 + UP * 0.55).normalized()
+            strip2(B, pts, ws, side, M_FIR3(), cols, nrm)
+    for k in range(4):                                       # てっぺん
+        a = k * math.pi / 2 + 0.3
+        out = Vector((math.cos(a), math.sin(a), 0)) * 0.18
+        pts = [Vector((0, 0, height * 0.88)) + (out + UP) * s * 0.7 for s in (0, 0.5, 1)]
+        strip2(B, pts, [0.35, 0.4, 0.25], out.cross(UP).normalized(), M_FIR3(), [crown_color(1.0, 1.0, 0.6, 1.15)] * 3, (out + UP).normalized())
+    return B.build(name)
+
+
 def clover_bush(name, seed, radius=0.8):
     """クローバーの茂み（B03 左下・右）: 半球の面に spray_clover のカードを外向きに並べた小山"""
     R_ = random.Random(seed); B = Builder()
@@ -1197,6 +1232,9 @@ ASSETS = {
     'maple_b': lambda n: maple(n, 902, width=3.8, height=5.4, base=1.8, clusters=12),
     'maple_c': lambda n: maple(n, 903, width=3.0, height=4.2, base=1.4),
     'fir2_a': lambda n: fir2(n, 911, height=6.6, width=1.1),
+    'fir3_a': lambda n: fir3(n, 931),                              # もみ 第 3 世代（L24）
+    'fir3_b': lambda n: fir3(n, 932, height=7.8, width=3.6),
+    'rock_s': lambda n: smooth_rock(n, 947, size=(0.55, 0.45, 0.32), bulge=0.2, sub=3),   # 小石 第 3 世代（rock_c の面のある形をやめる）
     'fir2_b': lambda n: fir2(n, 912, height=7.6, width=1.3),
     'palm2_a': lambda n: palm2(n, 951),
     'palm2_b': lambda n: palm2(n, 952, height=3.8, frond=1.3, lean=0.9),

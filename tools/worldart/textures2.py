@@ -133,6 +133,37 @@ def frond_fir(w=512, h=1024, seed=103):
     finish(img, w, h, 'frond_fir.png')
 
 
+def frond_fir3(w=512, h=640, seed=115):
+    """もみの小枝 第 3 世代（L24、見本 B03・R03 のもみ）: 短い小枝 1 本。中軸に沿って、外へ下向きに垂れる切れ込みの葉片（3〜5 裂の扇）を
+    根元から先へ重ねて、先のとがったしずく形をほぼ埋める。重なりが下向きの山形（へ の字）の段になる。
+    先（上端）ほど明るい黄緑、根元は暗い青緑、葉片ごとに上の縁が明るい。根元 = 下端"""
+    r = rng(seed); W, H = w * SS, h * SS
+    img = canvas(w, h); d = ImageDraw.Draw(img)
+    cx = W / 2
+    d.line([(cx, H), (cx, H * 0.06)], fill=col((0.22, 0.24, 0.13)), width=int(W * 0.014))   # 中軸（葉の下に）
+    def half(t):                # しずく形の半幅（t: 0 = 根元、1 = 先）。根元は細く、中ほどが広く、先がとがる
+        return W * 0.46 * (math.sin(math.pi * min(1.0, 0.12 + 0.88 * t)) ** 0.6) * (1 - 0.55 * t)
+    rows = 15
+    for i in range(rows):       # 根元の段から先の段へ（先の段が上に重なる）
+        t = i / (rows - 1)
+        y = H * (0.84 - 0.76 * t)              # 下向きの葉片が絵の下端で切れないよう余白（E14）
+        hw = half(t)
+        n = max(2, int(round(2 + 6 * hw / (W * 0.46))))
+        for j in range(n):
+            u = (j + 0.5) / n * 2 - 1                    # -1〜1（左右）
+            x = cx + u * hw * 0.85 + r.normal(0, W * 0.01)
+            size = W * (0.10 + 0.05 * (1 - t)) * r.uniform(0.85, 1.15)
+            ang = math.pi / 2 + u * 0.9 + r.normal(0, 0.12)   # 下向き（画像の y+）に、外側ほど外へ開く
+            dark = lerp((0.14, 0.25, 0.16), (0.30, 0.44, 0.15), t); mid = lerp((0.24, 0.40, 0.20), (0.48, 0.64, 0.22), t)
+            hi = lerp((0.36, 0.54, 0.24), (0.72, 0.84, 0.36), t)
+            k = int(r.integers(3, 6))
+            for q in range(k):
+                aa = ang + (q - (k - 1) / 2) * 0.42
+                d.polygon(lobe(x, y, aa, size, size * 0.55, 8), fill=col(dark if q % 2 else mid))
+            d.polygon(lobe(x, y, ang, size * 0.55, size * 0.34, 8), fill=col(hi))      # 付け根の上の明るい面
+    finish(img, w, h, 'frond_fir3.png')
+
+
 def grass_tall(n=512, seed=104):
     r = rng(seed); W = n * SS
     img = canvas(n, n); d = ImageDraw.Draw(img)
@@ -402,5 +433,5 @@ def plate_maple(n=512, seed=115):
 
 if __name__ == '__main__':
     spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
-    plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); rock_face(); lavender(); flagstone(); meander()
+    plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); rock_face(); frond_fir3(); lavender(); flagstone(); meander()
     print('textures2 ->', OUT)

@@ -1,17 +1,17 @@
 [
  {
-  "name": "statue2",
-  "tris": 20620,
+  "name": "tarp_tent",
+  "tris": 196,
   "size": [
-   2.03,
-   1.75,
-   3.76
+   4.26,
+   3.56,
+   1.76
   ],
-  "zmin": -0.2,
+  "zmin": -0.06,
   "mats": [
-   "stone",
-   "stone_meander",
-   "rock_crack"
+   "crate",
+   "canvas_blue",
+   "paint"
   ],
   "colors": 1
  }

@@ -256,7 +256,7 @@
  ],
  "trees": [
   {
-   "asset": "fir2_a",
+   "asset": "fir3_a",
    "canopy": [
     0.345,
     0.33
@@ -385,7 +385,7 @@
    ],
    "trees": [
     "maple2_c",
-    "fir2_a"
+    "fir3_a"
    ],
    "spacing": 3.6,
    "scale": [

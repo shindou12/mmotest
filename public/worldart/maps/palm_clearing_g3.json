@@ -212,7 +212,7 @@
  ],
  "trees": [
   {
-   "asset": "fir2_a",
+   "asset": "fir3_a",
    "screen": [
     0.16,
     0.35
@@ -260,7 +260,7 @@
    "trees": [
     "maple2_a",
     "maple2_b",
-    "fir2_a"
+    "fir3_a"
    ],
    "spacing": 3.4,
    "scale": [
@@ -321,7 +321,7 @@
    ],
    "trees": [
     "maple2_b",
-    "fir2_a"
+    "fir3_a"
    ],
    "spacing": 3.4,
    "scale": [
