@@ -1,29 +1,17 @@
 [
  {
-  "name": "slab_a",
-  "tris": 76,
+  "name": "statue2",
+  "tris": 20620,
   "size": [
-   1.71,
-   1.22,
-   0.66
+   2.03,
+   1.75,
+   3.76
   ],
-  "zmin": -0.09,
+  "zmin": -0.2,
   "mats": [
-   "rock"
-  ],
-  "colors": 1
- },
- {
-  "name": "slab_b",
-  "tris": 76,
-  "size": [
-   1.37,
-   1.17,
-   0.6
-  ],
-  "zmin": -0.08,
-  "mats": [
-   "rock"
+   "stone",
+   "stone_meander",
+   "rock_crack"
   ],
   "colors": 1
  }

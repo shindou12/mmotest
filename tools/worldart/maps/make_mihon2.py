@@ -132,7 +132,7 @@ B04 = dict(name='B04', camera=VIEWS['B04'], scatter_off=['grass_tall_a'],   # �
   cliffs=[dict(screen=[P(-200, 300), P(560, 300), P(1080, 300)], low='near', drop=0.4, width=0.3, jag=0.0, radius=10, **{'raise': True}),   # 石像の段
           dict(screen=[P(980, 70), P(1800, 70)], low='near', drop=2.0, width=0.6, jag=0.0, radius=10, **{'raise': True})],                # 石段の上
   props=[
-    dict(asset='statue', screen=P(680, 345), rot=0, scale=1.25),   # 台座 2.0m
+    dict(asset='statue2', screen=P(680, 345), rot=0, scale=1.25),   # 台座 2.0m
     dict(asset='stone_steps', screen=P(1140, 300), rot=0, scale=1.0), dict(asset='stone_steps', screen=P(1370, 300), rot=0, scale=1.0),
     dict(asset='stone_steps', screen=P(1600, 300), rot=0, scale=1.0),
     dict(asset='stone_lantern', screen=P(1060, 290), scale=1.0), dict(asset='stone_lantern', screen=P(1720, 330), scale=1.0),
@@ -162,8 +162,8 @@ spec = {
     {"world": [[-2.5, -12], [2, -24], [6, -36], [5, -47]], "width": 2.6, "mat": "dirt"},
   ],
   "zones": [   # 区画のまわりを埋める林（見えるのは斜め・遠景のビュー）
-    {"kind": "forest", "world": [[-80, -100], [60, -100], [60, 50], [-80, 50]], "trees": ["maple_a", "maple_b", "fir2_a", "palm2_b"],
-     "spacing": 3.6, "scale": [0.95, 1.15], "clear": 7.0, "outside_views": True}
+    {"kind": "forest", "world": [[-80, -100], [60, -100], [60, 50], [-80, 50]], "trees": ["maple2_s", "maple2_t", "fir2_a", "palm2_b"],
+     "spacing": 3.0, "scale": [0.8, 1.0], "clear": 7.0, "outside_views": True}   # L20: 区画の木と同じ尺度（小さく詰まった木）
   ],
   "sections": [B01, B02, B03, B04],
   "scatter": {

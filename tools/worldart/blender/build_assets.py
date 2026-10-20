@@ -1010,6 +1010,90 @@ def pedestal_statue(name, seed):
     return ob
 
 
+def slab(B, p0, p1, side, w0, w1, d, m, ao=None):
+    """p0 → p1 の向きの板（幅 w0 → w1、厚み d）。side は幅の向き、厚みは軸と side に直交"""
+    ax = (p1 - p0).normalized(); sd = (side - ax * side.dot(ax)).normalized(); nm = ax.cross(sd).normalized()
+    b = [p0 - sd * w0 / 2 - nm * d / 2, p0 + sd * w0 / 2 - nm * d / 2, p0 + sd * w0 / 2 + nm * d / 2, p0 - sd * w0 / 2 + nm * d / 2]
+    t = [p1 - sd * w1 / 2 - nm * d / 2, p1 + sd * w1 / 2 - nm * d / 2, p1 + sd * w1 / 2 + nm * d / 2, p1 - sd * w1 / 2 + nm * d / 2]
+    hexa(B, b, t, m, (1, 1), ao)
+
+
+def pedestal_statue2(name, seed):
+    """台座と座った鎧の戦士の石像 第 2 版（B04 の拡大から、L20）。
+    見本: 像は台座の奥の腰掛けに座り、画面の左の脚はすねを真っすぐ下ろして素足を台座の前に、右の脚はひざを外へ開いて素足を台座の右の縁へ。
+    腰から前へ縦の筋と鋲のある前垂れ、ももに重ねた板の草摺、左のひざに手。素足とすねに苔。
+    → 肌（脚・足・手・胴・頭）は球をつないでボクセルで溶かす、鎧（前垂れ・草摺・胸当て・肩当て）は角のある板（Builder）"""
+    R_ = random.Random(seed); B = Builder()
+    pw, pd, ph = 1.6, 1.4, 0.85
+    box(B, -pw / 2 - 0.12, -pd / 2 - 0.12, -0.2, pw / 2 + 0.12, pd / 2 + 0.12, 0.18, M_STONE(), (2, 2), lambda p: 0.8)
+    box(B, -pw / 2, -pd / 2, 0.18, pw / 2, pd / 2, ph, M_MEANDER(), (pw, ph), lambda p: 0.85 + 0.15 * p.z / ph, skip=('bottom',))
+    base_ob = B.build(name + '_base', smooth=False)
+    z = ph; V = lambda x, y, zz: Vector((x, y, z + zz))
+    parts = []
+    def sph(c, sc):
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=1, location=c, segments=16, ring_count=10); o = bpy.context.object; o.scale = sc; parts.append(o)
+    def limb(a, b, r0, r1, n=10):   # L20b: 球を密に・太く（見本の脚は太い。粗いと数珠に見えた）
+        for i in range(n + 1):
+            t = i / n; sph(a.lerp(b, t), ((r0 + (r1 - r0) * t) * 1.3,) * 3)
+    # 腰掛け（台座の奥）・胴・頭
+    bpy.ops.mesh.primitive_cylinder_add(radius=1, depth=2, location=V(0, 0.38, 0.42), vertices=14); o = bpy.context.object; o.scale = (0.72, 0.42, 0.42); parts.append(o)
+    sph(V(0, 0.22, 1.62), (0.58, 0.42, 0.62)); sph(V(0, 0.18, 2.42), (0.27, 0.27, 0.3))
+    # 画面の左の脚（像の右）: もも → ひざ → すね真っすぐ → 素足は台座の前
+    limb(V(-0.3, 0.2, 1.02), V(-0.42, -0.42, 0.98), 0.24, 0.2); limb(V(-0.42, -0.42, 0.98), V(-0.42, -0.5, 0.16), 0.18, 0.14)
+    sph(V(-0.42, -0.62, 0.08), (0.19, 0.3, 0.1))
+    for k in range(4): sph(V(-0.52 + k * 0.07, -0.88, 0.06), (0.045, 0.06, 0.05))          # 足の指
+    # 画面の右の脚: ひざを外へ開き、素足は台座の右の縁（指先は右へ）
+    limb(V(0.3, 0.2, 1.02), V(0.66, -0.25, 0.92), 0.24, 0.2); limb(V(0.66, -0.25, 0.92), V(0.6, -0.12, 0.16), 0.18, 0.14)
+    sph(V(0.72, -0.12, 0.08), (0.3, 0.18, 0.1))
+    for k in range(4): sph(V(0.99, -0.2 + k * 0.06, 0.06), (0.06, 0.04, 0.05))
+    # 腕: 左のひざに手、右は肩から下ろして太ももの上
+    limb(V(-0.62, 0.15, 1.85), V(-0.62, -0.15, 1.35), 0.17, 0.15); limb(V(-0.62, -0.15, 1.35), V(-0.46, -0.42, 1.12), 0.15, 0.13)
+    sph(V(-0.44, -0.48, 1.12), (0.2, 0.17, 0.11))
+    limb(V(0.64, 0.15, 1.85), V(0.7, -0.05, 1.3), 0.17, 0.15); sph(V(0.7, -0.15, 1.12), (0.18, 0.18, 0.12))
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts: o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]; bpy.ops.object.join()
+    st = bpy.context.object; st.name = name + '_fig'
+    md = st.modifiers.new('rm', 'REMESH'); md.mode = 'VOXEL'; md.voxel_size = 0.05; bpy.ops.object.modifier_apply(modifier='rm')
+    md = st.modifiers.new('sm', 'SMOOTH'); md.factor = 0.6; md.iterations = 8; bpy.ops.object.modifier_apply(modifier='sm')
+    md = st.modifiers.new('dc', 'DECIMATE'); md.ratio = 0.3; bpy.ops.object.modifier_apply(modifier='dc')
+    for p_ in st.data.polygons: p_.use_smooth = True
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.cube_project(cube_size=2.0); bpy.ops.object.mode_set(mode='OBJECT')
+    st.data.materials.append(M_ROCK2())
+    ca = st.data.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+    for poly_ in st.data.polygons:
+        for l in poly_.loop_indices:
+            zz = st.data.vertices[st.data.loops[l].vertex_index].co.z
+            a = 0.72 + 0.3 * min(1, max(0, (zz - ph) / 2.2)); ca.data[l].color = (a * 0.92, a, a * 0.85, 1)
+    # 鎧（角のある板）。材質は像の肌と同じ石（M_STONE の煉瓦の絵だと壁に見えた）
+    A = Builder(); ao = lambda p: 0.78 + 0.22 * min(1, max(0, (p.z - ph) / 2.0)); X = Vector((1, 0, 0))
+    slab(A, V(0, -0.4, 1.38), V(0, -0.66, 0.3), X, 0.66, 0.98, 0.08, M_ROCK2(), ao)            # 前垂れ（ひざの間を覆い台座の近くまで）
+    for k in range(5):                                                                            # 縦の筋
+        f = (k - 2) / 2
+        slab(A, V(f * 0.24, -0.45, 1.32), V(f * 0.36, -0.71, 0.36), X, 0.04, 0.05, 0.06, M_ROCK2(), lambda p: 0.7)
+    for k in range(6):                                                                            # 鋲（縁）
+        t = k / 5
+        for sx in (-1, 1):
+            c = V(sx * (0.31 + 0.15 * t), -0.45 - 0.26 * t, 1.3 - 0.98 * t); box(A, c.x - 0.025, c.y - 0.03, c.z - 0.025, c.x + 0.025, c.y + 0.0, c.z + 0.025, M_ROCK2(), (0.2, 0.2), lambda p: 1.0)
+    for sx, kx in ((-1, -0.42), (1, 0.6)):                                                        # 草摺: ももに重ねた板 3 段
+        for r in range(3):
+            t = r / 3
+            hip = V(sx * 0.32, 0.12, 1.2); knee = V(kx, -0.36 if sx < 0 else -0.2, 1.08)
+            a0 = hip.lerp(knee, t) + Vector((0, 0, 0.16)); a1 = hip.lerp(knee, t + 0.42) + Vector((0, 0, 0.1))
+            slab(A, a0, a1, Vector((0, 0, 1)).cross((knee - hip).normalized()), 0.66, 0.6, 0.07, M_ROCK2(), ao)
+    slab(A, V(0, -0.12, 1.25), V(0, -0.1, 2.05), X, 0.95, 1.05, 0.12, M_ROCK2(), ao)               # 胸当て
+    for sx in (-1, 1):                                                                            # 肩当て 3 段
+        for r in range(3):
+            c = V(sx * (0.62 + 0.04 * r), 0.15, 2.0 - 0.13 * r)
+            slab(A, c + Vector((-sx * 0.1, 0, 0.1)), c + Vector((sx * 0.22, 0, -0.12)), Vector((0, 1, 0)), 0.55, 0.5, 0.07, M_ROCK2(), ao)
+    slab(A, V(-0.95, 0.25, 0.0), V(-0.8, 0.0, 2.3), Vector((0, 1, 0)), 0.16, 0.13, 0.08, M_ROCK2(), lambda p: 0.6)   # 剣（左に立てる）
+    arm = A.build(name + '_armor', smooth=False)
+    bpy.ops.object.select_all(action='DESELECT'); st.select_set(True); arm.select_set(True); base_ob.select_set(True)
+    bpy.context.view_layer.objects.active = base_ob; bpy.ops.object.join()
+    ob = bpy.context.object; ob.name = name; ob.data.name = name; ob.select_set(False)
+    return ob
+
+
 def stone_lantern(name, seed):
     """石の灯籠（B04）: 台・柱・火袋・笠・宝珠"""
     B = Builder(); ao = lambda p: 0.75 + 0.3 * min(1, p.z / 1.8)
@@ -1135,7 +1219,8 @@ ASSETS = {
     'stump': lambda n: stump(n, 1005),
     'lavender': lambda n: lavender_bush(n, 1006),
     'stone_steps': lambda n: stone_steps(n, 1007),
-    'statue': lambda n: pedestal_statue(n, 1008),   # 置くときに 1.6 倍（見本の像は台座からはみ出す大きさ）
+    'statue': lambda n: pedestal_statue(n, 1008),
+    'statue2': lambda n: pedestal_statue2(n, 1009),   # 置くときに 1.6 倍（見本の像は台座からはみ出す大きさ）
     'stone_lantern': lambda n: stone_lantern(n, 1009),
     'curb': lambda n: curb(n, 1010),
     'rail_fence': lambda n: rail_fence(n, 1011),
