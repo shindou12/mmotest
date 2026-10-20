@@ -87,8 +87,13 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
 .turn button:active { background: var(--accent); color: var(--accent-ink); }
 @media (max-width: 760px) {
   .stick { width: 104px; height: 104px; }
-  .info { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); max-height: 38%; }
-  .ctl { max-height: 46%; }
+  /* 版の説明の板は、操作の板のすぐ下（左上）に重ねる。下の端は、スティックと回転ボタンの帯（下から 150px）より上で止める */
+  .info {
+    top: calc(env(safe-area-inset-top, 0px) + 20px + var(--ctl-h, 46px)); bottom: auto;
+    left: max(16px, env(safe-area-inset-left, 0px)); right: auto;
+    max-height: calc(100% - var(--ctl-h, 46px) - 190px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+  .ctl { max-height: calc(100% - 260px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 }
 [hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -370,5 +375,7 @@ setInterval(() => {
 if (innerWidth < 900) { $('info').classList.add('min'); $('info-min').textContent = 'ひらく'; }
 if (innerWidth < 600) { $('ctl').classList.add('min'); $('ctl-min').textContent = 'ひらく'; }   // スマホは地図を広く（板は「ひらく」で出す）
 resetIdeas(state.ver); renderIdeas();
+// 操作の板の高さを CSS に渡す（狭い画面で版の説明の板をその下に置くため）
+new ResizeObserver(() => document.documentElement.style.setProperty('--ctl-h', $('ctl').offsetHeight + 'px')).observe($('ctl'));
 loadVersion(state.ver);
 </script>
