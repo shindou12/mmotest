@@ -1,9 +1,9 @@
 # アイデアの入／切の比較（L22）
-撮影: `sh tools/worldart/abshoot.sh art/shots/ab`、比べる: `python3 -I tools/worldart/abcompare.py <切> <入> <拡大.png>`。
+撮影: `sh tools/worldart/abshoot.sh art/shots/ab`（撮影は pack_shots.py で webp にして保存）、比べる: `python3 -I tools/worldart/abcompare.py <切> <入> <拡大.png>`。
 固定した条件: 地図のデータ・カメラ（見本②は各見本の基準カメラ B01・B02・B03 と近景 near@B01、south_coast は地図の基準カメラと近景）・地形・配置・光・解像度（1532×869）。変えるのは URL の引数 1 つだけ。
 見本②は L22 の設定（線形の階調・露出 1.25・空の光 2.1・彩度 1.0・MSAA 4）、south_coast はその地図の既定（ACES・MSAA なし）。
 数値: |ΔL| = 画面全体の輝度の差の平均（0〜255）、変化 = ΔL > 3 の画素の割合、平均 ΔL = 入 − 切。草・土 = rulecheck の [日陰/日なたの比, 青の寄り]（切 → 入）。
-拡大: `art/shots/ab/cmp/<アイデア>_<地図>_<ビュー>.png`（左 = 切、中 = 入、右 = 差を 8 倍）。全数値: `art/shots/ab/cmp/results.txt`。
+拡大: `art/shots/ab/cmp/<アイデア>_<地図>_<ビュー>.webp`（左 = 切、中 = 入、右 = 差を 8 倍）。全数値: `art/shots/ab/cmp/results.txt`。
 
 | アイデア | 見本② B01 | B02 | B03 | near@B01 | south_coast 基準 | 近景 | 拡大で見た違い | 判定 |
 |---|---|---|---|---|---|---|---|---|
