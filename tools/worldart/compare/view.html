@@ -7,6 +7,7 @@
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1d2318; }
   canvas { display: block; touch-action: none; }
+  html, body { touch-action: none; overscroll-behavior: none; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -34,6 +35,22 @@
       if (d) api.setYaw(api.pose().yaw + d * 70 * dt);
       requestAnimationFrame(spin);
     })(last);
+    // ズーム: 2 本指のピンチ（指の間が開くと近づく）とマウスのホイール。カメラの距離 3〜80m
+    const zoomTo = (d) => { const p = api.pose(); const nd = Math.min(80, Math.max(3, d)); api.setCam(nd, p.pitch); host?.__cmpZoomed?.(nd, p.pitch); };
+    const pts = new Map(); let pinch = null;
+    const span = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+    addEventListener('pointerdown', (e) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) pinch = { span: span(), dist: api.pose().dist };
+    });
+    addEventListener('pointermove', (e) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pts.size >= 2) { const sp = span(); if (sp > 10) zoomTo(pinch.dist * pinch.span / sp); }
+    });
+    const lift = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
+    addEventListener('pointerup', lift); addEventListener('pointercancel', lift);
+    addEventListener('wheel', (e) => { e.preventDefault(); zoomTo(api.pose().dist * Math.exp(e.deltaY * 0.0012)); }, { passive: false });
     host?.__cmpOnReady?.(api, window);
   };
   addEventListener('error', (e) => host?.__cmpProgress?.('読み込めませんでした: ' + e.message, true));

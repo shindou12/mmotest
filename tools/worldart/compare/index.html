@@ -35,7 +35,7 @@ h2 { margin: 0; font-family: var(--display); font-size: 15px; text-wrap: balance
 h3 { margin: 4px 0 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-soft); }
 .group { display: flex; flex-direction: column; gap: 6px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chips button, .tabs button, .pad button, .minbtn {
+.chips button, .tabs button, .minbtn {
   font: 500 12.5px/1.2 var(--body); color: var(--ink); background: transparent; border: 1px solid var(--line);
   border-radius: 999px; padding: 6px 10px; cursor: pointer; text-align: left;
 }
@@ -66,13 +66,28 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
   color: var(--ink-soft); font-size: 14px; letter-spacing: 0.06em; text-align: center; padding-inline: max(16px, env(safe-area-inset-left, 0px));
 }
 .loading.err { color: var(--bad); }
-.pad {
-  position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-  display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); gap: 6px;
+.stick {
+  position: fixed; z-index: 6; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: 120px; height: 120px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
 }
-.pad button { border-radius: 10px; background: var(--panel); text-align: center; font-size: 15px; padding: 0; touch-action: none; user-select: none; }
+.stick .knob {
+  position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+  background: var(--accent); opacity: 0.85; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); pointer-events: none;
+}
+.stick.on { cursor: grabbing; }
+.turn {
+  position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex; gap: 8px;
+}
+.turn button {
+  width: 52px; height: 52px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+  font-size: 20px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;
+}
+.turn button:active { background: var(--accent); color: var(--accent-ink); }
 @media (max-width: 760px) {
-  .info { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 116px); max-height: 40%; }
+  .stick { width: 104px; height: 104px; }
+  .info { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); max-height: 38%; }
   .ctl { max-height: 46%; }
 }
 [hidden] { display: none !important; }
@@ -101,7 +116,7 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
     <h3>アイデアの入／切（L22 だけ）</h3>
     <div class="chips" id="ideatg" role="group" aria-label="アイデアの入／切"></div>
   </div>
-  <p class="help">歩く: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> か矢印キー、向き: <kbd>Q</kbd><kbd>E</kbd>。地図を一度押すとキーが効きます。赤い柱が人物の代わりです。版を替えても、いる場所・向き・カメラはそのままです。</p>
+  <p class="help">歩く: 左下のスティックを押したまま倒す（<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> と矢印キーも可）。向き: 右下の ⟲ ⟳ か <kbd>Q</kbd><kbd>E</kbd>。ズーム: 地図を 2 本指でつまむ、PC はホイール。赤い柱が人物の代わりです。版を替えても、いる場所・向き・カメラはそのままです。</p>
   <div class="pose" id="pose">—</div>
 </aside>
 
@@ -115,9 +130,9 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
   <div id="pane-ideas" class="sect" hidden></div>
 </aside>
 
-<div class="pad" id="pad" aria-label="移動のボタン">
-  <button data-k="q" aria-label="左へ回る">⟲</button><button data-k="w" aria-label="前へ">▲</button><button data-k="e" aria-label="右へ回る">⟳</button>
-  <button data-k="a" aria-label="左へ">◀</button><button data-k="s" aria-label="後ろへ">▼</button><button data-k="d" aria-label="右へ">▶</button>
+<div class="stick" id="stick" role="application" aria-label="移動のスティック（押したまま倒した向きへ歩く）"><div class="knob" id="knob"></div></div>
+<div class="turn" aria-label="向きを回す">
+  <button id="turn-l" data-k="q" aria-label="左へ回る">⟲</button><button id="turn-r" data-k="e" aria-label="右へ回る">⟳</button>
 </div>
 
 <script>
@@ -234,7 +249,10 @@ function applyCam() {
   if (!api) return;
   if (state.cam === 'game' && state.gameCam) api.setCam(state.gameCam.dist, state.gameCam.pitch, state.gameCam.fov);
   else if (CAM_SET[state.cam]) api.setCam(CAM_SET[state.cam][0], CAM_SET[state.cam][1]);
+  else if (state.cam === 'free' && state.free) api.setCam(state.free.dist, state.free.pitch);
 }
+// ピンチ・ホイールでズームしたら、その距離を覚えて版を替えても保つ（カメラの選択は外れる）
+window.__cmpZoomed = (dist, pitch) => { state.cam = 'free'; state.free = { dist, pitch }; mark('cam'); };
 window.__cmpOnReady = (a, w) => {
   api = a; frameWin = w;
   api.setView(state.area);                    // この版のそのエリアのカメラと光
@@ -281,7 +299,23 @@ for (const id of ['ctl', 'info']) {
 const send = (type, key) => { try { frameWin?.dispatchEvent(new KeyboardEvent(type, { key })); } catch (e) {} };
 addEventListener('keydown', (e) => { if (/^(w|a|s|d|q|e|arrow)/i.test(e.key)) send('keydown', e.key); });
 addEventListener('keyup', (e) => { if (/^(w|a|s|d|q|e|arrow)/i.test(e.key)) send('keyup', e.key); });
-document.querySelectorAll('#pad button').forEach((b) => {
+// 仮想スティック: 中心からのずれを半径で割って -1〜1。中心の 12% は遊び。地図の中の window.__stick に渡す
+const stick = $('stick'), knob = $('knob'); const R = innerWidth <= 760 ? 40 : 48; let stickId = null;
+function setStick(x, y) {
+  knob.style.transform = `translate(${x * R}px, ${y * R}px)`;
+  const m = Math.hypot(x, y), v = m < 0.12 ? { x: 0, y: 0 } : { x, y };
+  try { if (frameWin) frameWin.__stick = v; } catch (e) {}
+}
+function stickAt(e) {
+  const r = stick.getBoundingClientRect();
+  let x = (e.clientX - (r.left + r.width / 2)) / R, y = (e.clientY - (r.top + r.height / 2)) / R;
+  const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+  setStick(x, y);
+}
+stick.addEventListener('pointerdown', (e) => { e.preventDefault(); stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stick.classList.add('on'); stickAt(e); });
+stick.addEventListener('pointermove', (e) => { if (e.pointerId === stickId) stickAt(e); });
+for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(t, (e) => { if (e.pointerId !== stickId) return; stickId = null; stick.classList.remove('on'); setStick(0, 0); });
+document.querySelectorAll('.turn button').forEach((b) => {
   const k = b.dataset.k;
   b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); send('keydown', k); });
   for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, () => send('keyup', k));
@@ -291,5 +325,6 @@ setInterval(() => {
   try { state.pose = api.pose(); $('pose').textContent = `x ${state.pose.x.toFixed(1)}  z ${state.pose.z.toFixed(1)}  向き ${Math.round(state.pose.yaw)}°  距離 ${state.pose.dist.toFixed(0)}m`; } catch (e) {}
 }, 250);
 if (innerWidth < 900) { $('info').classList.add('min'); $('info-min').textContent = 'ひらく'; }
+if (innerWidth < 600) { $('ctl').classList.add('min'); $('ctl-min').textContent = 'ひらく'; }   // スマホは地図を広く（板は「ひらく」で出す）
 loadVersion(state.ver);
 </script>

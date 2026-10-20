@@ -26,6 +26,11 @@ REPL = [
      "  const bin = Uint8Array.from(atob(txt), (c) => c.charCodeAt(0));\n"
      "  return new Promise((res, rej) => gltf.parse(bin.buffer, '', res, rej));\n};\nwindow.__nload = 0;"),
     ("const terrain = await load(", "window.__progress?.('地形を読み込み中');\nconst terrain = await load("),
+    # 仮想スティック（比較ページ）: window.__stick = { x, y }（-1〜1、y は手前が +）。倒した向きで進み、倒した量で速さが変わる
+    ("(keys.has('s') || keys.has('arrowdown')) - (keys.has('w') || keys.has('arrowup')));",
+     "(keys.has('s') || keys.has('arrowdown')) - (keys.has('w') || keys.has('arrowup')));\n"
+     "    const stk = window.__stick, stkOn = !!(stk && (stk.x || stk.y)); if (stkOn) v.set(stk.x, 0, stk.y);"),
+    ("v.normalize().multiplyScalar(5 * dt)", "v.normalize().multiplyScalar(5 * dt * (stkOn ? Math.min(1, Math.hypot(stk.x, stk.y)) : 1))"),
 ]
 def patch(src):
     for a, b in REPL:
