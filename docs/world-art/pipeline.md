@@ -69,6 +69,10 @@ PORT=8091 node server.js &
 3. 撮る: `views.mjs`（作り直し）と `gameshot.mjs <エリア> <地図> <出力>`（ゲーム本体の今の絵。人物を地図の views の注目点へ置き、板を隠して撮る）。並べる: `pairsheet.py`。
 4. 比較ページ: `tools/worldart/compare/build.py` の `MAPS3` と `index.html` の `MAPS.<名>.areas`（固定ビューを選ぶ）。
 
+## 3d. Godot 4 へ書き出す（L26）
+`python3 -I tools/worldart/godot/export_godot.py <地図>` → `godot/worldart/data/`。撮影は `sh tools/worldart/godot/run.sh -- --shot=F01,… --out=<絶対パス>`（Godot 4.3・xvfb-run・mesa-vulkan-drivers）。
+シェーダーは `godot/worldart/shaders/`（three.js の world.js と同じ式）。world.js の材質や光を変えたら、こちらも同じに直して撮り比べる（`pairsheet.py`）。
+
 ## 3b. 第 2 世代の地図を第 3 世代の規則へ移す
 `python3 -I tools/worldart/maps/to_gen3.py <名> …` → `<名>_g3.json`（元は残す。手で直さず、元の地図か規則か to_gen3.py を直す）→ `build_map.py -- <名>_g3`。アセットの置き換え（maple2・fir3・rock_s）も to_gen3.py の REP。アセットを足したら `build_assets.py` を全部実行し直す（決定的なので、変わるのは直した物だけ。変わった GLB を一覧で確かめる）。
 

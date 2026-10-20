@@ -1,0 +1,155 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="WorldArt (Godot)"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1532
+window/size/viewport_height=869
+
+[input]
+
+move_up={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":87,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194320,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+move_down={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":83,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194322,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+move_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":65,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194319,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+move_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194321,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+turn_left={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":81,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+turn_right={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":69,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+
+[rendering]
+
+lights_and_shadows/directional_shadow/size=8192
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=4
+textures/default_filters/anisotropic_filtering_level=3
+anti_aliasing/quality/msaa_3d=2
+
+[shader_globals]
+
+wa_hemi_sky={
+"type": "vec3",
+"value": Vector3(0.4, 0.52, 0.71)
+}
+wa_hemi_ground={
+"type": "vec3",
+"value": Vector3(0.16, 0.17, 0.14)
+}
+wa_hemi_int={
+"type": "float",
+"value": 1.6
+}
+wa_albedo_sat={
+"type": "float",
+"value": 0.9
+}
+wa_leaf_sat={
+"type": "float",
+"value": 0.95
+}
+wa_leaf_tint={
+"type": "vec3",
+"value": Vector3(1.18, 1, 0.76)
+}
+wa_wrap={
+"type": "float",
+"value": 0.5
+}
+wa_grass_tint={
+"type": "vec3",
+"value": Vector3(2.15, 1.6, 0.5)
+}
+wa_dirt_tint={
+"type": "vec3",
+"value": Vector3(0.92, 1, 0.42)
+}
+wa_alt_tint={
+"type": "vec3",
+"value": Vector3(1, 1, 1)
+}
+wa_rock_tint={
+"type": "vec3",
+"value": Vector3(0.92, 0.94, 0.78)
+}
+wa_lush_tint={
+"type": "vec3",
+"value": Vector3(0.55, 0.92, 0.95)
+}
+wa_lush_amt={
+"type": "float",
+"value": 1.3
+}
+wa_lush_bias={
+"type": "float",
+"value": 0.12
+}
+wa_tuft_tint={
+"type": "vec3",
+"value": Vector3(1.12, 1.05, 0.8)
+}
+wa_alt_scale={
+"type": "float",
+"value": 6.0
+}
+wa_rock_scale={
+"type": "float",
+"value": 4.5
+}
+wa_rock_pix={
+"type": "float",
+"value": 1.0
+}
+wa_gb_amt={
+"type": "float",
+"value": 0.85
+}
+wa_gb_h={
+"type": "float",
+"value": 0.32
+}
+wa_gb_on={
+"type": "float",
+"value": 1.0
+}
+wa_splat_st={
+"type": "vec3",
+"value": Vector3(0, 0, 1)
+}
