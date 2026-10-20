@@ -132,18 +132,56 @@ static func mob_def(floor_n: int, d: int) -> Dictionary:
 	return {"t": "slime", "name": "?", "color": "#888888", "scale": 1.0}
 
 
-## stats.js calcStats のうち、試作で使う部分（防具・装飾・ツリー・称号なし、武器は初心者の武器）
+## stats.js calcStats のうち、試作で使う部分: 装備（武器・防具・装飾）の基礎値と強化、付加効果（affixes）、防具の基本効果、重さ。
+## まだ入れていないもの: スキルツリー・武器ツリー・称号・スキル変化（sv）・固有効果（fx）
+static func enh_mult(it) -> float:
+	return 1.0 + float(it.get("enh", 0)) * 0.08 if it is Dictionary else 1.0
+
+
+static func item_weight(it) -> float:
+	if not it is Dictionary: return 0.0
+	if it.has("weight"): return float(it["weight"])
+	if it["slot"] == "weapon": return float(data()["weapons"].get(it.get("kind", "sword"), {}).get("weight", 4))
+	if it["slot"] == "armor": return float(data()["armorClasses"][it.get("armor", "medium")]["weight"])
+	return 0.5
+
+
 static func calc_stats(ch: Dictionary) -> Dictionary:
 	var D := data()
-	var wk: String = ch.get("wk", D["defaultWeapon"])
+	var eq: Dictionary = ch.get("eq", {})
+	var items := []
+	for k in ["weapon", "armor", "acc"]:
+		if eq.get(k) is Dictionary: items.append(eq[k])
+	var aff := {}
+	for it in items:
+		for a in it.get("affixes", []):
+			var key := String(a[0])
+			if not D["affixes"].has(key): continue   # スキル変化（sv_*）はまだ
+			aff[key] = float(aff.get(key, 0.0)) + float(D["affixes"][key]["tiers"][int(a[1]) - 1])
+	var arm = eq.get("armor")
+	if arm is Dictionary and arm.get("base") is Array:
+		aff[String(arm["base"][0])] = float(aff.get(String(arm["base"][0]), 0.0)) + float(arm["base"][1])
+	var m := func(k: String) -> float: return float(aff.get(k, 0.0))
+	var base := func(it, k: String) -> float: return float(it.get(k, 0.0)) * enh_mult(it) if it is Dictionary else 0.0
+	var w = eq.get("weapon")
+	var acc = eq.get("acc")
+	var wk: String = w["kind"] if w is Dictionary else String(D["defaultWeapon"])
 	var W: Dictionary = D["weapons"][wk]
-	var L: Dictionary = D["levels"][int(ch["lv"]) - 1]
-	var watk := float(ch.get("watk", 6))
-	var atk := float(L["atk"]) + watk
-	var mhp := roundf(float(L["hp"]))
-	var def := minf(65.0, (float(D["instinct"]["dr"]) if W.get("melee", false) else 0.0) + float(L["wdef"][wk]))
-	return {"wk": wk, "W": W, "atk": atk, "mhp": mhp, "def": def, "crit": 5.0, "critd": 150.0, "aspd": 0.0, "move": 0.0,
-		"maxPot": 3, "dodgeCd": 0.75 * 0.7, "roll": 1.1, "wr": 1}
+	var lv := int(ch["lv"])
+	var L: Dictionary = D["levels"][lv - 1]
+	var atk: float = (float(L["atk"]) + base.call(w, "atk") + base.call(acc, "atk")) * (1 + m.call("atkp") / 100.0)
+	var mhp: float = roundf((float(L["hp"]) + base.call(arm, "hp") + base.call(acc, "hp")) * (1 + m.call("hpp") / 100.0))
+	var weight := 0.0
+	for it in items: weight += item_weight(it)
+	var wc: Dictionary = D["weightClasses"][-1]
+	for c in D["weightClasses"]:
+		if weight <= float(c["max"]): wc = c; break
+	var def := minf(65.0, m.call("def") + base.call(arm, "def") + (float(D["instinct"]["dr"]) if W.get("melee", false) else 0.0) + float(L["wdef"][wk]))
+	return {"wk": wk, "W": W, "atk": atk, "mhp": mhp, "def": def, "crit": 5.0 + m.call("crit"), "critd": 150.0 + m.call("critd"),
+		"aspd": m.call("aspd"), "move": m.call("move"), "vamp": m.call("vamp"), "cdr": minf(60.0, m.call("cdr")),
+		"normp": m.call("normp"), "heavyp": m.call("heavyp"), "wskillp": m.call("wskillp"),
+		"maxPot": 3 + int(m.call("potion")), "dodgeCd": 0.75 * float(wc["cd"]) * (1 - minf(60.0, m.call("dodgecd")) / 100.0), "roll": float(wc["roll"]),
+		"wr": int(w["rarity"]) if w is Dictionary else 0, "weight": weight, "wc": wc, "skill": String(w.get("skill", "retreat")) if w is Dictionary else "retreat"}
 
 
 ## data.js xpToNext

@@ -3,8 +3,9 @@ extends Node3D
 ## ブラウザ版（public/js/game/）から移したもの: 歩く・当たり判定（loop.js moveMe / areas.js collide）、通常攻撃の 3 段（actions.js doSwing・
 ## strikes.arc、combat.js dealDamage）、回避（tryDodge）、回復薬（usePotion）、敵の予告と被弾（hurt.js onTele・resolveTele・takeDamage）、
 ## 這いずり・復活・力尽きる（fall・revived・bleed）、経験値とレベル（gainXp）、出口（loop.js の出口）、敵と他の人の表示（snapshot.js onSnap）。
-## まだないもの: 強攻撃・武器スキル・ツリー・装備・落とし物の拾得・ボスの弾と演出・人物と敵の本当のモデル。屋内のエリアは仮の壁と床。
-## 操作: WASD / 矢印 移動、マウス 狙い、左クリック 攻撃、Space 回避、R 回復薬、F 調べる（レバー・宝箱）、ホイール カメラの距離。
+## CP5（combat.gd・items.gd）: 溜め斬り（強攻撃）・片手剣の武器スキル 5 種・飛ぶ斬撃・踏み込み、落とし物を拾う・持ち物・装備（能力値の計算）。
+## まだないもの: ツリー・ガード・弓などの武器ごとの技・ボスの弾と演出・人物と敵の本当のモデル。屋内のエリアは仮の壁と床。
+## 操作: WASD / 矢印 移動、マウス 狙い、左クリック 攻撃（長押しで溜め斬り）、右クリック 武器スキル、Space 回避、R 回復薬、F 調べる（レバー・宝箱）、I 持ち物、ホイール カメラの距離。
 ## 起動の引数（-- の後）: --server=ws://… --name=… --auto（名前の入力を飛ばす）--bot（自動で敵を探して戦う。確認用）
 ##   --goto=<エリア>（自動操作がその出口へ歩く）--shot=<フレーム数>:<出力.png>（草原に入って敵が見えてから撮って終わる）--quit=<秒> --at=x,z（草原に入ったらその位置へ）
 
@@ -34,9 +35,10 @@ var send_t := 0.0
 var dist := 33.0
 var started := false
 var mouse_ground := Vector3.ZERO
-var held_attack := false
 var bot_t := 0.0
 var door_open := false
+var combat: GameCombat
+var items: GameItems
 
 # HUD
 var ui := {}
@@ -48,6 +50,8 @@ func _ready() -> void:
 			var kv := a.substr(2).split("=", true, 1)
 			args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	world.auto_build = false
+	combat = GameCombat.new(self)
+	items = GameItems.new(self)
 	add_child(net)
 	net.message.connect(_on_msg)
 	net.closed.connect(func(): _log("サーバーとの接続が切れました", Color(1, 0.4, 0.4)))
@@ -63,8 +67,18 @@ func _load_char() -> void:
 	if FileAccess.file_exists(SAVE):
 		ch = JSON.parse_string(FileAccess.get_file_as_string(SAVE))
 	if ch.is_empty():
-		ch = {"name": "Godot", "color": "#448a9b", "lv": 1, "xp": 0, "gold": 0, "wk": "sword", "watk": 6}
+		ch = {"name": "Godot", "color": "#448a9b", "lv": 1, "xp": 0, "gold": 0}
+	if not ch.has("eq"):   # 初心者の片手剣（ブラウザ版の新しいキャラと同じ: data.js starterWeapon）
+		ch["eq"] = {"weapon": {"slot": "weapon", "kind": "sword", "rarity": 1, "ilvl": 1, "affixes": [], "enh": 0, "atk": 6, "name": "初心者の片手剣", "skill": "retreat", "weight": 4}}
+	if not ch.has("inv"): ch["inv"] = []
 	S = GameRules.calc_stats(ch)
+
+
+## 装備を変えたら能力値を計算し直す（stats.js calcStats）
+func _recalc() -> void:
+	S = GameRules.calc_stats(ch)
+	me.hp = minf(me.hp, S["mhp"])
+	_save_char()
 
 
 func _save_char() -> void:
@@ -76,7 +90,8 @@ func _reset_me() -> void:
 	me = {"x": 0.0, "z": 0.0, "a": PI, "hp": S["mhp"], "dead": false, "crawl": false, "downs": 0, "downsAt": 0.0,
 		"swingT": 9.0, "swingDur": 0.4, "combo": 0, "lastSwing": -9.0, "sw": 0, "queued": 0.0,
 		"dodgeT": 0.0, "dodgeCd": 0.0, "dodgeDir": Vector2.ZERO, "iframe": 0.0, "potions": S["maxPot"], "potCd": 0.0,
-		"hurtT": 0.0, "transit": false, "deathAt": 0.0}
+		"hurtT": 0.0, "transit": false, "deathAt": 0.0, "charging": false, "chargeT": 0.0, "wsCd": 0.0, "skillT": -1.0, "skillDuration": 0.55, "sk": 0,
+		"dashT": 0.0, "dashA": 0.0, "dashSpeed": 0.0}
 
 
 func _start(pname: String, url: String) -> void:
@@ -106,7 +121,7 @@ func _on_msg(m: Dictionary) -> void:
 			ch["gold"] = int(ch.get("gold", 0)) + int(m.n)
 			_float(Vector3(me.x, 2.6, me.z), "+%d G" % int(m.n), Color(1, 0.85, 0.3))
 			_save_char()
-		"loot": _log("ドロップ %d 個（拾うのは未対応）" % m.items.size(), Color(0.7, 0.9, 1))
+		"loot": items.on_loot(m)
 		"chat": _log(("%s: " % m.from if m.from != "" else "") + String(m.text), Color.html(m.get("color", "#ffffff")))
 		"leave": _remove_other(int(m.id))
 		"revived": _revived(String(m.by))
@@ -125,6 +140,7 @@ func _enter_area(id: String, x: float, z: float) -> void:
 	for te in teles:
 		for g in te.meshes: g.queue_free()
 	teles.clear()
+	items.clear()
 	world.load_area(id)
 	door_open = false
 	_add_marker_nodes()
@@ -330,26 +346,30 @@ func _strike_arc(rng: float, deg: float, mult: float, a: float) -> void:
 		var dx: float = mb.x - me.x; var dz: float = mb.z - me.z; var d := sqrt(dx * dx + dz * dz)
 		if d > rng + mb.rad: continue
 		if absf(GameRules.ang_diff(atan2(dx, dz), a)) <= arc + mb.rad / maxf(d, 0.5) or d < mb.rad + 0.6:
-			_deal_damage(id, mb, mult)
+			_deal_damage(id, mb, mult, "normal")
 
 
-func _deal_damage(id: int, mb: Dictionary, mult: float) -> void:
+func _deal_damage(id: int, mb: Dictionary, mult: float, type := "normal") -> void:
 	if mb.hp <= 0: return
 	var crit: bool = randf() * 100 < float(S["crit"])
 	var stunned := 1.3 if mb.get("stunT", 0.0) > 0 else 1.0
-	var dmg := maxf(1, roundf(S["atk"] * mult * stunned * randf_range(0.92, 1.08) * (S["critd"] / 100.0 if crit else 1.0)))
+	var type_mult := 1.0 + float(S.get({"normal": "normp", "heavy": "heavyp", "wskill": "wskillp"}.get(type, ""), 0.0)) / 100.0
+	var dmg := maxf(1, roundf(S["atk"] * mult * type_mult * stunned * randf_range(0.92, 1.08) * (S["critd"] / 100.0 if crit else 1.0)))
 	mb.hp -= dmg; mb.localT = t_now
-	net.send({"t": "hit", "id": id, "dmg": dmg, "crit": crit, "st": 0})
+	var st := 0.0
+	if mb.kind == 2 and mb.get("stunT", 0.0) <= 0:   # ボスのスタン値（combat.js stunValue。ツリーなし）
+		st = snappedf({"normal": 1.2, "heavy": 6.0, "wskill": 3.0}.get(type, 0.0) * float(S["W"].get("stun", 1.0)), 0.1)
+	net.send({"t": "hit", "id": id, "dmg": dmg, "crit": crit, "st": st})
 	if args.has("bot"): print("HIT %s %d%s hp=%d" % [mb.name, int(dmg), " crit" if crit else "", int(mb.hp)])
 	_float(Vector3(mb.x, 2.2, mb.z), str(int(dmg)), Color(1, 0.85, 0.3) if crit else Color.WHITE)
 
 
 func _try_dodge(dir: Vector2) -> void:
-	if me.dead or me.crawl or me.dodgeCd > 0: return
+	if me.dead or me.crawl or me.dodgeCd > 0 or me.dashT > 0: return
 	if dir == Vector2.ZERO: dir = Vector2(sin(me.a), cos(me.a))
 	me.dodgeDir = dir.normalized(); me.dodgeT = 0.38; me.iframe = 0.32
 	me.dodgeCd = maxf(S["dodgeCd"], me.iframe + 0.15)
-	me.swingT = 9.0
+	me.swingT = 9.0; me.skillT = -1.0; me.charging = false
 
 
 func _use_potion() -> void:
@@ -407,7 +427,9 @@ func _process(dt: float) -> void:
 		if pending[i].at <= t_now:
 			var p = pending[i]; pending.remove_at(i)
 			if not me.dead and not me.crawl: p.fn.call()
-	for k in ["dodgeCd", "iframe", "potCd", "hurtT"]: me[k] -= dt
+	for k in ["dodgeCd", "iframe", "potCd", "hurtT", "wsCd"]: me[k] -= dt
+	combat.update(dt)
+	items.update(dt)
 	var safe: bool = area["type"] == "town" or area["type"] == "camp"
 	_update_mouse()
 	if me.dead:
@@ -423,12 +445,17 @@ func _process(dt: float) -> void:
 			me.dodgeT -= dt
 			var sp := 17.0 * float(S["roll"])
 			_moveme(me.dodgeDir.x * sp * dt, me.dodgeDir.y * sp * dt)
+		elif me.dashT > 0:   # 踏み込み・後退（actions.js dash）
+			var ddt := minf(dt, me.dashT)
+			me.dashT -= dt
+			_moveme(sin(me.dashA) * me.dashSpeed * ddt, cos(me.dashA) * me.dashSpeed * ddt)
 		elif mv != Vector2.ZERO:
-			var busy: bool = me.swingT < me.swingDur
-			var spd: float = 7.2 * (1 + float(S["move"]) / 100.0) * (0.45 if busy else 1.0)
+			var busy: bool = me.swingT < me.swingDur or me.skillT >= 0
+			var slow := 0.45 if busy else (0.4 if me.charging and me.chargeT > GameCombat.CHARGE_MIN else 1.0)
+			var spd: float = 7.2 * (1 + float(S["move"]) / 100.0) * slow
 			var n := mv.normalized()
 			_moveme(n.x * spd * dt, n.y * spd * dt)
-			if not busy: me.a = atan2(n.x, n.y)
+			if not busy and not me.charging: me.a = atan2(n.x, n.y)
 		# 出口
 		if not me.transit:
 			for p in portals:
@@ -436,10 +463,17 @@ func _process(dt: float) -> void:
 				if d < p.r and p.armed:
 					me.transit = true; net.send({"t": "move", "to": p.to}); break
 				if d > p.r + 1.5: p.armed = true
+		# 溜め（左を押している間）: 0.22 秒を過ぎると狙いの方を向く
+		if me.charging:
+			me.chargeT += dt
+			if me.chargeT >= GameCombat.CHARGE_MIN: me.a = _aim_angle()
+		# 通常攻撃（短押しの入力を少し保持してコンボをつなぐ）
 		me.swingT += dt
-		if not me.crawl and me.queued > t_now and me.swingT >= me.swingDur and not safe:
+		if not me.crawl and me.queued > t_now and combat.can_act() and me.swingT >= me.swingDur and not safe:
 			me.queued = 0.0; _do_swing()
-		if held_attack: me.queued = t_now + 0.25
+		if me.skillT >= 0:
+			me.skillT += dt
+			if me.skillT > me.skillDuration: me.skillT = -1.0
 		if safe: me.hp = minf(S["mhp"], me.hp + S["mhp"] * 0.1 * dt); me.potions = S["maxPot"]
 	_update_teles()
 	_sync_nodes(dt)
@@ -455,14 +489,23 @@ func _unhandled_input(ev: InputEvent) -> void:
 	if not started: return
 	if ev is InputEventMouseButton:
 		if ev.button_index == MOUSE_BUTTON_LEFT:
-			held_attack = ev.pressed
-			if ev.pressed: me.queued = t_now + 0.25
+			if ev.pressed:
+				if combat.can_act(): me.charging = true; me.chargeT = 0.0
+				else: me.queued = t_now + 0.25
+			elif me.charging:
+				me.charging = false
+				var safe: bool = area.get("type", "") in ["town", "camp"]
+				if me.chargeT >= GameCombat.CHARGE_MIN and not safe: combat.do_heavy(2 if me.chargeT >= GameCombat.CHARGE_MAX else 1)
+				else: me.queued = t_now + 0.25
+		elif ev.pressed and ev.button_index == MOUSE_BUTTON_RIGHT:
+			if not area.get("type", "") in ["town", "camp"]: combat.try_weapon_skill()
 		elif ev.pressed and ev.button_index == MOUSE_BUTTON_WHEEL_UP: dist = maxf(8.0, dist * 0.9)
 		elif ev.pressed and ev.button_index == MOUSE_BUTTON_WHEEL_DOWN: dist = minf(60.0, dist / 0.9)
 	if ev is InputEventKey and ev.pressed and not ev.echo:
 		if ev.physical_keycode == KEY_SPACE: _try_dodge(Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down")))
 		elif ev.physical_keycode == KEY_R: _use_potion()
 		elif ev.physical_keycode == KEY_F: _interact()
+		elif ev.physical_keycode == KEY_I: items.toggle()
 
 
 func _update_mouse() -> void:
@@ -487,14 +530,37 @@ func _bot(_dt: float) -> Vector2:
 		var d := Vector2(mb.x - me.x, mb.z - me.z).length()
 		if d < bd: bd = d; best = mb
 	if me.hp < S["mhp"] * 0.4: _use_potion()
+	# 落とし物: 近くに敵がいなければ拾いに行く。拾った武器・防具・装飾は、攻撃力・HP が上がるなら装備する（確認用）
+	var dr = items.nearest()
+	if dr != null and (best == null or bd > 6.0) and Vector2(dr.x - me.x, dr.z - me.z).length() < 25.0:
+		return Vector2(dr.x - me.x, dr.z - me.z).normalized()
+	_bot_equip()
 	if best == null: return Vector2.ZERO
 	var dir := Vector2(best.x - me.x, best.z - me.z)
 	me.a = atan2(dir.x, dir.y)
 	mouse_ground = Vector3(best.x, 0, best.z)
 	if bd < float(S["W"]["range"]) + best.rad - 0.3:
-		me.queued = t_now + 0.25
+		if me.wsCd <= 0 and combat.can_act(): combat.try_weapon_skill(); print("SKILL ", S.get("skill"))
+		elif combat.can_act() and me.swingT >= me.swingDur and t_now - bot_t > 3.0: bot_t = t_now; combat.do_heavy(2); print("HEAVY 2")
+		else: me.queued = t_now + 0.25
 		return Vector2.ZERO
 	return dir.normalized()
+
+
+func _bot_equip() -> void:
+	var inv: Array = ch.get("inv", [])
+	for i in inv.size():
+		var it: Dictionary = inv[i]
+		var slot := String(it.get("slot", ""))
+		if not slot in ["weapon", "armor", "acc"]: continue
+		if slot == "weapon" and not GameRules.data()["weapons"].get(it.get("kind", ""), {}).get("melee", false): continue
+		var before := S.duplicate()
+		var trial := ch.duplicate(true); trial["eq"][slot] = it
+		var after := GameRules.calc_stats(trial)
+		if float(after.atk) + float(after.mhp) * 0.1 > float(before.atk) + float(before.mhp) * 0.1:
+			items.equip(i)
+			print("EQUIP %s atk %d->%d hp %d->%d" % [it.get("name"), int(before.atk), int(S.atk), int(before.mhp), int(S.mhp)])
+			return
 
 
 # ---------------------------------------------------------------- 表示
@@ -593,9 +659,11 @@ func _setup_hud() -> void:
 	ui.log = RichTextLabel.new(); ui.log.scroll_following = true; ui.log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ui.log)
 	ui.log.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); ui.log.offset_left = 16; ui.log.offset_right = 540; ui.log.offset_top = -190; ui.log.offset_bottom = -16
-	ui.help = Label.new(); ui.help.text = "WASD 移動 / 左クリック 攻撃 / Space 回避 / R 回復薬 / F 調べる / ホイール 距離"
+	ui.help = Label.new(); ui.help.text = "WASD 移動  左 攻撃（長押し 溜め斬り）  右 武器スキル\nSpace 回避  R 回復薬  F 調べる  I 持ち物  ホイール 距離"; ui.help.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	root.add_child(ui.help)
-	ui.help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); ui.help.offset_left = -580; ui.help.offset_top = -40; ui.help.offset_right = -16; ui.help.offset_bottom = -12
+	ui.help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); ui.help.offset_left = -560; ui.help.offset_top = -64; ui.help.offset_right = -16; ui.help.offset_bottom = -12
+	items.build_ui(root)
+	if args.has("inv"): items.toggle()   # 確認用: 持ち物の画面を開いて始める
 	# はじめの画面（名前とサーバー）
 	ui.menu = PanelContainer.new()
 	root.add_child(ui.menu)
@@ -614,7 +682,9 @@ func _update_hud() -> void:
 	ui.hp.max_value = S["mhp"]; ui.hp.value = me.hp
 	ui.hpl.text = "HP %d / %d   %s" % [int(me.hp), int(S["mhp"]), "（倒れている）" if me.crawl else ""]
 	ui.xp.max_value = GameRules.xp_to_next(int(ch["lv"])); ui.xp.value = int(ch["xp"])
-	ui.info.text = "%s  Lv %d   回復薬 %d   %d G" % [ch["name"], int(ch["lv"]), int(me.potions), int(ch.get("gold", 0))]
+	var wsn: String = GameCombat.WEAPON_SKILLS.get(S.get("skill", "retreat"), GameCombat.WEAPON_SKILLS["retreat"]).name
+	ui.info.text = "%s  Lv %d   回復薬 %d   %d G\n武器スキル %s %s%s" % [ch["name"], int(ch["lv"]), int(me.potions), int(ch.get("gold", 0)), wsn,
+		"（あと %.1f 秒）" % me.wsCd if me.wsCd > 0 else "（使える）", "   溜め %d%%" % int(minf(1.0, me.chargeT / GameCombat.CHARGE_MAX) * 100) if me.charging and me.chargeT >= GameCombat.CHARGE_MIN else ""]
 	if ui.banner.has_meta("t") and t_now > float(ui.banner.get_meta("t")): ui.banner.text = ""
 
 
