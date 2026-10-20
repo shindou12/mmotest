@@ -14,7 +14,8 @@ VIEWS = {
     'B01': dict(CAM, target=[0, 0, 0]),
     'B02': dict(CAM, target=[10.1, 0, 2.1]),       # 円錐の天幕の位置から計算（goal-mihon2.md 2）。L12: 見本の物が画面の 0.17 上 → 手前へ 2.1m
     'B03': dict(CAM, target=[-36, 0, -26],         # 位置は推測
-                light=dict(hemi=1.1, exposure=1.06)),     # L14: L13 の空の光 1.5 で B03 の日陰が深くなりすぎた（明暗比 3.23、見本 2.84）→ B03 は L12 までの光に戻す
+                light=dict(hemi=1.0, exposure=1.06)),   # L23: 1.1 → 1.0（B03 の明暗比）
+     # L14: L13 の空の光 1.5 で B03 の日陰が深くなりすぎた（明暗比 3.23、見本 2.84）→ B03 は L12 までの光に戻す
     'B04': dict(CAM, target=[8, 0, -52], pitch=40, dist=15, fov=25,   # L22: カットシーンの画角は 25° のまま（L21 で共通の 18° を引き継いだ退行を戻す）
    # 人物の画面の高さ 17% から距離を逆算（L09）   # 位置・カメラとも推測（カットシーン）
                 light=dict(sun=0.55, hemi=1.15, exposure=1.0, sat=1.1, vignette=0.45, topDark=0.55)),   # カットシーンの照明（L02）
@@ -152,12 +153,12 @@ spec = {
   "seed": 202, "aspect": 1532 / 869,
   "camera": VIEWS['B01'], "views": VIEWS,
   "sun": {"azimuth": 70, "elevation": 40, "color": "#fff0d4", "intensity": 4.0},
-  "sky": {"color": "#cfe0ee", "light": "#a9bfdc", "ground": "#6f7468", "intensity": 2.1}, "tone": "linear",   # L21: 輝度だけの階調圧縮 + 青い空の光（日陰は日なたの 0.45〜0.65 倍で青寄り）。L22: 2.6 → 2.1（L21 の明暗比 2.0〜2.1、見本 2.4〜2.8）   # L19: 1.5 → 1.65（L18 の明暗比 2.95、見本 2.61）   # L13: 物を小さくして木の陰が減った分、日陰を深く
+  "sky": {"color": "#cfe0ee", "light": "#a9bfdc", "ground": "#6f7468", "intensity": 1.6}, "tone": "linear",   # L21: 輝度だけの階調圧縮 + 青い空の光（日陰は日なたの 0.45〜0.65 倍で青寄り）。L22: 2.6 → 2.1（L21 の明暗比 2.0〜2.1、見本 2.4〜2.8）   # L19: 1.5 → 1.65（L18 の明暗比 2.95、見本 2.61）   # L13: 物を小さくして木の陰が減った分、日陰を深く
   "albedoSat": 0.9, "shadowMap": "vsm", "shadowRadius": 6,
-  "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
-  "post": {"msaa": 4, "exposure": 1.25, "sat": 1.0,   # L22: 階調は線形（曲線で圧縮しない）+ 露出 1.25。tone "lum" は r160 の OutputPass で効いていなかった（F25）。効かせると明暗比 1.9〜2.0・明部 180〜194 と見本から遠ざかった   # L22: 0.86 → 1.0（ACES をやめた分の彩度の落ち。L21 の彩度 0.45〜0.49、見本 0.51〜0.55）
+  "foliage": {"wrap": 0.5, "trans": 0.0, "receiveShadow": True, "sat": 0.95, "lift": 0.0, "tint": [1.18, 1.0, 0.76], "groundBlend": True},   # L23: 葉の持ち上げ 0（明暗比）、葉の色味（日なたの色相）、草の房の根元に地面の色（01）、透けは効果 0 なので 0
+  "post": {"msaa": 4, "exposure": 1.25, "sat": 0.92,   # L23: 色味を足した分の彩度   # L22: 階調は線形（曲線で圧縮しない）+ 露出 1.25。tone "lum" は r160 の OutputPass で効いていなかった（F25）。効かせると明暗比 1.9〜2.0・明部 180〜194 と見本から遠ざかった   # L22: 0.86 → 1.0（ACES をやめた分の彩度の落ち。L21 の彩度 0.45〜0.49、見本 0.51〜0.55）
            "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
-  "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.94, 0.78], "rock": "face", "rockPix": True,   # L15: 見本 B03 の岩肌（明るさ 0.55、苔で黄緑寄り）
+  "ground": {"grassTint": [2.15, 1.6, 0.5], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.94, 0.78], "rock": "face", "rockPix": True,   # L15: 見本 B03 の岩肌（明るさ 0.55、苔で黄緑寄り）
              "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 5.0},
   "terrain": {"size": 150, "cell": 0.5, "ground": "grass", "center": [-8, -22], "hills": {"amp": 0.25, "scale": 16}},
   "paths": [  # 区画どうしをつなぐ道（推測）

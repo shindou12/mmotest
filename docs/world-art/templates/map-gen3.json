@@ -1,6 +1,6 @@
 {
  "name": "NEW_MAP",
- "note": "第 3 世代の規則の地図の雛形（docs/world-art/rulebook.md）。public/worldart/maps/<名>.json に複製し、name・地形・道・区域を書き換える。光・階調・仕上げ・地面の色は規則なのでそのまま使う。",
+ "note": "第 3 世代の規則の地図の雛形（docs/world-art/rulebook.md、L23 の光と色）。public/worldart/maps/<名>.json に複製し、name・地形・道・区域を書き換える。光・階調・仕上げ・地面の色は規則なのでそのまま使う。",
  "seed": 1,
  "aspect": 1.7778,
  "camera": {
@@ -24,7 +24,7 @@
   "color": "#cfe0ee",
   "light": "#a9bfdc",
   "ground": "#6f7468",
-  "intensity": 2.1
+  "intensity": 1.6
  },
  "tone": "linear",
  "albedoSat": 0.9,
@@ -35,12 +35,18 @@
   "trans": 0.0,
   "receiveShadow": true,
   "sat": 0.95,
-  "lift": 0.14
+  "lift": 0.0,
+  "tint": [
+   1.18,
+   1.0,
+   0.76
+  ],
+  "groundBlend": true
  },
  "post": {
   "msaa": 4,
   "exposure": 1.25,
-  "sat": 1.0,
+  "sat": 0.92,
   "contrast": 1.0,
   "lift": [
    0,
@@ -56,9 +62,9 @@
  },
  "ground": {
   "grassTint": [
-   1.8,
+   2.15,
    1.6,
-   0.62
+   0.5
   ],
   "lushBias": 0.12,
   "dirtTint": [

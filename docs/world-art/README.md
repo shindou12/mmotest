@@ -49,16 +49,15 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 ```
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
-## 現在の状態（L22）
-- **見本②（`mihon2`）**: 区画つきの地図で B01〜B04 を再現（`art/shots/mihon2/L22/sheet.webp`）。輝度・彩度・明部は見本に近く、B04 は構図・数値ともほぼ一致。残りは明暗比の浅さと日なたの色相（rulebook 16）。
+## 現在の状態（L23）
+- **見本②（`mihon2`）**: 区画つきの地図で B01〜B04 を再現（`art/shots/mihon2/L23/sheet.webp`）。明暗比・彩度・緑の色相が B01・B02・B04 で見本とほぼ一致（rules/ab-L23.md）。残りは B03 の明暗比と B01 の色相（rulebook 16）。
 - 歩ける比較ページ: https://claude.ai/artifact/A31scCgQs9tWLQ1dhMAgZQ （L20・L21・L21 修正・L22 を同じ場所で切り替え、アイデア 01・02・04・05 の入／切）。
 - 第 2 世代の地図（orc_meadow・south_coast・town_plaza・forest_path・palm_clearing）は第 2 世代の規則のまま（試遊: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ ）。第 3 世代の規則（カメラ・階調・MSAA）はまだ入れていない。
 - 詳細と経緯は `goal-mihon2.md`（L01〜L22）と `experiments.md`（E01〜E34）。
 
 ## 次にやること（優先順）
 rulebook.md の「16. 未解決・未検証」が正。要約:
-1. 日なたの色相が緑寄り（≈75°、見本 ≈68°）→ 葉・草の地色を黄へ。
-2. 明暗比が浅く暗部が明るい（2.2 対 2.4〜2.8）→ 葉の持ち上げ・草の房・地面の暗部を切り分け。
-3. アイデア01 を草の房だけに絞って入／切、05 の値。
-4. 第 2 世代の地図を第 3 世代の規則へ移し、全部撮り直す（規則が場面をまたいで成り立つかの確認）。
-5. 町・砂漠・洞窟を規則だけで作る。
+1. B03 の明暗比（2.52 対 2.84）と森の奥の暗さ、B01 の緑の色相 +6°。
+2. 第 2 世代の地図を第 3 世代の規則（L23 の光と色）へ移し、全部撮り直す（場面をまたいで成り立つかの確認）。
+3. 町・砂漠・洞窟を規則だけで作る。
+4. 残りのアイデア（03・06〜09・11・14・16）の入／切。
