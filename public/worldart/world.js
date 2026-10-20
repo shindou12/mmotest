@@ -248,9 +248,11 @@ function addLushToGrass(sh) {
 }
 // アイデア01（L22）: 地面と草の色の融合。草・低木の根元はその場所の地面の色（地面の材質と同じ式で求めた地色）を受け取り、
 // 先へ向かって本来の色に戻す。gblend=1（URL）か spec.foliage.groundBlend で入れる。地面の頂点色（土・砂/石畳・岩）は読み込み後に
-// 絵（SPLAT）に写して引く。対象は GB_ASSETS の草・茂み・羊歯・ラベンダー。高さ uGBH m で本来の色へ戻る（根元の割合 uGBAmt）
+// 絵（SPLAT）に写して引く。対象は GB_ASSETS（草の房）。高さ uGBH m で本来の色へ戻る（根元の割合 uGBAmt）
 const GBLEND = num('gblend', spec.foliage?.groundBlend ? 1 : 0) > 0;
-const GB_ASSETS = /^(grass_a|grass_tall_a|clover_a|clover_b|palm2_low|lavender|flowers_a)$/;
+// 対象は草の房だけ（L23）。茂み・羊歯・ラベンダーまで含めると、道際の茂みの下部が土色の輪になった（rules/ab-L22.md）。
+// gbset=all で L22 の広い対象に戻せる（比較用）
+const GB_ASSETS = q.get('gbset') === 'all' ? /^(grass_a|grass_tall_a|clover_a|clover_b|palm2_low|lavender|flowers_a)$/ : /^(grass_a|grass_tall_a)$/;
 const GB = { tSplat: { value: null }, uST: { value: new THREE.Vector3(0, 0, 1) }, uGBAmt: { value: num('gbamt', 0.85) }, uGBH: { value: num('gbh', 0.32) } };
 function buildSplat(terrainScene, tm) {
   // 地形の頂点色を、地形の格子と同じ解像度の絵に写す（R=土 G=砂/石畳 B=岩）
