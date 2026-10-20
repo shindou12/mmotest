@@ -25,8 +25,63 @@ const SH_LAMBERT := preload("res://shaders/lambert.gdshader")
 const SH_ROCK := preload("res://shaders/rock.gdshader")
 
 
+@export var auto_build := true   ## ゲーム（scripts/game/game.gd）は false にして load_area で組み立てる
+
+
 func _ready() -> void:
-	build()
+	if auto_build: build()
+
+
+## ゲームのエリアを組み立てる（L27）。data/<id>/map.json があれば第 3 世代の地図、なければ仮の地面（ゲームの輪郭・当たり判定の形だけ）
+func load_area(id: String) -> void:
+	if FileAccess.file_exists("res://data/%s/map.json" % id):
+		map_name = id
+		if not is_inside_tree() or not auto_build: build()
+		return
+	for c in get_children():
+		remove_child(c)
+		c.free()
+	spec = _json("res://data/f1_field/map.json")   # 光・階調は第 3 世代の雛形と同じ値（f1_field の地図から借りる）
+	placed = {}
+	_set_globals()
+	_build_light()
+	_build_fallback(GameRules.area(id))
+
+
+## 仮の地面: 階層の地面の色の平面、輪郭の外の低い壁（灰色の岩の列）、当たり判定のある木・岩・建物を単純な形で
+func _build_fallback(ar: Dictionary) -> void:
+	var F: Dictionary = GameRules.data()["floors"][int(ar["floor"]) - 1]
+	var size := float(ar.get("maxR", 60.0)) * 2.0 + 60.0
+	var plane := MeshInstance3D.new()
+	var pm := PlaneMesh.new(); pm.size = Vector2(size, size)
+	var mat := StandardMaterial3D.new(); mat.albedo_color = Color.html(F["ground2"])
+	pm.material = mat; plane.mesh = pm; plane.name = "Ground"
+	add_child(plane)
+	var body := StaticBody3D.new(); var cs := CollisionShape3D.new(); var ws := WorldBoundaryShape3D.new()
+	cs.shape = ws; body.add_child(cs); add_child(body)
+	var rock := StandardMaterial3D.new(); rock.albedo_color = Color(0.45, 0.46, 0.42)
+	var ol: Array = ar.get("outline", [])
+	for i in range(0, ol.size(), 4):   # 輪郭の外に 4° ごとの岩
+		var p := Vector2(ol[i][0], ol[i][1]); var p2 := p * (1.0 + 2.5 / maxf(p.length(), 1.0))
+		var near_exit := false
+		for e in ar["exits"]:
+			if p.distance_to(Vector2(e["x"], e["z"])) < 6.0: near_exit = true
+		if near_exit: continue
+		var m := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 1.6; sm.height = 3.0; sm.material = rock
+		m.mesh = sm; m.position = Vector3(p2.x, 0.6, p2.y); add_child(m)
+	var tree := StandardMaterial3D.new(); tree.albedo_color = Color(0.25, 0.45, 0.2)
+	for o in ar.get("obstacles", []):
+		if not o["solid"]: continue
+		var m := MeshInstance3D.new()
+		if o.has("box"):
+			var bm := BoxMesh.new(); var b: Dictionary = o["box"]
+			bm.size = Vector3(b["w"], 4.0, b["d"]); bm.material = rock; m.mesh = bm
+			m.position = Vector3(b["x"], 2.0, b["z"]); m.rotation.y = float(b["ry"])   # town-layout.js inBox と同じ回転
+		else:
+			var sm := SphereMesh.new(); sm.radius = float(o["r"]); sm.height = float(o["r"]) * (2.6 if o["kind"] == "tree" else 1.4)
+			sm.material = tree if o["kind"] == "tree" else rock; m.mesh = sm
+			m.position = Vector3(o["x"], sm.height * 0.45, o["z"])
+		add_child(m)
 
 
 func _json(path: String) -> Dictionary:

@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="WorldArt (Godot)"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/game.tscn"
 config/features=PackedStringArray("4.3", "Forward Plus")
 
 [display]
@@ -137,6 +137,9 @@ wa_rock_pix={
 "type": "float",
 "value": 1.0
 }
+wa_occ_cam={"type": "vec3", "value": Vector3(0, 0, 0)}
+wa_occ_tgt={"type": "vec3", "value": Vector3(0, 0, 0)}
+wa_occ_r={"type": "float", "value": 0.0}
 wa_gb_amt={
 "type": "float",
 "value": 0.85

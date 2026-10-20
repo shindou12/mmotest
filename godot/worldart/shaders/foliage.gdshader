@@ -31,14 +31,17 @@ varying vec3 v_vn;
 varying vec3 v_wn;
 varying vec2 v_root;
 varying float v_h;
+varying vec3 v_w;
 void vertex() {
 	v_vn = (MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz;
 	v_wn = (MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz;
 	vec3 root = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	v_root = root.xz;
 	v_h = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y - root.y;
+	v_w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 void fragment() {
+	if (!is_grass && wa_occluded(v_w, FRAGCOORD.xy, CAMERA_POSITION_WORLD)) discard;   // 草は抜かない（three と同じ）
 	vec4 t = texture(albedo_tex, UV);
 	vec3 c = t.rgb * COLOR.rgb;
 	if (is_grass) {

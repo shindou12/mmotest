@@ -8,6 +8,7 @@ varying vec3 v_w;
 varying vec3 v_wn;
 void vertex() { v_w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; v_wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz); }
 void fragment() {
+	if (wa_occluded(v_w, FRAGCOORD.xy, CAMERA_POSITION_WORLD)) discard;
 	vec3 n = normalize(v_wn);
 	vec3 an = pow(abs(n), vec3(3.0)); an /= (an.x + an.y + an.z);
 	vec3 rc = texture(t_crack, v_w.zy / 1.6).rgb * an.x + texture(t_crack, v_w.xy / 1.6).rgb * an.z + texture(t_crack, v_w.xz / 1.6).rgb * an.y;
