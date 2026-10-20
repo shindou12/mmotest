@@ -60,6 +60,9 @@ PORT=8091 node server.js &
    ```
 9. 確認点: 数値は rulebook の 13.2（見本と同じ道具 refstats・rulecheck で測った値。第 2 世代の「輝度比 2.9〜3.4・彩度 ≈0.4」は R 系列の動画から取った値で、撮り方で変わる）。樹冠が画面に入っている、影の塊がある、手前の物が人物を隠さない、歩いて水に入らない。
 
+## 3b. 第 2 世代の地図を第 3 世代の規則へ移す
+`python3 -I tools/worldart/maps/to_gen3.py <名> …` → `<名>_g3.json`（元は残す。手で直さず、元の地図か規則か to_gen3.py を直す）→ `build_map.py -- <名>_g3`。アセットの置き換え（maple2・fir3・rock_s）も to_gen3.py の REP。アセットを足したら `build_assets.py` を全部実行し直す（決定的なので、変わるのは直した物だけ。変わった GLB を一覧で確かめる）。
+
 ## 4. 検証のループ（第 3 世代、見本②で使った手順）
 1. `node tools/worldart/views.mjs <地図> art/shots/<地図>/Lnn <ビュー,…>`（見本のカメラ B01… と固定ビュー oblique/side/top/walker/near/far@基準。1 回の読み込みで撮る。サーバーがなければ立てる）
 2. `python3 -I tools/worldart/viewsheet.py art/shots/<地図>/Lnn art/shots/<地図>/Lnn/sheet.png`

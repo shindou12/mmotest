@@ -52,12 +52,12 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 ## 現在の状態（L23）
 - **見本②（`mihon2`）**: 区画つきの地図で B01〜B04 を再現（`art/shots/mihon2/L23/sheet.webp`）。明暗比・彩度・緑の色相が B01・B02・B04 で見本とほぼ一致（rules/ab-L23.md）。残りは B03 の明暗比と B01 の色相（rulebook 16）。
 - 歩ける比較ページ: https://claude.ai/artifact/A31scCgQs9tWLQ1dhMAgZQ （L20・L21・L21 修正・L22 を同じ場所で切り替え、アイデア 01・02・04・05 の入／切）。
-- 第 2 世代の地図（orc_meadow・south_coast・town_plaza・forest_path・palm_clearing）は第 2 世代の規則のまま（試遊: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ ）。第 3 世代の規則（カメラ・階調・MSAA）はまだ入れていない。
+- 第 2 世代の地図（orc_meadow・south_coast・town_plaza・forest_path・palm_clearing）に第 3 世代の規則を当てた `<名>_g3` を作った（`tools/worldart/maps/to_gen3.py`、L24、結果は `rules/gen3-maps-L24.md`）。元の地図は残している（試遊: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ ）。比較ページで第 2 世代と第 3 世代を同じ場所で切り替えられる。
 - 詳細と経緯は `goal-mihon2.md`（L01〜L22）と `experiments.md`（E01〜E34）。
 
 ## 次にやること（優先順）
 rulebook.md の「16. 未解決・未検証」が正。要約:
 1. B03 の明暗比（2.52 対 2.84）と森の奥の暗さ、B01 の緑の色相 +6°。
-2. 第 2 世代の地図を第 3 世代の規則（L23 の光と色）へ移し、全部撮り直す（場面をまたいで成り立つかの確認）。
+2. L24 で場面をまたいで成り立たなかった 3 つ（暗部の浮き・方位の違う地図の緑・町の照り返し、rulebook 16 の A〜C）。
 3. 町・砂漠・洞窟を規則だけで作る。
 4. 残りのアイデア（03・06〜09・11・14・16）の入／切。
