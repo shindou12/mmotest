@@ -1,31 +1,16 @@
 [
  {
-  "name": "maple2_s",
-  "tris": 716,
+  "name": "teepee2",
+  "tris": 513,
   "size": [
-   3.25,
-   3.61,
-   5.01
+   7.93,
+   7.93,
+   3.42
   ],
-  "zmin": -0.3,
+  "zmin": -0.03,
   "mats": [
-   "bark",
-   "leaf_plate"
-  ],
-  "colors": 1
- },
- {
-  "name": "maple2_t",
-  "tris": 708,
-  "size": [
-   3.63,
-   3.82,
-   5.64
-  ],
-  "zmin": -0.3,
-  "mats": [
-   "bark",
-   "leaf_plate"
+   "canvas_hide",
+   "wood"
   ],
   "colors": 1
  }

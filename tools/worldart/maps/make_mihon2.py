@@ -11,7 +11,7 @@ P = lambda x, y: [cu(x), cv(y)]          # 元画像の画素 → 画面座標
 CAM = dict(yaw=0, pitch=52, dist=22, fov=25, aspect=1532 / 869)
 VIEWS = {
     'B01': dict(CAM, target=[0, 0, 0]),
-    'B02': dict(CAM, target=[10.1, 0, 0]),         # 円錐の天幕の位置から計算（goal-mihon2.md 2）
+    'B02': dict(CAM, target=[10.1, 0, 2.1]),       # 円錐の天幕の位置から計算（goal-mihon2.md 2）。L12: 見本の物が画面の 0.17 上 → 手前へ 2.1m
     'B03': dict(CAM, target=[-36, 0, -26]),        # 位置は推測
     'B04': dict(CAM, target=[8, 0, -52], pitch=40, dist=15,   # 人物の画面の高さ 17% から距離を逆算（L09）   # 位置・カメラとも推測（カットシーン）
                 light=dict(sun=0.55, hemi=1.05, exposure=0.95, sat=1.1, vignette=0.45, topDark=0.3)),   # カットシーンの照明（L02）
@@ -20,7 +20,7 @@ VIEWS = {
 B01 = dict(name='B01', camera=VIEWS['B01'],
   paths=[
     dict(screen=[P(640, -60), P(650, 120), P(690, 300), P(800, 400), P(930, 430)], width=2.6, mat='dirt', soft=0.7),      # 北へ
-    dict(screen=[P(930, 430), P(1150, 380), P(1450, 330), P(1800, 300)], width=2.5, mat='dirt', soft=0.7),               # 東へ（B02 へつながる）
+    dict(screen=[P(930, 430), P(1150, 380), P(1400, 345)], width=2.5, mat='dirt', soft=0.7),               # 東へ（B02 へつながる。L12: 先は B02 の道）
     dict(screen=[P(930, 430), P(820, 560), P(700, 720), P(600, 900), P(520, 1000)], width=2.8, mat='dirt', soft=0.7),    # 南西へ
     dict(screen=[P(690, 300), P(560, 360), P(380, 420), P(150, 470)], width=1.6, mat='dirt', soft=0.7),                  # 西への細い道
   ],
@@ -72,14 +72,16 @@ def shrink(sec, kp, kt):
         if 'y' in o: o['y'] = round(o['y'] * kp, 3)
     for g in sec.get('groves', []): g['scale'] = [round(x * kt, 3) for x in g['scale']]
 shrink(B01, 0.72, 0.65)
+for o in B01['props']:
+    if o['asset'] == 'teepee': o['scale'] = 1.0     # L12: 円錐の天幕は B02 で幅 ≈ 画面の 0.22（3.8m）→ 縮めない
 B01['groves'][0].update(trees=['maple2_s', 'maple2_t'], scale=[0.9, 1.05])   # L11: 林も小さく詰まった木で
 
 B02 = dict(name='B02', camera=VIEWS['B02'],                 # B01 と重なる左 1/3 は B01 で置いた物を使う
-  paths=[dict(screen=[P(700, 270), P(950, 330), P(1300, 420), P(1750, 500)], width=2.6, mat='dirt', soft=0.8)],   # L05: 空き地は草地（土は細い道だけ）
+  paths=[dict(screen=[P(200, 250), P(560, 255), P(900, 265), P(1300, 285), P(1750, 305)], width=2.0, mat='dirt', soft=0.8)],   # L12: 見本は画面の v 0.28〜0.35 をほぼ水平   # L05: 空き地は草地（土は細い道だけ）
   trees=[
-    dict(asset='palm2_b', screen=P(770, 790), scale=1.45), dict(asset='palm2_a', screen=P(1020, 860), scale=1.3),
-    dict(asset='palm2_b', canopy=P(640, 90), scale=1.35), dict(asset='palm2_b', canopy=P(1110, 150), scale=1.35),   # 樹冠の位置で置く
-    dict(asset='maple_b', canopy=P(1470, 140), scale=1.0), dict(asset='palm2_b', screen=P(1520, 800), scale=1.4),
+    dict(asset='palm2_b', screen=P(770, 790), scale=0.9), dict(asset='palm2_a', screen=P(1020, 860), scale=0.8),     # L12: 樹冠 ≈ 画面幅の 0.15
+    dict(asset='palm2_b', canopy=P(896, 50), scale=1.0), dict(asset='palm2_b', canopy=P(1290, 70), scale=1.0),   # 樹冠の位置で置く（L12: 見本の上のヤシ 2 本）
+    dict(asset='clover_b', screen=P(1350, 150), scale=1.6), dict(asset='clover_b', screen=P(1230, 170), scale=1.4), dict(asset='palm2_b', screen=P(1520, 800), scale=0.85),
     dict(asset='clover_b', screen=P(800, 220), scale=1.1), dict(asset='clover_b', screen=P(1160, 250), scale=1.1),
     dict(asset='clover_a', screen=P(1200, 800), scale=1.1), dict(asset='clover_a', screen=P(1600, 700), scale=1.0),
   ],
@@ -87,6 +89,7 @@ B02 = dict(name='B02', camera=VIEWS['B02'],                 # B01 と重なる�
          dict(asset='lavender', screen=P(720, 500), scale=0.8), dict(asset='boulder_a', screen=P(480, 200), rot=40, scale=0.6)],
   shadow_casters=[dict(asset='maple_big', screen=P(1230, 460), scale=1.1), dict(asset='maple_b', screen=P(1350, 560), scale=1.0)],
 )
+shrink(B02, 0.72, 0.65)    # L12: B01 と同じ尺度（ヤシ・maple2_t は上で直接）
 
 # B03: 再現済みの forest_path の中身をそのまま区画にする（高い側を持ち上げる形に直す）
 fp = json.load(open(os.path.join(ROOT, 'public/worldart/maps/forest_path.json')))

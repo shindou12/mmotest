@@ -273,6 +273,23 @@ def canvas_blue(n=512, seed=111):
     img.save(os.path.join(OUT, 'canvas_blue.png'))
 
 
+def canvas_hide(n=512, seed=113):
+    """円錐の天幕の革の板（B02 左下、L13）: 1 枚の板 = u 0〜1、v 0〜1（下が 0）。クリーム色、板の中ほどが膨らんで明るく縁が暗い、
+    下の段（v 0.15〜0.65）に薄い灰の渦巻き、裾に細い暗い縁"""
+    r = rng(seed)
+    x = np.linspace(0, 1, n)[None, :, None]; y = np.linspace(1, 0, n)[:, None, None]
+    puff = np.sin(np.pi * x) ** 0.6 * (0.75 + 0.25 * np.sin(np.pi * np.clip(y, 0, 1)))
+    base = lerp((0.62, 0.56, 0.38), (0.93, 0.89, 0.72), 0.25 + 0.75 * puff)
+    base = base * (0.96 + 0.04 * r.standard_normal((n, n, 1)).clip(-1, 1))
+    img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB'); d = ImageDraw.Draw(img)
+    cx, cy = n * 0.5, n * 0.6
+    pts = [(cx + math.cos(t) * t * n * 0.016, cy + math.sin(t) * t * n * 0.016) for t in np.linspace(0.3, 3.6 * math.pi, 120)]
+    d.line(pts, fill=(176, 168, 140), width=7)
+    d.line([(cx + n * 0.18, cy + n * 0.02), (n * 0.95, cy + n * 0.06)], fill=(176, 168, 140), width=6)
+    d.rectangle([0, n - 14, n, n], fill=(128, 110, 76))
+    img.save(os.path.join(OUT, 'canvas_hide.png'))
+
+
 def lavender(n=256, seed=112):
     """ラベンダーの株（B01・B02）: 細い茎の先に紫の穂。下端が根元"""
     r = rng(seed); W = n * SS
@@ -353,5 +370,5 @@ def plate_maple(n=512, seed=115):
 
 if __name__ == '__main__':
     spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
-    plate_maple(); canvas_beige(); canvas_blue(); lavender(); flagstone(); meander()
+    plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); lavender(); flagstone(); meander()
     print('textures2 ->', OUT)

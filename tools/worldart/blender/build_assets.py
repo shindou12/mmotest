@@ -76,6 +76,7 @@ M_GRASS2 = lambda: material('grass_tall', 'grass_tall.png', alpha=True)
 M_ROCK2 = lambda: material('rock_crack', 'rock_crack.png')
 M_PALM2 = lambda: material('leaf_palm2', 'frond_palm.png', alpha=True)
 M_CANVAS_B = lambda: material('canvas_beige', 'canvas_beige.png')
+M_HIDE = lambda: material('canvas_hide', 'canvas_hide.png')
 M_CANVAS_BL = lambda: material('canvas_blue', 'canvas_blue.png')
 M_LAVENDER = lambda: material('leaf_lavender', 'lavender.png', alpha=True)
 M_MEANDER = lambda: material('stone_meander', 'stone_meander.png')
@@ -782,6 +783,57 @@ def teepee(name, seed, r=1.7, h=3.1):
     return B.build(name, smooth=False)
 
 
+def teepee2(name, seed, r=1.9, h=3.0):
+    """円錐の天幕 第 2 版（B02 左下の拡大から、L13）: 革の板を 3 段の裾に重ねた膨らんだ円錐。板は 7 枚で中ほどが外へ膨らみ、
+    裾は板の中ほどで下がる（丸い縁）。上の段が下の段の上端に影を落とす（頂点色）。入口は下の段の板 1 枚を開ける。
+    てっぺんに短く太い支柱 6 本の束を綱で縛り、太い綱 4 本が円錐の面を下ってから外の地面へ伸びる"""
+    R_ = random.Random(seed); B = Builder()
+    rc = lambda z: r * max(0.0, 1 - z / h) ** 0.85
+    tiers = [(0.0, 1.25), (1.05, 2.15), (1.95, 2.85)]
+    P_, M_ = 7, 5
+    for ti, (zb, zt) in enumerate(tiers):
+        a_off = ti * math.pi / P_
+        for pi_ in range(P_):
+            if ti == 0 and pi_ == 0: continue          # 入口
+            ring_b, ring_t = [], []
+            for m in range(M_ + 1):
+                f = m / M_; a = a_off + 2 * math.pi * (pi_ + f) / P_
+                bul = math.sin(math.pi * f)
+                zb_ = zb - 0.14 * bul if ti == 0 else zb - 0.18 * bul
+                rb = rc(max(zb_, 0)) * (1.06 + 0.10 * bul) + (0.04 if ti else 0)
+                rt = rc(zt) * (1.0 + 0.05 * bul)
+                d = Vector((math.cos(a), math.sin(a), 0))
+                ring_b.append(d * rb + Vector((0, 0, max(zb_, 0.0)))); ring_t.append(d * rt + Vector((0, 0, zt)))
+            vt = (0.62, 1.0) if ti else (0.0, 1.0)
+            for m in range(M_):
+                f0, f1 = m / M_, (m + 1) / M_
+                idx = [B.add_v(q) for q in (ring_b[m], ring_b[m + 1], ring_t[m + 1], ring_t[m])]
+                cb, ct = (1.0,) * 3, ((0.62,) * 3 if ti < 2 else (0.95,) * 3)
+                B.face(idx, [(f0, vt[0]), (f1, vt[0]), (f1, vt[1]), (f0, vt[1])], [cb, cb, ct, ct], None, M_HIDE())
+    # 入口の奥（暗い内側）
+    a0, a1 = 0.0, 2 * math.pi / P_
+    idx = [B.add_v(q) for q in (Vector((math.cos(a0) * r * 0.5, math.sin(a0) * r * 0.5, 0)), Vector((math.cos(a1) * r * 0.5, math.sin(a1) * r * 0.5, 0)),
+                                Vector((0, 0, 1.3)))]
+    B.face(idx, [(0, 0), (1, 0), (0.5, 0.5)], [(0.18,) * 3] * 3, None, M_HIDE())
+    top = Vector((0, 0, h * 0.93))
+    for k in range(6):       # 支柱の束
+        a = 2 * math.pi * k / 6 + R_.uniform(-0.2, 0.2)
+        d = Vector((math.cos(a) * 0.22, math.sin(a) * 0.22, 1.0)).normalized()
+        b0 = top - d * 0.35 + Vector((math.cos(a), math.sin(a), 0)) * 0.05
+        tube(B, [b0, b0 + d * R_.uniform(0.85, 1.05)], [0.1, 0.09], M_WOOD(), sides=6, ao=(0.8, 1.25), u0=0.5, u1=1.0)
+    ring = [top + Vector((math.cos(t) * 0.2, math.sin(t) * 0.2, 0.05)) for t in [2 * math.pi * i / 8 for i in range(9)]]
+    tube(B, ring, [0.05] * 9, M_WOOD(), sides=5, ao=(0.75, 0.9))
+    for k in range(4):       # 張り綱: 面を下ってから外へ
+        a = 2 * math.pi * k / 4 + 0.5
+        d = Vector((math.cos(a), math.sin(a), 0))
+        pts = [top + d * 0.2]
+        for z in (2.3, 1.6, 1.0):
+            pts.append(d * (rc(z) * 1.12 + 0.05) + Vector((0, 0, z)))
+        pts += [d * (r + 1.2) + Vector((0, 0, 0.45)), d * (r + 2.6) + Vector((0, 0, 0.0))]
+        tube(B, pts, [0.035] * len(pts), M_WOOD(), sides=4, ao=(0.7, 0.8))
+    return B.build(name)
+
+
 def tarp_tent(name, seed):
     """布をかけた荷の山（B01 左下、L03 で作り直し）: 2 段の木の荷箱に、薄い藤色の布を上からかぶせて四隅を外へ引く。
     布は 7x7 の面で、荷の上は平ら、縁は垂れ、四隅は斜めの金属の杭へ引かれる"""
@@ -1074,6 +1126,7 @@ ASSETS = {
     'cliff_col_a': lambda n: smooth_rock(n, 944, size=(1.5, 1.1, 4.6), bulge=0.14, flat_top=False),
     'cliff_col_b': lambda n: smooth_rock(n, 945, size=(1.2, 0.95, 4.0), bulge=0.18, flat_top=False),
     'teepee': lambda n: teepee(n, 1001),
+    'teepee2': lambda n: teepee2(n, 1011),
     'tarp_tent': lambda n: tarp_tent(n, 1002),
     'barrel': lambda n: barrel(n, 1003),
     'cart_frame': lambda n: cart_frame(n, 1004),
