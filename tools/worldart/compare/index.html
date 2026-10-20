@@ -97,6 +97,10 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
     <h3>カメラ</h3>
     <div class="chips" id="cams" role="group" aria-label="カメラ"></div>
   </div>
+  <div class="group" id="ideas-grp" hidden>
+    <h3>アイデアの入／切（L22 だけ）</h3>
+    <div class="chips" id="ideatg" role="group" aria-label="アイデアの入／切"></div>
+  </div>
   <p class="help">歩く: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> か矢印キー、向き: <kbd>Q</kbd><kbd>E</kbd>。地図を一度押すとキーが効きます。赤い柱が人物の代わりです。版を替えても、いる場所・向き・カメラはそのままです。</p>
   <div class="pose" id="pose">—</div>
 </aside>
@@ -135,31 +139,39 @@ const VERSIONS = {
     issues: ['日陰が明るすぎ（明暗比 2.0〜2.1、見本 2.4〜2.8）、彩度が低い（0.45〜0.49、見本 0.51〜0.55）', 'B04（神殿前）の画角が狭い（共通のカメラの 18° を引き継いだ）', '材質のシェーダーの取り違え（草の房の色が違って見える）'],
   },
   L21f: {
-    name: 'L21 修正', sub: 'シェーダーの取り違えだけ直す', module: 'world_L22.js', data: 'L21/', extra: '',
-    restore: '今の world.js を、アイデア01 を切った状態で使います。地形・配置・カメラ・光は L21 と同じデータです。',
+    name: 'L21 修正', sub: 'シェーダーの取り違えだけ直す', module: 'world_L21f.js', data: 'L21/', extra: '',
+    restore: 'コミット 60877e3 の world.js を、アイデア01 を切った状態で使います。地形・配置・カメラ・光は L21 と同じデータです。',
     changes: ['材質ごとにシェーダーのキーを分けた（three はシェーダーを onBeforeCompile の文字列で使い回すため、草の房と葉が取り違えられていた）', 'アイデア01 の仕組みはコードにあるが、この版では切ってある'],
     ideas: 'L21 と同じ。01 の比較の基準。',
     status: 'B01・B03・近く・歩行者の目線で目視（草の房が緑寄りに変わる）。12 ビューの撮影はまだ。',
     issues: ['L21 の残課題（日陰が明るい・彩度が低い・B04 の画角）はそのまま'],
   },
   L21g: {
-    name: 'L21 修正 + 01', sub: '地面と草の色の融合だけ足す', module: 'world_L22.js', data: 'L21/', extra: 'gblend=1',
+    name: 'L21 修正 + 01', sub: '地面と草の色の融合だけ足す', module: 'world_L21f.js', data: 'L21/', extra: 'gblend=1',
     restore: '「L21 修正」と同じコード・地形・配置・カメラ・光に、gblend=1 の切り替えだけを足しています。',
     changes: ['草・茂み・羊歯・ラベンダー・花の根元が、その場所の地面の地色（地面と同じ式: 草の絵・土・敷石の塗り分けと色むら）を受け取る', '根元の割合 0.85、高さ 0.32m で本来の色へ戻る（先は本来の色のまま）', '地面の頂点色（土・敷石・岩の塗り分け）を読み込み時に絵に写して引く'],
     ideas: 'アイデア01 を導入（検証中）。',
     status: 'B01 の近くと歩行者の目線で目視: 草地の房の根元は地面の緑に、道の際の房は根元が土色になり、地面とつながって見える。数値の比較と、林・崖・別の地図での確認はまだ。',
     issues: ['背の低い房は全体が地面の色に寄り、先の黄色が弱くなる（高さ 0.32m の決め方が要検討）', 'ゲームのカメラ（33m）では差が小さい。「近く」「足元」のカメラで見比べる'],
   },
+  L22: {
+    name: 'L22 最新', sub: '退行の修正 + アイデアの入／切', module: 'world_L22.js', data: 'L22/', extra: '', ideas01: true,
+    restore: 'コミット 71c581d の world.js と地図データです。下の「アイデアの入／切」は URL の引数を 1 つだけ変えて、同じ場所で読み直します（地形・配置・カメラ・光は同じ）。',
+    changes: ['B04（神殿前）の画角を 25° に戻した（L21 の退行）', '階調は線形（露出を掛けて切るだけ）+ 露出 1.25。L21 の tone "lum" は three の OutputPass で効いていなかった（F25）。効かせると明暗比 1.9〜2.0 で見本から遠ざかったので不採用', '空の光 2.6 → 2.1、仕上げの彩度 0.86 → 1.0', 'シェーダーの取り違えの修正（F24）込み'],
+    ideas: '01 は既定で切（入れると草の房の根元が地面の色に）。02・04・05 は既定で入。入／切の比較の結果は「アイデア表」と docs/world-art/rules/ab-L22.md。',
+    status: '12 ビューの撮影（L22）と rulecheck: 輝度 0.51/0.54/0.52/0.48（見本 0.51/0.51/0.49/0.48）、彩度 0.56/0.58/0.52/0.30（見本 0.53/0.55/0.51/0.30）、B04 は構図・数値とも見本にほぼ一致。アイデア 01・02・04・05 は見本②の B01〜B03・近景と south_coast で入／切を比較済み。',
+    issues: ['B01〜B03 の明暗比が浅い（2.2、見本 2.4〜2.8）、いちばん暗い所が明るい（p0.5 ≈50、見本 32〜38）。05 は原因でない', '01 を入れると、道際の茂み（クローバー）の下部が土色の輪になる（草の房だけに絞るべき）', '02（葉の透け）はこのカメラと太陽の向きでは効かない（画素の変化 0）', '石像の出来は評価の対象外'],
+  },
 };
 const AREAS = { B01: '道と野営地', B02: '草原とヤシ', B03: '林と崖', B04: '神殿前の広場' };
 const CAMS = { game: 'ゲーム', near: '近く', low: '足元' };
 const CAM_SET = { near: [11, 36], low: [7, 28] };
 const IDEAS = [
-  ['01', 1, '地面と草の色の融合', 'part', '導入（検証中）', 'この比較の「L21 修正 + 01」。目視のみ'],
-  ['02', 1, '葉の透過光', 'part', '導入済み・効果小', 'trans 0.3。見本では光の筋の場面以外に透けは見えない。入れる/入れないの比較は未'],
+  ['01', 1, '地面と草の色の融合', 'part', '検証済み・条件付き', '草の房は地面になじむ（画面の 17〜26% が変化）。茂みは道際で下部が土色の輪 → 草の房に絞るべき。既定は切'],
+  ['02', 1, '葉の透過光', 'no', '却下（検証済み）', '見本②で画素の変化 0（このカメラと太陽の向きでは効かない）。south_coast でも小'],
   ['03', 0, '地面の材質の境', 'part', '一部導入', '傾き・ノイズ・三方向・画素ごとの岩。高さで混ぜる方式は未'],
-  ['04', 1, '樹冠の球状の法線', 'done', '導入済み', '房の中心から外向き。複数の木での比較は未'],
-  ['05', 1, 'Wrapped Diffuse', 'part', '葉だけ導入', 'wrap 0.5。草の房・茂みへの適用は未検証'],
+  ['04', 1, '樹冠の球状の法線', 'done', '導入・検証済み', '切ると草の房に暗い面、樹冠が平たくなる。入で樹冠が塊として読める'],
+  ['05', 1, 'Wrapped Diffuse', 'part', '導入・効く向きは検証', '葉と草の房に効く（前の「葉だけ」は誤り）。影側を持ち上げる。値 0.5 の適否は未検証'],
   ['06', 0, '草の法線を上向きに', 'done', '導入済み', '草の房の法線は真上'],
   ['07', 0, '樹冠の内部の暗部', 'done', '導入済み', '頂点 AO + 葉が影を受ける'],
   ['08', 0, '頂点色の色階調', 'done', '導入済み', '上は黄、下は青緑'],
@@ -171,12 +183,18 @@ const IDEAS = [
   ['14', 0, 'やわらかい影・木漏れ日', 'done', '導入済み', 'VSM、葉の切り抜きを影に'],
   ['15', 0, '細部の情報量の制御', 'part', '検討済み', '上下のぼけ。見本の細部量の順位は測定済み'],
   ['16', 0, 'ミップマップ・フィルタ', 'done', '標準のまま', '異方性 8、LOD なし'],
-  ['17', 0, '色管理・階調の圧縮', 'done', '導入・検証済み', 'L21。日陰の青の寄りが見本の範囲。空の光は強すぎ'],
+  ['17', 0, '色管理・階調の圧縮', 'done', '導入・検証済み（訂正）', 'ACES をやめ線形 + 露出 1.25。L21 の lum は効いていなかった（F25）'],
   ['18', 0, '弱いブルーム', 'no', '却下（一般の場面）', '見本は発光物の小さな光の輪だけ'],
 ];
 
 const $ = (id) => document.getElementById(id);
-const state = { ver: 'L21g', area: 'B01', cam: 'game', pose: null, gameCam: null };
+const state = { ver: 'L22', area: 'B01', cam: 'game', pose: null, gameCam: null, idea: { '01': false, '02': true, '04': true, '05': true } };
+const IDEA_ARG = { '01': ['gblend=1', ''], '02': ['', 'trans=0'], '04': ['', 'fnorm=card'], '05': ['', 'wrap=0'] };   // [入のときの引数, 切のときの引数]
+const IDEA_NAME = { '01': '01 地面と草の色', '02': '02 葉の透け', '04': '04 球状の法線', '05': '05 回り込む光' };
+function extraFor(k) {
+  const v = VERSIONS[k]; if (!v.ideas01) return v.extra;
+  return Object.entries(state.idea).map(([n, on]) => IDEA_ARG[n][on ? 0 : 1]).filter(Boolean).join('&');
+}
 let api = null, frameWin = null;
 
 function chips(el, items, key, onPick, render) {
@@ -202,7 +220,7 @@ function renderInfo() {
     <h3>既知の問題</h3><ul>${li(v.issues)}</ul>
     ${state.ver === 'L21g' || state.ver === 'L21f' ? '<p class="help">01 の見比べ方: エリア「道と野営地」、カメラ「足元」で、道の際の草の房の根元を「L21 修正」と「L21 修正 + 01」で切り替えて見ます。</p>' : ''}`;
   const cls = { done: 'done', part: 'part', new: 'new', no: 'no' };
-  $('pane-ideas').innerHTML = `<p class="help"><span class="star">★</span> は優先して検証する項目（01・02・04・05）。状態は docs/world-art/rules/ideas.md と同じです。</p>
+  $('pane-ideas').innerHTML = `<p class="help"><span class="star">★</span> は優先して検証する項目（01・02・04・05）。入／切の比較は L22 の版で切り替えて見られます。状態は docs/world-art/rules/ideas.md と同じです。</p>
     <table><tbody>${IDEAS.map(([n, pr, t, c, st, note]) => `<tr><td>${n}${pr ? ' <span class="star">★</span>' : ''}</td><td><b>${t}</b><br><span class="st ${cls[c]}">${st}</span> ${note}</td></tr>`).join('')}</tbody></table>`;
 }
 
@@ -228,20 +246,29 @@ function loadVersion(k) {
   const v = VERSIONS[k];
   try { if (api) state.pose = api.pose(); } catch (e) {}
   api = null; frameWin = null;
-  window.__cmpConfig = { module: v.module, data: v.data, extra: v.extra };
+  window.__cmpConfig = { module: v.module, data: v.data, extra: extraFor(k) };
   window.__cmpProgress(`${v.name} を読み込み中`);
   const old = $('stage'); const f = document.createElement('iframe');
   f.id = 'stage'; f.title = '3D の地図'; f.tabIndex = 0; f.src = 'view.html';
   old.replaceWith(f);                          // 前の版の WebGL を手放してから次を作る
 }
-function pickVer(k) { if (k === state.ver && api) return; state.ver = k; mark('ver'); renderInfo(); loadVersion(k); }
+function pickVer(k) { if (k === state.ver && api) return; state.ver = k; mark('ver'); renderInfo(); renderIdeas(); loadVersion(k); }
+function renderIdeas() {
+  const on = !!VERSIONS[state.ver].ideas01; $('ideas-grp').hidden = !on; const el = $('ideatg'); el.innerHTML = '';
+  for (const n of Object.keys(state.idea)) {
+    const b = document.createElement('button'); b.id = `idea-${n}`; b.setAttribute('aria-pressed', String(state.idea[n]));
+    b.textContent = `${IDEA_NAME[n]}：${state.idea[n] ? '入' : '切'}`;
+    b.addEventListener('click', () => { state.idea[n] = !state.idea[n]; renderIdeas(); loadVersion(state.ver); focusStage(); });
+    el.appendChild(b);
+  }
+}
 function pickArea(k) { state.area = k; mark('area'); state.pose = null; if (!api) return; api.setView(k); const p = api.pose(); state.gameCam = { dist: p.dist, pitch: p.pitch, fov: p.fov }; applyCam(); }
 function pickCam(k) { state.cam = k; mark('cam'); applyCam(); }
 
 chips($('vers'), VERSIONS, 'ver', pickVer, (k, v) => `${v.name}<small>${v.sub}</small>`);
 chips($('areas'), AREAS, 'area', pickArea);
 chips($('cams'), CAMS, 'cam', pickCam);
-renderInfo();
+renderInfo(); renderIdeas();
 for (const [b, p] of [['tab-ver', 'pane-ver'], ['tab-ideas', 'pane-ideas']]) {
   $(b).addEventListener('click', () => {
     for (const [b2, p2] of [['tab-ver', 'pane-ver'], ['tab-ideas', 'pane-ideas']]) { $(b2).setAttribute('aria-selected', String(b2 === b)); $(p2).hidden = p2 !== p; }
