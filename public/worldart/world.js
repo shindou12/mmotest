@@ -246,8 +246,61 @@ function addLushToGrass(sh) {
       float lushg = smoothstep(0.42 - uLushBiasG, 0.6 - uLushBiasG, nzg.r * 0.55 + nzg.g * 0.3 + nzg.b * 0.15);
       diffuseColor.rgb *= uGrassTintG * mix(vec3(1.0), uLushTintG, lushg * uLushAmtG);`);
 }
+// アイデア01（L22）: 地面と草の色の融合。草・低木の根元はその場所の地面の色（地面の材質と同じ式で求めた地色）を受け取り、
+// 先へ向かって本来の色に戻す。gblend=1（URL）か spec.foliage.groundBlend で入れる。地面の頂点色（土・砂/石畳・岩）は読み込み後に
+// 絵（SPLAT）に写して引く。対象は GB_ASSETS の草・茂み・羊歯・ラベンダー。高さ uGBH m で本来の色へ戻る（根元の割合 uGBAmt）
+const GBLEND = num('gblend', spec.foliage?.groundBlend ? 1 : 0) > 0;
+const GB_ASSETS = /^(grass_a|grass_tall_a|clover_a|clover_b|palm2_low|lavender|flowers_a)$/;
+const GB = { tSplat: { value: null }, uST: { value: new THREE.Vector3(0, 0, 1) }, uGBAmt: { value: num('gbamt', 0.85) }, uGBH: { value: num('gbh', 0.32) } };
+function buildSplat(terrainScene, tm) {
+  // 地形の頂点色を、地形の格子と同じ解像度の絵に写す（R=土 G=砂/石畳 B=岩）
+  const cell = spec.terrain.cell || 0.5, R = Math.round(tm.size / cell) + 1;
+  const data = new Uint8Array(R * R * 4); const v = new THREE.Vector3();
+  terrainScene.updateMatrixWorld(true);
+  terrainScene.traverse((o) => {
+    if (!o.isMesh || !o.geometry.attributes.color || o.material?.name === 'water') return;
+    const pos = o.geometry.attributes.position, col = o.geometry.attributes.color;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      const ix = Math.round((v.x - tm.x0) / cell), iz = Math.round((v.z - tm.z0) / cell);
+      if (ix < 0 || iz < 0 || ix >= R || iz >= R) continue;
+      const k = (iz * R + ix) * 4;
+      data[k] = col.getX(i) * 255; data[k + 1] = col.getY(i) * 255; data[k + 2] = col.getZ(i) * 255; data[k + 3] = 255;
+    }
+  });
+  const t = new THREE.DataTexture(data, R, R, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true;
+  GB.tSplat.value = t; GB.uST.value.set(tm.x0, tm.z0, (R - 1) * cell);
+}
+function addGroundBlend(sh) {
+  Object.assign(sh.uniforms, GB, {
+    tGrassB: { value: T.grass }, tNoiseB: { value: T.noise }, tDirtB: { value: T.dirt }, tAltB: { value: altTex },
+    uGrassTintB: { value: new THREE.Color(...(GROUND.grassTint || [1, 1, 1])) }, uDirtTintB: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
+    uAltTintB: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) }, uAltScaleB: { value: GROUND.altScale || 6.0 },
+    uLushTintB: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmtB: { value: num('lush', GROUND.lushAmt ?? 0) }, uLushBiasB: { value: num('lushBias', GROUND.lushBias ?? 0) } });
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vGBroot; varying float vGBh;')
+    .replace('#include <project_vertex>', `#include <project_vertex>
+      vec4 gbRoot = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+      vGBroot = gbRoot.xz; vGBh = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y - gbRoot.y;`);
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      uniform sampler2D tSplat, tGrassB, tNoiseB, tDirtB, tAltB; uniform vec3 uST, uGrassTintB, uDirtTintB, uAltTintB, uLushTintB;
+      uniform float uGBAmt, uGBH, uAltScaleB, uLushAmtB, uLushBiasB; varying vec2 vGBroot; varying float vGBh;`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      {   // 根元の地面の地色（地面の材質と同じ式。岩は除く）
+        vec2 wp = vGBroot; vec4 sp = texture2D(tSplat, (wp - uST.xy) / uST.z);
+        vec3 g1 = texture2D(tGrassB, wp / 7.0).rgb, g2 = texture2D(tGrassB, wp / 19.0 + 0.37).rgb;
+        vec3 gr = mix(g1, g2, 0.35) * uGrassTintB;
+        gr *= mix(0.86, 1.1, smoothstep(0.25, 0.6, texture2D(tGrassB, wp / 61.0).g));
+        vec3 nz = texture2D(tNoiseB, wp / 28.0).rgb;
+        gr *= mix(vec3(1.0), uLushTintB, smoothstep(0.42 - uLushBiasB, 0.6 - uLushBiasB, nz.r * 0.55 + nz.g * 0.3 + nz.b * 0.15) * uLushAmtB);
+        float n = dot(g1, vec3(0.33)) - 0.33;
+        vec3 gcol = mix(gr, texture2D(tDirtB, wp / 6.0).rgb * uDirtTintB, smoothstep(0.4, 0.6, sp.r + n * 0.9));
+        gcol = mix(gcol, texture2D(tAltB, wp / uAltScaleB).rgb * uAltTintB, smoothstep(0.4, 0.6, sp.g + n * 0.9));
+        float kb = uGBAmt * (1.0 - smoothstep(0.0, uGBH, vGBh));
+        diffuseColor.rgb = mix(diffuseColor.rgb, gcol, kb);
+      }`);
+}
 const MSAA = num('msaa', spec.post?.msaa ?? 0);   // 0 = なし（前の撮影と同じ）、4 = 第 3 世代の規則
-function fixMaterial(mesh) {
+function fixMaterial(mesh, assetName = '') {
   const src = mesh.material;
   const isLeaf = /leaf|frond|grass/.test(src.name);
   const m = new THREE.MeshLambertMaterial({
@@ -260,11 +313,15 @@ function fixMaterial(mesh) {
   const isGrassMat = /grass/.test(src.name);
   const isRock2 = src.name === 'rock_crack';
   if (isRock2) { m.map = null; m.vertexColors = true; }
+  const gbOn = GBLEND && GB_ASSETS.test(assetName);
+  // three はシェーダーを onBeforeCompile の文字列で使い回すので、分岐ごとにキーを分ける（分けないとアイデア01が別の材質のシェーダーに埋もれる）
+  m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}`;
   m.onBeforeCompile = (sh) => {
     addDesat(sh, isLeaf && !isGrassMat ? LEAF_SAT : ALBEDO_SAT);
     if (!isGrassMat) addOcc(sh);
     if (isGrassMat) addLushToGrass(sh);
     if (isRock2) addRockTriplanar(sh);
+    if (gbOn) addGroundBlend(sh);   // アイデア01
     if (!isLeaf) return;
     // 葉: 裏面で法線を反転させない（房として丸く光らせる）
     {
@@ -331,6 +388,7 @@ terrain.scene.traverse((o) => {
   }
 });
 scene.add(terrain.scene);
+if (GBLEND && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // アイデア01: 地面の頂点色を絵に
 
 const SKIP = new Set(flag('grass') ? [] : ['grass_a']);
 const assetNames = Object.keys(placed.assets).filter((a) => !SKIP.has(a));
@@ -342,7 +400,7 @@ await Promise.all(assetNames.map(async (name) => {
   g.scene.updateMatrixWorld(true);
   g.scene.traverse((o) => {
     if (!o.isMesh) return;
-    const mat = fixMaterial(o);
+    const mat = fixMaterial(o, name);
     const im = new THREE.InstancedMesh(o.geometry, mat, items.length);
     items.forEach(([x, y, z, r, s], i) => {
       dummy.position.set(x, y, z); dummy.rotation.set(0, r, 0); dummy.scale.setScalar(s); dummy.updateMatrix();
