@@ -3,8 +3,8 @@ extends Node3D
 ## ブラウザ版（public/js/game/）から移したもの: 歩く・当たり判定（loop.js moveMe / areas.js collide）、通常攻撃の 3 段（actions.js doSwing・
 ## strikes.arc、combat.js dealDamage）、回避（tryDodge）、回復薬（usePotion）、敵の予告と被弾（hurt.js onTele・resolveTele・takeDamage）、
 ## 這いずり・復活・力尽きる（fall・revived・bleed）、経験値とレベル（gainXp）、出口（loop.js の出口）、敵と他の人の表示（snapshot.js onSnap）。
-## まだないもの: 強攻撃・武器スキル・ツリー・装備・落とし物の拾得・ボスの弾と演出・屋内のマス目のエリア・人物と敵の本当のモデル。
-## 操作: WASD / 矢印 移動、マウス 狙い、左クリック 攻撃、Space 回避、R 回復薬、ホイール カメラの距離。
+## まだないもの: 強攻撃・武器スキル・ツリー・装備・落とし物の拾得・ボスの弾と演出・人物と敵の本当のモデル。屋内のエリアは仮の壁と床。
+## 操作: WASD / 矢印 移動、マウス 狙い、左クリック 攻撃、Space 回避、R 回復薬、F 調べる（レバー・宝箱）、ホイール カメラの距離。
 ## 起動の引数（-- の後）: --server=ws://… --name=… --auto（名前の入力を飛ばす）--bot（自動で敵を探して戦う。確認用）
 ##   --goto=<エリア>（自動操作がその出口へ歩く）--shot=<フレーム数>:<出力.png>（草原に入って敵が見えてから撮って終わる）--quit=<秒> --at=x,z（草原に入ったらその位置へ）
 
@@ -36,6 +36,7 @@ var started := false
 var mouse_ground := Vector3.ZERO
 var held_attack := false
 var bot_t := 0.0
+var door_open := false
 
 # HUD
 var ui := {}
@@ -112,6 +113,8 @@ func _on_msg(m: Dictionary) -> void:
 		"bleed":
 			if me.crawl: _die()
 		"pdown": _log("%s が倒れた" % m.name, Color(1, 0.6, 0.5))
+		"door":
+			if m.get("open", false): door_open = true; world.set_door_open(true)
 
 
 func _enter_area(id: String, x: float, z: float) -> void:
@@ -123,6 +126,7 @@ func _enter_area(id: String, x: float, z: float) -> void:
 		for g in te.meshes: g.queue_free()
 	teles.clear()
 	world.load_area(id)
+	door_open = false
 	_add_marker_nodes()
 	me.x = x; me.z = z; me.a = PI; me.transit = false
 	portals.clear()
@@ -146,7 +150,7 @@ func _add_marker_nodes() -> void:
 		ring.position = Vector3(e["x"], world.ground_y(e["x"], e["z"]) + 0.06, e["z"])
 		world.add_child(ring)
 		var dst: Dictionary = GameRules.area(e["to"])
-		var lb := GameVisuals.label("▶ " + String(dst["name"]) + ("（未対応）" if dst["shape"] != "open" else ""), Color(0.7, 0.95, 1))
+		var lb := GameVisuals.label("▶ " + String(dst["name"]), Color(0.7, 0.95, 1))
 		lb.position = ring.position + Vector3(0, 2.6, 0)
 		world.add_child(lb)
 
@@ -154,6 +158,8 @@ func _add_marker_nodes() -> void:
 # ---------------------------------------------------------------- スナップショット（snapshot.js onSnap）
 func _on_snap(m: Dictionary) -> void:
 	if m.ar != area_id: return
+	if bool(int(m.get("door", 0))) != door_open:
+		door_open = bool(int(m.get("door", 0))); world.set_door_open(door_open)
 	var seen_p := {}
 	for p in m.p:
 		var id := int(p[0])
@@ -354,6 +360,18 @@ func _use_potion() -> void:
 	_float(Vector3(me.x, 2.2, me.z), "+%d" % int(h), Color(0.5, 1, 0.6))
 
 
+## 調べる（F）: 近くのレバー・宝箱（4m 以内）。ブラウザ版の画面のボタン（main.js interact）にあたる
+func _interact() -> void:
+	if me.dead or me.crawl: return
+	if area["shape"] == "grid" and area.get("gimmick", "") == "lever" and not door_open:
+		for L in area["pts"].get("L", []):
+			if Vector2(L["x"] - me.x, L["z"] - me.z).length() < 4.0:
+				net.send({"t": "interact", "what": "lever"}); return
+	for c in area.get("chests", []):
+		if Vector2(c["x"] - me.x, c["z"] - me.z).length() < 4.0:
+			net.send({"t": "interact", "what": "chest", "id": c["id"]}); return
+
+
 func _gain_xp(n: int) -> void:
 	ch["xp"] = int(ch["xp"]) + n
 	if args.has("bot"): print("XP +%d -> %d/%d lv%d" % [n, int(ch["xp"]), GameRules.xp_to_next(int(ch["lv"])), int(ch["lv"])])
@@ -368,7 +386,7 @@ func _gain_xp(n: int) -> void:
 
 
 func _moveme(dx: float, dz: float) -> void:
-	var c := GameRules.collide(area, me.x + dx, me.z + dz, 0.45)
+	var c := GameRules.collide(area, me.x + dx, me.z + dz, 0.45, door_open)
 	me.x = c.x; me.z = c.y
 
 
@@ -416,8 +434,6 @@ func _process(dt: float) -> void:
 			for p in portals:
 				var d := Vector2(p.x - me.x, p.z - me.z).length()
 				if d < p.r and p.armed:
-					if GameRules.area(p.to)["shape"] != "open":
-						_banner("屋内のエリアはまだ未対応"); p.armed = false; continue
 					me.transit = true; net.send({"t": "move", "to": p.to}); break
 				if d > p.r + 1.5: p.armed = true
 		me.swingT += dt
@@ -446,6 +462,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 	if ev is InputEventKey and ev.pressed and not ev.echo:
 		if ev.physical_keycode == KEY_SPACE: _try_dodge(Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down")))
 		elif ev.physical_keycode == KEY_R: _use_potion()
+		elif ev.physical_keycode == KEY_F: _interact()
 
 
 func _update_mouse() -> void:
@@ -576,7 +593,7 @@ func _setup_hud() -> void:
 	ui.log = RichTextLabel.new(); ui.log.scroll_following = true; ui.log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(ui.log)
 	ui.log.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); ui.log.offset_left = 16; ui.log.offset_right = 540; ui.log.offset_top = -190; ui.log.offset_bottom = -16
-	ui.help = Label.new(); ui.help.text = "WASD 移動 / 左クリック 攻撃 / Space 回避 / R 回復薬 / ホイール 距離"
+	ui.help = Label.new(); ui.help.text = "WASD 移動 / 左クリック 攻撃 / Space 回避 / R 回復薬 / F 調べる / ホイール 距離"
 	root.add_child(ui.help)
 	ui.help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); ui.help.offset_left = -580; ui.help.offset_top = -40; ui.help.offset_right = -16; ui.help.offset_bottom = -12
 	# はじめの画面（名前とサーバー）

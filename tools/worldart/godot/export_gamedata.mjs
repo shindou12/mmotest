@@ -5,7 +5,7 @@
 // 計算の式（collide・inShape・ダメージ）は godot/worldart/scripts/game/ に GDScript で移してある（元の式と同じ）。
 import fs from 'node:fs';
 import * as D from '../../../public/shared/data.js';
-import { AREAS, boundR, maxR, exitsOf, obstaclesOf, hazardsOf, chestsOf, spawnPoint, waypointOf, arrival } from '../../../public/shared/areas.js';
+import { AREAS, CELL, grid, boundR, maxR, exitsOf, obstaclesOf, hazardsOf, chestsOf, spawnPoint, waypointOf, arrival } from '../../../public/shared/areas.js';
 import { BALANCE, REVIVE } from '../../../public/shared/balance.js';
 
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -34,6 +34,11 @@ for (const [id, def] of Object.entries(AREAS)) {
     a.chests = chestsOf(def).map((c) => ({ id: c.id, x: r3(c.x), z: r3(c.z) }));
     a.spawn = spawnPoint(def); a.waypoint = waypointOf(def);
     a.arrivals = Object.fromEntries(def.exits.map((e) => [e.to, arrival(def, e.to)]));
+  } else {
+    // 屋内のマス目（# 壁 . 床 E 出口 D 扉 L レバー P 感圧板 C 宝箱 B ボス部屋の中心 など）。1 マス CELL m
+    const g = grid(def);
+    Object.assign(a, { cell: CELL, W: g.W, H: g.H, rows: g.rows, pts: Object.fromEntries(Object.entries(g.pts).map(([k, v]) => [k, v.map((p) => ({ c: p.c, r: p.r, x: p.x, z: p.z }))])),
+      gimmick: def.gimmick || '', chests: chestsOf(def).map((c) => ({ id: c.id, x: r3(c.x), z: r3(c.z), big: true })), spawn: spawnPoint(def), waypoint: waypointOf(def) });
   }
   areas[id] = a;
 }

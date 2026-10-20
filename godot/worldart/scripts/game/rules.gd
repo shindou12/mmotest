@@ -59,8 +59,33 @@ static func push_out_box(b: Dictionary, x: float, z: float, rad: float):
 	return Vector2(float(b["x"]) + px * c + pz * s, float(b["z"]) - px * s + pz * c)
 
 
-## areas.js collide（屋外だけ。屋内のマス目のエリアは未対応）
-static func collide(ar: Dictionary, x: float, z: float, rad := 0.5) -> Vector2:
+## areas.js solidAt（屋内のマス目: 壁と閉じた扉）
+static func solid_at(ar: Dictionary, c: int, r: int, door_open: bool) -> bool:
+	if r < 0 or c < 0 or r >= int(ar["H"]) or c >= int(ar["W"]): return true
+	var ch := String(ar["rows"][r])[c]
+	return ch == "#" or (ch == "D" and not door_open)
+
+
+## areas.js collide（屋外: 輪郭と当たり判定のある物。屋内: マス目の壁と扉）
+static func collide(ar: Dictionary, x: float, z: float, rad := 0.5, door_open := false) -> Vector2:
+	if ar["shape"] == "grid":
+		var CELL := float(ar["cell"]); var W := int(ar["W"]); var H := int(ar["H"])
+		for _p in 2:
+			var c := int(floor(x / CELL + W / 2.0)); var r := int(floor(z / CELL + H / 2.0))
+			for dr in [-1, 0, 1]:
+				for dc in [-1, 0, 1]:
+					if not solid_at(ar, c + dc, r + dr, door_open): continue
+					var cx: float = (c + dc - W / 2.0) * CELL; var cz: float = (r + dr - H / 2.0) * CELL
+					var nx := clampf(x, cx, cx + CELL); var nz := clampf(z, cz, cz + CELL)
+					var dx := x - nx; var dz := z - nz; var d := sqrt(dx * dx + dz * dz)
+					if d < rad:
+						if d > 1e-4:
+							x = nx + dx / d * rad; z = nz + dz / d * rad
+						else:
+							var opts := [[cx - rad - x, 0.0], [cx + CELL + rad - x, 0.0], [0.0, cz - rad - z], [0.0, cz + CELL + rad - z]]
+							opts.sort_custom(func(p, q): return absf(p[0] + p[1]) < absf(q[0] + q[1]))
+							x += opts[0][0]; z += opts[0][1]
+		return Vector2(x, z)
 	var passes := 2 if String(ar.get("layout", "")) != "" else 1
 	for _p in passes:
 		for o in ar["obstacles"]:

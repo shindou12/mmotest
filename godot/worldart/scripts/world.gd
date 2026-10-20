@@ -45,7 +45,54 @@ func load_area(id: String) -> void:
 	placed = {}
 	_set_globals()
 	_build_light()
-	_build_fallback(GameRules.area(id))
+	var ar := GameRules.area(id)
+	if ar["shape"] == "grid": _build_grid(ar)
+	else: _build_fallback(ar)
+
+
+var door_nodes: Array = []
+## 仮の屋内（マス目）: 床、壁の箱（MultiMesh）、扉（開くと消える）、レバー・感圧板・宝箱・ボス部屋の印
+func _build_grid(ar: Dictionary) -> void:
+	var CELL := float(ar["cell"]); var W := int(ar["W"]); var H := int(ar["H"])
+	var floor_m := MeshInstance3D.new(); var pm := PlaneMesh.new(); pm.size = Vector2(W * CELL, H * CELL)
+	var fm := GameVisuals.mat(Color(0.42, 0.36, 0.3)); pm.material = fm; floor_m.mesh = pm
+	add_child(floor_m)
+	var body := StaticBody3D.new(); var cs := CollisionShape3D.new(); cs.shape = WorldBoundaryShape3D.new(); body.add_child(cs); add_child(body)
+	var walls := []
+	door_nodes.clear()
+	var wall_m := GameVisuals.mat(Color(0.36, 0.33, 0.3))
+	var door_m := GameVisuals.mat(Color(0.45, 0.3, 0.18))
+	for r in H:
+		var row := String(ar["rows"][r])
+		for c in W:
+			var ch := row[c]
+			var x := (c - W / 2.0 + 0.5) * CELL; var z := (r - H / 2.0 + 0.5) * CELL
+			if ch == "#":
+				# 床に面した壁だけ置く（中の詰まった壁は省く）
+				var edge := false
+				for d in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
+					var rr: int = r + d[1]; var cc: int = c + d[0]
+					if rr >= 0 and cc >= 0 and rr < H and cc < W and String(ar["rows"][rr])[cc] != "#": edge = true
+				if edge: walls.append(Vector3(x, 0, z))
+			elif ch == "D":
+				var dm := MeshInstance3D.new(); var bm := BoxMesh.new(); bm.size = Vector3(CELL, 3.2, CELL * 0.4); bm.material = door_m
+				dm.mesh = bm; dm.position = Vector3(x, 1.6, z); add_child(dm); door_nodes.append(dm)
+			elif ch in ["L", "P", "C", "B"]:
+				var mk := MeshInstance3D.new(); var mm := BoxMesh.new()
+				var col: Color = {"L": Color(0.9, 0.8, 0.3), "P": Color(0.6, 0.6, 0.65), "C": Color(0.75, 0.55, 0.25), "B": Color(0.8, 0.2, 0.2)}[ch]
+				mm.size = Vector3(1.0, 1.2, 1.0) if ch == "L" else (Vector3(2.4, 0.1, 2.4) if ch == "P" else (Vector3(1.0, 0.7, 0.7) if ch == "C" else Vector3(1.2, 0.05, 1.2)))
+				var m := GameVisuals.mat(col); mm.material = m
+				mk.mesh = mm; mk.position = Vector3(x, mm.size.y / 2.0, z); add_child(mk)
+	var mmw := MultiMesh.new(); mmw.transform_format = MultiMesh.TRANSFORM_3D
+	var wb := BoxMesh.new(); wb.size = Vector3(CELL, 3.6, CELL); wb.material = wall_m
+	mmw.mesh = wb; mmw.instance_count = walls.size()
+	for i in walls.size(): mmw.set_instance_transform(i, Transform3D(Basis(), walls[i] + Vector3(0, 1.8, 0)))
+	var mmi := MultiMeshInstance3D.new(); mmi.multimesh = mmw; add_child(mmi)
+
+
+func set_door_open(open: bool) -> void:
+	for d in door_nodes:
+		if is_instance_valid(d): d.visible = not open
 
 
 ## 仮の地面: 階層の地面の色の平面、輪郭の外の低い壁（灰色の岩の列）、当たり判定のある木・岩・建物を単純な形で
@@ -54,12 +101,12 @@ func _build_fallback(ar: Dictionary) -> void:
 	var size := float(ar.get("maxR", 60.0)) * 2.0 + 60.0
 	var plane := MeshInstance3D.new()
 	var pm := PlaneMesh.new(); pm.size = Vector2(size, size)
-	var mat := StandardMaterial3D.new(); mat.albedo_color = Color.html(F["ground2"])
+	var mat := GameVisuals.mat(Color.html(F["ground2"]))
 	pm.material = mat; plane.mesh = pm; plane.name = "Ground"
 	add_child(plane)
 	var body := StaticBody3D.new(); var cs := CollisionShape3D.new(); var ws := WorldBoundaryShape3D.new()
 	cs.shape = ws; body.add_child(cs); add_child(body)
-	var rock := StandardMaterial3D.new(); rock.albedo_color = Color(0.45, 0.46, 0.42)
+	var rock := GameVisuals.mat(Color(0.45, 0.46, 0.42))
 	var ol: Array = ar.get("outline", [])
 	for i in range(0, ol.size(), 4):   # 輪郭の外に 4° ごとの岩
 		var p := Vector2(ol[i][0], ol[i][1]); var p2 := p * (1.0 + 2.5 / maxf(p.length(), 1.0))
@@ -69,7 +116,7 @@ func _build_fallback(ar: Dictionary) -> void:
 		if near_exit: continue
 		var m := MeshInstance3D.new(); var sm := SphereMesh.new(); sm.radius = 1.6; sm.height = 3.0; sm.material = rock
 		m.mesh = sm; m.position = Vector3(p2.x, 0.6, p2.y); add_child(m)
-	var tree := StandardMaterial3D.new(); tree.albedo_color = Color(0.25, 0.45, 0.2)
+	var tree := GameVisuals.mat(Color(0.25, 0.45, 0.2))
 	for o in ar.get("obstacles", []):
 		if not o["solid"]: continue
 		var m := MeshInstance3D.new()
