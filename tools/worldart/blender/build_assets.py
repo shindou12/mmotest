@@ -820,7 +820,7 @@ def teepee2(name, seed, r=1.9, h=3.0):
         a = 2 * math.pi * k / 6 + R_.uniform(-0.2, 0.2)
         d = Vector((math.cos(a) * 0.22, math.sin(a) * 0.22, 1.0)).normalized()
         b0 = top - d * 0.35 + Vector((math.cos(a), math.sin(a), 0)) * 0.05
-        tube(B, [b0, b0 + d * R_.uniform(0.85, 1.05)], [0.1, 0.09], M_WOOD(), sides=6, ao=(0.8, 1.25), u0=0.5, u1=1.0)
+        tube(B, [b0, b0 + d * R_.uniform(0.75, 0.95)], [0.14, 0.13], M_WOOD(), sides=6, ao=(0.8, 1.25), u0=0.5, u1=1.0)
     ring = [top + Vector((math.cos(t) * 0.2, math.sin(t) * 0.2, 0.05)) for t in [2 * math.pi * i / 8 for i in range(9)]]
     tube(B, ring, [0.05] * 9, M_WOOD(), sides=5, ao=(0.75, 0.9))
     for k in range(4):       # 張り綱: 面を下ってから外へ

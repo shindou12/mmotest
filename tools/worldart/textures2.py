@@ -279,13 +279,13 @@ def canvas_hide(n=512, seed=113):
     r = rng(seed)
     x = np.linspace(0, 1, n)[None, :, None]; y = np.linspace(1, 0, n)[:, None, None]
     puff = np.sin(np.pi * x) ** 0.6 * (0.75 + 0.25 * np.sin(np.pi * np.clip(y, 0, 1)))
-    base = lerp((0.62, 0.56, 0.38), (0.93, 0.89, 0.72), 0.25 + 0.75 * puff)
+    base = lerp((0.50, 0.44, 0.24), (0.86, 0.79, 0.52), 0.25 + 0.75 * puff)   # 見本の暖かいクリーム（日陰はオリーブ）
     base = base * (0.96 + 0.04 * r.standard_normal((n, n, 1)).clip(-1, 1))
     img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB'); d = ImageDraw.Draw(img)
     cx, cy = n * 0.5, n * 0.6
     pts = [(cx + math.cos(t) * t * n * 0.016, cy + math.sin(t) * t * n * 0.016) for t in np.linspace(0.3, 3.6 * math.pi, 120)]
-    d.line(pts, fill=(176, 168, 140), width=7)
-    d.line([(cx + n * 0.18, cy + n * 0.02), (n * 0.95, cy + n * 0.06)], fill=(176, 168, 140), width=6)
+    d.line(pts, fill=(196, 188, 160), width=7)
+    d.line([(cx + n * 0.18, cy + n * 0.02), (n * 0.95, cy + n * 0.06)], fill=(196, 188, 160), width=6)
     d.rectangle([0, n - 14, n, n], fill=(128, 110, 76))
     img.save(os.path.join(OUT, 'canvas_hide.png'))
 

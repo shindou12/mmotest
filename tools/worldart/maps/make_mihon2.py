@@ -51,7 +51,7 @@ B01 = dict(name='B01', camera=VIEWS['B01'],
     dict(asset='crate', screen=P(220, 690), rot=-25, scale=1.1),
     dict(asset='cart_frame', screen=P(830, 310), rot=-22, scale=1.0),
     dict(asset='barrel', screen=P(755, 310), rot=0, scale=1.0),
-    dict(asset='teepee', screen=P(1385, 820), rot=-40, scale=1.0),
+    dict(asset='teepee2', screen=P(1385, 820), rot=-40, scale=1.0),
     dict(asset='stump', screen=P(1620, 660), rot=0, scale=0.9),
     dict(asset='lavender', screen=P(1650, 700), scale=1.0), dict(asset='lavender', screen=P(1690, 660), scale=0.9),
     dict(asset='lavender', screen=P(1110, 800), scale=0.9),
@@ -73,15 +73,20 @@ def shrink(sec, kp, kt):
     for g in sec.get('groves', []): g['scale'] = [round(x * kt, 3) for x in g['scale']]
 shrink(B01, 0.72, 0.65)
 for o in B01['props']:
-    if o['asset'] == 'teepee': o['scale'] = 1.0     # L12: 円錐の天幕は B02 で幅 ≈ 画面の 0.22（3.8m）→ 縮めない
+    if o['asset'] == 'teepee2': o['scale'] = 1.0     # L12: 円錐の天幕は B02 で幅 ≈ 画面の 0.22（3.8m）→ 縮めない
 B01['groves'][0].update(trees=['maple2_s', 'maple2_t'], scale=[0.9, 1.05])   # L11: 林も小さく詰まった木で
 
-B02 = dict(name='B02', camera=VIEWS['B02'],                 # B01 と重なる左 1/3 は B01 で置いた物を使う
+B02 = dict(name='B02', camera=VIEWS['B02'], scatter_off=['clover_a'],   # L13: 見本の B02 に丸い茂みはない                 # B01 と重なる左 1/3 は B01 で置いた物を使う
   paths=[dict(screen=[P(200, 250), P(560, 255), P(900, 265), P(1300, 285), P(1750, 305)], width=2.0, mat='dirt', soft=0.8)],   # L12: 見本は画面の v 0.28〜0.35 をほぼ水平   # L05: 空き地は草地（土は細い道だけ）
   trees=[
     dict(asset='palm2_b', screen=P(770, 790), scale=0.9), dict(asset='palm2_a', screen=P(1020, 860), scale=0.8),     # L12: 樹冠 ≈ 画面幅の 0.15
     dict(asset='palm2_b', canopy=P(896, 50), scale=1.0), dict(asset='palm2_b', canopy=P(1290, 70), scale=1.0),   # 樹冠の位置で置く（L12: 見本の上のヤシ 2 本）
-    dict(asset='clover_b', screen=P(1350, 150), scale=1.6), dict(asset='clover_b', screen=P(1230, 170), scale=1.4), dict(asset='palm2_b', screen=P(1520, 800), scale=0.85),
+    dict(asset='clover_b', screen=P(1350, 150), scale=1.6), dict(asset='clover_b', screen=P(1230, 170), scale=1.4), dict(asset='palm2_b', screen=P(1640, 760), scale=0.9),
+    dict(asset='palm2_b', canopy=P(250, 365), scale=0.95),
+    dict(asset='palm2_low', screen=P(900, 700), scale=0.8), dict(asset='palm2_low', screen=P(1010, 745), scale=0.75),   # 羊歯（左の木 2 本は B01 の右の木が入る）
+    dict(asset='palm2_low', screen=P(560, 430), scale=0.7), dict(asset='palm2_low', screen=P(1580, 840), scale=0.8),
+    dict(asset='clover_b', screen=P(920, 160), scale=1.5), dict(asset='clover_b', screen=P(1540, 830), scale=1.4),
+    dict(asset='maple2_s', canopy=P(250, 60), scale=1.0),
     dict(asset='clover_b', screen=P(800, 220), scale=1.1), dict(asset='clover_b', screen=P(1160, 250), scale=1.1),
     dict(asset='clover_a', screen=P(1200, 800), scale=1.1), dict(asset='clover_a', screen=P(1600, 700), scale=1.0),
   ],
@@ -128,10 +133,10 @@ spec = {
   "seed": 202, "aspect": 1532 / 869,
   "camera": VIEWS['B01'], "views": VIEWS,
   "sun": {"azimuth": 70, "elevation": 40, "color": "#fff0d4", "intensity": 4.4},
-  "sky": {"color": "#cfe0ee", "light": "#c4ccc8", "ground": "#8a8050", "intensity": 1.8},
+  "sky": {"color": "#cfe0ee", "light": "#c4ccc8", "ground": "#8a8050", "intensity": 1.5},   # L13: 物を小さくして木の陰が減った分、日陰を深く
   "albedoSat": 0.9, "shadowMap": "vsm", "shadowRadius": 6,
   "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
-  "post": {"exposure": 1.1, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
+  "post": {"exposure": 1.04, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
   "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.98, 0.88], "rock": "crack",
              "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 5.0},
   "terrain": {"size": 150, "cell": 0.5, "ground": "grass", "center": [-8, -22], "hills": {"amp": 0.25, "scale": 16}},
