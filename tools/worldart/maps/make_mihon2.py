@@ -96,7 +96,13 @@ B02 = dict(name='B02', camera=VIEWS['B02'], scatter_off=['clover_a'],   # L13: �
   ],
   props=[dict(asset='stump', screen=P(630, 490), scale=1.0), dict(asset='lavender', screen=P(690, 520), scale=1.0),
          dict(asset='lavender', screen=P(720, 500), scale=0.8), dict(asset='boulder_a', screen=P(480, 200), rot=40, scale=0.6)],
-  shadow_casters=[dict(asset='maple_big', screen=P(1230, 460), scale=1.1), dict(asset='maple_b', screen=P(1350, 560), scale=1.0)],
+  shadow_casters=[dict(asset='maple_big', screen=P(1230, 460), scale=1.1), dict(asset='maple_b', screen=P(1350, 560), scale=1.0),
+                  dict(asset='maple_big', screen=P(520, 90), scale=1.2), dict(asset='maple_big', screen=P(1000, 70), scale=1.2), dict(asset='maple_big', screen=P(1520, 90), scale=1.2)],   # L17: 上の帯の日陰
+  # L17: 見本の B02 の上の帯（v 0〜0.25）は木と茂みが詰まって暗い（輝度 0.42〜0.47、こちらは 0.52〜0.58）、下は暗い羊歯の群れ
+  groves=[dict(space='screen', centers=[P(330, 200), P(700, 215), P(1050, 190), P(1480, 215), P(1700, 180)], trees=['clover_b', 'clover_b', 'palm2_low', 'maple2_s'],   # 根元は道のすぐ上（樹冠は画面の上へ）
+               count=[3, 4], radius=2.2, scale=[1.35, 1.55]),
+          dict(space='screen', centers=[P(620, 820), P(900, 840), P(1250, 860), P(260, 640)], trees=['palm2_low', 'clover_b'],
+               count=[3, 4], radius=1.6, scale=[1.2, 1.45])],
 )
 shrink(B02, 0.72, 0.65)    # L12: B01 と同じ尺度（ヤシ・maple2_t は上で直接）
 
