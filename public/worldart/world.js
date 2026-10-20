@@ -234,12 +234,14 @@ function addLushToGrass(sh) {
       float lushg = smoothstep(0.42 - uLushBiasG, 0.6 - uLushBiasG, nzg.r * 0.55 + nzg.g * 0.3 + nzg.b * 0.15);
       diffuseColor.rgb *= uGrassTintG * mix(vec3(1.0), uLushTintG, lushg * uLushAmtG);`);
 }
+const MSAA = num('msaa', spec.post?.msaa ?? 0);   // 0 = なし（前の撮影と同じ）、4 = 第 3 世代の規則
 function fixMaterial(mesh) {
   const src = mesh.material;
   const isLeaf = /leaf|frond|grass/.test(src.name);
   const m = new THREE.MeshLambertMaterial({
     map: src.map || null, vertexColors: !!mesh.geometry.attributes.color,
-    alphaTest: isLeaf ? 0.5 : 0, side: isLeaf ? THREE.DoubleSide : THREE.FrontSide,
+    alphaTest: isLeaf ? (MSAA ? 0.25 : 0.5) : 0, side: isLeaf ? THREE.DoubleSide : THREE.FrontSide,
+    alphaToCoverage: isLeaf && MSAA > 0,   // 切り抜きの縁を MSAA の標本で半透明に（見本の葉の縁はなめらか）
   });
   m.name = src.name;
   if (isLeaf && FNORM_CARD) mesh.geometry.computeVertexNormals();   // 比較用: 板の向きの法線
@@ -346,7 +348,8 @@ await Promise.all(assetNames.map(async (name) => {
 }));
 
 // ---------------------------------------------------------------- 仕上げ
-const composer = new EffectComposer(renderer);
+// 縁のなめらかさ（L21）: 仕上げの描画先に MSAA を持たせる。EffectComposer の既定の描画先は MSAA なしで、葉・草の切り抜きと物の輪郭がぎざぎざになっていた
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio(), { type: THREE.HalfFloatType, samples: MSAA }));
 composer.addPass(new RenderPass(scene, camera));
 composer.addPass(new OutputPass());   // トーンマップと sRGB をここで済ませ、以降は表示の色で扱う
 const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';

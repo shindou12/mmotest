@@ -153,7 +153,7 @@ spec = {
   "sky": {"color": "#cfe0ee", "light": "#c4ccc8", "ground": "#8a8050", "intensity": 1.65},   # L19: 1.5 → 1.65（L18 の明暗比 2.95、見本 2.61）   # L13: 物を小さくして木の陰が減った分、日陰を深く
   "albedoSat": 0.9, "shadowMap": "vsm", "shadowRadius": 6,
   "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
-  "post": {"exposure": 1.04, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
+  "post": {"msaa": 4, "exposure": 1.04, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
   "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.94, 0.78], "rock": "face", "rockPix": True,   # L15: 見本 B03 の岩肌（明るさ 0.55、苔で黄緑寄り）
              "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 5.0},
   "terrain": {"size": 150, "cell": 0.5, "ground": "grass", "center": [-8, -22], "hills": {"amp": 0.25, "scale": 16}},
