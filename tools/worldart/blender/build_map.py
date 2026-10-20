@@ -206,7 +206,8 @@ for band in TS.get('bands', []):
 gz, gx = np.gradient(H, cell)
 ny = 1 / np.sqrt(1 + gx * gx + gz * gz)
 ROCK = smooth(0.82, 0.62, ny)
-for w_ in DRAPE: ROCK = ROCK * (1 - w_)
+KEEP = np.ones_like(H)     # 頂点色の A: 岩肌を残す割合（草の垂れの分だけ下げる。実行環境で画素ごとの傾きに掛ける、L18）
+for w_ in DRAPE: ROCK = ROCK * (1 - w_); KEEP = KEEP * (1 - w_)
 
 
 def height_at(x, z):
@@ -233,7 +234,7 @@ def build_terrain():
     me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
     me.uv_layers.new(name='UVMap')
     ca = me.color_attributes['Col']
-    flat = np.stack([DIRT.ravel(), ALT.ravel(), ROCK.ravel(), np.ones(n * n)], 1).astype(np.float32)
+    flat = np.stack([DIRT.ravel(), ALT.ravel(), ROCK.ravel(), KEEP.ravel()], 1).astype(np.float32)
     ca.data.foreach_set('color', flat.ravel())
     uvl = me.uv_layers['UVMap']
     uvs = np.zeros((len(me.loops), 2), np.float32)

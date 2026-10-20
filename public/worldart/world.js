@@ -119,7 +119,7 @@ function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
-      tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
+      tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
       uAltTint: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) },
       uLushTint: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmt: { value: num('lush', GROUND.lushAmt ?? 0) }, uLushBias: { value: num('lushBias', GROUND.lushBias ?? 0) },
       uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
@@ -132,12 +132,15 @@ function groundMaterial() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale, uRockPix; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
         vec2 wp = vW.xz;
-        vec3 g1 = texture2D(tGrass, wp / 7.0).rgb, g2 = texture2D(tGrass, wp / 19.0 + 0.37).rgb;
+        // 草の絵は三方向から貼る（L18）: 上から 1 方向だけだと崖の面で縦に伸び、岩との境が歯の列に見えた（F23）
+        vec3 an = abs(vWN); an = an * an; an /= (an.x + an.y + an.z);
+        vec3 g1 = texture2D(tGrass, vW.zy / 7.0).rgb * an.x + texture2D(tGrass, vW.xy / 7.0).rgb * an.z + texture2D(tGrass, wp / 7.0).rgb * an.y;
+        vec3 g2 = texture2D(tGrass, vW.zy / 19.0 + 0.37).rgb * an.x + texture2D(tGrass, vW.xy / 19.0 + 0.37).rgb * an.z + texture2D(tGrass, wp / 19.0 + 0.37).rgb * an.y;
         vec3 grass = mix(g1, g2, 0.35) * uGrassTint;
         float big = texture2D(tGrass, wp / 61.0).g;          // 大きなむら
         grass *= mix(0.86, 1.1, smoothstep(0.25, 0.6, big));
@@ -147,13 +150,19 @@ function groundMaterial() {
         grass *= mix(vec3(1.0), uLushTint, lush * uLushAmt);
         vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
         vec3 alt = texture2D(tAlt, wp / uAltScale).rgb * uAltTint;
-        vec3 an = abs(vWN);
         vec3 rock = texture2D(tRock, vW.zy / uRockScale).rgb * an.x + texture2D(tRock, vW.xy / uRockScale).rgb * an.z + texture2D(tRock, vW.xz / uRockScale).rgb * an.y;
-        rock /= (an.x + an.y + an.z);
         float n = dot(g1, vec3(0.33)) - 0.33;
         float wd = smoothstep(0.4, 0.6, vSplat.r + n * 0.9);
         float wa = smoothstep(0.4, 0.6, vSplat.g + n * 0.9);
-        float wr = smoothstep(0.35, 0.65, vSplat.b + n * 0.6);
+        // 岩肌: rockPix のとき画素ごとの傾き（補間した法線）× 頂点色 A（草の垂れ）で決める。頂点ごとの岩の重みは崖の面が 1〜2 マスしかなく、
+        // 三角の対角線で草と岩の境が歯の列になった（F23、L18）
+        float rk = vSplat.b;
+        if (uRockPix > 0.5) {   // 苔の斑（三方向のノイズ、網の目と無関係）: 岩肌の一部に草が乗る
+          vec3 mz = texture2D(tNoise, vW.zy / 3.5).rgb * an.x + texture2D(tNoise, vW.xy / 3.5).rgb * an.z + texture2D(tNoise, wp / 3.5).rgb * an.y;
+          vec3 gn = normalize(cross(dFdx(vW), dFdy(vW)));   // 三角ごとの面の向き（補間した法線は細い面で歯の列になる）
+          rk = smoothstep(0.9, 0.75, abs(gn.y)) * vSplat.a * (1.0 - smoothstep(0.56, 0.66, mz.r * 0.6 + mz.g * 0.4));
+        }
+        float wr = smoothstep(0.35, 0.65, rk + n * 0.6);
         vec3 col = mix(grass, dirt, wd);
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);

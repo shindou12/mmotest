@@ -25,10 +25,10 @@ B01 = dict(name='B01', camera=VIEWS['B01'],
     dict(screen=[P(930, 430), P(820, 560), P(700, 720), P(600, 900), P(520, 1000)], width=2.8, mat='dirt', soft=0.7),    # 南西へ
     dict(screen=[P(690, 300), P(560, 360), P(380, 420), P(150, 470)], width=1.6, mat='dirt', soft=0.7),                  # 西への細い道
   ],
-  cliffs=[dict(screen=[P(100, 90), P(260, 60), P(380, 10), P(420, -40)], low='near', drop=1.5, width=1.0, jag=0.8,   # L10: 左上の隅だけ
-               radius=6, **{'raise': True}, relief=0.3, drape=0.5),
-          dict(screen=[P(1060, 110), P(1150, 60), P(1190, -40)], low='near', drop=1.5, width=1.0, jag=0.8,
-               radius=5, **{'raise': True}, relief=0.3, drape=0.5)],
+  cliffs=[dict(screen=[P(100, 90), P(260, 60), P(380, 10), P(420, -40)], low='near', drop=1.5, width=1.9, jag=0.4,   # L10: 左上の隅だけ
+               radius=6, **{'raise': True}, relief=0.3),
+          dict(screen=[P(1060, 110), P(1150, 60), P(1190, -40)], low='near', drop=1.5, width=1.9, jag=0.4,
+               radius=5, **{'raise': True}, relief=0.3)],
   trees=[
     dict(asset='maple2_t', canopy=P(990, -50), scale=1.1),     # 上の大木（樹冠を画面の上に入れる）。L11: 小さく詰まった木 maple2_s/t
     dict(asset='maple2_t', canopy=P(1480, 70), scale=1.0),
@@ -154,7 +154,7 @@ spec = {
   "albedoSat": 0.9, "shadowMap": "vsm", "shadowRadius": 6,
   "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
   "post": {"exposure": 1.04, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
-  "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.94, 0.78], "rock": "face",   # L15: 見本 B03 の岩肌（明るさ 0.55、苔で黄緑寄り）
+  "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.94, 0.78], "rock": "face", "rockPix": True,   # L15: 見本 B03 の岩肌（明るさ 0.55、苔で黄緑寄り）
              "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 5.0},
   "terrain": {"size": 150, "cell": 0.5, "ground": "grass", "center": [-8, -22], "hills": {"amp": 0.25, "scale": 16}},
   "paths": [  # 区画どうしをつなぐ道（推測）
