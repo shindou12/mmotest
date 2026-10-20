@@ -28,8 +28,11 @@ body { background: var(--ground); color: var(--ink); font-family: var(--body); o
   backdrop-filter: blur(6px); display: flex; flex-direction: column; gap: 10px; padding: 12px 14px;
   max-height: calc(100% - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
 }
-.ctl { top: calc(env(safe-area-inset-top, 0px) + 12px); left: max(16px, env(safe-area-inset-left, 0px)); width: min(300px, calc(100vw - 32px)); }
-.info { top: calc(env(safe-area-inset-top, 0px) + 12px); right: max(16px, env(safe-area-inset-right, 0px)); width: min(380px, calc(100vw - 32px)); }
+.ctl { top: calc(env(safe-area-inset-top, 0px) + 12px); left: max(16px, env(safe-area-inset-left, 0px)); width: min(340px, calc(100vw - 32px)); }
+.about { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.about summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink-soft); }
+.about[open] summary { margin-bottom: 8px; }
+.about .tabs { margin-bottom: 8px; }
 h1 { margin: 0; font-family: var(--display); font-size: 17px; letter-spacing: 0.04em; text-wrap: balance; }
 h2 { margin: 0; font-family: var(--display); font-size: 15px; text-wrap: balance; }
 h3 { margin: 4px 0 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-soft); }
@@ -87,12 +90,6 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
 .turn button:active { background: var(--accent); color: var(--accent-ink); }
 @media (max-width: 760px) {
   .stick { width: 104px; height: 104px; }
-  /* 版の説明の板は、操作の板のすぐ下（左上）に重ねる。下の端は、スティックと回転ボタンの帯（下から 150px）より上で止める */
-  .info {
-    top: calc(env(safe-area-inset-top, 0px) + 20px + var(--ctl-h, 46px)); bottom: auto;
-    left: max(16px, env(safe-area-inset-left, 0px)); right: auto;
-    max-height: calc(100% - var(--ctl-h, 46px) - 190px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  }
   .ctl { max-height: calc(100% - 260px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 }
 [hidden] { display: none !important; }
@@ -127,17 +124,17 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
   </div>
   <p class="help">歩く: 左下のスティックを押したまま倒す（<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> と矢印キーも可）。向き: 右下の ⟲ ⟳ か <kbd>Q</kbd><kbd>E</kbd>。ズーム: 地図を 2 本指でつまむ、PC はホイール。赤い柱が人物の代わりです。版を替えても、いる場所・向き・カメラはそのままです。</p>
   <div class="pose" id="pose">—</div>
+  <details class="about" id="about">
+    <summary>版の説明とアイデア表</summary>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-ver" aria-selected="true">この版</button>
+      <button role="tab" id="tab-ideas" aria-selected="false">アイデア表</button>
+    </div>
+    <div id="pane-ver" class="sect"></div>
+    <div id="pane-ideas" class="sect" hidden></div>
+  </details>
 </aside>
 
-<aside class="panel info" id="info" aria-label="版の説明">
-  <div class="head"><h2 id="info-title">—</h2><button class="minbtn" id="info-min">たたむ</button></div>
-  <div class="tabs" role="tablist">
-    <button role="tab" id="tab-ver" aria-selected="true">この版</button>
-    <button role="tab" id="tab-ideas" aria-selected="false">アイデア表</button>
-  </div>
-  <div id="pane-ver" class="sect"></div>
-  <div id="pane-ideas" class="sect" hidden></div>
-</aside>
 
 <div class="stick" id="stick" role="application" aria-label="移動のスティック（押したまま倒した向きへ歩く）"><div class="knob" id="knob"></div></div>
 <div class="turn" aria-label="向きを回す">
@@ -262,7 +259,6 @@ function focusStage() { try { $('stage').focus(); frameWin?.focus(); } catch (e)
 
 function renderInfo() {
   const v = VERSIONS[state.ver];
-  $('info-title').textContent = v.name;
   const li = (a) => a.map((x) => `<li>${x}</li>`).join('');
   $('pane-ver').innerHTML = `
     <p class="note">${v.restore}</p>
@@ -340,7 +336,7 @@ for (const [b, p] of [['tab-ver', 'pane-ver'], ['tab-ideas', 'pane-ideas']]) {
     for (const [b2, p2] of [['tab-ver', 'pane-ver'], ['tab-ideas', 'pane-ideas']]) { $(b2).setAttribute('aria-selected', String(b2 === b)); $(p2).hidden = p2 !== p; }
   });
 }
-for (const id of ['ctl', 'info']) {
+for (const id of ['ctl']) {
   $(`${id}-min`).addEventListener('click', () => { const el = $(id); el.classList.toggle('min'); $(`${id}-min`).textContent = el.classList.contains('min') ? 'ひらく' : 'たたむ'; });
 }
 // 親のページでキーを押しても歩けるように、地図の中へ渡す
@@ -372,10 +368,7 @@ setInterval(() => {
   if (!api) return;
   try { state.pose = api.pose(); $('pose').textContent = `x ${state.pose.x.toFixed(1)}  z ${state.pose.z.toFixed(1)}  向き ${Math.round(state.pose.yaw)}°  距離 ${state.pose.dist.toFixed(0)}m`; } catch (e) {}
 }, 250);
-if (innerWidth < 900) { $('info').classList.add('min'); $('info-min').textContent = 'ひらく'; }
 if (innerWidth < 600) { $('ctl').classList.add('min'); $('ctl-min').textContent = 'ひらく'; }   // スマホは地図を広く（板は「ひらく」で出す）
 resetIdeas(state.ver); renderIdeas();
-// 操作の板の高さを CSS に渡す（狭い画面で版の説明の板をその下に置くため）
-new ResizeObserver(() => document.documentElement.style.setProperty('--ctl-h', $('ctl').offsetHeight + 'px')).observe($('ctl'));
 loadVersion(state.ver);
 </script>
