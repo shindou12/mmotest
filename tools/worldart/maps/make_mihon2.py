@@ -15,7 +15,7 @@ VIEWS = {
     'B03': dict(CAM, target=[-36, 0, -26],         # 位置は推測
                 light=dict(hemi=1.2, exposure=1.06)),     # L14: L13 の空の光 1.5 で B03 の日陰が深くなりすぎた（明暗比 3.23、見本 2.84）→ B03 は L12 までの光に戻す
     'B04': dict(CAM, target=[8, 0, -52], pitch=40, dist=15,   # 人物の画面の高さ 17% から距離を逆算（L09）   # 位置・カメラとも推測（カットシーン）
-                light=dict(sun=0.55, hemi=1.26, exposure=1.0, sat=1.1, vignette=0.45, topDark=0.3)),   # カットシーンの照明（L02）
+                light=dict(sun=0.55, hemi=1.26, exposure=1.0, sat=1.1, vignette=0.45, topDark=0.55)),   # カットシーンの照明（L02）
 }
 
 B01 = dict(name='B01', camera=VIEWS['B01'],
@@ -26,9 +26,9 @@ B01 = dict(name='B01', camera=VIEWS['B01'],
     dict(screen=[P(690, 300), P(560, 360), P(380, 420), P(150, 470)], width=1.6, mat='dirt', soft=0.7),                  # 西への細い道
   ],
   cliffs=[dict(screen=[P(100, 90), P(260, 60), P(380, 10), P(420, -40)], low='near', drop=1.5, width=1.0, jag=0.8,   # L10: 左上の隅だけ
-               radius=6, **{'raise': True}, rocks=dict(mode='face', asset=['cliff_col_a', 'cliff_col_b'], spacing=1.2, scale=[0.42, 0.55])),
+               radius=6, **{'raise': True}, relief=0.3, drape=0.5),
           dict(screen=[P(1060, 110), P(1150, 60), P(1190, -40)], low='near', drop=1.5, width=1.0, jag=0.8,
-               radius=5, **{'raise': True}, rocks=dict(mode='face', asset=['cliff_col_a', 'cliff_col_b'], spacing=1.2, scale=[0.42, 0.55]))],
+               radius=5, **{'raise': True}, relief=0.3, drape=0.5)],
   trees=[
     dict(asset='maple2_t', canopy=P(990, -50), scale=1.1),     # 上の大木（樹冠を画面の上に入れる）。L11: 小さく詰まった木 maple2_s/t
     dict(asset='maple2_t', canopy=P(1480, 70), scale=1.0),
@@ -135,7 +135,7 @@ B04 = dict(name='B04', camera=VIEWS['B04'], scatter_off=['grass_tall_a'],   # �
          dict(asset='curb', screen=[P(1090, 305), P(1090, 1000)], step=3.0, scale=1.0),
          dict(asset='rail_fence', screen=[P(-100, 150), P(560, 150)], step=3.0, scale=1.0),
          dict(asset='temple_wall', screen=[P(-200, 40), P(1000, 40)], step=6.0, scale=1.0)],   # 奥の暗い建物（L09）
-  trees=[dict(asset='maple_c', canopy=P(350, 150), scale=0.75, base=0.4)],
+  trees=[dict(asset='maple2_s', canopy=P(330, 120), scale=0.75, base=0.4)],   # L16: 見本は細い幹の小さな木 1 本
 )
 
 spec = {
