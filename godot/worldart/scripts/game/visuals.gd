@@ -33,8 +33,36 @@ static func _part(parent: Node3D, mesh: Mesh, m: Material, pos: Vector3, scl := 
 	return mi
 
 
-## 人物（仮）: 体の円柱・頭の球・向きの印（剣）。高さ ≈1.7m
+## ゲームのモデル（data/models/<名>.glb。tools/worldart/godot/export_models.mjs が models.js の形を書き出したもの）。
+## 材質は色だけなので、地図と同じ光の式の単色（flat.gdshader）に、光る部品（目など）は光るまま（unshaded）に置き換える。なければ null
+static var _model_cache := {}
+static func model(name: String) -> Node3D:
+	var path := "res://data/models/%s.glb" % name
+	if not ResourceLoader.exists(path): return null
+	if not _model_cache.has(name): _model_cache[name] = load(path)
+	var n: Node3D = _model_cache[name].instantiate()
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		for s in mi.mesh.get_surface_count():
+			var src: Material = mi.get_active_material(s)
+			if src is BaseMaterial3D:
+				var glow: bool = src.resource_name == "glow"
+				mi.set_surface_override_material(s, mat(src.albedo_color, glow, 1.0) if not glow else _glow(src.albedo_color))
+	return n
+
+
+static func _glow(c: Color) -> Material:
+	var key := "glow_" + c.to_html()
+	if _mats.has(key): return _mats[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c; m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_mats[key] = m
+	return m
+
+
+## 人物: ゲームのモデル（なければ仮の形: 体の円柱・頭の球・向きの印）。高さ ≈1.7m
 static func player(color: Color) -> Node3D:
+	var gm := model("player")
+	if gm != null: return gm
 	var n := Node3D.new()
 	var body := CapsuleMesh.new(); body.radius = 0.32; body.height = 1.25
 	_part(n, body, mat(color), Vector3(0, 0.62, 0))
@@ -47,7 +75,11 @@ static func player(color: Color) -> Node3D:
 
 
 ## 敵（仮）: 形の種類 t ごとに単純な形。色と大きさは階層の表
-static func mob(t: String, color: Color, sc: float) -> Node3D:
+static func mob(t: String, color: Color, sc: float, boss := false) -> Node3D:
+	var gm := model(("boss_" if boss else "mob_") + t)
+	if gm != null:
+		gm.scale = Vector3.ONE * sc
+		return gm
 	var n := Node3D.new()
 	var m := mat(color)
 	match t:
@@ -77,7 +109,7 @@ static func mob(t: String, color: Color, sc: float) -> Node3D:
 static func label(text: String, color := Color.WHITE) -> Label3D:
 	var l := Label3D.new()
 	l.text = text; l.modulate = color; l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	l.font_size = 40; l.pixel_size = 0.0075; l.outline_size = 10; l.no_depth_test = true
+	l.font_size = 32; l.pixel_size = 0.0065; l.outline_size = 8; l.no_depth_test = true
 	l.fixed_size = false
 	l.render_priority = 110   # 仕上げの板（render_priority 100）の後
 	return l

@@ -207,7 +207,7 @@ func _on_snap(m: Dictionary) -> void:
 				sc = float(mds) if mds != null else (0.8 if kind == 1 else (1.9 if elite == 3 else (1.3 if elite > 0 else 1.0)))
 				nm = ("門番" if elite == 2 else ("精鋭 " if elite > 0 else "") + String(md["name"]))
 				rad = 0.75 * sc
-			mb = {"node": GameVisuals.mob(String(md["t"]), Color.html(String(md["color"])), sc), "label": GameVisuals.label(nm),
+			mb = {"node": GameVisuals.mob(String(md["t"]), Color.html(String(md["color"])), sc, kind == 2), "label": GameVisuals.label(nm),
 				"x": float(r[2]), "z": float(r[3]), "a": float(r[4]), "rad": rad, "kind": kind, "name": nm, "localT": -9.0, "hp": float(r[5])}
 			world.add_child(mb.node); world.add_child(mb.label)
 			mobs[id] = mb
@@ -570,9 +570,12 @@ func _sync_nodes(dt: float) -> void:
 	me_node.rotation.y = me.a
 	me_node.visible = not me.dead
 	me_node.scale = Vector3(1, 0.35, 1) if me.crawl else Vector3.ONE
-	var sword: Node3D = me_node.get_node("Sword")
+	# 動き（仮）: 歩くと上下に弾み、振りの間は体をひねる（ゲームの部品ごとの動きは未）
 	var k := clampf(me.swingT / maxf(me.swingDur, 0.05), 0, 1)
-	sword.rotation.y = lerp(1.2, -1.2, k) if k < 1 else 0.0
+	var sword: Node3D = me_node.get_node_or_null("Sword")
+	if sword != null: sword.rotation.y = lerp(1.2, -1.2, k) if k < 1 else 0.0
+	else: me_node.rotation.y = me.a + (sin(k * PI) * 0.6 if k < 1 else 0.0)
+	if not me.crawl: me_node.position.y += absf(sin(t_now * 9.0)) * 0.08 if Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO else 0.0
 	for id in mobs:
 		var mb = mobs[id]
 		var f := minf(1.0, dt * 10.0)
