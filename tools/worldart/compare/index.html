@@ -29,6 +29,7 @@ body { background: var(--ground); color: var(--ink); font-family: var(--body); o
   max-height: calc(100% - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
 }
 .ctl { top: calc(env(safe-area-inset-top, 0px) + 12px); left: max(16px, env(safe-area-inset-left, 0px)); width: min(340px, calc(100vw - 32px)); }
+.ctl { max-height: calc(100% - 170px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }   /* 下のスティックの帯にかからない（中はスクロール） */
 .about { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
 .about summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink-soft); }
 .about[open] summary { margin-bottom: 8px; }
