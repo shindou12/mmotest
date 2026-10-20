@@ -13,7 +13,7 @@ VIEWS = {
     'B01': dict(CAM, target=[0, 0, 0]),
     'B02': dict(CAM, target=[10.1, 0, 0]),         # 円錐の天幕の位置から計算（goal-mihon2.md 2）
     'B03': dict(CAM, target=[-36, 0, -26]),        # 位置は推測
-    'B04': dict(CAM, target=[8, 0, -52], pitch=42, dist=17,   # 位置・カメラとも推測（カットシーン）
+    'B04': dict(CAM, target=[8, 0, -52], pitch=40, dist=15,   # 人物の画面の高さ 17% から距離を逆算（L09）   # 位置・カメラとも推測（カットシーン）
                 light=dict(sun=0.55, hemi=1.05, exposure=0.95, sat=1.1, vignette=0.45, topDark=0.3)),   # カットシーンの照明（L02）
 }
 
@@ -24,18 +24,17 @@ B01 = dict(name='B01', camera=VIEWS['B01'],
     dict(screen=[P(930, 430), P(820, 560), P(700, 720), P(600, 900), P(520, 1000)], width=2.8, mat='dirt', soft=0.7),    # 南西へ
     dict(screen=[P(690, 300), P(560, 360), P(380, 420), P(150, 470)], width=1.6, mat='dirt', soft=0.7),                  # 西への細い道
   ],
-  cliffs=[dict(screen=[P(100, 140), P(300, 110), P(460, 70), P(560, 20), P(600, -40)], low='near', drop=1.5, width=1.0, jag=0.8,
-               radius=9, **{'raise': True}, rocks=dict(mode='face', asset=['cliff_col_a', 'cliff_col_b'], spacing=1.2, scale=[0.42, 0.55])),
-          dict(screen=[P(980, 130), P(1150, 120), P(1260, 60), P(1300, -40)], low='near', drop=1.5, width=1.0, jag=0.8,
-               radius=8, **{'raise': True}, rocks=dict(mode='face', asset=['cliff_col_a', 'cliff_col_b'], spacing=1.2, scale=[0.42, 0.55]))],
+  cliffs=[dict(screen=[P(100, 90), P(260, 60), P(380, 10), P(420, -40)], low='near', drop=1.5, width=1.0, jag=0.8,   # L10: 左上の隅だけ
+               radius=6, **{'raise': True}, rocks=dict(mode='face', asset=['cliff_col_a', 'cliff_col_b'], spacing=1.2, scale=[0.42, 0.55])),
+          dict(screen=[P(1060, 110), P(1150, 60), P(1190, -40)], low='near', drop=1.5, width=1.0, jag=0.8,
+               radius=5, **{'raise': True}, rocks=dict(mode='face', asset=['cliff_col_a', 'cliff_col_b'], spacing=1.2, scale=[0.42, 0.55]))],
   trees=[
     dict(asset='maple_big', canopy=P(990, 170), scale=1.0),    # 上の大木（樹冠を画面の上に入れる）
     dict(asset='maple_b', canopy=P(1480, 70), scale=1.0),
     dict(asset='maple_b', canopy=P(1290, 380), scale=1.05),     # 右の明るい木（2 本）
     dict(asset='maple_a', canopy=P(1480, 520), scale=1.0),
-    dict(asset='maple_c', canopy=P(1640, 330), scale=1.0),
-    dict(asset='palm2_b', screen=P(1060, 790), scale=1.4),      # 中央下のヤシ（見本の主役: 樹冠が画面幅の ≈ 1/5）
-    dict(asset='palm2_a', screen=P(985, 860), scale=1.3),
+    dict(asset='palm2_b', screen=P(1060, 790), scale=0.8),      # 中央下のヤシ（L10: 樹冠は画面幅の ≈ 0.12、高さ ≈ 4m）
+    dict(asset='palm2_a', screen=P(985, 860), scale=0.75),
     dict(asset='palm2_low', screen=P(440, 270), scale=1.0),     # 左の低いヤシ・羊歯
     dict(asset='palm2_low', screen=P(360, 345), scale=0.9),
     dict(asset='clover_b', screen=P(330, 240), scale=0.9),
@@ -63,6 +62,17 @@ B01 = dict(name='B01', camera=VIEWS['B01'],
                count=[2, 3], radius=2.2, scale=[0.95, 1.1])],     # L02: 右の木立は外す（見本の右は明るい木 2〜3 本と草地）
 )
 
+# L10: 見本の B01 では物が小さい（人物の高さ ≈ 画面の 0.12 = 1.7m に対し、天幕の幅 2.1m、木箱 0.75m、荷車 1.4m、
+# 広葉樹の樹冠 ≈ 3m）。L09 は 1.4 倍（樹冠は 1.6 倍）大きかった → 区画の物の大きさに掛ける（ヤシは上で直接）
+def shrink(sec, kp, kt):
+    for t in sec.get('trees', []) + sec.get('shadow_casters', []):
+        if not t['asset'].startswith('palm2_'): t['scale'] = round(t.get('scale', 1.0) * kt, 3)
+    for o in sec.get('props', []):
+        o['scale'] = round(o.get('scale', 1.0) * kp, 3)
+        if 'y' in o: o['y'] = round(o['y'] * kp, 3)
+    for g in sec.get('groves', []): g['scale'] = [round(x * kt, 3) for x in g['scale']]
+shrink(B01, 0.72, 0.65)
+
 B02 = dict(name='B02', camera=VIEWS['B02'],                 # B01 と重なる左 1/3 は B01 で置いた物を使う
   paths=[dict(screen=[P(700, 270), P(950, 330), P(1300, 420), P(1750, 500)], width=2.6, mat='dirt', soft=0.8)],   # L05: 空き地は草地（土は細い道だけ）
   trees=[
@@ -89,21 +99,22 @@ for t in B03['trees']:
 for t in B03['trees']:          # 台地の上の木: 持ち上げた高さで画面の位置を逆算
     if t['asset'] == 'maple_c': t['base'] = 4.5
 
-B04 = dict(name='B04', camera=VIEWS['B04'],
-  paths=[dict(screen=[P(1400, 260), P(1400, 600), P(1400, 1000)], width=7.5, mat='flag', jag=0.0, soft=0.06),       # 敷石の広場
+B04 = dict(name='B04', camera=VIEWS['B04'], scatter_off=['grass_tall_a'],   # 刈った芝（背の高い草の房なし）
+  paths=[dict(screen=[P(1560, 260), P(1560, 600), P(1560, 1000)], width=6.6, mat='flag', jag=0.0, soft=0.06),       # 敷石の広場（左の縁 = 画面の u 0.6）
          dict(screen=[P(140, 470), P(400, 560), P(560, 680), P(680, 800), P(720, 900)], width=1.4, mat='dirt'),       # 草地の細い土の道
          dict(screen=[P(1350, 120), P(1350, 290)], width=7.0, mat='flag', jag=0.0, soft=0.06)],
   cliffs=[dict(screen=[P(-200, 300), P(560, 300), P(1080, 300)], low='near', drop=0.4, width=0.3, jag=0.0, radius=10, **{'raise': True}),   # 石像の段
           dict(screen=[P(980, 70), P(1800, 70)], low='near', drop=2.0, width=0.6, jag=0.0, radius=10, **{'raise': True})],                # 石段の上
   props=[
-    dict(asset='statue', screen=P(680, 345), rot=0, scale=1.3),
+    dict(asset='statue', screen=P(680, 345), rot=0, scale=1.25),   # 台座 2.0m
     dict(asset='stone_steps', screen=P(1140, 300), rot=0, scale=1.0), dict(asset='stone_steps', screen=P(1370, 300), rot=0, scale=1.0),
     dict(asset='stone_steps', screen=P(1600, 300), rot=0, scale=1.0),
     dict(asset='stone_lantern', screen=P(1060, 290), scale=1.0), dict(asset='stone_lantern', screen=P(1720, 330), scale=1.0),
   ],
   lines=[dict(asset='curb', screen=[P(-100, 305), P(1090, 305)], step=3.0, scale=1.0),
          dict(asset='curb', screen=[P(1090, 305), P(1090, 1000)], step=3.0, scale=1.0),
-         dict(asset='rail_fence', screen=[P(-100, 150), P(560, 150)], step=3.0, scale=1.0)],
+         dict(asset='rail_fence', screen=[P(-100, 150), P(560, 150)], step=3.0, scale=1.0),
+         dict(asset='temple_wall', screen=[P(-200, 40), P(1000, 40)], step=6.0, scale=1.0)],   # 奥の暗い建物（L09）
   trees=[dict(asset='maple_c', canopy=P(350, 150), scale=0.75, base=0.4)],
 )
 
@@ -118,7 +129,7 @@ spec = {
   "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
   "post": {"exposure": 1.1, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},
   "ground": {"grassTint": [1.8, 1.6, 0.62], "lushBias": 0.12, "dirtTint": [0.92, 1.0, 0.42], "rockTint": [0.92, 0.98, 0.88], "rock": "crack",
-             "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 3.0},
+             "lushTint": [0.55, 0.92, 0.95], "lushAmt": 1.3, "tuftTint": [1.12, 1.05, 0.8], "alt": "flagstone", "altScale": 5.0},
   "terrain": {"size": 150, "cell": 0.5, "ground": "grass", "center": [-8, -22], "hills": {"amp": 0.25, "scale": 16}},
   "paths": [  # 区画どうしをつなぐ道（推測）
     {"world": [[-2.5, -12], [-6, -18], [-14, -22], [-26, -24], [-34, -26]], "width": 2.6, "mat": "dirt"},

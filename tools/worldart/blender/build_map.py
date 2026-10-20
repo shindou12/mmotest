@@ -278,11 +278,16 @@ for fr in SECTION_FRAMES:
     FOOT.append(np.array([s2w(fr, u, v)[[0, 2]] for u, v in ((-0.45, -0.7), (1.45, -0.7), (1.45, 1.6), (-0.45, 1.6))]))
 
 
+OFF = []      # 区画ごとに散らし物を止める（"scatter_off": ["grass_tall_a", ...]）: (止める物, その区画の画面の範囲)
+for sec, fr in zip(SPEC.get('sections', []), SECTION_FRAMES):
+    if sec.get('scatter_off'):
+        OFF.append((set(sec['scatter_off']), np.array([s2w(fr, u, v)[[0, 2]] for u, v in ((-0.2, -0.3), (1.2, -0.3), (1.2, 1.3), (-0.2, 1.3))])))
 CORE = [np.array([s2w(fr, u, v)[[0, 2]] for u, v in ((-0.08, -0.15), (1.08, -0.15), (1.08, 1.12), (-0.08, 1.12))]) for fr in SECTION_FRAMES]
 
 
 def place(asset, x, z, rot=None, scale=1.0, y=None):
     if FOOT and asset in SMALL and not any(bool(inside(np.array(x), np.array(z), f)) for f in FOOT): return
+    if any(asset in off and bool(inside(np.array(x), np.array(z), poly)) for off, poly in OFF): return
     hy = height_at(x, z) + (y or 0)
     PL.setdefault(asset, []).append([round(float(x), 3), round(hy, 3), round(float(z), 3),
                                      round(float(rot if rot is not None else RNG.uniform(0, 6.283)), 3), round(float(scale), 3)])

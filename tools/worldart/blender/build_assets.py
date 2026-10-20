@@ -906,7 +906,7 @@ def pedestal_statue(name, seed):
     """台座と座った戦士の石像（B04）: 台座 = 雷文の帯のある四角。像は球・円柱を組んでボクセルで溶かし、なめらかにした塊
     （見本は鎧の戦士。細部は再現しない: 大きさ・シルエット・苔の色を合わせる）"""
     R_ = random.Random(seed); B = Builder()
-    pw, pd, ph = 2.2, 1.9, 1.0
+    pw, pd, ph = 1.6, 1.4, 0.85   # L09: 台座は小さく、像ははみ出す大きさ（下で 1.45 倍）
     box(B, -pw / 2 - 0.12, -pd / 2 - 0.12, -0.2, pw / 2 + 0.12, pd / 2 + 0.12, 0.18, M_STONE(), (2, 2), lambda p: 0.8)
     box(B, -pw / 2, -pd / 2, 0.18, pw / 2, pd / 2, ph, M_MEANDER(), (pw, ph), lambda p: 0.85 + 0.15 * p.z / ph, skip=('bottom',))
     base_ob = B.build(name + '_base', smooth=False)
@@ -943,6 +943,7 @@ def pedestal_statue(name, seed):
     md = st.modifiers.new('rm', 'REMESH'); md.mode = 'VOXEL'; md.voxel_size = 0.07; bpy.ops.object.modifier_apply(modifier='rm')
     md = st.modifiers.new('sm', 'SMOOTH'); md.factor = 0.6; md.iterations = 6; bpy.ops.object.modifier_apply(modifier='sm')
     md = st.modifiers.new('dc', 'DECIMATE'); md.ratio = 0.35; bpy.ops.object.modifier_apply(modifier='dc')
+    for v_ in st.data.vertices: v_.co = v_.co + Vector((0, 0.32, 0))   # 足を台座の上に（奥へ 0.32m）。像の大きさは見本のすね ≈ 1.1m に合わせて 1.0 倍
     for p_ in st.data.polygons: p_.use_smooth = True
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.cube_project(cube_size=2.0); bpy.ops.object.mode_set(mode='OBJECT')
     st.data.materials.append(M_ROCK2())
@@ -1010,7 +1011,7 @@ def maple2(name, seed, height=6.0, width=4.2, base=2.0, tiers=5):
             out = Vector((math.cos(a), math.sin(a), 0))
             ctr = Vector((0, 0, z + R_.uniform(-0.25, 0.25))) + lean * (z / height) + out * rad * R_.uniform(0.35, 0.7)
             st = Vector((0, 0, z - 0.35)) + lean * (z / height)
-            tube(B, [st, ctr - out * 0.3], [0.05, 0.025], M_BARK(), sides=5, ao=(0.55, 0.75))
+            tube(B, [st, ctr - out * 0.45 - UP * 0.2], [0.04, 0.02], M_BARK(), sides=5, ao=(0.55, 0.75))   # 枝は房の下で終える（上から星形に見えない、L10）
             S = R_.uniform(1.25, 1.7) * (1.0 - 0.25 * t)
             tilt = math.radians(R_.uniform(15, 35))
             nrm_plate = (UP * math.cos(tilt) + out * math.sin(tilt)).normalized()
@@ -1023,7 +1024,21 @@ def maple2(name, seed, height=6.0, width=4.2, base=2.0, tiers=5):
             if R_.random() < 0.6:     # 房の下にもう 1 枚（厚み）
                 card2(B, ctr - fwd * S * 0.45 - nrm_plate * 0.25 + side * 0.2, fwd, side, S * 0.9, S * 0.9, M_PLATE(),
                       [crown_color(hb * 0.5, 0.3, 0.45, 0.9), crown_color(hb * 0.7, 0.6, 0.45, 1.0)], nrm)
+    S = width * 0.42; ctr = top + Vector((0, 0, 0.12))       # 頂の房: 幹の先と最上段の枝を上から隠す（L10）
+    card2(B, ctr - Vector((S / 2, 0, 0)), Vector((1, 0, 0)), Vector((0, 1, 0)), S, S, M_PLATE(),
+          [crown_color(0.9, 1.0, 0.45, 1.0), crown_color(1.0, 1.0, 0.45, 1.02)], UP)
     return B.build(name)
+
+
+def temple_wall(name, seed, L=6.0, H=3.6):
+    """奥の建物の壁（B04 の上、L09）: 石の腰壁の上に暗い木の板壁と太い柱、上に横の梁。長さは Y（lines の向き）"""
+    B = Builder()
+    box(B, -0.3, -L / 2, -0.1, 0.3, L / 2, 0.9, M_STONE(), (2, 2), lambda p: 0.7)
+    box(B, -0.2, -L / 2, 0.9, 0.2, L / 2, H, M_WOOD(), (1.5, 1.5), lambda p: 0.32)
+    for y in (-L / 2 + 0.2, 0.0, L / 2 - 0.2):
+        box(B, -0.32, y - 0.18, 0.9, 0.32, y + 0.18, H + 0.2, M_WOOD(), (1, 1), lambda p: 0.42)
+    box(B, -0.36, -L / 2, H - 0.2, 0.36, L / 2, H + 0.25, M_WOOD(), (1.5, 1.5), lambda p: 0.4)
+    return B.build(name, smooth=False)
 
 
 ASSETS = {
@@ -1069,6 +1084,7 @@ ASSETS = {
     'stone_lantern': lambda n: stone_lantern(n, 1009),
     'curb': lambda n: curb(n, 1010),
     'rail_fence': lambda n: rail_fence(n, 1011),
+    'temple_wall': lambda n: temple_wall(n, 1012),
     'maple_big': lambda n: maple(n, 904, width=5.6, height=7.5, base=2.4),
     'maple2_a': lambda n: maple2(n, 961),
     'maple2_b': lambda n: maple2(n, 962, height=7.0, width=4.8, base=2.4),
