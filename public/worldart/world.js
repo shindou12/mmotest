@@ -211,6 +211,8 @@ function addOcc(sh) {
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uOccCam, uOccTgt; uniform float uOccR; varying vec3 vOccW;')
     .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>' + occChunk);
 }
+// 葉の地色の色味（L23）: 葉の絵に掛ける RGB。地面の grassTint と同じ考えで、樹冠の日なたの色相を絵を描き直さずに合わせる
+const LEAF_TINT = { value: new THREE.Color(...(q.has('ltint') ? q.get('ltint').split(',').map(Number) : (spec.foliage?.tint || [1, 1, 1]))) };
 const LEAF = { lift: { value: num('llift', spec.foliage?.lift ?? 0.0) }, wrap: { value: num('wrap', spec.foliage?.wrap ?? 0.0) }, trans: { value: num('trans', spec.foliage?.trans ?? 0.0) },
   receive: flag('leafShadow', spec.foliage?.receiveShadow ?? true) };
 const ALBEDO_SAT = { value: num('asat', spec.albedoSat ?? 1.0) };
@@ -320,6 +322,11 @@ function fixMaterial(mesh, assetName = '') {
   m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}`;
   m.onBeforeCompile = (sh) => {
     addDesat(sh, isLeaf && !isGrassMat ? LEAF_SAT : ALBEDO_SAT);
+    if (isLeaf && !isGrassMat) {   // 葉の色味（草の房には掛けない）
+      sh.uniforms.uLeafTint = LEAF_TINT;
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uLeafTint;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= uLeafTint;');
+    }
     if (!isGrassMat) addOcc(sh);
     if (isGrassMat) addLushToGrass(sh);
     if (isRock2) addRockTriplanar(sh);
