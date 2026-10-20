@@ -80,3 +80,8 @@
 
 違い: three は歩くときにカメラと注目点の間の木を点描で抜くが、Godot 版にはまだない（F03・F04 で木がそのまま映る。F04 の明暗比の差の主因）。影の方式（three は VSM、Godot は平行光の影の 2 分割）。
 光の対応の決まり（太陽の強さ / π、半球光は材質の EMISSION、階調は仕上げの板）は `godot/worldart/README.md`。
+
+## ゲームを Godot へ移せるかの調査（L27）
+- 通信: `server.js` は WebSocket（`/ws`）で JSON をやり取りする。サーバーが権威なのは敵・エリア・ボス・宝箱・共有ボックス。**自分の位置・HP・与えるダメージはブラウザ側が計算して送る**（`st`・`hit`）。敵の攻撃は予告（`tele`）が届き、当たったかはブラウザ側（hurt.js）が決める。
+- 確認: Godot 4.3 の `WebSocketPeer` から今のサーバーにつなぎ、hello → welcome → wp（ひだまりの草原へ）→ snap（敵の一覧）→ st（敵の横へ）→ hit をくり返して、敵（ドクキノコ）が倒れ、die・xp・gold・loot が届いた（`godot/worldart/scripts/net_probe.gd`）。サーバーは変えていない。
+- 移すのに要るもの（ブラウザ側の JavaScript、約 1.6 万行）: 歩く・当たり判定（areas.js の collide）、ダメージの計算（combat.js）、被弾・ガード・回避（hurt.js）、6 種の武器とスキル（weapons・skills）、人物と敵のモデルと動き（models・motions）、UI、キャラのセーブ。サーバー・共通の表（data.js・areas.js）はそのまま使える。
