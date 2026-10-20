@@ -101,10 +101,14 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
 <aside class="panel ctl" id="ctl" aria-label="操作">
   <div class="head"><h1>見本② 版くらべ</h1><button class="minbtn" id="ctl-min">たたむ</button></div>
   <div class="group">
+    <h3>地図</h3>
+    <div class="chips" id="maps" role="group" aria-label="地図"></div>
+  </div>
+  <div class="group">
     <h3>版</h3>
     <div class="ver chips" id="vers" role="group" aria-label="版"></div>
   </div>
-  <div class="group">
+  <div class="group" id="areas-grp">
     <h3>エリア</h3>
     <div class="chips" id="areas" role="group" aria-label="エリア"></div>
   </div>
@@ -188,6 +192,21 @@ const VERSIONS = {
     issues: ['林と崖（B03）の明暗比 2.52（見本 2.84）、森の奥の影が浅い', '道と野営地（B01）の緑がまだ 6° 緑寄り', '草の日陰の青みが見本②より少し強い', 'この光と色はまだ見本②だけで決めたもの（ほかの地図では未確認）'],
   },
 };
+// 第 2 世代の地図に第 3 世代の規則を当てた比較（L24、tools/worldart/maps/to_gen3.py）。MAPINFO の数値は rulecheck（docs/world-art/rules/gen3-maps-L24.md）
+const MAPS = { mihon2: { name: '見本②（南パヨン）', def: 'L23' } };
+const MAPINFO = window.__MAPINFO || {};
+for (const [m, nm] of [['orc_meadow', 'オーク村の草地'], ['south_coast', '南の海辺'], ['town_plaza', '町の通り'], ['forest_path', '崖下の小道'], ['palm_clearing', '林の空き地']]) {
+  const I = MAPINFO[m] || {};
+  MAPS[m] = { name: nm, def: `${m}__g3` };
+  VERSIONS[`${m}__g2`] = { map: m, name: '第 2 世代', sub: 'もとの設定（今のコードで描く）', module: 'world_now.js', data: `M/${m}/`, extra: '',
+    restore: '第 2 世代の設定の地図（public/worldart/maps/' + m + '.json）を、今のコードで描いています（シェーダーの取り違えの修正などは入っています）。',
+    changes: ['カメラ 俯角 52°・画角 25°・距離 22m、階調 ACES、灰緑の空の光 1.8、葉の持ち上げ 0.12', '第 2 世代の広葉樹（丸い房）、崖は岩の柱を並べる'],
+    ideas: '04・05 は導入済み。01・10・17 はなし。', status: I.g2 || '—', issues: I.g2issues || [] };
+  VERSIONS[`${m}__g3`] = { map: m, name: '第 3 世代の規則', sub: 'to_gen3.py で変換', module: 'world_now.js', data: `M/${m}/`, mapName: `${m}_g3`, extra: '',
+    restore: '同じ地図の構図（道・区域・小物・木の位置・太陽の向き）のまま、規則集（rulebook.md、L23 の光と色）の設定だけを当てています（' + m + '_g3.json）。',
+    changes: ['カメラ 45°・18°・33m、階調は線形 + 露出 1.25、MSAA 4', '青い空の光 1.6、葉の持ち上げ 0、葉と草の色味、仕上げの彩度 0.92、やわらかい影', '広葉樹を第 3 世代（maple2）に、崖は地形の岩肌 + 起伏（置いた岩の列をやめる）', 'アイデア01（草の房の根元に地面の色）'],
+    ideas: '01・04・05・10・17 を導入。02 は使わない。', status: I.g3 || '—', issues: I.g3issues || [] };
+}
 const AREAS = { B01: '道と野営地', B02: '草原とヤシ', B03: '林と崖', B04: '神殿前の広場' };
 const CAMS = { game: 'ゲーム', near: '近く', low: '足元' };
 const CAM_SET = { near: [11, 36], low: [7, 28] };
@@ -213,7 +232,7 @@ const IDEAS = [
 ];
 
 const $ = (id) => document.getElementById(id);
-const state = { ver: 'L23', area: 'B01', cam: 'game', pose: null, gameCam: null, idea: {} };
+const state = { map: 'mihon2', ver: 'L23', area: 'B01', cam: 'game', pose: null, gameCam: null, idea: {} };
 const IDEA_ARG = { '01': ['gblend=1', ''], '02': ['', 'trans=0'], '04': ['', 'fnorm=card'], '05': ['', 'wrap=0'] };   // [入のときの引数, 切のときの引数]
 const IDEA_NAME = { '01': '01 地面と草の色', '02': '02 葉の透け', '04': '04 球状の法線', '05': '05 回り込む光', c: '色と明暗（L23）' };
 const IDEA_DEFAULT = { '01': false, '02': true, '04': true, '05': true };   // L22 の既定
@@ -268,7 +287,7 @@ function applyCam() {
 window.__cmpZoomed = (dist, pitch) => { state.cam = 'free'; state.free = { dist, pitch }; mark('cam'); };
 window.__cmpOnReady = (a, w) => {
   api = a; frameWin = w;
-  api.setView(state.area);                    // この版のそのエリアのカメラと光
+  api.setView(state.map === 'mihon2' ? state.area : 'cam');   // この版のそのエリアのカメラと光（ほかの地図は地図のカメラ）
   const p0 = api.pose(); state.gameCam = { dist: p0.dist, pitch: p0.pitch, fov: p0.fov };
   if (state.pose) { api.moveTo(state.pose.x, state.pose.z); api.setYaw(state.pose.yaw); }
   applyCam(); focusStage();
@@ -277,7 +296,7 @@ function loadVersion(k) {
   const v = VERSIONS[k];
   try { if (api) state.pose = api.pose(); } catch (e) {}
   api = null; frameWin = null;
-  window.__cmpConfig = { module: v.module, data: v.data, extra: extraFor(k) };
+  window.__cmpConfig = { module: v.module, data: v.data, extra: extraFor(k), map: v.mapName || v.map || 'mihon2' };
   window.__cmpProgress(`${v.name} を読み込み中`);
   const old = $('stage'); const f = document.createElement('iframe');
   f.id = 'stage'; f.title = '3D の地図'; f.tabIndex = 0; f.src = 'view.html';
@@ -296,7 +315,18 @@ function renderIdeas() {
 function pickArea(k) { state.area = k; mark('area'); state.pose = null; if (!api) return; api.setView(k); const p = api.pose(); state.gameCam = { dist: p.dist, pitch: p.pitch, fov: p.fov }; applyCam(); }
 function pickCam(k) { state.cam = k; mark('cam'); applyCam(); }
 
-chips($('vers'), VERSIONS, 'ver', pickVer, (k, v) => `${v.name}<small>${v.sub}</small>`);
+function renderVers() {
+  chips($('vers'), Object.fromEntries(Object.entries(VERSIONS).filter(([, v]) => (v.map || 'mihon2') === state.map)), 'ver', pickVer, (k, v) => `${v.name}<small>${v.sub}</small>`);
+  $('areas-grp').hidden = state.map !== 'mihon2';
+}
+function pickMap(m) {
+  if (m === state.map) return;
+  state.map = m; mark('map'); state.pose = null; state.cam = 'game'; state.free = null; mark('cam');
+  api = null; frameWin = null;                 // 別の地図: 位置は持ち越さない
+  state.ver = null; renderVers(); pickVer(MAPS[m].def);
+}
+chips($('maps'), Object.fromEntries(Object.entries(MAPS).map(([k, v]) => [k, v.name])), 'map', pickMap);
+renderVers();
 chips($('areas'), AREAS, 'area', pickArea);
 chips($('cams'), CAMS, 'cam', pickCam);
 renderInfo(); renderIdeas();
