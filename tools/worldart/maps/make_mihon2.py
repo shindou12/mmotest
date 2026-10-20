@@ -12,9 +12,10 @@ CAM = dict(yaw=0, pitch=52, dist=22, fov=25, aspect=1532 / 869)
 VIEWS = {
     'B01': dict(CAM, target=[0, 0, 0]),
     'B02': dict(CAM, target=[10.1, 0, 2.1]),       # 円錐の天幕の位置から計算（goal-mihon2.md 2）。L12: 見本の物が画面の 0.17 上 → 手前へ 2.1m
-    'B03': dict(CAM, target=[-36, 0, -26]),        # 位置は推測
+    'B03': dict(CAM, target=[-36, 0, -26],         # 位置は推測
+                light=dict(hemi=1.2, exposure=1.06)),     # L14: L13 の空の光 1.5 で B03 の日陰が深くなりすぎた（明暗比 3.23、見本 2.84）→ B03 は L12 までの光に戻す
     'B04': dict(CAM, target=[8, 0, -52], pitch=40, dist=15,   # 人物の画面の高さ 17% から距離を逆算（L09）   # 位置・カメラとも推測（カットシーン）
-                light=dict(sun=0.55, hemi=1.05, exposure=0.95, sat=1.1, vignette=0.45, topDark=0.3)),   # カットシーンの照明（L02）
+                light=dict(sun=0.55, hemi=1.26, exposure=1.0, sat=1.1, vignette=0.45, topDark=0.3)),   # カットシーンの照明（L02）
 }
 
 B01 = dict(name='B01', camera=VIEWS['B01'],
@@ -86,7 +87,10 @@ B02 = dict(name='B02', camera=VIEWS['B02'], scatter_off=['clover_a'],   # L13: �
     dict(asset='palm2_low', screen=P(900, 700), scale=0.8), dict(asset='palm2_low', screen=P(1010, 745), scale=0.75),   # 羊歯（左の木 2 本は B01 の右の木が入る）
     dict(asset='palm2_low', screen=P(560, 430), scale=0.7), dict(asset='palm2_low', screen=P(1580, 840), scale=0.8),
     dict(asset='clover_b', screen=P(920, 160), scale=1.5), dict(asset='clover_b', screen=P(1540, 830), scale=1.4),
-    dict(asset='maple2_s', canopy=P(250, 60), scale=1.0),
+    dict(asset='maple2_s', canopy=P(250, 60), scale=1.0), dict(asset='maple2_t', canopy=P(420, 40), scale=1.0),   # 左上の暗い木立
+    dict(asset='palm2_low', screen=P(640, 820), scale=0.8), dict(asset='palm2_low', screen=P(820, 860), scale=0.85),   # L14: 下の羊歯の群れ（見本の下は暗い羊歯）
+    dict(asset='palm2_low', screen=P(1150, 820), scale=0.8), dict(asset='palm2_low', screen=P(220, 600), scale=0.8),
+    dict(asset='clover_b', screen=P(700, 860), scale=1.5), dict(asset='clover_b', screen=P(1080, 860), scale=1.5), dict(asset='clover_b', screen=P(200, 520), scale=1.4),
     dict(asset='clover_b', screen=P(800, 220), scale=1.1), dict(asset='clover_b', screen=P(1160, 250), scale=1.1),
     dict(asset='clover_a', screen=P(1200, 800), scale=1.1), dict(asset='clover_a', screen=P(1600, 700), scale=1.0),
   ],
@@ -107,6 +111,13 @@ for t in B03['trees']:
     t.pop('base', None)
 for t in B03['trees']:          # 台地の上の木: 持ち上げた高さで画面の位置を逆算
     if t['asset'] == 'maple_c': t['base'] = 4.5
+# L14: 見本の B03 の崖は割れた小さな岩が苔に覆われる（こちらは大きな灰色の柱の壁）→ 岩を小さく密に。
+# 広葉樹は B01 と同じ小さく詰まった木、もみは見本の幅 0.19・下端 0.55 に合わせて 0.85
+for c in B03['cliffs']:
+    c['rocks'].update(scale=[0.5, 0.68], spacing=0.72)
+for t in B03['trees']:
+    t['asset'] = {'maple_a': 'maple2_t', 'maple_b': 'maple2_t', 'maple_c': 'maple2_s'}.get(t['asset'], t['asset'])
+    if t['asset'] == 'fir2_a': t['scale'] = 0.85
 
 B04 = dict(name='B04', camera=VIEWS['B04'], scatter_off=['grass_tall_a'],   # 刈った芝（背の高い草の房なし）
   paths=[dict(screen=[P(1560, 260), P(1560, 600), P(1560, 1000)], width=6.6, mat='flag', jag=0.0, soft=0.06),       # 敷石の広場（左の縁 = 画面の u 0.6）
