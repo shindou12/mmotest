@@ -8,7 +8,8 @@ cu = lambda x: round((x - 176) / 1532, 3)
 cv = lambda y: round(y / 869, 3)
 P = lambda x, y: [cu(x), cv(y)]          # 元画像の画素 → 画面座標
 
-CAM = dict(yaw=0, pitch=52, dist=22, fov=25, aspect=1532 / 869)
+CAM = dict(yaw=0, pitch=45, dist=33, fov=18, aspect=1532 / 869)   # L21: 全 23 枚の測定（俯角 45°・縦の画角 18°・人物 = 画面の 0.115）。L20 までは 52°/25°/22m
+
 VIEWS = {
     'B01': dict(CAM, target=[0, 0, 0]),
     'B02': dict(CAM, target=[10.1, 0, 2.1]),       # 円錐の天幕の位置から計算（goal-mihon2.md 2）。L12: 見本の物が画面の 0.17 上 → 手前へ 2.1m
@@ -149,8 +150,8 @@ spec = {
   "note": "見本②（見本②.zip = S__13352987〜990.jpg = B01〜B04、南パヨン）の世界。区画ごとに見本の基準カメラ（views）を持つ。B01/B02 の位置関係は共通の天幕から計算、B03/B04 の位置は推測（docs/world-art/goal-mihon2.md）。",
   "seed": 202, "aspect": 1532 / 869,
   "camera": VIEWS['B01'], "views": VIEWS,
-  "sun": {"azimuth": 70, "elevation": 40, "color": "#fff0d4", "intensity": 4.4},
-  "sky": {"color": "#cfe0ee", "light": "#c4ccc8", "ground": "#8a8050", "intensity": 1.65},   # L19: 1.5 → 1.65（L18 の明暗比 2.95、見本 2.61）   # L13: 物を小さくして木の陰が減った分、日陰を深く
+  "sun": {"azimuth": 70, "elevation": 40, "color": "#fff0d4", "intensity": 4.0},
+  "sky": {"color": "#cfe0ee", "light": "#a9bfdc", "ground": "#6f7468", "intensity": 2.6}, "tone": "lum",   # L21: 輝度だけの階調圧縮 + 青い空の光（日陰は日なたの 0.45〜0.65 倍で青寄り）   # L19: 1.5 → 1.65（L18 の明暗比 2.95、見本 2.61）   # L13: 物を小さくして木の陰が減った分、日陰を深く
   "albedoSat": 0.9, "shadowMap": "vsm", "shadowRadius": 6,
   "foliage": {"wrap": 0.5, "trans": 0.3, "receiveShadow": True, "sat": 0.95, "lift": 0.14},
   "post": {"msaa": 4, "exposure": 1.04, "sat": 0.86, "contrast": 1.0, "lift": [0, 0, 0], "gain": [1, 1, 1], "dof": 1.0},

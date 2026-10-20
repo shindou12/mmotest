@@ -35,7 +35,19 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = flag('shadow');
 renderer.shadowMap.type = { pcfsoft: THREE.PCFSoftShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap }[q.get('smap') || spec.shadowMap || 'pcfsoft'];
-renderer.toneMapping = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping }[q.get('tone') || spec.tone || 'aces'];
+// lum（L21）: 輝度だけを圧縮し R:G:B の比を保つ。ACES は明るい所を白へ寄せて彩度を落とすため、日なたが日陰より青く見え
+// （日陰が暖かく見える）、見本の「同じ材質の日なたと日陰で R:G:B の比がほぼ同じ、日陰はやや青」と逆になった（rules/lighting-post-survey.md）
+THREE.ShaderChunk.tonemapping_pars_fragment = THREE.ShaderChunk.tonemapping_pars_fragment.replace(
+  'vec3 CustomToneMapping( vec3 color ) { return color; }',
+  `vec3 CustomToneMapping( vec3 color ) {
+    color *= toneMappingExposure;
+    float L = dot( color, vec3( 0.2126, 0.7152, 0.0722 ) );
+    float Lt = L * ( 1.0 + L / 9.0 ) / ( 1.0 + L );          // 白 3.0 の拡張 Reinhard（輝度だけ）
+    vec3 c = color * ( Lt / max( L, 1e-5 ) );
+    float m = max( c.r, max( c.g, c.b ) );
+    return m > 1.0 ? mix( c / m, vec3( 1.0 ), clamp( ( m - 1.0 ) * 0.5, 0.0, 1.0 ) ) : c;   // はみ出した色だけ白へ逃がす
+  }`);
+renderer.toneMapping = { aces: THREE.ACESFilmicToneMapping, agx: THREE.AgXToneMapping, reinhard: THREE.ReinhardToneMapping, linear: THREE.LinearToneMapping, lum: THREE.CustomToneMapping }[q.get('tone') || spec.tone || 'aces'];
 renderer.toneMappingExposure = num('exposure', P.exposure);
 document.body.appendChild(renderer.domElement);
 
