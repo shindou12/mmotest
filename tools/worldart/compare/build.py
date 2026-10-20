@@ -1,5 +1,6 @@
 """比較用の試遊ページ（Artifact）の束を作る（L22）。
 python3 -I tools/worldart/compare/build.py <出力フォルダ>
+公開: Artifact「見本② 版くらべ」https://claude.ai/artifact/A31scCgQs9tWLQ1dhMAgZQ（出力フォルダの index.html をページに、残りを files に）
 版:
   L20  = コミット 8b3708e の world.js と mihon2 の地図データ（L21 より前の基準。git から正確に戻す）
   L21  = コミット d342f95 の world.js と地図データ（撮影したときのまま。材質のシェーダーの取り違えを含む）
@@ -56,4 +57,6 @@ for n in sorted(names):
     open(os.path.join(OUT, 'assets', f'{n}.glb.b64.txt'), 'w').write(base64.b64encode(open(os.path.join(ROOT, 'public/worldart/assets', f'{n}.glb'), 'rb').read()).decode())
 if os.path.exists(os.path.join(OUT, 'tex')): shutil.rmtree(os.path.join(OUT, 'tex'))
 shutil.copytree(os.path.join(ROOT, 'public/worldart/tex'), os.path.join(OUT, 'tex'))
+for f in ('index.html', 'view.html'):   # 比較ページ本体（親）と、版を動かす中の枠
+    shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), f), os.path.join(OUT, f))
 print('->', OUT, len(names), 'assets')
