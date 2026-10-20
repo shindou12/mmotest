@@ -6,17 +6,18 @@ python3 -I tools/worldart/compare/build.py <出力フォルダ>
   L21  = コミット d342f95 の world.js と地図データ（撮影したときのまま。材質のシェーダーの取り違えを含む）
   L21f = コミット 60877e3 の world.js（シェーダーのキャッシュの修正 + アイデア01 の仕組み）を 01 なしで、L21 と同じ地図データ
   L21g = L21f にアイデア01（gblend=1）だけを足したもの（コード・地図・カメラ・光は L21f と同じ）
-  L22  = <L22 の版>（既定 HEAD）の world.js と地図データ（B04 の画角 25°、線形の階調 + 露出 1.25、空の光 2.1、彩度 1.0、
+  L22  = コミット 71c581d の world.js と地図データ（B04 の画角 25°、線形の階調 + 露出 1.25、空の光 2.1、彩度 1.0、
          OutputPass の修正）。アイデア 01・02・04・05 はページで入／切（URL の引数 1 つだけを変える）
+  L23  = <L23 の版>（既定 HEAD）の world.js と地図データ（葉の持ち上げ 0・空の光 1.6・地色の色味・01 を草の房だけで既定で入）
 アセットとテクスチャは L20〜L21 で同じなので共有する。GLB は Artifact で配られないため base64 のテキストにする。
 world.js への書き換えはすべての版に同じ置換を当てる（版の違いを混ぜない）。"""
 import sys, os, json, base64, shutil, subprocess
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 OUT = os.path.abspath(sys.argv[1])
 git = lambda rev, path: subprocess.check_output(['git', '-C', ROOT, 'show', f'{rev}:{path}'])
-L22REV = sys.argv[2] if len(sys.argv) > 2 else 'HEAD'
-VERS = {'L20': '8b3708e', 'L21': 'd342f95', 'L22': L22REV}            # 地図データ
-WORLDS = {'L20': '8b3708e', 'L21': 'd342f95', 'L21f': '60877e3', 'L22': L22REV}   # world.js
+L23REV = sys.argv[2] if len(sys.argv) > 2 else 'HEAD'
+VERS = {'L20': '8b3708e', 'L21': 'd342f95', 'L22': '71c581d', 'L23': L23REV}            # 地図データ
+WORLDS = {'L20': '8b3708e', 'L21': 'd342f95', 'L21f': '60877e3', 'L22': '71c581d', 'L23': L23REV}   # world.js
 
 REPL = [
     ("const q = new URLSearchParams(location.search);", "const q = new URLSearchParams('walk=1&' + (window.__CMP?.extra || ''));"),

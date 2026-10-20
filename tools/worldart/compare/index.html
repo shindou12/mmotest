@@ -113,7 +113,7 @@ td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: 
     <div class="chips" id="cams" role="group" aria-label="カメラ"></div>
   </div>
   <div class="group" id="ideas-grp" hidden>
-    <h3>アイデアの入／切（L22 だけ）</h3>
+    <h3>アイデアの入／切（L22・L23）</h3>
     <div class="chips" id="ideatg" role="group" aria-label="アイデアの入／切"></div>
   </div>
   <p class="help">歩く: 左下のスティックを押したまま倒す（<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> と矢印キーも可）。向き: 右下の ⟲ ⟳ か <kbd>Q</kbd><kbd>E</kbd>。ズーム: 地図を 2 本指でつまむ、PC はホイール。赤い柱が人物の代わりです。版を替えても、いる場所・向き・カメラはそのままです。</p>
@@ -170,26 +170,36 @@ const VERSIONS = {
     issues: ['背の低い房は全体が地面の色に寄り、先の黄色が弱くなる（高さ 0.32m の決め方が要検討）', 'ゲームのカメラ（33m）では差が小さい。「近く」「足元」のカメラで見比べる'],
   },
   L22: {
-    name: 'L22 最新', sub: '退行の修正 + アイデアの入／切', module: 'world_L22.js', data: 'L22/', extra: '', ideas01: true,
+    name: 'L22', sub: '退行の修正 + アイデアの入／切', module: 'world_L22.js', data: 'L22/', extra: '', ideas01: true,
     restore: 'コミット 71c581d の world.js と地図データです。下の「アイデアの入／切」は URL の引数を 1 つだけ変えて、同じ場所で読み直します（地形・配置・カメラ・光は同じ）。',
     changes: ['B04（神殿前）の画角を 25° に戻した（L21 の退行）', '階調は線形（露出を掛けて切るだけ）+ 露出 1.25。L21 の tone "lum" は three の OutputPass で効いていなかった（F25）。効かせると明暗比 1.9〜2.0 で見本から遠ざかったので不採用', '空の光 2.6 → 2.1、仕上げの彩度 0.86 → 1.0', 'シェーダーの取り違えの修正（F24）込み'],
     ideas: '01 は既定で切（入れると草の房の根元が地面の色に）。02・04・05 は既定で入。入／切の比較の結果は「アイデア表」と docs/world-art/rules/ab-L22.md。',
     status: '12 ビューの撮影（L22）と rulecheck: 輝度 0.51/0.54/0.52/0.48（見本 0.51/0.51/0.49/0.48）、彩度 0.56/0.58/0.52/0.30（見本 0.53/0.55/0.51/0.30）、B04 は構図・数値とも見本にほぼ一致。アイデア 01・02・04・05 は見本②の B01〜B03・近景と south_coast で入／切を比較済み。',
     issues: ['B01〜B03 の明暗比が浅い（2.2、見本 2.4〜2.8）、いちばん暗い所が明るい（p0.5 ≈50、見本 32〜38）。05 は原因でない', '01 を入れると、道際の茂み（クローバー）の下部が土色の輪になる（草の房だけに絞るべき）', '02（葉の透け）はこのカメラと太陽の向きでは効かない（画素の変化 0）', '石像の出来は評価の対象外'],
   },
+  L23: {
+    name: 'L23 最新', sub: '色相と明暗比の修正 + 01 は草の房だけ', module: 'world_L23.js', data: 'L23/', extra: '', ideas01: true,
+    ideaArgs: { '01': ['', 'gblend=0'], '02': ['trans=0.3', ''], '04': ['', 'fnorm=card'], '05': ['', 'wrap=0'], c: ['', 'llift=0.14&hemi=2.1&ltint=1,1,1&gtint=1.8,1.6,0.62&sat=1.0'] },
+    ideaDefault: { '01': true, '02': false, '04': true, '05': true, c: true },
+    restore: 'コミット 07988ba の world.js と地図データです。下の入／切は URL の引数だけを変えて同じ場所で読み直します。「色と明暗（L23）」を切ると、葉の持ち上げ・空の光・地色の色味・彩度を L22 の値に戻します（B03 だけの空の光の上書き 1.1→1.0 は戻りません）。',
+    changes: ['葉の持ち上げ 0.14 → 0（明暗比を浅くしていた一番の要因）', '空の光 2.1 → 1.6', '葉の色味 [1.18, 1.0, 0.76]（新設）と草の地色 [2.15, 1.6, 0.5] で緑すぎた色相を直す。太陽を暖色にする案は色相が動かず不採用', '仕上げの彩度 1.0 → 0.92', 'アイデア01 を草の房だけにして既定で入（茂みの土色の輪が出ない）', '葉の透け 0（効果がないため）'],
+    ideas: '01 採用（草の房だけ）、02 却下、04 採用、05 採用（0.5、値の感度は小さい）。結果は「アイデア表」と docs/world-art/rules/ab-L23.md。',
+    status: '12 ビューの撮影（L23）: 明暗比 2.59/2.38/2.52/2.40（見本 2.61/2.36/2.84/2.35）、彩度 0.55/0.57/0.51/0.30（見本 0.53/0.55/0.51/0.30）、緑の日なたの色相 74/70/72°（見本 68/71/72°）、最も暗い所 42/45/39（見本 37/38/32）。',
+    issues: ['林と崖（B03）の明暗比 2.52（見本 2.84）、森の奥の影が浅い', '道と野営地（B01）の緑がまだ 6° 緑寄り', '草の日陰の青みが見本②より少し強い', 'この光と色はまだ見本②だけで決めたもの（ほかの地図では未確認）'],
+  },
 };
 const AREAS = { B01: '道と野営地', B02: '草原とヤシ', B03: '林と崖', B04: '神殿前の広場' };
 const CAMS = { game: 'ゲーム', near: '近く', low: '足元' };
 const CAM_SET = { near: [11, 36], low: [7, 28] };
 const IDEAS = [
-  ['01', 1, '地面と草の色の融合', 'part', '検証済み・条件付き', '草の房は地面になじむ（画面の 17〜26% が変化）。茂みは道際で下部が土色の輪 → 草の房に絞るべき。既定は切'],
+  ['01', 1, '地面と草の色の融合', 'done', '採用・検証済み（L23）', '草の房だけに絞って採用。茂みの土色の輪が出ない。L23 で既定で入'],
   ['02', 1, '葉の透過光', 'no', '却下（検証済み）', '見本②で画素の変化 0（このカメラと太陽の向きでは効かない）。south_coast でも小'],
   ['03', 0, '地面の材質の境', 'part', '一部導入', '傾き・ノイズ・三方向・画素ごとの岩。高さで混ぜる方式は未'],
   ['04', 1, '樹冠の球状の法線', 'done', '導入・検証済み', '切ると草の房に暗い面、樹冠が平たくなる。入で樹冠が塊として読める'],
-  ['05', 1, 'Wrapped Diffuse', 'part', '導入・効く向きは検証', '葉と草の房に効く（前の「葉だけ」は誤り）。影側を持ち上げる。値 0.5 の適否は未検証'],
+  ['05', 1, 'Wrapped Diffuse', 'done', '採用・検証済み（L23）', '0.25〜0.75 で結果がほぼ同じ（感度小）。0.5 のまま'],
   ['06', 0, '草の法線を上向きに', 'done', '導入済み', '草の房の法線は真上'],
   ['07', 0, '樹冠の内部の暗部', 'done', '導入済み', '頂点 AO + 葉が影を受ける'],
-  ['08', 0, '頂点色の色階調', 'done', '導入済み', '上は黄、下は青緑'],
+  ['08', 0, '頂点色の色階調', 'done', '導入済み', '上は黄、下は青緑。L23 で葉の色味 foliage.tint を新設'],
   ['09', 0, 'アルファ抜きの葉カード', 'done', '導入済み', 'もみの小羽片の絵は要修正'],
   ['10', 0, 'Alpha to Coverage', 'done', '導入・検証済み', 'L21。拡大で縁がなめらか'],
   ['11', 0, '葉・枝の階層', 'part', '一部導入', '段の房、詰まった小さな木'],
@@ -203,12 +213,15 @@ const IDEAS = [
 ];
 
 const $ = (id) => document.getElementById(id);
-const state = { ver: 'L22', area: 'B01', cam: 'game', pose: null, gameCam: null, idea: { '01': false, '02': true, '04': true, '05': true } };
+const state = { ver: 'L23', area: 'B01', cam: 'game', pose: null, gameCam: null, idea: {} };
 const IDEA_ARG = { '01': ['gblend=1', ''], '02': ['', 'trans=0'], '04': ['', 'fnorm=card'], '05': ['', 'wrap=0'] };   // [入のときの引数, 切のときの引数]
-const IDEA_NAME = { '01': '01 地面と草の色', '02': '02 葉の透け', '04': '04 球状の法線', '05': '05 回り込む光' };
+const IDEA_NAME = { '01': '01 地面と草の色', '02': '02 葉の透け', '04': '04 球状の法線', '05': '05 回り込む光', c: '色と明暗（L23）' };
+const IDEA_DEFAULT = { '01': false, '02': true, '04': true, '05': true };   // L22 の既定
+const ideaArgs = (v) => v.ideaArgs || IDEA_ARG;
+const resetIdeas = (k) => { state.idea = { ...(VERSIONS[k].ideaDefault || IDEA_DEFAULT) }; };
 function extraFor(k) {
   const v = VERSIONS[k]; if (!v.ideas01) return v.extra;
-  return Object.entries(state.idea).map(([n, on]) => IDEA_ARG[n][on ? 0 : 1]).filter(Boolean).join('&');
+  return Object.entries(state.idea).map(([n, on]) => ideaArgs(v)[n][on ? 0 : 1]).filter(Boolean).join('&');
 }
 let api = null, frameWin = null;
 
@@ -270,7 +283,7 @@ function loadVersion(k) {
   f.id = 'stage'; f.title = '3D の地図'; f.tabIndex = 0; f.src = 'view.html';
   old.replaceWith(f);                          // 前の版の WebGL を手放してから次を作る
 }
-function pickVer(k) { if (k === state.ver && api) return; state.ver = k; mark('ver'); renderInfo(); renderIdeas(); loadVersion(k); }
+function pickVer(k) { if (k === state.ver && api) return; state.ver = k; resetIdeas(k); mark('ver'); renderInfo(); renderIdeas(); loadVersion(k); }
 function renderIdeas() {
   const on = !!VERSIONS[state.ver].ideas01; $('ideas-grp').hidden = !on; const el = $('ideatg'); el.innerHTML = '';
   for (const n of Object.keys(state.idea)) {
@@ -326,5 +339,6 @@ setInterval(() => {
 }, 250);
 if (innerWidth < 900) { $('info').classList.add('min'); $('info-min').textContent = 'ひらく'; }
 if (innerWidth < 600) { $('ctl').classList.add('min'); $('ctl-min').textContent = 'ひらく'; }   // スマホは地図を広く（板は「ひらく」で出す）
+resetIdeas(state.ver); renderIdeas();
 loadVersion(state.ver);
 </script>
