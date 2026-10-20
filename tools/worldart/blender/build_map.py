@@ -270,7 +270,7 @@ try:
 except Exception:
     ASSET_H = {}
 # 樹冠の中心の高さ（scale=1）。アセットの寸法から（assets_report.json の高さの約 0.65）
-CANOPY_H = {'maple2_a': 4.2, 'maple2_b': 4.8, 'maple2_c': 3.4, 'maple2_big': 5.8, 'tree_broad_a': 3.8, 'tree_broad_b': 4.4, 'pine_a': 3.5, 'pine_b': 4.3, 'bush_a': 0.6,
+CANOPY_H = {'maple2_s': 3.1, 'maple2_t': 3.6, 'maple2_a': 4.2, 'maple2_b': 4.8, 'maple2_c': 3.4, 'maple2_big': 5.8, 'tree_broad_a': 3.8, 'tree_broad_b': 4.4, 'pine_a': 3.5, 'pine_b': 4.3, 'bush_a': 0.6,
             'maple_a': 3.5, 'maple_b': 3.9, 'maple_c': 3.0, 'fir2_a': 3.3, 'fir2_b': 3.8, 'palm_a': 4.2, 'palm_b': 4.8, 'palm2_a': 2.9, 'palm2_b': 3.4, 'clover_a': 0.4, 'clover_b': 0.4}
 SMALL = {'grass_a', 'grass_tall_a', 'flowers_a', 'rock_c'}
 FOOT = []    # 区画のある地図: 細かい散らし物は、どれかのビューの足元の範囲の中だけに置く（数を抑える）

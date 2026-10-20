@@ -29,10 +29,10 @@ B01 = dict(name='B01', camera=VIEWS['B01'],
           dict(screen=[P(1060, 110), P(1150, 60), P(1190, -40)], low='near', drop=1.5, width=1.0, jag=0.8,
                radius=5, **{'raise': True}, rocks=dict(mode='face', asset=['cliff_col_a', 'cliff_col_b'], spacing=1.2, scale=[0.42, 0.55]))],
   trees=[
-    dict(asset='maple_big', canopy=P(990, 170), scale=1.0),    # 上の大木（樹冠を画面の上に入れる）
-    dict(asset='maple_b', canopy=P(1480, 70), scale=1.0),
-    dict(asset='maple_b', canopy=P(1290, 380), scale=1.05),     # 右の明るい木（2 本）
-    dict(asset='maple_a', canopy=P(1480, 520), scale=1.0),
+    dict(asset='maple2_t', canopy=P(990, -50), scale=1.1),     # 上の大木（樹冠を画面の上に入れる）。L11: 小さく詰まった木 maple2_s/t
+    dict(asset='maple2_t', canopy=P(1480, 70), scale=1.0),
+    dict(asset='maple2_s', canopy=P(1290, 310), scale=1.05),    # 右の明るい木（2 本、樹冠 ≈ 3m）
+    dict(asset='maple2_s', canopy=P(1480, 430), scale=1.0),
     dict(asset='palm2_b', screen=P(1060, 790), scale=0.8),      # 中央下のヤシ（L10: 樹冠は画面幅の ≈ 0.12、高さ ≈ 4m）
     dict(asset='palm2_a', screen=P(985, 860), scale=0.75),
     dict(asset='palm2_low', screen=P(440, 270), scale=1.0),     # 左の低いヤシ・羊歯
@@ -66,12 +66,13 @@ B01 = dict(name='B01', camera=VIEWS['B01'],
 # 広葉樹の樹冠 ≈ 3m）。L09 は 1.4 倍（樹冠は 1.6 倍）大きかった → 区画の物の大きさに掛ける（ヤシは上で直接）
 def shrink(sec, kp, kt):
     for t in sec.get('trees', []) + sec.get('shadow_casters', []):
-        if not t['asset'].startswith('palm2_'): t['scale'] = round(t.get('scale', 1.0) * kt, 3)
+        if not t['asset'].startswith(('palm2_', 'maple2_')): t['scale'] = round(t.get('scale', 1.0) * kt, 3)
     for o in sec.get('props', []):
         o['scale'] = round(o.get('scale', 1.0) * kp, 3)
         if 'y' in o: o['y'] = round(o['y'] * kp, 3)
     for g in sec.get('groves', []): g['scale'] = [round(x * kt, 3) for x in g['scale']]
 shrink(B01, 0.72, 0.65)
+B01['groves'][0].update(trees=['maple2_s', 'maple2_t'], scale=[0.9, 1.05])   # L11: 林も小さく詰まった木で
 
 B02 = dict(name='B02', camera=VIEWS['B02'],                 # B01 と重なる左 1/3 は B01 で置いた物を使う
   paths=[dict(screen=[P(700, 270), P(950, 330), P(1300, 420), P(1750, 500)], width=2.6, mat='dirt', soft=0.8)],   # L05: 空き地は草地（土は細い道だけ）

@@ -1,11 +1,11 @@
 [
  {
-  "name": "maple2_a",
-  "tris": 486,
+  "name": "maple2_s",
+  "tris": 716,
   "size": [
-   4.18,
-   3.98,
-   6.37
+   3.25,
+   3.61,
+   5.01
   ],
   "zmin": -0.3,
   "mats": [
@@ -15,42 +15,12 @@
   "colors": 1
  },
  {
-  "name": "maple2_b",
-  "tris": 488,
+  "name": "maple2_t",
+  "tris": 708,
   "size": [
-   4.36,
-   4.45,
-   7.45
-  ],
-  "zmin": -0.3,
-  "mats": [
-   "bark",
-   "leaf_plate"
-  ],
-  "colors": 1
- },
- {
-  "name": "maple2_c",
-  "tris": 398,
-  "size": [
-   3.59,
-   3.48,
-   5.54
-  ],
-  "zmin": -0.3,
-  "mats": [
-   "bark",
-   "leaf_plate"
-  ],
-  "colors": 1
- },
- {
-  "name": "maple2_big",
-  "tris": 582,
-  "size": [
-   5.22,
-   5.13,
-   8.67
+   3.63,
+   3.82,
+   5.64
   ],
   "zmin": -0.3,
   "mats": [

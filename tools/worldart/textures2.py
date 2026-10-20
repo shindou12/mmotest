@@ -267,7 +267,7 @@ def canvas_blue(n=512, seed=111):
     r = rng(seed)
     w = r.standard_normal((n, n)); f = np.sqrt(np.fft.fftfreq(n)[:, None] ** 2 + np.fft.fftfreq(n)[None, :] ** 2)
     v = np.real(np.fft.ifft2(np.fft.fft2(w) * np.exp(-(f * n / 24) ** 2))); v = (v - v.min()) / (v.max() - v.min())
-    base = lerp((0.66, 0.66, 0.84), (0.84, 0.84, 0.96), v[..., None])   # 薄い藤色（B01）
+    base = lerp((0.50, 0.52, 0.78), (0.66, 0.68, 0.90), v[..., None])   # 薄い藤色（B01）。L11: 日なたで見本の (185,189,225) に
     img = Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB'); d = ImageDraw.Draw(img)
     d.rectangle([0, 0, n, 10], fill=(120, 124, 140)); d.rectangle([0, n - 10, n, n], fill=(120, 124, 140))
     img.save(os.path.join(OUT, 'canvas_blue.png'))

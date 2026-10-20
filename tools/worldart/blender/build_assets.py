@@ -992,7 +992,7 @@ def rail_fence(name, seed, L=3.0):
     return B.build(name, smooth=False)
 
 
-def maple2(name, seed, height=6.0, width=4.2, base=2.0, tiers=5):
+def maple2(name, seed, height=6.0, width=4.2, base=2.0, tiers=5, dens=1.0):
     """広葉樹 第 3 世代（見本② B01/B02、L06）: 細い幹が上まで伸び、枝ごとに平たい葉の房（plate_maple、1.2〜1.7m）を
     ほぼ水平（外へ 15〜35° 傾ける）に置き、段を 4〜5 つ重ねる。上の段ほど小さく明るい。段の間から幹と下の房の陰が見える"""
     R_ = random.Random(seed); B = Builder()
@@ -1004,7 +1004,7 @@ def maple2(name, seed, height=6.0, width=4.2, base=2.0, tiers=5):
         t = i / (tiers - 1)
         z = base + (height * 0.95 - base) * t
         rad = width / 2 * (1.0 - 0.35 * t) * R_.uniform(0.9, 1.05)
-        cnt = max(3, int(round(9 - 5 * t)))
+        cnt = max(3, int(round((9 - 5 * t) * dens)))
         a0 = R_.uniform(0, 6.28)
         for k in range(cnt):
             a = a0 + 2 * math.pi * k / cnt + R_.uniform(-0.35, 0.35)
@@ -1090,6 +1090,8 @@ ASSETS = {
     'maple2_b': lambda n: maple2(n, 962, height=7.0, width=4.8, base=2.4),
     'maple2_c': lambda n: maple2(n, 963, height=5.0, width=3.6, base=1.6, tiers=4),
     'maple2_big': lambda n: maple2(n, 964, height=8.5, width=6.2, base=2.8, tiers=6),
+    'maple2_s': lambda n: maple2(n, 965, height=4.4, width=3.0, base=1.3, tiers=5, dens=1.5),   # 見本② B01 の小さく詰まった木（樹冠 ≈ 3m、L11）
+    'maple2_t': lambda n: maple2(n, 966, height=5.2, width=3.4, base=1.6, tiers=5, dens=1.5),
     'palm2_low': lambda n: palm2(n, 953, height=0.5, frond=0.9, lean=0.1),
     'house_a': lambda n: house(n, 801),
     'house_b': lambda n: house(n, 802, w=9.0, d=5.5, h=5.4, roof_h=3.0),
