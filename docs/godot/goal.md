@@ -13,6 +13,12 @@
 | `origin/codex/greatsword-base-refine` | 491709f（2026-10-15 15:35）「Refine Greatsword models and register two unique swords」 | 上の 1 つ前 |
 | `claude/funny-hypatia-z9ba69`（この会話の作業ブランチ） | c9ed64b 以降 | 履歴は上の 2 つとつながっていない（根が別: 1a10f3b「Plan Skorpio」2026-10-15）。大剣の主なファイル（`public/js/models/greatsword-forms.js`・`unique-greatswords.js`・`public/greatsword-expansion.html`・`docs/greatsword-model-refine.md`）は `greatsword-unique-normal` と**同じ中身**。そのうえにゲームの続き（砂塵の大蠍スコルピオ・クリスタロス・グラズ・振りの軌跡など、`public/js/` で 247 ファイルの差）と、この会話のワールドアート・Godot の作業が載っている |
 
+### 訂正（2026-10-21、新しい会話で調べ直した）
+前の表の「履歴がつながっていない」は**浅いクローン（深さ 50）による誤り**。`git fetch --unshallow` 後は根が共通（12e3f93「浮遊城エテルナ」）。
+- リポジトリの既定ブランチは **`claude/loving-babbage-so7rp1`**（先端 15c948b、PR #4 のマージ）。`codex/greatsword-unique-normal`（a2c1818）はその祖先で、大剣の後にボス・生存力・地形エリア・精鋭・町の作り直しなどが続く
+- この作業ブランチは既定ブランチを丸ごと含み、`public/`・サーバーへの差はワールドアートの追加だけ（ゲームのコードは既定ブランチと同じ）
+- 既定ブランチに入っていない枝: **`claude/project-thread-tu085g`（PR #3、未マージ・open）**= 大剣の溜めモーションと強攻撃の縦の射程の修正・大きな振りかぶり、デバッグ部屋、エフェクト A+B、ヒット音（2b6c4ba から 10 コミット、35 ファイル）。`claude/happy-dirac-saapxt` = ElevenLabs の被弾音（1 コミット）。`claude/serene-mendel-90a0lr` = 森の家の地図（8 コミット）。`codex/dawnring-valley`（PR #2、open）= 暁の環谷（1 コミット、後の地形エリアと重なる）
+
 → 「大剣ブランチ」が `codex/greatsword-unique-normal` を指すのか、大剣の作業を含む今のゲームの最新（この作業ブランチの 1〜60 番目のコミットまで = 1a10f3b〜Skorpio・Crystalos の時点）を指すのかを、ユーザーに確かめてから移植元を固定する。
 
 ## 完了の条件（案。移植元が決まったら確定する）
