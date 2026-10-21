@@ -2,7 +2,7 @@
 //   node tools/worldart/walktest.mjs <URL> <出力の接頭辞> x1,z1 x2,z2 ...
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-const pw = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
+const pw = await (await import('../../e2e/lib/harness.mjs')).loadPlaywright();   // 場所は PLAYWRIGHT_MODULE か既定（harness.mjs）
 const [url, prefix, ...pts] = process.argv.slice(2);
 mkdirSync(dirname(prefix), { recursive: true });
 const b = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });

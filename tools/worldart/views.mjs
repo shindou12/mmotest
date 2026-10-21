@@ -3,7 +3,7 @@
 //   ビューの書き方: 地図の views の名前（B01 など）か、標準ビュー（oblique/side/top/walker/near/far）に @基準 を付ける（例 oblique@B01）
 import { mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-const pw = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
+const pw = await (await import('../../e2e/lib/harness.mjs')).loadPlaywright();   // 場所は PLAYWRIGHT_MODULE か既定（harness.mjs）
 const [map, outDir, list, w = 1532, h = 869, extra = ''] = process.argv.slice(2);   // extra: URL に足す引数（実験用、例 'lsat=1.1'）
 mkdirSync(outDir, { recursive: true });
 const up = async () => { try { return (await fetch('http://localhost:8091/health')).ok; } catch { return false; } };

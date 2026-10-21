@@ -137,7 +137,8 @@ function groundMaterial() {
       uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
       uDirtTint: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
       uAltScale: { value: GROUND.altScale || 6.0 },
-      uWater: { value: new THREE.Vector2(spec.terrain.water?.level ?? 0, spec.terrain.water ? 1 : 0) },
+      // y: 0 = 水なし、1 = 第 2 世代（水際の砂を暗く）、2 = 水の規則 w1（水際の砂を明るく光らせる。見本 W01・W04）
+      uWater: { value: new THREE.Vector2(spec.terrain.water?.level ?? 0, !spec.terrain.water ? 0 : num('wrule', spec.terrain.water.rule === 'w1' ? 1 : 0) > 0 ? 2 : 1) },
     });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
@@ -178,7 +179,10 @@ function groundMaterial() {
         vec3 col = mix(grass, dirt, wd);
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);
-        if (uWater.y > 0.5) {
+        if (uWater.y > 1.5) {
+          float wet = smoothstep(0.45, 0.0, vW.y - uWater.x);
+          col = mix(col, col * 1.18 + vec3(0.10, 0.10, 0.07), wet * 0.8);
+        } else if (uWater.y > 0.5) {
           float wet = smoothstep(0.55, 0.05, vW.y - uWater.x);
           col *= mix(vec3(1.0), vec3(0.72, 0.74, 0.76), wet);
         }
@@ -356,7 +360,75 @@ const W = spec.terrain.water || null;
 const TM = placed.terrain || null;
 const heightTex = (W && TM) ? texLoader.load(`${BASE}maps/${MAP}/height.png`) : null;
 const TIME = { value: 0 };
+// 水の規則（rulebook 13 の水、見本 W01〜W05）: 地図の terrain.water.rule が 'w1' のときだけ。?wrule=0/1 で入／切
+const WRULE = W ? num('wrule', W.rule === 'w1' ? 1 : 0) > 0 : false;
 function waterMaterial() {
+  return WRULE ? waterMaterialW1() : waterMaterialG2();
+}
+// 第 3 世代の水（w1）: 沖は砂の 0.6〜0.75 倍の明るさの青（hue 195〜210°）、浅瀬は明るい水色で底が透け、
+// 底に光の網（コースティクス）。岸は白い泡の太線ではなく、レースの縁の淡い帯。沖に輪の波は描かず、小さなきらめきと波の筋
+function waterMaterialW1() {
+  const m = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { tH: { value: heightTex }, tN: { value: T.noise }, uTime: TIME,
+      uT: { value: new THREE.Vector4(TM.x0, TM.z0, TM.size, 0) }, uHR: { value: new THREE.Vector3(TM.hmin, TM.hmax, W.level) },
+      uShallow: { value: new THREE.Color(W.shallowW1 || '#3f5d5a') }, uDeep: { value: new THREE.Color(W.colorW1 || '#1a4880') },
+      uWD: { value: new THREE.Vector4(num('wdeep', W.deepAt ?? 2.6), num('wcaus', W.causticAt ?? 1.6), num('wband', W.bandAt ?? 0.28), num('wglint', W.glint ?? 1.0)) } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvW = (modelMatrix * vec4(position,1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      uniform sampler2D tH, tN; uniform vec4 uT, uWD; uniform vec3 uHR, uShallow, uDeep; uniform float uTime; varying vec3 vW;
+      vec2 wHash(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
+      // 細胞の縁の近さ（0 = 縁）。光の網と泡のレースに使う
+      float wCell(vec2 p, float t) {
+        vec2 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0;
+        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+          vec2 g = vec2(float(x), float(y)); vec2 o = wHash(i + g); o = 0.5 + 0.38 * sin(t + 6.2831 * o);
+          float d = length(g + o - f); if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+        }
+        return d2 - d1;
+      }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      vec2 huv = vec2((vW.x - uT.x) / uT.z, 1.0 - (vW.z - uT.y) / uT.z);
+      float th = mix(uHR.x, uHR.y, texture2D(tH, huv).r);
+      float depth = uHR.z - th;
+      float nz = texture2D(tN, vW.xz / 11.0 + uTime * 0.008).r;
+      float nz2 = texture2D(tN, vW.xz * vec2(0.09, 0.22) - uTime * vec2(0.004, 0.012)).r;
+      float dd = depth + (nz - 0.5) * 0.5;
+      // 深さの帯: 岸の浅瀬は暗い灰緑（底が沈んで見える。W01・W05 の網の目の中）→ 沖の青（hue 195〜210°）
+      vec3 wc = mix(uShallow, uDeep, smoothstep(uWD.y * 0.5, uWD.x, dd));
+      // 波の筋（沖の明るさの揺れ ±8%）
+      wc *= 0.92 + 0.16 * nz2;
+      // 寄せる波の泡（W01・W04）: 岸と同じ形の白い線（等しい深さの線）が寄せては引く。線と岸の間だけに、
+      // 崩れた泡が網目のレースで残る。線より沖に泡はない
+      float reach = uWD.y;                                            // 泡の届く深さ（波の線のいちばん沖）
+      float ph = fract(uTime * 0.08);                                 // 寄せて引く 1 周（12.5 秒）
+      float front = reach * (0.35 + 0.65 * (1.0 - ph));                // 波の線: 沖から岸へ寄せる
+      float fd = dd + (nz2 - 0.5) * 0.12;
+      float line = smoothstep(0.045, 0.0, abs(fd - front)) * smoothstep(0.0, 0.15, ph) * (0.6 + 0.4 * nz);
+      // 1 つ前の波の線（岸寄りで薄れていく）
+      float front2 = front * 0.45;
+      line = max(line, 0.6 * smoothstep(0.035, 0.0, abs(fd - front2)) * (1.0 - ph));
+      // 線と岸の間の崩れた泡のレース
+      vec2 cp = vW.xz * 2.0 + (vec2(nz, nz2) - 0.5) * 1.6;
+      float cw = wCell(cp, uTime * 0.3);
+      float inside = smoothstep(front + 0.02, front - 0.08, fd);       // 線より岸側
+      float lace = smoothstep(0.06, 0.012, cw) * inside * (0.35 + 0.65 * smoothstep(reach, 0.0, fd));
+      // 水際の帯: 泡が詰まって明るい
+      float band = smoothstep(uWD.z, 0.0, dd) * (0.6 + 0.4 * smoothstep(0.2, 0.05, cw));
+      float edge = clamp(max(max(line, lace * 0.75), band), 0.0, 1.0);
+      wc = mix(wc, vec3(0.80, 0.88, 0.74), edge * 0.85);
+      // 沖のきらめき: まばらで横に細長い白い点
+      float gl = texture2D(tN, vW.xz * vec2(0.55, 1.6) + vec2(uTime * 0.03, 0.0)).r * texture2D(tN, vW.xz * vec2(0.37, 1.1) - vec2(0.0, uTime * 0.02)).r;
+      float glint = smoothstep(0.50, 0.56, gl) * smoothstep(0.6, 1.8, dd) * uWD.w;
+      wc = mix(wc, vec3(1.0), glint);
+      diffuseColor.rgb = wc;
+      // 浅瀬は底が透ける。沖は不透明に近い
+      diffuseColor.a = mix(0.42, 0.97, smoothstep(0.05, 1.6, depth)) + edge * 0.4 + glint;`);
+  };
+  return m;
+}
+function waterMaterialG2() {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { tH: { value: heightTex }, tN: { value: T.sand }, uTime: TIME,
