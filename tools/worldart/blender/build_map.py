@@ -180,6 +180,16 @@ for cl in TS.get('cliffs', []):
         DRAPE.append(face * upper * smooth(0.5 - cl['drape'] * 0.3, 0.6 - cl['drape'] * 0.3, N1(X * 0.9, Z * 0.9, 9)))
     CLIFF_LINES.append((poly, cl, ref))
 
+for bs in TS.get('basins', []):
+    # 湖の窪み（f1_lake）: 中心 world・半径 r の縁から内へ、shelf m は浅瀬（0 → shelfDepth）、その先は depth までなだらかに下がる。
+    # 縁はノイズで jag m だけ揺らす（岸の形）。寄せる波の線（水の規則 w1）が岸と同じ形の一本になるよう、浅瀬の傾きはそろえる
+    bx, bz = bs['world']; ex = bs.get('ell', [1.0, 1.0])
+    rr = np.hypot((X - bx) / ex[0], (Z - bz) / ex[1]) + (N2(X * 0.35, Z * 0.35, 11) - 0.5) * 2 * bs.get('jag', 0.8)
+    inn = bs['r'] - rr                                   # 縁から内への距離（m）
+    shelf = bs.get('shelf', 3.0); sdep = bs.get('shelfDepth', 0.6)
+    prof = np.where(inn < shelf, sdep * smooth(-0.6, shelf, inn), sdep + (bs['depth'] - sdep) * smooth(shelf, shelf + bs.get('slope', 6.0), inn))
+    H = np.where(inn > -0.6, np.minimum(H, H * smooth(0.0, -0.6, inn) - prof), H)
+
 # 注目点（カメラの target）の地面を高さ 0 にそろえる。画面の位置からの逆算は高さ 0 を前提にしているため
 if TS.get('anchor', False):   # 地図で "anchor": true のときだけ（水面・砂の帯の高さの基準も動くため。F20）
     H = H - H[int(np.clip(round((T[2] - zs[0]) / cell), 0, n - 1)), int(np.clip(round((T[0] - xs[0]) / cell), 0, n - 1))]
@@ -211,6 +221,27 @@ ny = 1 / np.sqrt(1 + gx * gx + gz * gz)
 ROCK = smooth(0.82, 0.62, ny)
 KEEP = np.ones_like(H)     # 頂点色の A: 岩肌を残す割合（草の垂れの分だけ下げる。実行環境で画素ごとの傾きに掛ける、L18）
 for w_ in DRAPE: ROCK = ROCK * (1 - w_); KEEP = KEEP * (1 - w_)
+
+
+SHORE_MAX = 8.0   # 岸からの距離の上限（m）。height.png の G に 0〜1 で入れる
+
+
+def shore_distance():
+    """水の格子ごとの、いちばん近い岸（水と陸の境）までの距離（m、陸は 0）。岸の波の帯を作る距離場（定番の
+    shoreline distance field。出典は docs/world-art/sources.md）。底の深さで作ると、底のでこぼこで線が島に切れる"""
+    wet = H < TS['water']['level']
+    edge = wet & ~(np.roll(wet, 1, 0) & np.roll(wet, -1, 0) & np.roll(wet, 1, 1) & np.roll(wet, -1, 1))
+    ez, ex = np.nonzero(edge)
+    D = np.zeros_like(H)
+    wz, wx = np.nonzero(wet)
+    if len(ez) == 0 or len(wz) == 0: return D
+    E = np.stack([ez, ex], 1).astype(np.float32)
+    out = np.empty(len(wz), np.float32)
+    for i in range(0, len(wz), 2048):   # 水の格子 × 岸の格子の総当たりを、メモリに収まる大きさで区切る
+        P = np.stack([wz[i:i + 2048], wx[i:i + 2048]], 1).astype(np.float32)
+        out[i:i + 2048] = np.sqrt(((P[:, None, :] - E[None, :, :]) ** 2).sum(-1).min(1)) * cell
+    D[wz, wx] = np.minimum(out, SHORE_MAX)
+    return D
 
 
 def height_at(x, z):
@@ -563,13 +594,15 @@ if __name__ == '__main__':
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUTD, 'terrain.glb'), export_format='GLB', use_selection=True,
                               export_yup=True, export_normals=True, export_vertex_color='ACTIVE', export_materials='PLACEHOLDER')
     scatter()
-    # 高さマップ（水の深さ・泡に使う）。8bit、範囲は meta に
+    # 高さマップ（水の深さ・泡に使う）。8bit、範囲は meta に。R・B = 高さ、G = 岸からの距離（水の規則 w1）
     hmin, hmax = float(H.min()), float(H.max())
     img = bpy.data.images.new('height', n, n, alpha=False, float_buffer=False)
-    g = ((H - hmin) / max(hmax - hmin, 1e-6)).astype(np.float32)[::-1]          # 画像の下が z の大きい側
-    img.pixels.foreach_set((np.repeat(g.ravel(), 4) * np.tile([1, 1, 1, 0], n * n) + np.tile([0, 0, 0, 1], n * n)).astype(np.float32))
+    g = ((H - hmin) / max(hmax - hmin, 1e-6)).astype(np.float32)
+    sd = shore_distance() / SHORE_MAX if 'water' in TS else g
+    px = np.stack([g, sd.astype(np.float32), g, np.ones_like(g)], -1)[::-1]        # 画像の下が z の大きい側
+    img.pixels.foreach_set(px.ravel().astype(np.float32))
     img.filepath_raw = os.path.join(OUTD, 'height.png'); img.file_format = 'PNG'; img.save()
-    meta_terrain = dict(x0=float(xs[0]), z0=float(zs[0]), size=float(xs[-1] - xs[0]), hmin=hmin, hmax=hmax)
+    meta_terrain = dict(x0=float(xs[0]), z0=float(zs[0]), size=float(xs[-1] - xs[0]), hmin=hmin, hmax=hmax, shoreMax=SHORE_MAX)
     meta = dict(name=NAME, camera=cam, center=[float(cx), float(cz)], size=size, terrain=meta_terrain,
                 counts={k: len(v) for k, v in PL.items()}, assets=PL)
     json.dump(meta, open(os.path.join(OUTD, 'placements.json'), 'w'))

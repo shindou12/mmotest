@@ -180,8 +180,10 @@ function groundMaterial() {
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);
         if (uWater.y > 1.5) {
-          float wet = smoothstep(0.45, 0.0, vW.y - uWater.x);
+          float hw = vW.y - uWater.x;
+          float wet = smoothstep(0.45, 0.0, hw) * smoothstep(-0.12, 0.02, hw);   // 水の上の水際だけ明るく
           col = mix(col, col * 1.18 + vec3(0.10, 0.10, 0.07), wet * 0.8);
+          col *= mix(1.0, 0.5, smoothstep(0.0, -0.7, hw));                        // 水の下の底は沈んで暗い
         } else if (uWater.y > 0.5) {
           float wet = smoothstep(0.55, 0.05, vW.y - uWater.x);
           col *= mix(vec3(1.0), vec3(0.72, 0.74, 0.76), wet);
@@ -371,8 +373,8 @@ function waterMaterialW1() {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { tH: { value: heightTex }, tN: { value: T.noise }, uTime: TIME,
-      uT: { value: new THREE.Vector4(TM.x0, TM.z0, TM.size, 0) }, uHR: { value: new THREE.Vector3(TM.hmin, TM.hmax, W.level) },
-      uShallow: { value: new THREE.Color(W.shallowW1 || '#3f5d5a') }, uDeep: { value: new THREE.Color(W.colorW1 || '#1a4880') },
+      uT: { value: new THREE.Vector4(TM.x0, TM.z0, TM.size, TM.shoreMax || 0) }, uHR: { value: new THREE.Vector3(TM.hmin, TM.hmax, W.level) },
+      uShallow: { value: new THREE.Color(W.shallowW1 || '#3f8a8e') }, uDeep: { value: new THREE.Color(W.colorW1 || '#1f5a7c') },
       uWD: { value: new THREE.Vector4(num('wdeep', W.deepAt ?? 2.6), num('wcaus', W.causticAt ?? 1.6), num('wband', W.bandAt ?? 0.28), num('wglint', W.glint ?? 1.0)) } });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvW = (modelMatrix * vec4(position,1.0)).xyz;');
@@ -390,8 +392,10 @@ function waterMaterialW1() {
       }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
       vec2 huv = vec2((vW.x - uT.x) / uT.z, 1.0 - (vW.z - uT.y) / uT.z);
-      float th = mix(uHR.x, uHR.y, texture2D(tH, huv).r);
+      vec4 hs = texture2D(tH, huv);
+      float th = mix(uHR.x, uHR.y, hs.r);
       float depth = uHR.z - th;
+      float sdist = hs.g * uT.w;                                      // 岸からの距離（m、build_map.py が焼いた距離場）
       float nz = texture2D(tN, vW.xz / 11.0 + uTime * 0.008).r;
       float nz2 = texture2D(tN, vW.xz * vec2(0.09, 0.22) - uTime * vec2(0.004, 0.012)).r;
       float dd = depth + (nz - 0.5) * 0.5;
@@ -399,32 +403,33 @@ function waterMaterialW1() {
       vec3 wc = mix(uShallow, uDeep, smoothstep(uWD.y * 0.5, uWD.x, dd));
       // 波の筋（沖の明るさの揺れ ±8%）
       wc *= 0.92 + 0.16 * nz2;
-      // 寄せる波の泡（W01・W04）: 岸と同じ形の白い線（等しい深さの線）が寄せては引く。線と岸の間だけに、
-      // 崩れた泡が網目のレースで残る。線より沖に泡はない
-      float reach = uWD.y;                                            // 泡の届く深さ（波の線のいちばん沖）
+      // 寄せる波の泡（W01・W04）: 岸からの距離場の等しい距離の線（= 岸と同じ形の白い線）が寄せては引く。
+      // 線と岸の間だけに、崩れた泡が網目のレースで残る。線より沖に泡はない（定番の shoreline distance field の帯）
+      float reach = uWD.y;                                            // 泡の届く距離（m、波の線のいちばん沖）
       float ph = fract(uTime * 0.08);                                 // 寄せて引く 1 周（12.5 秒）
-      float front = reach * (0.35 + 0.65 * (1.0 - ph));                // 波の線: 沖から岸へ寄せる
-      float fd = dd + (nz2 - 0.5) * 0.12;
-      float line = smoothstep(0.045, 0.0, abs(fd - front)) * smoothstep(0.0, 0.15, ph) * (0.6 + 0.4 * nz);
+      float front = reach * (0.3 + 0.7 * (1.0 - ph));                 // 波の線: 沖から岸へ寄せる
+      float fd = sdist + (nz2 - 0.5) * 0.5;
+      float line = smoothstep(0.16, 0.0, abs(fd - front)) * smoothstep(0.0, 0.15, ph) * (0.6 + 0.4 * nz);
       // 1 つ前の波の線（岸寄りで薄れていく）
       float front2 = front * 0.45;
-      line = max(line, 0.6 * smoothstep(0.035, 0.0, abs(fd - front2)) * (1.0 - ph));
+      line = max(line, 0.6 * smoothstep(0.12, 0.0, abs(fd - front2)) * (1.0 - ph));
       // 線と岸の間の崩れた泡のレース
       vec2 cp = vW.xz * 2.0 + (vec2(nz, nz2) - 0.5) * 1.6;
       float cw = wCell(cp, uTime * 0.3);
-      float inside = smoothstep(front + 0.02, front - 0.08, fd);       // 線より岸側
-      float lace = smoothstep(0.06, 0.012, cw) * inside * (0.35 + 0.65 * smoothstep(reach, 0.0, fd));
+      float inside = smoothstep(front + 0.1, front - 0.3, fd);         // 線より岸側
+      float lace = smoothstep(0.06, 0.012, cw) * inside * smoothstep(reach * 0.85, 0.0, fd) * (0.5 + 0.5 * smoothstep(0.3, 0.6, nz2));   // 岸ほど密、沖へ途切れる
       // 水際の帯: 泡が詰まって明るい
-      float band = smoothstep(uWD.z, 0.0, dd) * (0.6 + 0.4 * smoothstep(0.2, 0.05, cw));
+      float band = smoothstep(uWD.z, 0.0, sdist) * (0.6 + 0.4 * smoothstep(0.2, 0.05, cw));
       float edge = clamp(max(max(line, lace * 0.75), band), 0.0, 1.0);
       wc = mix(wc, vec3(0.80, 0.88, 0.74), edge * 0.85);
       // 沖のきらめき: まばらで横に細長い白い点
-      float gl = texture2D(tN, vW.xz * vec2(0.55, 1.6) + vec2(uTime * 0.03, 0.0)).r * texture2D(tN, vW.xz * vec2(0.37, 1.1) - vec2(0.0, uTime * 0.02)).r;
-      float glint = smoothstep(0.50, 0.56, gl) * smoothstep(0.6, 1.8, dd) * uWD.w;
+      vec2 gq = mat2(0.8, -0.6, 0.6, 0.8) * vW.xz;                  // 絵の繰り返しが列に並ばないよう回す
+      float gl = texture2D(tN, gq * vec2(1.3, 3.6) + vec2(uTime * 0.03, 0.0)).r * texture2D(tN, vW.xz * vec2(0.9, 2.5) - vec2(0.0, uTime * 0.02)).r;
+      float glint = smoothstep(0.60, 0.64, gl) * smoothstep(0.6, 1.8, dd) * uWD.w;
       wc = mix(wc, vec3(1.0), glint);
       diffuseColor.rgb = wc;
       // 浅瀬は底が透ける。沖は不透明に近い
-      diffuseColor.a = mix(0.42, 0.97, smoothstep(0.05, 1.6, depth)) + edge * 0.4 + glint;`);
+      diffuseColor.a = mix(0.62, 0.97, smoothstep(0.05, 1.4, depth)) + edge * 0.4 + glint;`);
   };
   return m;
 }
@@ -463,7 +468,7 @@ const terrain = await load(`${BASE}maps/${MAP}/terrain.glb`);
 terrain.scene.traverse((o) => {
   if (!o.isMesh) return;
   if (o.name.startsWith('water') || o.material.name === 'water') {
-    o.material = waterMaterial(); o.receiveShadow = true; o.renderOrder = 2;
+    o.material = waterMaterial(); o.receiveShadow = num('wshadow', WRULE ? 0 : 1) > 0;   // w1 は水面に影を受けない（透ける水面に VSM の影が縦の筋になった。見本でも水面に木の影はほぼ落ちない） o.renderOrder = 2;
   } else {
     o.material = groundMaterial(); o.receiveShadow = true;
   }
