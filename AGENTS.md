@@ -1,0 +1,28 @@
+# Codex（Luna）向けの案内
+
+このリポジトリでは、Claude Code（Opus）がリーダーで、あなた（Codex）は依頼の札で渡された範囲の実装を担当します。分担の正本は `docs/agents/collaboration.md`。ここには、あなたが守ることだけを書きます。
+
+## 守ること
+- **依頼の札の「触ってよいファイル」だけを変える**。範囲の外を直したくなったら、変えずに報告の「気になった点」に書く。
+- **コミット・プッシュ・ブランチの操作をしない**（統合はリーダーがする）。
+- **見た目の判断をしない**。規則集 `docs/world-art/rulebook.md` の数値・規則を変えない。描画に触れる作業（種類 B）では、札の完了条件どおりに撮影と数値を出し、良し悪しは書かずに結果だけを返す。
+- **生成物を勝手に作り直さない**: Blender の組み立て（`tools/worldart/blender/`）、Godot への書き出し（`tools/worldart/godot/export_*`）、`art/shots/`・`art/blender/`・`public/worldart/assets/`・`public/worldart/maps/*/`・`godot/worldart/data/`。札に書いてあるときだけ。`build_assets.py --only` を本番の場所に使わない。
+- **移植は元の式のまま**: どの関数が元のどれかを関数の説明に書く。数値の表は手で写さず、書き出しの道具を使う。
+- **秘密情報**（API キー・トークン）を表示・保存・出力しない。
+- 認証・課金・外部への送信・戻しにくい操作が必要になったら、止めて報告に書く。
+
+## 書き方
+- コードは周りのコードに合わせる（命名・コメントの量と言葉）。コメントとドキュメントは日本語で、平易に。
+- 新しい描画の仕組みは、値を 2 段変えて画素が変わることを確かめてから「効く」と書く。
+
+## 報告（最後のメッセージ）
+短く、次の 4 つだけ:
+1. 変えたファイルと要点
+2. 完了条件のコマンドと結果（生の出力の要所。通らなかったものはそのまま）
+3. 画像・ログの保存場所
+4. 未解決・気になった点
+
+## よく使う確認
+- Godot のゲームの試作: `sh tools/worldart/godot/client_test.sh`（ゲームのサーバーを立て、画面なしの自動操作で確かめる）
+- Godot の描画の撮影: `sh tools/worldart/godot/run.sh -- --shot=F01,F02 --out=<絶対パス>`、並べる: `python3 -I tools/worldart/pairsheet.py`
+- three.js の地図の撮影と数値: `node tools/worldart/views.mjs`、`python3 -I tools/worldart/rulecheck.py`

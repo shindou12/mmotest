@@ -18,3 +18,11 @@
 上の `docs/ro-look-method.md` は先行研究で、そのうち光の強さ・彩度の数値は実験で棄却した（`docs/world-art/hypotheses.md`）。
 - 規則と数値: `docs/world-art/rulebook.md`（`style-spec.md` は第 2 世代までの記録。食い違えば rulebook が優先）、新しい地図の雛形: `docs/world-art/templates/map-gen3.json`、手順: `docs/world-art/pipeline.md`、実験の記録: `docs/world-art/experiments.md`
 - アセットと地形は Blender で作る（`tools/worldart/blender/`）。実行画面は `public/worldart/index.html?map=<名>`
+
+## 作業の分担（Opus がリーダー、Luna が実装）
+
+範囲の決まった実装・道具づくり・移植・自動の確認は、Codex（GPT-6 Luna）に `sh tools/agents/luna.sh <依頼の札.md>` で渡す。規則の正本は **`docs/agents/collaboration.md`**（役割・委任する作業の選び方・レビューと検証・ログ・サブエージェントの使い方・競合の避け方・相談の条件）。手順はスキル `.claude/skills/delegate`。Luna が守ることは `AGENTS.md`。
+- 見た目の判断（見本との比較・規則の採用・構図・色・アセットの形）、統合（コミット・プッシュ）、規則集と記録の更新は Opus が自分でする
+- 描画に触れる作業は、画像と数値（比較シート・`rulecheck.py`）で確かめるまで終わりにしない。Luna の報告は `.agents/runs/` の `last.md` と変更の一覧と生のテストの出力で確かめる
+- 生成物（Blender の組み立て・Godot への書き出し・撮影）を書き換える作業は同時に 1 つだけ。並行の Luna の作業は worktree を分ける
+- 認証・課金・外部への公開・戻しにくい操作・方針の変更はユーザーに相談する

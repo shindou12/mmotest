@@ -5,3 +5,6 @@ world-save-coop-hard.json
 out/
 *.blend1
 __pycache__/
+
+# Luna（codex exec）の実行の記録と依頼の札（docs/agents/collaboration.md）
+.agents/
