@@ -8,6 +8,8 @@
 - 数値の表（武器・レベル・敵・エリアの形）は `public/shared/` から書き出して使う（`node tools/worldart/godot/export_gamedata.mjs` → `godot/worldart/data/game.json`）。表を手で写さない。
 
 ## チェックポイント
+> 2026-10-21 から、全体の移植は `docs/godot/goal.md` の G1〜G9 で進めている（下の CP1〜CP6 は試作の記録）。G1（照合の土台・技・ダメージ）と G2（大剣と人物の見た目・動き）は済み。
+
 | CP | 中身 | 状態 |
 |---|---|---|
 | CP1 | Godot から今のサーバーにつなぎ、ひだまりの草原を同じ操作で歩ける。敵と他の人が見える | 済み（L27） |
