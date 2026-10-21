@@ -113,3 +113,4 @@ sh tools/worldart/godot/client_test.sh
 - Codex の機能 `image_generation` は stable で有効（`codex features list`）。`codex exec` で「image generation tool で作り、<ファイル名> で保存」と頼むと、作業フォルダーに PNG が残る（試し: 1254×1254、湖の水面の手描き風）
 - ChatGPT のプランの利用枠で動く（API の従量課金ではない）。使い方の決まりは `docs/agents/collaboration.md`（UI のアイコンなどで使う、見本にはしない）
 - Luna の既定は推論 max・高速（`tools/agents/luna.sh` の `LUNA_TIER=fast` = `service_tier="fast"`）
+- Luna に札を渡す流れ（`sh tools/agents/luna.sh .agents/cards/<札>.md --name <名>`）は Windows（Git Bash）でそのまま動いた。記録は `.agents/runs/<日時>-<名>/`（last.md・diffstat.txt など）。最初の札 G8-1（効果音の WAV の書き出し）は合格（85 音、Opus が WAV を検査）
