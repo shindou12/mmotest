@@ -108,3 +108,8 @@ sh tools/worldart/godot/client_test.sh
 - `tools/worldart/godot/golden_combat.mjs`: 自分自身を子プロセスで呼ぶ所（503 行）で `new URL(import.meta.url).pathname` と `tmp.pathname` が `/C:/Users/...` になり、`Cannot find module 'C:\C:\Users\...'` で止まる。同じフォルダーに一時的な写しを作って、その 2 か所を `fileURLToPath(...)` に替えて流し、写しは消した（10376 場面、`他の武器の効果が働いた場面: 0 件`、`combat_golden.json` を書けた）。直すなら `fileURLToPath` を使う
 - `tools/worldart/godot/pose_shots.mjs --godot`: `timeout`・`xvfb-run`・`VK_ICD_FILENAMES` が Linux 向け。上のとおり手で呼べば撮れる
 - `python3` は Windows ではストアの仮の入口（`WindowsApps\python3.exe`）に当たる。`py` か Python313 の `python.exe` を使う
+
+## 7. Luna の画像の生成（2026-10-22）
+- Codex の機能 `image_generation` は stable で有効（`codex features list`）。`codex exec` で「image generation tool で作り、<ファイル名> で保存」と頼むと、作業フォルダーに PNG が残る（試し: 1254×1254、湖の水面の手描き風）
+- ChatGPT のプランの利用枠で動く（API の従量課金ではない）。使い方の決まりは `docs/agents/collaboration.md`（UI のアイコンなどで使う、見本にはしない）
+- Luna の既定は推論 max・高速（`tools/agents/luna.sh` の `LUNA_TIER=fast` = `service_tier="fast"`）
