@@ -5,7 +5,8 @@ extends RefCounted
 ## 技そのものは移した技（scripts/game/skills/skills.gd の登録表）を、本物の文脈 GameCtx（skills/game_ctx.gd）に渡して呼ぶ。
 ## 当たりとダメージは game_ctx.gd → combat/damage.gd。試作の手写しの片手剣の技は消した（武器スキル・強攻撃は登録表から）。
 ## g は scripts/game/game.gd。式の順番・乱数を引く順は元の JavaScript と同じ。時刻は game.gd の t_now（JavaScript の now()）。
-## まだ入れていないもの: 盾槍のガード（guarding は常に false）・ガードカウンター・弓の引き（矢 arrow は短剣の投げナイフ用に入れた）・のけぞり/ダウン（staggerT・downT は 0 のまま）・スキル変化。
+## 弓: 通常攻撃は矢（ctx.arrow）、溜めると足元の射程の円が広がり（bow_guide.gd）、離したときの射程まで矢が飛ぶ（release の releaseRange）。
+## まだ入れていないもの: 盾槍のガード（guarding は常に false）・ガードカウンター・回転なぎ払い・のけぞり/ダウン（staggerT・downT は 0 のまま）・スキル変化。
 
 const Skills = preload("res://scripts/game/skills/skills.gd")
 const GameCtx = preload("res://scripts/game/skills/game_ctx.gd")
@@ -18,20 +19,27 @@ const FxSword = preload("res://scripts/game/combat/fx_sword.gd")
 const FxGreatsword = preload("res://scripts/game/combat/fx_greatsword.gd")
 const FxDagger = preload("res://scripts/game/combat/fx_dagger.gd")
 const FxAxe = preload("res://scripts/game/combat/fx_axe.gd")
+const FxSpear = preload("res://scripts/game/combat/fx_spear.gd")
+const FxBow = preload("res://scripts/game/combat/fx_bow.gd")
+const BowGuide = preload("res://scripts/game/combat/bow_guide.gd")
 
 var g
 var ctx
+var bow_guide
 
 
 func _init(game) -> void:
 	g = game
 	ctx = GameCtx.new(game)
-	# 武器ごとの効果（片手剣・大剣・短剣・大斧）を登録する。盾槍・弓は呼ぶ順の番号だけ同じにする空の登録
+	bow_guide = BowGuide.new(game)
+	# 武器ごとの効果（6 武器）を登録する。呼ぶ順は weapon_fx.gd が WEAPON_ORDER で並べる
 	WFX.clear()
 	FxSword.install(ctx)
 	FxGreatsword.install(ctx)
 	FxDagger.install(ctx)
 	FxAxe.install(ctx)
+	FxSpear.install(ctx)
+	FxBow.install(ctx)
 	WFX.register_placeholders()
 
 
@@ -119,6 +127,13 @@ func do_swing() -> void:
 
 
 # ---------------------------------------------------------------- 溜め（input.js pointerDown / pointerUp）
+## stats.js bowRange: 弓の射程。引くほど足元の円が広がり（弓を引く速さ）、最大射程で止まる。引かずに撃つ矢は bowBase まで
+func bow_range() -> float:
+	var S: Dictionary = g.S
+	if not g.me["charging"]: return float(S["bowBase"])
+	return minf(float(S["bowMax"]), float(S["bowBase"]) + float(S["bowDraw"]) * float(g.me["chargeT"]))
+
+
 ## 左を押した: 溜めを始める（盾槍はここでガード。未）
 func press() -> void:
 	var me: Dictionary = g.me
@@ -135,7 +150,8 @@ func press() -> void:
 func release() -> void:
 	var me: Dictionary = g.me
 	if not (me["charging"] and g.started): return
-	me["releaseRange"] = 0   # 弓の離したときの射程（弓は未）
+	me["releaseRange"] = bow_range() if g.S["W"].get("ranged", false) else 0   # 弓の離したときの射程（input.js pointerUp。charging を下ろす前に決める）
+	if g.args.has("bot") and g.S["W"].get("ranged", false): print("BOW release range=%.2f charge=%.2f (bowBase %.1f bowMax %.1f)" % [me["releaseRange"], me["chargeT"], g.S["bowBase"], g.S["bowMax"]])
 	me["charging"] = false
 	if float(me["chargeT"]) < charge_min(): me["queued"] = g.t_now + 0.45   # 短押し → 通常攻撃
 	elif WFX.fx_some("heavyNeedsFull") and int(me["chargeLv"]) < 2: me["queued"] = g.t_now + 0.45   # 短剣の瞬影は溜めきったときだけ
@@ -324,6 +340,7 @@ func tick_actions(dt: float, safe: bool) -> void:
 		if me["skillT"] > (me["skillDuration"] if me["skillDuration"] != 0 else 0.55): me["skillT"] = -1.0
 	ctx.update_projs(dt)
 	tick_dots(dt)   # 毒・出血（短剣）
+	bow_guide.update()   # 弓の射程の円
 
 
 ## loop.js の毒・出血（短剣）: 敵の継続ダメージ（0.5 秒ごと。type: dot）。毒が切れたら重ねを戻す

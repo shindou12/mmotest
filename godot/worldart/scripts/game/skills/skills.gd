@@ -1,7 +1,7 @@
 extends RefCounted
 ## 技の登録表（id → 関数）。元は public/js/weapons/index.js（WEAPON_DEFS）と public/js/skills.js（HEAVY・WEAPON_SKILLS・TREE_SKILLS）。
 ## 技の名前・kind・cd（skills.js が ×1.2 した後の値）・motion・duration は data/game.json の skills から読む（手で写さない）。
-## 片手剣（sword.gd）・大剣（greatsword.gd）・短剣（dagger.gd）・大斧（axe.gd）の分を移してある。盾槍・弓は別の作業。
+## 片手剣（sword.gd）・大剣（greatsword.gd）・短剣（dagger.gd）・大斧（axe.gd）・盾槍（spear.gd）・弓（bow.gd）の分を移してある（6 武器）。
 ## 関数は run(c) の c（ctx.gd の文脈）を受ける。強攻撃だけ run(c, lv)。
 
 const Common = preload("res://scripts/game/skills/common.gd")
@@ -9,6 +9,8 @@ const Sword = preload("res://scripts/game/skills/sword.gd")
 const Greatsword = preload("res://scripts/game/skills/greatsword.gd")
 const Dagger = preload("res://scripts/game/skills/dagger.gd")
 const Axe = preload("res://scripts/game/skills/axe.gd")
+const Spear = preload("res://scripts/game/skills/spear.gd")
+const Bow = preload("res://scripts/game/skills/bow.gd")
 
 
 ## 武器 wk の強攻撃 run(c, lv)。移していない武器は無効な Callable
@@ -18,6 +20,8 @@ static func heavy(wk: String) -> Callable:
 		"greatsword": return Greatsword.heavy
 		"dagger": return Dagger.heavy
 		"axe": return Axe.heavy
+		"spear": return Spear.heavy
+		"bow": return Bow.heavy
 	return Callable()
 
 
@@ -41,6 +45,14 @@ static func weapon_skill(id: String) -> Callable:
 		"tomahawk": return Axe.ws_tomahawk
 		"earthsplit": return Axe.ws_earthsplit
 		"bloodaxe": return Axe.ws_bloodaxe
+		"lance": return Spear.ws_lance
+		"helix": return Spear.ws_helix
+		"piercer": return Spear.ws_piercer
+		"whirlspear": return Spear.ws_whirlspear
+		"multishot": return Bow.ws_multishot
+		"arrowrain": return Bow.ws_arrowrain
+		"snipe": return Bow.ws_snipe
+		"blast": return Bow.ws_blast
 	return Callable()
 
 
@@ -64,6 +76,16 @@ static func tree_skill(id: String) -> Callable:
 			return func(c): Dagger.tech(c, Common.T(id))
 		"axe_hook", "axe_execute", "axe_return", "axe_blood", "axe_rush":
 			return func(c): Axe.tech(c, Common.T(id))
+		"shieldbash": return Spear.shieldbash
+		"taunt": return Spear.taunt
+		"javelin": return Spear.javelin
+		"whirl": return Spear.whirl
+		"spear_fan", "spear_sweep", "spear_press", "spear_stake", "spear_intercept":
+			return func(c): Spear.tech(c, Common.T(id))
+		"backshot": return Bow.backshot
+		"focus": return Bow.focus
+		"bow_double", "bow_tether", "bow_side", "bow_trap", "bow_chime":
+			return func(c): Bow.tech(c, Common.T(id))
 	return Callable()
 
 
@@ -94,14 +116,28 @@ static func wt_skill(id: String) -> Callable:
 		"ax_exec": return Axe.ax_exec
 		"ax_lust": return Axe.ax_lust
 		"ax_rush": return Axe.ax_rush
+		"sp_fan": return Spear.sp_fan
+		"sp_sweep": return Spear.sp_sweep
+		"sp_bash": return Spear.sp_bash
+		"sp_stake": return Spear.sp_stake
+		"sp_intercept": return Spear.sp_intercept
+		"sp_taunt": return Spear.sp_taunt
+		"bw_double": return Bow.bw_double
+		"bw_tether": return Bow.bw_tether
+		"bw_back": return Bow.bw_back
+		"bw_trap": return Bow.bw_trap
+		"bw_chime": return Bow.bw_chime
+		"bw_side": return Bow.bw_side
 	return Callable()
 
 
-## 武器ツリーのスキル id（頭の文字 sw_・gt_・dk_・ax_）が属する武器のスクリプト
+## 武器ツリーのスキル id（sw_・gt_・dk_・ax_・sp_・bw_）の持ち主の武器のスクリプト（cd_of・motion_of を持つ）
 static func wt_module(id: String):
 	if id.begins_with("sw_"): return Sword
 	if id.begins_with("dk_"): return Dagger
 	if id.begins_with("ax_"): return Axe
+	if id.begins_with("sp_"): return Spear
+	if id.begins_with("bw_"): return Bow
 	return Greatsword
 
 

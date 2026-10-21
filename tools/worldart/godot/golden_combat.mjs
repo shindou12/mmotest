@@ -31,7 +31,7 @@ import { WEAPON_DEFS } from '../../../public/js/weapons/index.js';
 import { WTREES, wtLearn, wtChoose, profOf } from '../../../public/js/weapon-tree.js';
 
 const ONLY = process.env.GOLDEN_ONLY ? process.env.GOLDEN_ONLY.split(',') : null; // 子プロセス用: 登録する武器を絞る
-const SUITE_OF = { sword: 'sword', greatsword: 'greatsword', dagger: 'dagger', axe: 'axe' };
+const SUITE_OF = { sword: 'sword', greatsword: 'greatsword', dagger: 'dagger', axe: 'axe', spear: 'spear', bow: 'bow' };
 const PORTED = Object.keys(SUITE_OF).join(','); // Godot へ移した武器（子プロセスで、この武器だけ登録した状態と比べる）
 
 // ---- 種を固定した乱数（golden_rules.mjs と同じ mulberry32） ----
@@ -59,7 +59,8 @@ performance.now = () => tms;
 const rec = (name) => (...args) => { ev.push([rawNow(), name, clean(args)]); };
 
 // ---- ダミー（wirePorts と武器の効果に渡す道具）----
-const fxD = { slash: rec('fx.slash'), ringWave: rec('fx.ringWave'), flash: rec('fx.flash'), lightning: rec('fx.lightning'), parts: { emit: rec('parts.emit'), burst: rec('parts.burst') } };
+// beam は旗手（盾槍）が使う。add・items・ground は罠と旗の見た目の置き場（記録しない。Godot では api.gd の trap_visual・banner_visual が受け持つ）
+const fxD = { slash: rec('fx.slash'), ringWave: rec('fx.ringWave'), flash: rec('fx.flash'), lightning: rec('fx.lightning'), beam: rec('fx.beam'), parts: { emit: rec('parts.emit'), burst: rec('parts.burst') }, add() {}, items: [], ground: () => 0 };
 const audioD = { sfx: rec('sfx') };
 const floatText = rec('floatText');
 const strikes = { arc: rec('arc'), line: rec('line'), circle: rec('circle'), proj: rec('proj'), arrow: rec('arrow'), dash: rec('dash'), hit: rec('hit') };
@@ -71,9 +72,13 @@ const onVariantHit = (mb, dmg, o) => { ev.push([rawNow(), 'onVariantHit', [mb.id
 let ext = {};
 const extendCombat = (o) => { Object.assign(ext, o); };
 const SWEEP = { ...SPEAR_TIMINGS.counter, r: 5.2, mult: 7.5, stun: 14 };
+SWEEP.dur = SWEEP.wind + SWEEP.slash + SWEEP.rest; // 盾槍のガードカウンター（guardCounter）が読む
+SWEEP.hitAt = SWEEP.wind + SWEEP.slash * 0.5;
 { // 自己確認 (1): actions.js の SWEEP の値（ダミーが使う）が元のソースと同じ
   const src = fs.readFileSync(new URL('../../../public/js/game/actions.js', import.meta.url), 'utf8');
-  if (!src.includes('export const SWEEP = { ...SPEAR_TIMINGS.counter, r: 5.2, mult: 7.5, stun: 14 };')) { console.error('自己確認 NG: actions.js の SWEEP がダミーの値と違う'); process.exit(1); }
+  for (const line of ['export const SWEEP = { ...SPEAR_TIMINGS.counter, r: 5.2, mult: 7.5, stun: 14 };', 'SWEEP.dur = SWEEP.wind + SWEEP.slash + SWEEP.rest;', 'SWEEP.hitAt = SWEEP.wind + SWEEP.slash * 0.5;']) {
+    if (!src.includes(line)) { console.error('自己確認 NG: actions.js の SWEEP がダミーの値と違う:', line); process.exit(1); }
+  }
 }
 let aimV = 0;
 
@@ -93,7 +98,7 @@ const api = {
   field: { mobs: state.mobs, world: state.world, heightAt: () => 0, aimAngle: () => aimV, aimPoint: () => ({ x: 0, z: 0 }) },
   attack: { strikes, dealDamage: CB.dealDamage, extendCombat, SWEEP, ATK_TYPES: TE.ATK_TYPES, later: CB.later },
   tree: { quietBuff: TE.quietBuff, cutCds: TE.cutCds, wtEmit: TE.wtEmit },
-  show: { fx: fxD, audio: audioD, floatText, addShake: CB.addShake, trapMesh: () => null, bannerMesh: () => null, handTracker: () => () => ({ x: state.me.x + 0.3, y: 1.1, z: state.me.z + 0.2 }) },
+  show: { fx: fxD, audio: audioD, floatText, addShake: CB.addShake, trapMesh: (o) => ({ g: { position: { set() {} } }, ring: { material: {} }, col: o.color ?? 0xffc860 }), bannerMesh: () => ({ g: { position: { set() {} } }, flag: { rotation: {} }, ring: { material: {} } }), handTracker: () => () => ({ x: state.me.x + 0.3, y: 1.1, z: state.me.z + 0.2 }) },
   party: { taunt },
   register: registerWeaponFx,
 };
@@ -191,7 +196,7 @@ const BUFFS = [
   { id: 'b_atk', mods: { atkp: 20 } }, { id: 'b_dmg', mods: { dmgp: 25 } }, { id: 'b_crit', mods: { crit: 30 } }, { id: 'b_heavy', mods: { heavyp: 40 } },
   { id: 'b_norm', mods: { normp: 15 } }, { id: 'b_wsk', mods: { wskillp: 30 } }, { id: 'b_stun', mods: { stunp: 50 } }, { id: 'b_vamp', mods: { vamp: 8 } },
   { id: 'sw_saint', mods: {} }, { id: 'sw_dance', mods: {} }, { id: 'sw_brave', mods: {} }, { id: 'sw_parryB', mods: { atkp: 25 } }, { id: 'sw_cycleB', mods: { aspd: 12 } },
-  { id: 'gt_siege', mods: {} }, { id: 'dk_poison', mods: {} }, { id: 'ax_rage', mods: { atkp: 5 } }, { id: 'gt_eye', mods: { dmgp: 15 } }, { id: 'gt_mirror', mods: { dmgp: 30 } }, { id: 'poison', mods: {} }, { id: 'dr_a', mods: { dr: 10 } },
+  { id: 'gt_siege', mods: {} }, { id: 'dk_poison', mods: {} }, { id: 'ax_rage', mods: { atkp: 5 } }, { id: 'sp_thunder', mods: {} }, { id: 'sp_intercept', mods: {} }, { id: 'sp_taunt', mods: {} }, { id: 'gt_eye', mods: { dmgp: 15 } }, { id: 'gt_mirror', mods: { dmgp: 30 } }, { id: 'poison', mods: {} }, { id: 'dr_a', mods: { dr: 10 } },
 ];
 const mkBuff = (b, t) => ({ id: b.id, label: b.id, t, max: Math.max(t, rr(t, t + 3)), mods: b.mods, color: pick([0xffffff, 0xffd84a, 0x9affff]) });
 function genMe(t) {
@@ -217,6 +222,12 @@ function genMe(t) {
   o.model = chance(0.5) ? true : null;
   if (chance(0.3)) o.undyingT = t - pick([1, 30, 100]);
   o.dead = chance(0.05);
+  // 盾槍・弓の状態
+  o.gg = pick([0, 40, 100]); o.soarReady = t + pick([-1, 1]); o.pierceReady = chance(0.3); o.tipRun = ri(0, 4); o.tipAct = pick([-1, o.act]); o.boltT = t - pick([0.1, 1]);
+  o.banner = chance(0.3) ? { x: rr(-2, 2), z: rr(-2, 2), until: t + pick([-1, 3]), mesh: { k: 'banner' } } : null;
+  o.aimN = ri(0, 3); o.hawkT = t - pick([1, 9]); o.stormN = ri(0, 9); o.trapT = t - pick([1, 3]);
+  o.traps = Array.from({ length: pick([0, 0, 1, 2, 3]) }, () => ({ x: rr(-2, 2), z: rr(-2, 2), r: pick([1.8, 2.7]), mult: pick([2, 2.6]), stun: pick([3, 16]), life: 5, arm: 0.2, color: 0x85d9ff, ...(chance(0.5) ? { dodge: true } : {}),
+    armAt: t + pick([-1, 1]), until: t + pick([-1, 5]), area: pick(['f1_field', 'f1_field', 'f2_field']), mesh: { k: 'trap' } }));
   return o;
 }
 const T_OPT = ['normal', 'heavy', 'wskill', 'tskill', 'dot', 'proc'];
@@ -229,6 +240,9 @@ function genO(type) {
   if (chance(0.1)) o.noProc = true;
   if (chance(0.2)) o.wave = true;
   if (chance(0.25)) o.proj = chance(0.5) ? { eclipse: true } : (chance(0.5) ? {} : { heaven: true, boomed: true });
+  if (chance(0.2)) o.tip = pick([0.1, 0.5, 0.8]);
+  if (chance(0.15)) o.full = true;
+  if (chance(0.15)) o.snipe = true;
   if (chance(0.1)) o.sv = { key: pick(['sv_heavy', 'sv_quake', 'sv_giant']), t: ri(1, 7) };
   if (chance(0.1)) o.healOnHit = 0.1;
   if (chance(0.1)) o.threat = pick([1, 1.5, 3]);
@@ -336,6 +350,8 @@ function execute(suite, name, stateId, spec) {
 }
 
 // ---- 場面を作る ----
+// 飛んでいる矢（projs の要素のうち効果が読む値）
+const mkArrow = () => ({ x: rr(-2, 2), z: rr(-2, 2), sx: 0, sz: 0, a: rr(-3, 3), range: pick([9, 14, 22]), snipe: chance(0.6), type: 'heavy', ...(chance(0.2) ? { snipeDone: true } : {}) });
 const HOOKS = (ctx) => {
   const { o, crit, snap } = ctx;
   const W = { $: 'W' }, MB = { $: 'mob' };
@@ -367,9 +383,21 @@ const HOOKS = (ctx) => {
     critAfter: { kind: 'some', args: [MB, o] }, ambushMult: { kind: 'reduce', acc: pick([1, 1.2]), args: [flag] },
     finisher: { kind: 'reduce', acc: pick([1, 40, 500]), args: [MB, crit, o] },
     poisonTick: { kind: 'reduce', acc: 0, args: [MB] }, bleedMul: { kind: 'reduce', acc: pick([1, 1.5]), args: [] },
-    stun: { kind: 'reduce', acc: pick([1.2, 6, 3]), args: [o] }, reach: { kind: 'reduce', acc: 1, args: [flag] },
+    stun: { kind: 'reduce', acc: pick([1.2, 6, 3, 12.5]), args: [o] }, reach: { kind: 'reduce', acc: 1, args: [flag] },
     heavyNeedsFull: { kind: 'some', args: [] }, heavyStart: { kind: 'call', args: [pick([1, 2])] }, heavyAfter: { kind: 'call', args: [pick([1, 2])] },
     heavyOverride: { kind: 'some', args: [pick([1, 2])] }, cheatDeath: { kind: 'some', args: [] },
+    // 盾槍
+    hitOpts: { kind: 'reduce', acc: o, args: [rr(0, 1)] }, swingColor: { kind: 'reduce', acc: 0xcfd3da, args: [] },
+    swingExtra: { kind: 'call', args: [rr(-3, 3), pick([2.8, 4.3]), 0xcfd3da] }, hitTech: { kind: 'reduce', acc: 'tx', args: [o, MB] },
+    onHurtFirst: { kind: 'call', args: [] }, steadyGuard: { kind: 'some', args: [] }, guardKeep: { kind: 'reduce', acc: 1, args: [] }, guardRegen: { kind: 'reduce', acc: 1, args: [] },
+    guardRegenDelay: { kind: 'reduce', acc: 1, args: [] }, guardLock: { kind: 'reduce', acc: pick([0.3, 0.4]), args: [] },
+    guardCtrLock: { kind: 'reduce', acc: 0.85, args: [{ max: 100, cut: 0.25, regenDelay: 1.6, regen: 20, up: 0.06, lock: 0.3, ctrLock: 0.7 }] },
+    counterGauge: { kind: 'call', args: [100] }, chargeStart: { kind: 'some', args: [] },
+    sweepPower: { kind: 'reduce', acc: 0.5, args: [] }, sweepStun: { kind: 'reduce', acc: 14, args: [] }, shieldBack: { kind: 'some', args: [] },
+    // 弓
+    onDodge: { kind: 'call', args: [] }, shoot: { kind: 'some', args: [rr(-3, 3), pick([0.6, 0.66])] },
+    iaiLabel: { kind: 'reduce', acc: '居合', args: [] },
+    arrowTick: { kind: 'call', args: [mkArrow()] }, arrowEdge: { kind: 'some', args: [mkArrow(), rr(0, 22)] }, arrowHit: { kind: 'call', args: [mkArrow(), MB] }, arrowGone: { kind: 'call', args: [mkArrow()] },
   };
 };
 const HOOK_NAMES = Object.keys(HOOKS({ o: {}, crit: false }));
@@ -426,7 +454,7 @@ for (const wk of Object.keys(SUITE_OF)) {
     for (const name of picked) {
       const o = genO(); const crit = chance(0.4);
       const h = HOOKS({ o, crit, snap: states[sid].S })[name];
-      const spec = scene(`hooks_${sc}`, name, sid, { randN: name === 'aura' ? 300 : 16 });
+      const spec = scene(`hooks_${sc}`, name, sid, { randN: name === 'aura' ? 300 : name === 'shoot' ? 64 : 16 });
       if (name === 'poisonTick') spec.mobs[0].vStack = ri(1, 5); // 毒の1回は毒が重なっている敵にだけ呼ばれる
       spec.op = { k: 'hook', name, ...h };
       execute(`hooks_${sc}`, `${name} ${sid}`, sid, spec);
@@ -446,7 +474,8 @@ for (const wk of Object.keys(SUITE_OF)) {
     const MOBREF = { $: 'mob' };
     for (const e of [{ name: 'parry', args: [pick([0.4, 0.55]), pick([70, 80])] }, { name: 'primeCharge', args: [pick([0.5, 0.8])] },
       { name: 'poison', args: [MOBREF, pick([1, 3, 5])] }, { name: 'bleed', args: [MOBREF, pick([0.2, 0.45]), chance(0.5)] }, { name: 'bleed', args: [MOBREF, pick([0.2, 0.45])] },
-      { name: 'ambush', args: [pick([1, 3, 4])] }, { name: 'pay', args: [pick([0.15, 0.9])] }].filter((e) => ext[e.name])) if (chance(0.25)) {
+      { name: 'ambush', args: [pick([1, 3, 4])] }, { name: 'pay', args: [pick([0.15, 0.9])] },
+      { name: 'trap', args: [rr(-2, 2), rr(-2, 2), { mult: pick([2.6, 3.3]), r: pick([1.8, 2.7]), stun: pick([3, 16]), life: 5, arm: 0.2, color: 0x85d9ff }] }].filter((e) => ext[e.name])) if (chance(0.25)) {
       const spec = scene(`hooks_${sc}`, e.name, sid);
       spec.op = { k: 'ext', ...e };
       execute(`hooks_${sc}`, `ext:${e.name} ${sid}`, sid, spec);

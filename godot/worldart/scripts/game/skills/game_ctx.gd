@@ -14,6 +14,7 @@ extends "res://scripts/game/combat/api.gd"
 ##   sfx(*)        音: swing・heavy・skill・hit・block・impact・wave・charge・charged・perfect・thunder・stunHit・buff ほか全部
 ##   （済み: fx.slash = 扇の斬撃の板、text / floatText = 浮かぶ文字、shake = 画面の揺れ、proj = 飛ぶ斬撃の板・投げ斧の板、arrow = 矢の板）
 ##   武器の手の位置（hand_pos）・武器ツリーの光（wt_aura）は人物のモデル待ち（06b）。矢 arrow・戻る飛び道具 boomerang・斧の形は短剣・大斧の分を入れた（見た目は板で代用）。
+##   （済み: arrow = 矢の板。細長い板が飛び、update_projs が当てる。罠・旗は部品を置く）
 ##
 ## ---- 元と違う所 ----
 ##   * スキル変化（付加効果 sv_*）は未。castWeaponSkill は常に sv なしの経路（sk.run(combat)）を通る。
@@ -54,6 +55,14 @@ func point() -> Dictionary: return {"x": float(g.mouse_ground.x), "z": float(g.m
 func area() -> String: return g.area_id
 func col() -> int: return int(weapon_color())
 func wt(): return st.get("wt")
+## 弓: 離したときの射程（なければ最大射程）。input.js pointerUp が決める me.releaseRange
+func range():
+	var r = me.get("releaseRange")
+	return float(r) if WFX.truthy(r) else float(st["bowMax"])
+## 突きの届く距離の倍率（騎士の雷で伸びる）
+func reach(normal = null): return WFX.fx_reduce("reach", 1.0, [normal])
+## field.aimPoint: マウスの指す地面の点
+func aim_point() -> Dictionary: return point()
 
 func net_send(msg: Dictionary) -> void:
 	if msg.get("t") == "hit": last_hit = msg
@@ -283,7 +292,15 @@ func strike_arrow(o: Dictionary) -> void:
 		"life": (rng + 0.6) / speed, "range": rng, "rad": float(_nn(o, "rad", 0.7)), "mult": float(_nn(o, "mult", 1.0)), "type": o.get("type"),
 		"pierce": WFX.truthy(o.get("pierce")), "hit": {}, "color": color, "sv": o.get("sv"), "cast": o.get("cast"), "tech": o.get("tech"),
 		"poison": float(Dmg.or_(o.get("poison"), 0.0)), "crit": o.get("crit"), "snipe": o.get("snipe"), "full": o.get("full"), "onHit": o.get("onHit")})
+	var fx0: float = me["x"] + sin(a) * 0.9
+	var fz0: float = me["z"] + cos(a) * 0.9
+	fx_flash_arrow(fx0, fz0, color, WFX.truthy(o.get("big")))   # 射出の閃光
 	sfx("swing")
+
+
+func fx_flash_arrow(x: float, z: float, color, big: bool) -> void:
+	_op("fx.flash", [x, 1.3, z, color, 14 if big else 8, 0.15, 6])
+	fx.parts.burst(x, 1.25, z, 18 if big else 8, {"color": color, "speed": 5, "size": 0.35, "life": 0.25, "gravity": 0})
 
 
 ## actions.js boomerangStep: 戻ってくる飛び道具の動き（位置は update_projs が先に向きと速さで進めている）。持ち主に戻ったら true
@@ -352,6 +369,7 @@ func update_projs(dt: float) -> void:
 func _update_arrow(w: Dictionary, i: int) -> bool:
 	w["node"].position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.2, w["z"])
 	var done := false
+	if random() < 0.7: fx.parts.emit(w["x"], 1.2, w["z"], {"color": w["color"], "size": 0.35, "life": 0.25, "speed": 0.4, "gravity": 0})
 	WFX.fx_call("arrowTick", [w])   # 射抜き など
 	for mb in mobs.values():
 		if w["hit"].has(mb["id"]) or sqrt(pow(float(mb["x"]) - w["x"], 2) + pow(float(mb["z"]) - w["z"], 2)) > w["rad"] + float(mb["rad"]): continue
@@ -431,3 +449,63 @@ func fx_slash(x: float, z: float, a: float, r: float, deg: float, color) -> void
 	tw.tween_interval(0.12)
 	tw.tween_callback(m.queue_free)
 
+
+# ---------------------------------------------------------------- 罠・旗の見た目（meshes.js trapMesh・bannerMesh と fx.add）
+## 罠: 地面の輪と棘。返した部品が me.traps[].mesh に入る
+func trap_visual(x, z, o: Dictionary):
+	var r := float(o.get("r", 1.8))
+	var col = o.get("color") if o.get("color") != null else 0xffc860
+	var n := Node3D.new()
+	var ring := MeshInstance3D.new()
+	ring.mesh = GameVisuals.shape_mesh({"k": "ring", "r0": r - 0.12, "r1": r}, 1.0)
+	ring.material_override = GameVisuals.mat(_color(col), true, 0.55)
+	ring.position.y = 0.06
+	n.add_child(ring)
+	for i in 6:
+		var sp := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.0; cm.bottom_radius = 0.07; cm.height = 0.35
+		sp.mesh = cm
+		sp.material_override = GameVisuals.mat(Color.html("#d8c8a8"))
+		var ang := i / 6.0 * TAU
+		sp.position = Vector3(sin(ang) * r * 0.45, 0.15, cos(ang) * r * 0.45)
+		n.add_child(sp)
+	n.position = Vector3(float(x), g.world.ground_y(float(x), float(z)), float(z))
+	g.world.add_child(n)
+	return n
+
+
+func trap_visual_free(t: Dictionary) -> void:
+	var n = t.get("mesh")
+	if n != null and is_instance_valid(n) and n is Node: n.queue_free()
+
+
+## 旗: 旗竿と旗と効果範囲の輪（8 秒で消える）。前の旗は消す
+func banner_visual(x, z, old):
+	if old != null and is_instance_valid(old) and old is Node: old.queue_free()
+	var n := Node3D.new()
+	var pole := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.05; pm.bottom_radius = 0.05; pm.height = 3.2
+	pole.mesh = pm
+	pole.material_override = GameVisuals.mat(Color.html("#8a6a40"))
+	pole.position.y = 1.6
+	n.add_child(pole)
+	var flag := MeshInstance3D.new()
+	var fm := BoxMesh.new()
+	fm.size = Vector3(0.05, 0.7, 1.1)
+	flag.mesh = fm
+	flag.material_override = GameVisuals.mat(Color.html("#6ab0ff"), true, 0.9)
+	flag.position = Vector3(0, 2.8, 0.6)
+	n.add_child(flag)
+	var ring := MeshInstance3D.new()
+	ring.mesh = GameVisuals.shape_mesh({"k": "ring", "r0": 4.85, "r1": 5.0}, 1.0)
+	ring.material_override = GameVisuals.mat(Color.html("#6ab0ff"), true, 0.3)
+	ring.position.y = 0.06
+	n.add_child(ring)
+	n.position = Vector3(float(x), g.world.ground_y(float(x), float(z)), float(z))
+	g.world.add_child(n)
+	var tw: Tween = g.create_tween()
+	tw.tween_interval(8.0)
+	tw.tween_callback(func(): if is_instance_valid(n): n.queue_free())
+	return n

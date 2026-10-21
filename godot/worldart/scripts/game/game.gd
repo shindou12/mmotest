@@ -603,7 +603,8 @@ func _bot(_dt: float) -> Vector2:
 	var dir := Vector2(best.x - me.x, best.z - me.z)
 	me.a = atan2(dir.x, dir.y)
 	mouse_ground = Vector3(best.x, 0, best.z)
-	if bd < float(S["W"]["range"]) + best.rad - 0.3:
+	var engage: float = float(S["W"]["baseRange"]) if S["W"].get("ranged", false) else float(S["W"]["range"])   # 弓は引かずに撃つ矢の届く所まで寄る
+	if bd < engage + best.rad - 0.3:
 		# 溜めている間は離すまで待つ（溜めきるか 1.5 秒で離して強攻撃）
 		if me.charging:
 			if me.chargeT >= float(S["chargeMax"]) or t_now - bot_t > 1.5: combat.release()

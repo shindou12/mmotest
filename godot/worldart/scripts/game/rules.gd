@@ -154,7 +154,7 @@ static func item_weight(it) -> float:
 
 
 ## 武器ツリーの効果と技を移してある武器。ほかの武器は S.wt = null（ツリーの mods と効果は未）
-const TREE_PORTED := ["sword", "greatsword", "dagger", "axe"]
+const TREE_PORTED := ["sword", "greatsword", "dagger", "axe", "spear", "bow"]
 
 ## 旧スキルツリーのノードの表（skills.js NODE_INDEX。表は game.json の trees から。手で写さない）
 static var _node_index: Dictionary = {}

@@ -8,7 +8,7 @@ extends SceneTree
 ##   out: ret・args（呼んだあとの引数のオブジェクト）・ev（記録だけの操作 [時刻, 名前, 引数]）・net（サーバーへの送信）・
 ##        me / mobs（場面の前との差）・shake・hitStop・used（使った乱数の数）
 ## suite ごとに「OK n 件」か「NG」（最初の 3 件の名前・どの項目・期待・実際）を出し、全部 OK のときだけ終了コード 0。
-##   damage_<武器>（sword・greatsword・dagger・axe）: dealDamage・stunValue（敵・自分・バフ・オプションの組み合わせ）
+##   damage_<武器>（sword・greatsword・dagger・axe・spear・bow）: dealDamage・stunValue（敵・自分・バフ・オプションの組み合わせ）
 ##   hooks_<武器>: 差し込み口（fxCall・fxSome・fxReduce で呼ぶ効果）・tree-effects の入口・技の文脈に足す道具
 ## 比べ方は _same: 数は 1e-6 の許容差、配列は中まで、辞書はキーの集合も同じ。
 ## 環境 Rec は combat/api.gd を土台に、呼ばれた操作を書き留める（元の golden_combat.mjs のダミーと同じ形）。
@@ -21,9 +21,11 @@ const FxSword = preload("res://scripts/game/combat/fx_sword.gd")
 const FxGreatsword = preload("res://scripts/game/combat/fx_greatsword.gd")
 const FxDagger = preload("res://scripts/game/combat/fx_dagger.gd")
 const FxAxe = preload("res://scripts/game/combat/fx_axe.gd")
+const FxSpear = preload("res://scripts/game/combat/fx_spear.gd")
+const FxBow = preload("res://scripts/game/combat/fx_bow.gd")
 const WTree = preload("res://scripts/game/skills/wtree.gd")
 const Common = preload("res://scripts/game/skills/common.gd")
-const SUITES := ["damage_sword", "damage_greatsword", "damage_dagger", "damage_axe", "hooks_sword", "hooks_greatsword", "hooks_dagger", "hooks_axe"]
+const SUITES := ["damage_sword", "damage_greatsword", "damage_dagger", "damage_axe", "damage_spear", "damage_bow", "hooks_sword", "hooks_greatsword", "hooks_dagger", "hooks_axe", "hooks_spear", "hooks_bow"]
 
 
 ## 呼ばれた操作を書き留める環境（golden_combat.mjs のダミー）
@@ -47,6 +49,9 @@ class Rec extends Api:
 		var v: float = rand[used]
 		used += 1
 		return v
+
+	## world.area（照合のダミーのエリア）
+	func area() -> String: return "f1_field"
 
 	## handTracker のダミー: 自分の少し横
 	func hand_pos(_model) -> Dictionary:
@@ -256,6 +261,8 @@ func _init() -> void:
 	FxGreatsword.install(api)
 	FxDagger.install(api)
 	FxAxe.install(api)
+	FxSpear.install(api)
+	FxBow.install(api)
 	WFX.register_placeholders()
 	var base_me: Dictionary = j["base"]["me"]
 	var by_suite := {}

@@ -193,8 +193,27 @@ func pay(p1 = null, p2 = null):
 	if ext.has("pay"): return ext["pay"].call(p1, p2)
 	return super.pay(p1, p2)
 
+func trap(p1 = null, p2 = null, p3 = null):
+	if ext.has("trap"): return ext["trap"].call(p1, p2, p3)
+	return super.trap(p1, p2, p3)
+
+
+# ---- 狙った点・罠と旗の見た目（弓・盾槍の効果が使う。ゲームの環境が本物にする）----
+## field.aimPoint: 狙った地面の点。照合では (0, 0)
+func aim_point() -> Dictionary: return {"x": 0.0, "z": 0.0}
+
+## 罠の見た目の部品を置いて返す（meshes.js trapMesh + fx.add。返したものが me.traps[].mesh に入る）。照合では置き物
+func trap_visual(_x, _z, _o: Dictionary): return {"position": {"set": "fn"}}
+
+## 罠の見た目を消す（fx.items.find して life = 0）
+func trap_visual_free(_t: Dictionary) -> void: pass
+
+## 旗の見た目の部品を置いて返す（meshes.js bannerMesh + fx.add。前の旗 old は消す）。照合では置き物
+func banner_visual(_x, _z, _old): return {"position": {"set": "fn"}}
+
 
 ## c.fx。ctx.gd の Fx と同じだが、flash・lightning は JavaScript の引数の数が多い（flash は x, y, z, 色, 強さ, 秒の 6 つ）
 class Fx2 extends Ctx.Fx:
 	func lightning(x = null, z = null, p3 = null, p4 = null): return c._op("fx.lightning", c._args([x, z, p3, p4]))
 	func flash(x = null, y = null, z = null, color = null, p5 = null, p6 = null): return c._op("fx.flash", c._args([x, y, z, color, p5, p6]))
+	func beam(x = null, z = null, color = null, p4 = null, p5 = null, p6 = null): return c._op("fx.beam", c._args([x, z, color, p4, p5, p6]))

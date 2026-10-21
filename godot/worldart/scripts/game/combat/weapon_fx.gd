@@ -62,7 +62,7 @@ static func _fns(name: String) -> Array:
 	for i in LIST.size():
 		var e: Dictionary = LIST[i]
 		if e["hooks"].has(name) and e["hooks"][name] is Callable:
-			var rank: float = float(e["order"][name]) if e["order"].has(name) else 1000.0 + i
+			var rank: float = float(e["order"][name]) if e["order"].has(name) else 1000.0 + float(WEAPON_ORDER.find(e["wk"]))
 			items.append({"rank": rank, "fn": e["hooks"][name]})
 	# 安定な挿入ソート（JavaScript の sort は安定）
 	for i in range(1, items.size()):

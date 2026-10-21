@@ -9,6 +9,8 @@ const Sword = preload("res://scripts/game/skills/sword.gd")
 const Greatsword = preload("res://scripts/game/skills/greatsword.gd")
 const Dagger = preload("res://scripts/game/skills/dagger.gd")
 const Axe = preload("res://scripts/game/skills/axe.gd")
+const Spear = preload("res://scripts/game/skills/spear.gd")
+const Bow = preload("res://scripts/game/skills/bow.gd")
 
 
 static func wtrees() -> Dictionary:
@@ -160,5 +162,7 @@ static func effects(ch: Dictionary, wk: String):
 		"greatsword": Greatsword.mods(st, w.br, w.mods)
 		"dagger": Dagger.mods(st, w.br, w.mods)
 		"axe": Axe.mods(st, w.br, w.mods)
+		"spear": Spear.mods(st, w.br, w.mods)
+		"bow": Bow.mods(st, w.br, w.mods)
 		_: push_error("wtree.gd: %s のツリーの mods はまだ移していない" % wk)
 	return w

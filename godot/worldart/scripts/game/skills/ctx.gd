@@ -45,7 +45,7 @@ func nearest(_r = null): return null
 func area() -> String: return ""
 func range(): return 12.0
 func zone() -> Array: return [6.0, 10.0]
-func reach(): return 1.0
+func reach(_normal = null): return 1.0
 ## 時刻（JavaScript の now() = performance.now() / 1000）と乱数（Math.random の代わり）
 func now() -> float: return 0.0
 func rnd(a: float = 0.0, b: float = 1.0) -> float: return a + 0.5 * (b - a)
