@@ -374,12 +374,16 @@ function waterMaterialW1() {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { tH: { value: heightTex }, tN: { value: T.noise }, uTime: TIME,
       uT: { value: new THREE.Vector4(TM.x0, TM.z0, TM.size, TM.shoreMax || 0) }, uHR: { value: new THREE.Vector3(TM.hmin, TM.hmax, W.level) },
-      uShallow: { value: new THREE.Color(W.shallowW1 || '#629aa3') }, uDeep: { value: new THREE.Color(W.colorW1 || '#40778f') },
-      uWD: { value: new THREE.Vector4(num('wdeep', W.deepAt ?? 2.6), num('wcaus', W.causticAt ?? 1.6), num('wband', W.bandAt ?? 0.28), num('wglint', W.glint ?? 1.0)) } });
+      uShallow: { value: new THREE.Color(W.shallowW1 || '#629aa3') }, uDeep: { value: new THREE.Color(W.colorW1 || '#3a6e87') },
+      uWD: { value: new THREE.Vector4(num('wdeep', W.deepAt ?? 2.6), num('wcaus', W.causticAt ?? 1.6), num('wband', W.bandAt ?? 0.28), num('wglint', W.glint ?? 1.0)) },
+      uSun: { value: sunDir }, uSky: { value: new THREE.Color(spec.sky?.color || '#cfe0ee') }, uRefl: { value: num('wrefl', W.refl ?? 1.0) } });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvW = (modelMatrix * vec4(position,1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      uniform sampler2D tH, tN; uniform vec4 uT, uWD; uniform vec3 uHR, uShallow, uDeep; uniform float uTime; varying vec3 vW;
+      uniform sampler2D tH, tN; uniform vec4 uT, uWD; uniform vec3 uHR, uShallow, uDeep, uSun, uSky; uniform float uTime, uRefl; varying vec3 vW;
+      vec3 wRefl = vec3(0.0);   // 反射（光の当たり方に掛けない。emissive に足す）
+      // 波の高さ（2 つの流れるノイズ）。法線を作って、太陽の映りと空の映りに使う
+      float wWave(vec2 p, float t) { p *= vec2(0.55, 1.5); return texture2D(tN, p * 0.21 + t * vec2(0.012, 0.006)).r + 0.6 * texture2D(tN, p * 0.47 - t * vec2(0.007, 0.016)).r; }   // 横に長い波（見本の波の筋は横長）
       vec2 wHash(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
       // 細胞の縁の近さ（0 = 縁）。光の網と泡のレースに使う
       float wCell(vec2 p, float t) {
@@ -421,16 +425,28 @@ function waterMaterialW1() {
       float lace = smoothstep(0.06, 0.012, cw) * inside * smoothstep(reach * 0.85, 0.0, fd) * (0.5 + 0.5 * smoothstep(0.3, 0.6, nz2));   // 岸ほど密、沖へ途切れる
       // 水際の帯: 泡が詰まって明るい
       float band = smoothstep(uWD.z, 0.0, sdist) * (0.6 + 0.4 * smoothstep(0.2, 0.05, cw));
-      float edge = clamp(max(max(line, lace * 0.75), band), 0.0, 1.0);
-      wc = mix(wc, vec3(0.80, 0.88, 0.74), edge * 0.85);
-      // 沖のきらめき: まばらで横に細長い白い点
-      vec2 gq = mat2(0.8, -0.6, 0.6, 0.8) * vW.xz;                  // 絵の繰り返しが列に並ばないよう回す
-      float gl = texture2D(tN, gq * vec2(1.3, 3.6) + vec2(uTime * 0.03, 0.0)).r * texture2D(tN, vW.xz * vec2(0.9, 2.5) - vec2(0.0, uTime * 0.02)).r;
-      float glint = smoothstep(0.60, 0.64, gl) * smoothstep(0.6, 1.8, dd) * uWD.w;
-      wc = mix(wc, vec3(1.0), glint);
+      float edge = clamp(max(max(line * 0.6, lace * 0.45), band * 0.7), 0.0, 1.0);   // 泡は半透明（白く塗りつぶさない）
+      wc = mix(wc, vec3(0.82, 0.90, 0.80), edge * 0.75);
+      // 沖の反射（定番のトゥーンの鏡面反射: 揺らした法線で太陽の映りを計算し、しきい値で切って白い点に。
+      // 見る角度で空の色を映すフレネル）。泡の上と浅瀬では弱く
+      vec2 e = vec2(0.12, 0.0);
+      float hx = wWave(vW.xz + e.xy, uTime) - wWave(vW.xz - e.xy, uTime), hz = wWave(vW.xz + e.yx, uTime) - wWave(vW.xz - e.yx, uTime);
+      vec3 wn = normalize(vec3(-hx * 3.2, 1.0, -hz * 3.2));
+      vec3 wv = normalize(cameraPosition - vW);
+      float open = smoothstep(0.4, 2.0, max(dd, sdist * 0.5)) * (1.0 - edge);
+      vec3 wh = normalize(uSun + wv);
+      float sheen = smoothstep(0.05, 0.4, pow(max(dot(wn, wh), 0.0), 40.0)) * open * 0.07;   // 大きな波のやわらかい明るみ（筋）
+      // きらめきは細かい波（大きな波の 3.5 倍の細かさ、横に細長く）の法線で。小さく横に細長い白い点（W05）
+      vec2 gp = vW.xz * vec2(1.6, 4.5);
+      float gx = wWave(gp + e.xy, uTime * 2.0) - wWave(gp - e.xy, uTime * 2.0), gz = wWave(gp + e.yx, uTime * 2.0) - wWave(gp - e.yx, uTime * 2.0);
+      vec3 gn = normalize(wn + vec3(-gx * 2.5, 0.0, -gz * 2.5));
+      float glint = smoothstep(0.45, 0.65, pow(max(dot(gn, wh), 0.0), 140.0)) * open * uWD.w;
+      float fres = pow(1.0 - max(dot(wn, wv), 0.0), 4.0) * open;           // 空の映り
+      wRefl = (uSky * (fres * 0.3 + sheen) + vec3(1.0) * glint * 0.9) * uRefl;
       diffuseColor.rgb = wc;
       // 浅瀬は底が透ける。沖は不透明に近い
-      diffuseColor.a = mix(0.62, 0.97, max(smoothstep(0.05, 1.4, depth), smoothstep(1.0, 5.0, sdist))) + edge * 0.4 + glint;`);
+      diffuseColor.a = mix(0.62, 0.97, max(smoothstep(0.05, 1.4, depth), smoothstep(1.0, 5.0, sdist))) + edge * 0.25 + glint;`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n      totalEmissiveRadiance += wRefl;');
   };
   return m;
 }
