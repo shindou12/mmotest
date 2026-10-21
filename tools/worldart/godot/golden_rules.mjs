@@ -15,6 +15,11 @@ import { wirePorts, state } from '../../../public/js/game/ports.js';
 import * as D from '../../../public/shared/data.js';
 import * as A from '../../../public/shared/areas.js';
 import * as ST from '../../../public/js/game/stats.js';
+import * as S0 from '../../../public/js/game/state.js';
+import { registerWeaponFx } from '../../../public/js/game/weapon-fx.js';
+import { WEAPON_DEFS } from '../../../public/js/weapons/index.js';
+import { WTREES, wtLearn, wtChoose, profOf } from '../../../public/js/weapon-tree.js';
+import { TREES } from '../../../public/js/skills.js';
 
 // 種を固定した乱数（mulberry32）
 let seed = 20261021;
@@ -97,7 +102,7 @@ SUITES.xp_to_next = () => {
 };
 
 // stats.js calcStats（装備の基礎値・強化・付加効果・防具の基本効果・重さ。ツリー・称号なし）
-wirePorts({ state: { char: null, me: { hp: 1e9, buffs: [] }, CHARGE_MAX: 1, DODGE_CD: 0.75 }, view: { weaponStyle: () => null, armorLook: () => null, setPlayerWeapon() {}, setPlayerArmor() {} }, screen: { ui: { refresh() {} } } });
+wirePorts({ state: { char: null, me: { hp: 1e9, buffs: [] }, CHARGE_MAX: S0.CHARGE_MAX, DODGE_CD: S0.DODGE_CD }, view: { weaponStyle: () => null, armorLook: () => null, setPlayerWeapon() {}, setPlayerArmor() {} }, screen: { ui: { refresh() {} } } });
 const AFFIX_KEYS = Object.keys(D.AFFIXES);
 const mkAffixes = () => Array.from({ length: ri(0, 4) }, () => [pick(AFFIX_KEYS), ri(1, D.AFFIXES.atkp.tiers.length)]);
 const mkItem = (slot) => {
@@ -125,6 +130,59 @@ SUITES.calc_stats = () => {
     const S = ST.S;
     const o = { wk: S.wk, atk: S.atk, mhp: S.mhp, def: S.def, crit: S.crit, critd: S.critd, aspd: S.aspd, move: S.move, vamp: S.vamp, cdr: S.cdr,
       normp: S.normp, heavyp: S.heavyp, wskillp: S.wskillp, maxPot: S.maxPot, dodgeCd: S.dodgeCd, roll: S.wc.roll, wr: S.wr, weight: S.weight };
+    out.push({ in: [ch], out: o });
+  }
+  return out;
+};
+
+// stats.js calcStats（G1-3b）: 武器ツリー（wtEffects の mods）・旧ツリー（treeEffects）・称号・fxCall('stats') まで。
+// 全武器の効果（weapons/*.js の effects）を登録した状態（元のゲームと同じ）で回す。片手剣・大剣の場面で、ほかの武器の 'stats' が値を変えないことの確認を兼ねる。
+// 効果が使う道具（api）は 'stats' / 'afterStats' に要らないので、何もしない代用品にする（register と player だけ本物）
+{
+  const nop = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : nop), apply: () => undefined });
+  const api = { player: { me: state.me, get S() { return ST.S; }, weaponColor: () => 0xffffff, addBuff: ST.addBuff, hasBuff: ST.hasBuff, heal() {}, setHitStop() {} },
+    field: nop, attack: nop, tree: nop, show: nop, party: nop, register: registerWeaponFx };
+  for (const d of WEAPON_DEFS) d.effects?.(api);
+}
+const TITLE_IDS = Object.keys(D.TITLES);
+const FX_POOL = ['skillcrit', 'thunder', 'flame', 'vamp', 'wave', 'star', 'quake', 'execute'];
+SUITES.calc_stats_tree = () => {
+  const out = [];
+  for (let i = 0; i < N; i++) {
+    const wk = i % 2 ? 'greatsword' : 'sword';
+    const weapon = { slot: 'weapon', kind: wk, rarity: ri(0, 7), ilvl: ri(1, 50), enh: ri(0, 15), affixes: mkAffixes(), skill: pick(D.WEAPON_SKILL_POOL[wk]), atk: ri(1, 400) };
+    if (rnd() < 0.3) weapon.fx = [pick(FX_POOL), ...(rnd() < 0.3 ? [pick(FX_POOL)] : [])];
+    const eq = { weapon };
+    if (rnd() < 0.8) eq.armor = mkItem('armor');
+    if (rnd() < 0.7) eq.acc = mkItem('acc');
+    if (i % 3 !== 0) { // 称号あり（条件に合わない・固有効果つきも混ぜる）
+      const id = pick(TITLE_IDS), T = D.TITLES[id];
+      eq.title = { slot: 'title', kind: null, rarity: T.rarity, ilvl: 1, affixes: [], enh: 0, v: 3, weight: 0, name: T.name, title: id, req: T.req || (rnd() < 0.15 ? wk : null) };
+      if (rnd() < 0.4) eq.title.fx = [pick(FX_POOL)];
+    }
+    // 旧ツリー（stat・style）: ノードをランダムな段階まで
+    const tree = {};
+    for (const t of Object.values(TREES)) for (const n of t.nodes) if (rnd() < 0.5) tree[n.id] = ri(1, n.max);
+    const ch = { lv: ri(1, D.MAX_LEVEL), eq, potBonus: pick([0, 0, 1, 2]), skills: {}, tree, wtree: {}, prof: {}, wt: {}, slots: [null, null] };
+    // 武器ツリー: クラス・マスター・スキル・パッシブ（段階・分岐つき）をランダムに
+    if (i % 5 !== 4) {
+      profOf(ch, wk).lv = 20;
+      const all = WTREES[wk].rows.flatMap((r) => r.nodes.map((n) => ({ ...n, kind: r.kind })));
+      const k1 = pick(all.filter((n) => n.kind === 'ks1'));
+      wtLearn(ch, k1.id);
+      if (rnd() < 0.8) wtLearn(ch, pick(all.filter((n) => n.kind === 'ks2' && n.from === k1.id)).id);
+      for (const n of all) if ((n.kind === 'skill' || n.kind === 'passive') && rnd() < 0.5) { const lv = ri(1, 3); for (let j = 0; j < lv; j++) wtLearn(ch, n.id); if (lv === 3) wtChoose(ch, n.id, pick(['A', 'B'])); }
+    }
+    state.char = JSON.parse(JSON.stringify(ch));
+    ST.calcStats();
+    const S = ST.S;
+    // 数・真偽・文字と Set（並べた配列）だけを比べる
+    const o = {};
+    for (const [k, v] of Object.entries(S)) {
+      if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') o[k] = v;
+      else if (v instanceof Set) o[k] = [...v].sort();
+    }
+    o.roll = S.wc.roll;
     out.push({ in: [ch], out: o });
   }
   return out;

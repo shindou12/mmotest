@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import * as D from '../../../public/shared/data.js';
 import { AREAS, CELL, grid, boundR, maxR, exitsOf, obstaclesOf, hazardsOf, chestsOf, spawnPoint, waypointOf, arrival } from '../../../public/shared/areas.js';
 import { BALANCE, REVIVE } from '../../../public/shared/balance.js';
-import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, SKILL_CD_MULT } from '../../../public/js/skills.js';
+import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, SKILL_CD_MULT, TREES } from '../../../public/js/skills.js';
+import * as ST0 from '../../../public/js/game/state.js';
 import { WTREES, WT_NODE, PROF_MAX, ROW_REQ } from '../../../public/js/weapon-tree.js';
 import { TECHNIQUES } from '../../../public/shared/techniques.js';
 import { TREE_MOTIONS } from '../../../public/shared/tree-motions.js';
@@ -75,6 +76,9 @@ const out = {
   // スキル変化 SV のうち戦闘の式が使う値（G1-3a）: stunValue の SV.quake(t)。t は 0〜8 の添字（ティアは 1〜7）
   sv: { quake: Array.from({ length: 9 }, (_, t) => D.SV.quake(t)) },
   skills, wtrees: WTREES, wtnode: WT_NODE, wtConst: { profMax: PROF_MAX, rowReq: ROW_REQ }, techniques: TECHNIQUES, treeMotions: TREE_MOTIONS, motionDurations: MOTION_DURATIONS, skillTimings: SPEAR_TIMINGS,
+  // G1-3b: 武器スキルの候補・旧スキルツリー（stat・style）・状態の定数・自分の状態の初期値（state.js の me。モデルは除く）
+  weaponSkillPool: D.WEAPON_SKILL_POOL, trees: TREES, consts: { chargeMin: ST0.CHARGE_MIN, chargeMax: ST0.CHARGE_MAX, dodgeCd: ST0.DODGE_CD },
+  meInit: JSON.parse(JSON.stringify({ ...ST0.me, model: undefined })),
   weapons, levels, floors, areas, floorHub: Object.fromEntries(D.FLOORS.map((F) => [F.n, Object.keys(AREAS).find((k) => AREAS[k].floor === F.n && (AREAS[k].type === 'town' || AREAS[k].type === 'camp'))])),
 };
 fs.writeFileSync(new URL('../../../godot/worldart/data/game.json', import.meta.url), JSON.stringify(out));

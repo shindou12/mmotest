@@ -4,6 +4,9 @@ extends RefCounted
 ## 数値の表は data/game.json（tools/worldart/godot/export_gamedata.mjs が public/shared/ から書く）。
 ## 元の式を変えたら、ここも同じに直す（どの関数が元のどれかは各関数の説明に書いてある）。
 
+const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
+const WTree = preload("res://scripts/game/skills/wtree.gd")
+
 static var G: Dictionary = {}
 
 
@@ -137,8 +140,7 @@ static func mob_def(floor_n: int, d: int) -> Dictionary:
 	return {"t": "slime", "name": "?", "color": "#888888", "scale": 1.0}
 
 
-## stats.js calcStats のうち、試作で使う部分: 装備（武器・防具・装飾）の基礎値と強化、付加効果（affixes）、防具の基本効果、重さ。
-## まだ入れていないもの: スキルツリー・武器ツリー・称号・スキル変化（sv）・固有効果（fx）
+## 装備の強化倍率（data.js enhMult）
 static func enh_mult(it) -> float:
 	return 1.0 + float(it.get("enh", 0)) * 0.08 if it is Dictionary else 1.0
 
@@ -151,42 +153,128 @@ static func item_weight(it) -> float:
 	return 0.5
 
 
-static func calc_stats(ch: Dictionary) -> Dictionary:
+## 武器ツリーの効果と技を移してある武器。ほかの武器は S.wt = null（ツリーの mods と効果は未）
+const TREE_PORTED := ["sword", "greatsword"]
+
+## 旧スキルツリーのノードの表（skills.js NODE_INDEX。表は game.json の trees から。手で写さない）
+static var _node_index: Dictionary = {}
+
+
+static func node_index() -> Dictionary:
+	if _node_index.is_empty():
+		for tid in data()["trees"]:
+			for n in data()["trees"][tid]["nodes"]:
+				var m: Dictionary = n.duplicate()
+				m["tree"] = tid
+				_node_index[n["id"]] = m
+	return _node_index
+
+
+## skills.js treeEffects: 旧スキルツリー（stat・style）の効果の集計。{ mods, flags, actives }（flags・actives は Set = キーが値の Dictionary）
+static func tree_effects(ch: Dictionary, _wk: String) -> Dictionary:
+	var mods := {}
+	var flags := {}
+	var actives := {}
+	var idx := node_index()
+	var tree = ch.get("tree")
+	if tree is Dictionary:
+		for id in tree:
+			var r := float(tree[id])
+			if not idx.has(id) or r == 0.0: continue
+			var n: Dictionary = idx[id]
+			if n.has("mods"):
+				for k in n["mods"]: mods[k] = float(mods.get(k, 0.0)) + float(n["mods"][k]) * r
+			if n.has("flag"): flags[n["flag"]] = true
+			if n.has("active"): actives[n["active"]] = true
+	return {"mods": mods, "flags": flags, "actives": actives}
+
+
+## stats.js weaponSkillId: 武器のスキル。その武器種のものでなければ候補の先頭
+static func weapon_skill_id(wk: String, w) -> String:
+	var id = w.get("skill") if w is Dictionary else null
+	var tbl: Dictionary = data()["skills"]["weapon"]
+	if id != null and String(id) != "" and tbl.has(id) and tbl[id].get("kind") == wk: return String(id)
+	return String(data()["weaponSkillPool"][wk][0])
+
+
+## data.js titleReqOk
+static func title_req_ok(req, wk: String) -> bool:
+	if req == null or String(req) == "": return true
+	if req == "melee": return bool(data()["weapons"].get(wk, {}).get("melee", false))
+	return req == wk
+
+
+## stats.js calcStats: 装備（武器・防具・装飾・称号）・旧スキルツリー・武器ツリー・重さから能力値 S を作る。
+## Set（fx・flags・actives・tfx）は「キーが値の Dictionary」（.has(キー) で JavaScript の Set.has と同じ）。
+## 武器ごとの効果の 'stats'・'afterStats'（weapon_fx.gd に登録済みのもの）も呼ぶ。me を渡すと HP を最大 HP に切り詰める（元の calcStats と同じ）。
+## api（戦闘の環境）を渡すと、afterStats の前に api.st を新しい S にする。
+## まだ入れていないもの: スキル変化（sv_ の付加効果。S.sv = null）、見た目 wst・arm（ゲームの外観の関数）、ほかの武器（短剣・盾槍・大斧・弓）のツリー
+static func calc_stats(ch: Dictionary, me = null, api = null) -> Dictionary:
 	var D := data()
 	var eq: Dictionary = ch.get("eq", {})
 	var items := []
 	for k in ["weapon", "armor", "acc"]:
 		if eq.get(k) is Dictionary: items.append(eq[k])
 	var aff := {}
+	var fxs := {}
 	for it in items:
 		for a in it.get("affixes", []):
 			var key := String(a[0])
-			if not D["affixes"].has(key): continue   # スキル変化（sv_*）はまだ
+			if not D["affixes"].has(key): continue   # スキル変化（sv_*）は未
 			aff[key] = float(aff.get(key, 0.0)) + float(D["affixes"][key]["tiers"][int(a[1]) - 1])
+		for f in it.get("fx", []): fxs[String(f)] = true
 	var arm = eq.get("armor")
 	if arm is Dictionary and arm.get("base") is Array:
 		aff[String(arm["base"][0])] = float(aff.get(String(arm["base"][0]), 0.0)) + float(arm["base"][1])
-	var m := func(k: String) -> float: return float(aff.get(k, 0.0))
-	var base := func(it, k: String) -> float: return float(it.get(k, 0.0)) * enh_mult(it) if it is Dictionary else 0.0
 	var w = eq.get("weapon")
 	var acc = eq.get("acc")
 	var wk: String = w["kind"] if w is Dictionary else String(D["defaultWeapon"])
+	# 称号: 条件（近接のみ など）を満たすときだけ効く。同じ固有効果は重ならない（Set）
+	var title = eq.get("title")
+	var title_on: bool = title is Dictionary and title_req_ok(title.get("req"), wk)
+	var tfx := {}
+	if title_on:
+		if title.get("title") != null and String(title["title"]) != "": tfx[String(title["title"])] = true
+		for f in title.get("fx", []): fxs[String(f)] = true
+	var T := tree_effects(ch, wk)
+	var WT = WTree.effects(ch, wk) if wk in TREE_PORTED else null
+	var m := func(k: String) -> float: return float(aff.get(k, 0.0)) + float(T["mods"].get(k, 0.0)) + (float(WT.mods.get(k, 0.0)) if WT != null else 0.0)
+	for f in T["flags"]: fxs[f] = true
+	var base := func(it, k: String) -> float: return float(it.get(k, 0.0)) * enh_mult(it) if it is Dictionary else 0.0
 	var W: Dictionary = D["weapons"][wk]
 	var lv := int(ch["lv"])
 	var L: Dictionary = D["levels"][lv - 1]
 	var atk: float = (float(L["atk"]) + base.call(w, "atk") + base.call(acc, "atk")) * (1 + m.call("atkp") / 100.0)
-	var mhp: float = roundf((float(L["hp"]) + base.call(arm, "hp") + base.call(acc, "hp")) * (1 + m.call("hpp") / 100.0))
+	var mhp: float = (float(L["hp"]) + base.call(arm, "hp") + base.call(acc, "hp")) * (1 + m.call("hpp") / 100.0)
 	var weight := 0.0
 	for it in items: weight += item_weight(it)
 	var wc: Dictionary = D["weightClasses"][-1]
 	for c in D["weightClasses"]:
 		if weight <= float(c["max"]): wc = c; break
 	var def := minf(65.0, m.call("def") + base.call(arm, "def") + (float(D["instinct"]["dr"]) if W.get("melee", false) else 0.0) + float(L["wdef"][wk]))
-	return {"wk": wk, "W": W, "atk": atk, "mhp": mhp, "def": def, "crit": 5.0 + m.call("crit"), "critd": 150.0 + m.call("critd"),
-		"aspd": m.call("aspd"), "move": m.call("move"), "vamp": m.call("vamp"), "cdr": minf(60.0, m.call("cdr")),
-		"normp": m.call("normp"), "heavyp": m.call("heavyp"), "wskillp": m.call("wskillp"),
-		"maxPot": 3 + int(m.call("potion")), "dodgeCd": 0.75 * float(wc["cd"]) * (1 - minf(60.0, m.call("dodgecd")) / 100.0), "roll": float(wc["roll"]),
-		"wr": int(w["rarity"]) if w is Dictionary else 0, "weight": weight, "wc": wc, "skill": String(w.get("skill", "retreat")) if w is Dictionary else "retreat"}
+	var actives: Dictionary = T["actives"].duplicate()
+	if WT != null:
+		for id in WT.actives: actives[id] = true
+	var ws_id := weapon_skill_id(wk, w)
+	var cs: Dictionary = D["consts"]
+	var S := {"wk": wk, "W": W, "atk": atk, "mhp": roundf(mhp), "fx": fxs, "flags": T["flags"], "actives": actives,
+		"wt": WT, "guard": bool(W.get("guard", false)), "chargeMax": float(cs["chargeMax"]), "dodgeDist": 1.0,
+		"dStackPer": 0.0, "dStackMax": 10.0, "dStackT": 3.0,
+		"crit": 5.0 + m.call("crit"), "critd": 150.0 + m.call("critd"), "aspd": m.call("aspd"), "move": m.call("move"),
+		"vamp": m.call("vamp") + (4.0 if fxs.has("vamp") else 0.0), "cdr": minf(60.0, m.call("cdr") + (35.0 if fxs.has("star") else 0.0)),
+		"def": def, "wr": int(w["rarity"]) if w is Dictionary else 0,
+		"sv": null, "title": title, "titleOn": title_on, "tfx": tfx,
+		"normp": m.call("normp"), "heavyp": m.call("heavyp"), "wskillp": m.call("wskillp"), "dodgecd": minf(60.0, m.call("dodgecd")),
+		"justbuff": m.call("justbuff"), "counter": m.call("counter"), "backwater": m.call("backwater"), "maxPot": 3 + int(m.call("potion")) + int(ch.get("potBonus", 0)),
+		"ws": D["skills"]["weapon"][ws_id], "skill": ws_id, "weight": weight, "wc": wc,
+		"dodgeCd": float(cs["dodgeCd"]) * float(wc["cd"]) * (1 - minf(60.0, m.call("dodgecd")) / 100.0) * 1.0,
+		"iframeBonus": 0.0, "stunp": m.call("stunp"),
+		"bowBase": float(W.get("baseRange", 0.0)), "bowMax": float(W.get("range", 0.0)), "bowDraw": float(W.get("draw", 1.0))}
+	WFX.fx_call("stats", [S, WT, W])   # 武器ツリーで変わるもの（ガード・溜め・回避の距離・連撃）は各武器が決める
+	if me != null: me["hp"] = minf(float(me["hp"]), float(S["mhp"]))
+	if api != null: api.st = S   # afterStats の効果が新しい S を読めるように（元は module の S を読む）
+	WFX.fx_call("afterStats")
+	return S
 
 
 ## data.js xpToNext

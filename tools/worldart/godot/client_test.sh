@@ -9,6 +9,9 @@ SRV=$!
 sleep 1
 OUT=/tmp/godot_client_test.log
 ( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUT 2>&1 )
+# 大剣の回（G1-3b）: 大剣と武器ツリーを --wk・--wt・--slots で入れ、通常・溜め・強攻撃・武器スキル・Q/E を使わせる
+OUTG=/tmp/godot_client_test_gs.log
+( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --wk=greatsword --wt=gt_wave,gt_charge:3A,gt_break:2,gt_eye,gt_armor,gt_moon,gt_rising:2,gt_broad,gt_guillo,gt_slam:2,gt_fullmoon --slots=gt_rising,gt_slam --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUTG 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_town --server=ws://127.0.0.1:$PORT/ws --quit=40 >> $OUT 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_dun --server=ws://127.0.0.1:$PORT/ws --quit=50 >> $OUT 2>&1 )
 kill $SRV
@@ -23,6 +26,15 @@ grep -q "^SKILL" $OUT && echo "OK  武器スキル（$(grep -c '^SKILL' $OUT) �
 grep -q "^PICKUP" $OUT && echo "OK  落とし物を拾った（$(grep -c '^PICKUP' $OUT) 個）" || echo "--  落とし物なし（運しだい）"
 grep -q "^EQUIP" $OUT && echo "OK  拾った装備を着けた: $(grep '^EQUIP' $OUT | head -1)" || echo "--  装備の変更なし（運しだい）"
 grep -E "SCRIPT ERROR" $OUT && ok=1
+# 大剣の回: 強攻撃（HEAVY）・武器スキル（SKILL）・Q/E（TSKILL）が出て、HIT（当たり）に強攻撃の当たりが入っていること
+grep -q "^HEAVY" $OUTG && echo "OK  大剣: 強攻撃（$(grep -c '^HEAVY' $OUTG) 回）" || { echo "NG  大剣: 強攻撃が出ない"; ok=1; }
+grep -q "^SKILL" $OUTG && echo "OK  大剣: 武器スキル（$(grep -c '^SKILL' $OUTG) 回）" || { echo "NG  大剣: 武器スキルが出ない"; ok=1; }
+grep -q "^TSKILL" $OUTG && echo "OK  大剣: Q/E のツリースキル（$(grep -c '^TSKILL' $OUTG) 回）" || { echo "NG  大剣: Q/E が出ない"; ok=1; }
+grep -q "^HIT .* type=normal" $OUTG && echo "OK  大剣: 通常攻撃が当たった（$(grep -c '^HIT .* type=normal' $OUTG) 回）" || { echo "NG  大剣: 通常攻撃が当たらない"; ok=1; }
+grep -q "^HIT .* type=heavy" $OUTG && echo "OK  大剣: 強攻撃が当たった（$(grep -c '^HIT .* type=heavy' $OUTG) 回）: $(grep '^HIT .* type=heavy' $OUTG | head -1)" || { echo "NG  大剣: 強攻撃が当たらない"; ok=1; }
+grep -q "^HIT .* type=wskill" $OUTG && echo "OK  大剣: 武器スキルが当たった（$(grep -c '^HIT .* type=wskill' $OUTG) 回）" || { echo "NG  大剣: 武器スキルが当たらない"; ok=1; }
+grep -q "^HIT .* type=tskill" $OUTG && echo "OK  大剣: ツリースキルが当たった（$(grep -c '^HIT .* type=tskill' $OUTG) 回）" || { echo "NG  大剣: ツリースキルが当たらない"; ok=1; }
+grep -E "SCRIPT ERROR" $OUTG && ok=1
 # 式の照合（元の JavaScript で作った期待値と GDScript を比べる。JSON は node tools/worldart/godot/golden_rules.mjs で作り直せる）
 G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/rules_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"

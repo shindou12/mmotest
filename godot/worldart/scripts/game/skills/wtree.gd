@@ -39,6 +39,28 @@ static func prof_level(ch: Dictionary, wk: String) -> float:
 	return minf(prof_max(), maxf(maxf(prof_of(ch, wk)["lv"], floorf(best / 2.0)), 1.0))
 
 
+## weapon-tree.js profNeed: 熟練度 lv から次へ要る経験値（data.js xpToNext(2 * lv + 1)）
+static func prof_need(lv: float) -> float:
+	return float(Common.game()["levels"][int(2 * lv + 1) - 1]["xp"])
+
+
+## weapon-tree.js gainProf: 経験値を足す。上がった熟練度の配列を返す
+static func gain_prof(ch: Dictionary, wk: String, n: float) -> Array:
+	var p := prof_of(ch, wk)
+	var ups := []
+	if p["lv"] < prof_level(ch, wk): p["lv"] = prof_level(ch, wk)   # 引き継ぎ分から積み上げる
+	if p["lv"] >= prof_max(): return ups
+	p["xp"] += n
+	while p["lv"] < prof_max() and p["xp"] >= prof_need(p["lv"]):
+		p["xp"] -= prof_need(p["lv"])
+		p["lv"] += 1
+		ups.append(p["lv"])
+	if p["lv"] >= prof_max(): p["xp"] = 0
+	var best: float = ch["profBest"] if ch.get("profBest") != null else 0.0
+	ch["profBest"] = maxf(best, p["lv"])
+	return ups
+
+
 ## weapon-tree.js wtOf
 static func wt_of(ch: Dictionary, wk: String) -> Dictionary:
 	if not ch.has("wt") or ch["wt"] == null: ch["wt"] = {}
