@@ -18,3 +18,6 @@ godot/worldart/data/*/
 godot/worldart/data/assets/*
 # 試しの撮影
 art/shots/port/
+
+# サブエージェントの作業用の worktree（Agent の isolation: worktree）
+.claude/worktrees/
