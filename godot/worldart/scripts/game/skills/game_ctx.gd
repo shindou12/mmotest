@@ -17,7 +17,7 @@ extends "res://scripts/game/combat/api.gd"
 ##   （済み: arrow = 矢の板。細長い板が飛び、update_projs が当てる。罠・旗は部品を置く）
 ##
 ## ---- 元と違う所 ----
-##   * スキル変化（付加効果 sv_*）は未。castWeaponSkill は常に sv なしの経路（sk.run(combat)）を通る。
+##   * スキル変化（付加効果 sv_*）は combat.gd の start_skill が variants.gd の cast_weapon_skill を通して付ける（G4）。
 ##   * 称号の天候（t_storm）は未（エリアの天候の表を書き出していない）。
 
 const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
@@ -46,6 +46,7 @@ func bind() -> void:
 	st = g.S
 	mobs = g.mobs
 	pending = g.pending
+	ch = g.ch   # hurt.gd の防具の重さ（kb_scale）が読む
 
 
 # ---------------------------------------------------------------- 時刻・狙い・外への出力
@@ -93,6 +94,9 @@ func float_text(x, y, z, text, cls = null):
 	if text is float or text is int: s = str(int(text))
 	else: s = str(text)
 	g._float(Vector3(float(x), float(y), float(z)), s, _cls_color(String(cls) if cls != null else ""))
+	if g.args.has("bot"):   # 確認用の行: 被弾（hurt.gd take_damage）・ガード（防御・カウンター準備・ガードブレイク）・のけぞり／ダウン
+		if cls == "me": print("HURT %s hp=%d" % [s, int(me["hp"])])
+		elif s in ["防御", "カウンター準備!", "ガードブレイク!", "ダウン!", "受け身!"]: print("GUARD %s" % s if s != "ダウン!" and s != "受け身!" else "REACT %s" % s)
 
 func _cls_color(cls: String) -> Color:
 	match cls:
@@ -134,7 +138,14 @@ func _op(name: String, args: Array):
 			me["tcd"][args[0]] = 0.0
 			return null
 		"taunt": return _v(Callable(self, "net_send"), [{"t": "taunt", "r": args[0]}])
-		"setHitStop", "onVariantHit", "run": return null
+		"setHitStop", "onVariantHit", "run", "ui.hurt": return null
+		# hurt.gd が外へ頼む操作（画面の知らせ・移動・回避・強攻撃・セーブの削除）
+		"banner": return _v(Callable(g, "_banner"), [(String(args[0]) + "　" + String(args[1])) if args.size() > 1 and args[1] != null else String(args[0])])
+		"toast": return _v(Callable(g, "_log"), [String(args[0])])
+		"moveMe": return _v(Callable(g, "_moveme"), [float(args[0]), float(args[1])])
+		"tryDodge": return _v(Callable(g, "_try_dodge_input"), [])
+		"doHeavy": return _v(Callable(g.combat, "do_heavy"), [int(args[0])])
+		"characterDiscard": return _v(Callable(g, "_discard_char"), [])
 		"sfx": return _todo("sfx:" + str(args[0]))   # 音（TODO: G8）。名前ごとに数える
 		"arrow": return _v(Callable(self, "strike_arrow"), [args[0] if args.size() > 0 and args[0] != null else {}])
 	_todo(name)

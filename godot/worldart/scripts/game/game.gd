@@ -1,17 +1,19 @@
 extends Node3D
 ## Godot 版のゲームの試作クライアント（L27）。今のサーバー（server.js）にそのままつなぐ。
 ## ブラウザ版（public/js/game/）から移したもの: 歩く・当たり判定（loop.js moveMe / areas.js collide）、通常攻撃の 3 段（actions.js doSwing・
-## strikes.arc、combat.js dealDamage）、回避（tryDodge）、回復薬（usePotion）、敵の予告と被弾（hurt.js onTele・resolveTele・takeDamage）、
-## 這いずり・復活・力尽きる（fall・revived・bleed）、経験値とレベル（gainXp）、出口（loop.js の出口）、敵と他の人の表示（snapshot.js onSnap）。
+## strikes.arc、combat.js dealDamage）、回避（tryDodge）、回復薬（usePotion）、敵の予告の板（hurt.js onTele・updateTeles）、
+## 経験値とレベル（gainXp）、出口（loop.js の出口）、敵と他の人の表示（snapshot.js onSnap）。
+## G4: 被弾・ガード・のけぞり／ダウン／吹き飛び・受け身・這いずり・復活・力尽きる・毒沼は combat/hurt.gd（元は hurt.js・input.js のガード・actions.js sweepTick）を
+## 本物の文脈 combat.ctx で呼ぶ（このファイルに手写しはない）。スキル変化は combat.gd → combat/variants.gd。
 ## CP5（combat.gd・items.gd）: 溜め斬り（強攻撃）・片手剣の武器スキル 5 種・飛ぶ斬撃・踏み込み、落とし物を拾う・持ち物・装備（能力値の計算）。
-## まだないもの: ツリー・ガード・弓などの武器ごとの技・ボスの弾と演出・人物と敵の本当のモデル。屋内のエリアは仮の壁と床。
+## まだないもの: ボスの弾（bprojs）と演出・敵の本当のモデル・音・粒の見た目（G8）。屋内のエリアは仮の壁と床。
 ## 操作: WASD / 矢印 移動、マウス 狙い、左クリック 攻撃（長押しで溜め斬り）、右クリック 武器スキル、Space 回避、R 回復薬、F 調べる（レバー・宝箱）、I 持ち物、ホイール カメラの距離。
 ## G1-3b: 技は移した技（scripts/game/skills/）を本物の文脈（skills/game_ctx.gd）でつないだ。戦闘の流れは combat.gd（通常 3 段・溜め・強攻撃・武器スキル・Q/E・バフ・待ち時間・飛ぶ斬撃）。
 ## 操作の追加: Q / E ツリーのスキル（ch.slots）。キャラクターの保存に tree・prof・wt・slots を足した（ブラウザ版の character-store.js と同じ形）。
 ## 起動の引数（-- の後）: --server=ws://… --name=… --auto（名前の入力を飛ばす）--bot（自動で敵を探して戦う。確認用）
 ##   --goto=<エリア>（自動操作がその出口へ歩く）--shot=<フレーム数>:<出力.png>（草原に入って敵が見えてから撮って終わる）--quit=<秒> --at=x,z（草原に入ったらその位置へ）
 ##   --wk=<武器種>（その武器の初心者の武器を持つ。例 greatsword）--wt=<ノード,...>（武器ツリーを振る。熟練度は 20。<id>:<段階><分岐 A/B> 例 gt_wave,gt_charge:3A,gt_rising:2）
-##   --slots=<Q のスキル>,<E のスキル>（例 gt_rising,gt_slam）
+##   --slots=<Q のスキル>,<E のスキル>（例 gt_rising,gt_slam）  --sv=<スキル変化のキー>:<段階>（武器スキルに付ける。例 sv_blaze:3）  --fall=<秒>（その時に倒れる。確認用）
 ##
 ## ================================================================
 ## 自分の状態 me（人物の見た目・動き = 06b が読む項目。値は 0〜は秒・ラジアン。ブラウザ版の state.me と同じ名前・意味）
@@ -23,7 +25,12 @@ extends Node3D
 ##   技           skillT（技の経過。-1 = 技の間ではない）・skillDuration（技の長さ）・spin（回転系の技）・sk（技を出すたびに +1）
 ##                motion（動きの名前。空 = なし）・motionT（その経過）。名前は data/game.json の motionDurations のキー
 ##   回避・他     dodgeT（回避中。> 0）・dashT（踏み込み・後退中）・hurtT（被弾の揺れ。> 0）・crawl（這いずり）・dead
-##   能力値       S.wk（武器種）・S.wr（武器のレア度）・S.chargeMax
+##   被弾（G4）   staggerT（ひるみ・ガードブレイクの隙。> 0 の間は動けない）・downT（ダウン。> 0）・downStart（ダウンした時刻。受け身の窓の基準）・
+##                kbT・kbX・kbZ（押し戻し・吹き飛びの残り秒と速度）・noDownT（この時刻まで再ダウンしない）・brokenT（ガードブレイクの時刻。被ダメ 1.5 倍）
+##                downs・downsAt（倒れた回数と時刻。起こしにくさ）・rv（倒れている間の起こすゲージの表示。-1 = 立っている）
+##   ガード（G4） guarding・guardStart・gg（ガードゲージ 0〜100）・counter（カウンター準備）・counterFire（強攻撃がガードカウンターになる）・
+##                guardLockT・guardEndT・ggHitT（構え直し・回復の時刻）・sweepT・sweepHit（回転なぎ払いの経過）・sweep（回った角度。なければ -1。me_fields が読む）
+##   能力値      S.wk（武器種）・S.wr（武器のレア度）・S.chargeMax
 ## まとめて JavaScript の animatePlayer に渡す形にしたものが me_anim()（loop.js の animatePlayer の引数と同じキー）。
 ## ================================================================
 
@@ -31,6 +38,7 @@ const SAVE := "user://eterna_godot_char.json"
 const GameWTree = preload("res://scripts/game/skills/wtree.gd")
 const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Dmg = preload("res://scripts/game/combat/damage.gd")
+const Hurt = preload("res://scripts/game/combat/hurt.gd")
 
 @onready var world: Node3D = $World
 var net := GameNet.new()
@@ -130,6 +138,14 @@ func _apply_test_args() -> void:
 			if n.has("from"): GameWTree.wt_learn(ch, n["from"])
 			for i in lv: GameWTree.wt_learn(ch, id)
 			if br != null: GameWTree.wt_choose(ch, id, br)
+	if args.has("sv"):   # スキル変化を武器に付ける（確認用）。--sv=<キー>:<段階 1〜8> 例 sv_blaze:3
+		var kv2 := String(args["sv"]).split(":", true, 1)
+		var wp: Dictionary = ch["eq"]["weapon"]
+		var keep2 := []
+		for a in wp.get("affixes", []):
+			if not String(a[0]).begins_with("sv_"): keep2.append(a)
+		keep2.append([kv2[0], int(kv2[1]) if kv2.size() > 1 else 1, 0])
+		wp["affixes"] = keep2
 	if args.has("slots"):
 		var sl := []
 		for id in String(args["slots"]).split(",", true):
@@ -157,7 +173,7 @@ func _recalc() -> void:
 
 
 func _save_char() -> void:
-	if args.has("wk") or args.has("wt"): return   # 確認用に武器・ツリーを引数で入れたキャラは保存しない（本物のセーブを書き換えない）
+	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall"): return   # 確認用に武器・ツリーを引数で入れたキャラは保存しない（本物のセーブを書き換えない）
 	var f := FileAccess.open(SAVE, FileAccess.WRITE)
 	f.store_string(JSON.stringify(ch))
 
@@ -170,7 +186,9 @@ func _reset_me() -> void:
 		"dodgeT": 0.0, "dodgeCd": 0.0, "dodgeDir": Vector2.ZERO, "iframe": 0.0, "potions": S["maxPot"], "potCd": 0.0,
 		"hurtT": 0.0, "transit": false, "deathAt": 0.0, "charging": false, "chargeT": 0.0, "chargeLv": 0, "wsCd": 0.0, "tcd": {}, "buffs": [],
 		"skillT": -1.0, "skillDuration": 0.55, "spin": false, "motion": "", "motionT": 0.0, "heavySwing": false, "bulletT": 0.0,
-		"dashT": 0.0, "dashA": 0.0, "dashSpeed": 0.0, "moving": false, "walkT": 0.0}, true)
+		"dashT": 0.0, "dashA": 0.0, "dashSpeed": 0.0, "moving": false, "walkT": 0.0,
+		"gg": Hurt.GUARD()["max"], "counter": false, "counterFire": false, "guardLockT": 0.0, "guardEndT": 0.0, "ggHitT": 0.0, "brokenT": 0.0,
+		"sweepT": 0.0, "sweepHit": false, "sweep": -1.0, "hazT": 0.0, "hazKind": null}, true)
 	combat.bind()
 	_calc()   # me.hp を最大 HP に切り詰める・afterStats
 
@@ -205,10 +223,19 @@ func _on_msg(m: Dictionary) -> void:
 		"loot": items.on_loot(m)
 		"chat": _log(("%s: " % m.from if m.from != "" else "") + String(m.text), Color.html(m.get("color", "#ffffff")))
 		"leave": _remove_other(int(m.id))
-		"revived": _revived(String(m.by))
+		"revived": Hurt.revived(combat.ctx, String(m.by))
 		"bleed":
-			if me.crawl: _die()
-		"pdown": _log("%s が倒れた" % m.name, Color(1, 0.6, 0.5))
+			if me.crawl: Hurt.die(combat.ctx)
+		"pdown":
+			if int(m.id) != my_id:
+				_log("%s が倒れた" % m.name, Color(1, 0.6, 0.5))
+				var po = others.get(int(m.id))
+				if po != null: po.rv = maxf(float(po.get("rv", -1.0)), 0.01)
+		"prev":   # 仲間が起き上がった
+			var po2 = others.get(int(m.id))
+			if po2 != null:
+				po2.rv = -1.0
+				_log("%s が起き上がった" % po2.get("name", ""), Color(0.6, 1, 0.8))
 		"door":
 			if m.get("open", false): door_open = true; world.set_door_open(true)
 
@@ -226,6 +253,8 @@ func _enter_area(id: String, x: float, z: float) -> void:
 	world.load_area(id)
 	door_open = false
 	_add_marker_nodes()
+	combat.ctx.shape = String(area["shape"])   # hurt.gd のハザードの判定（屋内は無効）
+	combat.ctx.hazards = area.get("hazards", [])
 	me.x = x; me.z = z; me.a = PI; me.transit = false
 	portals.clear()
 	for e in area.get("exits", []):
@@ -261,7 +290,9 @@ func _on_snap(m: Dictionary) -> void:
 	var seen_p := {}
 	for p in m.p:
 		var id := int(p[0])
-		if id == my_id: continue
+		if id == my_id:
+			if me.crawl and float(p[21]) >= 0.0: me.rv = float(p[21])   # 倒れている間の起こすゲージ（snapshot.js）
+			continue
 		seen_p[id] = true
 		var o = others.get(id)
 		if o == null:
@@ -338,7 +369,7 @@ func _on_tele(m: Dictionary) -> void:
 		var fill := MeshInstance3D.new(); fill.material_override = GameVisuals.mat(col, true, 0.45)
 		fill.position = Vector3(s["x"], y + 0.01, s["z"]); world.add_child(fill)
 		meshes.append(out); meshes.append(fill)
-	teles.append({"meshes": meshes, "sh": m.sh, "start": t_now, "dur": float(m.d) / 1000.0, "dmg": float(m.dmg), "src": int(m.get("src", 0)), "kd": m.has("kd")})
+	teles.append({"meshes": meshes, "sh": m.sh, "start": t_now, "dur": float(m.d) / 1000.0, "dmg": float(m.dmg), "src": int(m.get("src", 0)), "kd": bool(m.get("kd", false)), "color": col})
 
 
 func _update_teles() -> void:
@@ -348,75 +379,9 @@ func _update_teles() -> void:
 		for j in te.sh.size():
 			te.meshes[j * 2 + 1].mesh = GameVisuals.shape_mesh(te.sh[j], k)
 		if k >= 1.0:
-			_resolve_tele(te)
+			Hurt.resolve_tele(combat.ctx, te)
 			for g in te.meshes: g.queue_free()
 			teles.remove_at(i)
-
-
-func _resolve_tele(te: Dictionary) -> void:
-	if me.dead or me.crawl: return
-	var hit := false
-	for s in te.sh:
-		if GameRules.in_shape(s, me.x, me.z): hit = true
-	if not hit: return
-	if me.iframe > 0:
-		_float(Vector3(me.x, 2.6, me.z), "JUST回避!", Color(0.6, 1, 1))
-		return
-	if te.src: net.send({"t": "absorb", "id": te.src})
-	var raw: float = te.dmg
-	var src = mobs.get(te.src)
-	if src != null:   # 敵の正面で受けると 1.3 倍、背後なら 0.7 倍
-		var off := absf(GameRules.ang_diff(atan2(me.x - src.x, me.z - src.z), src.a))
-		if off < deg_to_rad(60): raw *= 1.3
-		elif off > deg_to_rad(120): raw *= 0.7
-	_take_damage(raw)
-
-
-## hurt.js takeDamage のうち、ダメージの式（受ける前の補正・被ダメージ軽減）と武器ツリーの被弾の効果。のけぞり/ダウン・ガードは未
-func _take_damage(raw0: float) -> void:
-	var raw: float = WFX.fx_reduce("incoming", raw0)   # 狂剣士・捨て身 など
-	var back: float = WFX.fx_reduce("drLowHp", 0.0)   # 不撓B「背水」
-	# 一時的な被ダメージ軽減は重ねず、いちばん大きいものだけが効く（増える側＝マイナスはすべて足す）。防御（S.def）とは別の段
-	var drs := [back, Dmg.wt_dr(combat.ctx), 8.0 if combat.tf("t_relic") else 0.0, 12.0 if combat.tf("t_shell") else 0.0, -15.0 if combat.tf("t_berserk") else 0.0]
-	for b in me.buffs: drs.append(float(b["mods"].get("dr", 0.0)))
-	var mx := 0.0
-	var neg := 0.0
-	for v in drs:
-		mx = maxf(mx, v)
-		neg += minf(0.0, v)
-	var dr := clampf(mx + neg, -100.0, 90.0)
-	var dmg := maxf(1, roundf(raw * (1 - S["def"] / 100.0) * (1 - dr / 100.0) * randf_range(0.9, 1.1)))
-	me.hp -= dmg
-	if args.has("bot"): print("HURT %d hp=%d" % [int(dmg), int(me.hp)])
-	me.hurtT = 0.25
-	_float(Vector3(me.x, 2.2, me.z), str(int(dmg)), Color(1, 0.35, 0.3))
-	combat.ctx.add_shake(0.3)
-	if S.get("wt") != null: Dmg.wt_on_hurt(combat.ctx, false)
-	if me.hp <= 0 and WFX.fx_some("cheatDeath"): return   # 不死身 など（hurt.js takeDamage）
-	if me.hp <= 0: _fall()
-
-
-func _fall() -> void:
-	if me.crawl or me.dead: return
-	me.downs = mini(3, me.downs + 1); me.downsAt = t_now
-	me.crawl = true; me.hp = 0
-	net.send({"t": "down", "n": me.downs})
-	_banner("倒れた… 仲間の攻撃で起こしてもらえる")
-
-
-func _revived(by: String) -> void:
-	if not me.crawl: return
-	me.crawl = false
-	me.hp = roundf(S["mhp"] * float(GameRules.data()["revive"]["hp"])); me.iframe = float(GameRules.data()["revive"]["iframe"])
-	_banner("%s に起こしてもらった" % by)
-
-
-func _die() -> void:
-	# 協力ハード: 力尽きるとキャラクターは失われる（ブラウザ版と同じ）。5 秒後に新しいキャラで始め直す
-	me.dead = true; me.crawl = false
-	me.deathAt = t_now + float(GameRules.data()["balance"]["deathSeconds"])
-	_banner("力尽きた… キャラクターは失われた")
-	if not (args.has("wk") or args.has("wt")): DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 
 
 # ---------------------------------------------------------------- 狙い（combat.js aimAngle）。攻撃・技・ダメージは combat.gd と skills/game_ctx.gd
@@ -424,9 +389,13 @@ func _aim_angle() -> float:
 	return atan2(mouse_ground.x - me.x, mouse_ground.z - me.z)
 
 
-## actions.js tryDodge
+## actions.js tryDodge（入力の向きは呼ぶ側が決める）。ダウン中は受け身（hurt.gd try_tech）
 func _try_dodge(dir: Vector2) -> void:
-	if S.is_empty() or me.dead or me.crawl or me.dodgeCd > 0 or me.dashT > 0 or me.staggerT > 0: return
+	if S.is_empty(): return
+	if me.downT > 0:
+		Hurt.try_tech(combat.ctx)
+		return
+	if me.dead or me.crawl or me.dodgeCd > 0 or me.dashT > 0 or me.staggerT > 0: return
 	if dir == Vector2.ZERO: dir = Vector2(sin(me.a), cos(me.a))
 	var after: bool = combat.ctx.has_buff("afterimage")
 	me.dodgeDir = dir.normalized(); me.dodgeT = 0.38
@@ -435,14 +404,22 @@ func _try_dodge(dir: Vector2) -> void:
 	me.dodgeCd = maxf(float(S["dodgeCd"]) * (0.25 if after else 1.0), me.iframe + 0.15)
 	me.swingT = 9.0; me.skillT = -1.0; me.motion = ""; me.charging = false; me.guarding = false
 	WFX.fx_call("onDodge")   # 速射・罠師 など
+	if combat.tf("t_wind"):
+		var keep := []
+		for b in me.buffs:
+			if b["id"] != "wind": keep.append(b)
+		me.buffs = keep
+		me.buffs.append({"id": "wind", "label": "疾風", "t": 1.9, "max": 1.9, "mods": {"move": 40}, "color": 0x9affc8})
 
 
-## hurt.js onJustDodge
-func _on_just_dodge() -> void:
-	_float(Vector3(me.x, 2.6, me.z), "JUST回避!", Color(0.6, 1, 1))
-	if float(S["justbuff"]) > 0: combat.ctx.add_buff("just", "見切り", 3.0, {"dmgp": S["justbuff"]}, 0x9affff)
-	WFX.fx_call("justDodge")   # 後の先・残影・見切り眼 など
-	if float(S["counter"]) > 0: combat.ctx.strike_circle(me.x, me.z, 5.0, float(S["counter"]) / 100.0, {"type": "proc", "noProc": true})
+## 今の入力の向きで回避（Space。受け身は hurt.gd からここへ来る）
+func _try_dodge_input() -> void:
+	_try_dodge(Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down")))
+
+
+## 力尽きたキャラクターのセーブを消す（hurt.gd die → ctx.character_discard）。確認用の引数のキャラは保存していないので消さない
+func _discard_char() -> void:
+	if not (args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall")): DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 
 
 func _use_potion() -> void:
@@ -484,8 +461,12 @@ func _moveme(dx: float, dz: float) -> void:
 
 
 # ---------------------------------------------------------------- 毎フレーム（loop.js update）
-func _process(dt: float) -> void:
-	t_now += dt
+func _process(real_dt: float) -> void:
+	t_now += real_dt
+	var dt := real_dt
+	if combat.ctx.hit_stop > 0.0:   # ヒットストップ: 被弾の瞬間だけ動きをほぼ止めて、手応えを出す（loop.js loop。時刻は止めない）
+		combat.ctx.hit_stop -= real_dt
+		dt *= 0.1
 	if args.has("quit") and t_now > float(args["quit"]):
 		if args.has("bot"): print("FXTODO ", JSON.stringify(combat.ctx.todo))   # 見た目・音で呼ばれたが未実装の名前と回数（G8）
 		get_tree().quit()
@@ -498,11 +479,16 @@ func _process(dt: float) -> void:
 			print("SHOT ", sp[1])
 			get_tree().quit()
 	if not started or area.is_empty(): return
+	if args.has("fall") and not args.has("_fell") and t_now > float(args["fall"]) and not me.dead and not me.crawl:
+		# 確認用: その秒に倒れる（這いずり → 一人なら力尽きる → 始め直す、の流れを確かめる）。--fall=<秒>
+		args["_fell"] = "1"; me.hp = 0.0; Hurt.fall(combat.ctx)
 	for i in range(pending.size() - 1, -1, -1):
 		if pending[i].at <= t_now:
 			var p = pending[i]; pending.remove_at(i)
 			if not me.dead and not me.crawl: p.fn.call()
 	combat.tick_timers(dt)   # loop.js: 動きの時間・待ち時間・バフの時間
+	# しばらく倒れずにいると、起こしにくさが 1 段階戻る
+	if me.downs > 0 and not me.crawl and t_now - me.downsAt > float(Hurt.REVIVE()["decay"]): me.downs -= 1; me.downsAt = t_now
 	items.update(dt)
 	var safe: bool = area["type"] == "town" or area["type"] == "camp"
 	_update_mouse()
@@ -514,34 +500,60 @@ func _process(dt: float) -> void:
 		var mv := Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down"))
 		if args.has("bot"): mv = _bot(dt)
 		if me.crawl:
-			if mv != Vector2.ZERO: _moveme(mv.normalized().x * float(GameRules.data()["revive"]["crawl"]) * dt, mv.normalized().y * float(GameRules.data()["revive"]["crawl"]) * dt)
-		elif me.dodgeT > 0:
-			me.dodgeT -= dt
-			var sp := 17.0 * float(S["roll"])
-			_moveme(me.dodgeDir.x * sp * dt, me.dodgeDir.y * sp * dt)
-		elif me.dashT > 0:   # 踏み込み・後退（actions.js dash）
-			var ddt := minf(dt, me.dashT)
-			me.dashT -= dt
-			_moveme(sin(me.dashA) * me.dashSpeed * ddt, cos(me.dashA) * me.dashSpeed * ddt)
-		elif mv != Vector2.ZERO:
-			var busy: bool = me.swingT < me.swingDur or me.skillT >= 0
-			var slow := 0.45 if busy else (0.4 if me.charging and me.chargeT > GameCombat.charge_min() else 1.0)
-			var spd: float = 7.2 * (1 + (float(S["move"]) + combat.ctx.buff_mod("move") + (25.0 if combat.desperate() else 0.0) + combat.title_move()) / 100.0) * slow
-			var n := mv.normalized()
-			_moveme(n.x * spd * dt, n.y * spd * dt)
-			me.moving = true
-			me.walkT += dt
-			if not busy and not me.charging: me.a = atan2(n.x, n.y)
-		# 出口
-		if not me.transit:
-			for p in portals:
-				var d := Vector2(p.x - me.x, p.z - me.z).length()
-				if d < p.r and p.armed:
-					me.transit = true; net.send({"t": "move", "to": p.to}); break
-				if d > p.r + 1.5: p.armed = true
-		# 溜め・通常攻撃の予約・技の時間・飛ぶ斬撃（loop.js）
-		combat.tick_actions(dt, safe)
-		if safe: me.hp = minf(S["mhp"], me.hp + S["mhp"] * 0.1 * dt); me.potions = S["maxPot"]
+			Hurt.crawl_tick(combat.ctx, dt, mv.x, mv.y)   # 這いずり: ゆっくり動けるだけ
+		else:
+			me.moving = false
+			# 押し戻し・吹き飛び（ほかの動きと重ねて流される）
+			if me.kbT > 0:
+				var kk := minf(dt, me.kbT)
+				me.kbT -= dt
+				_moveme(me.kbX * kk, me.kbZ * kk)
+			if me.downT > 0:
+				# ダウン中は動けない（回避で受け身）
+				me.downT -= dt
+				if me.downT <= 0: Hurt.get_up(combat.ctx)
+			elif me.sweepT > 0:
+				pass   # ガードカウンターの回転なぎ払い中は、その場から動かない
+			elif me.dodgeT > 0:
+				me.dodgeT -= dt
+				var sp := 17.0 * float(S["wc"]["roll"]) * float(S["dodgeDist"])
+				_moveme(me.dodgeDir.x * sp * dt, me.dodgeDir.y * sp * dt)
+			elif me.dashT > 0:   # 踏み込み・後退（actions.js dash）
+				var ddt := minf(dt, me.dashT)
+				me.dashT -= dt
+				_moveme(sin(me.dashA) * me.dashSpeed * ddt, cos(me.dashA) * me.dashSpeed * ddt)
+			elif me.staggerT > 0:
+				pass   # ひるみ中は動けない
+			elif mv != Vector2.ZERO:
+				var busy: bool = me.swingT < me.swingDur or me.skillT >= 0
+				var slow := 0.45 if (me.guarding or busy) else (0.4 if me.charging and me.chargeT > GameCombat.charge_min() else 1.0)
+				var hz = Hurt.hazard_at(combat.ctx, me.x, me.z)
+				var spd: float = 7.2 * (1 + (float(S["move"]) + combat.ctx.buff_mod("move") + (25.0 if combat.desperate() else 0.0) + combat.title_move()) / 100.0) * slow * (0.5 if hz != null and hz["kind"] == "sand" else 1.0)
+				var n := mv.normalized()
+				_moveme(n.x * spd * dt, n.y * spd * dt)
+				me.moving = true
+				me.walkT += dt
+				if not busy and not me.charging and not me.guarding: me.a = atan2(n.x, n.y)
+			# 盾槍: 強攻撃を溜めている間はガードを構える
+			if me.charging and me.chargeT >= GameCombat.charge_min() and Hurt.can_guard(combat.ctx):
+				me.guarding = true; me.guardStart = t_now; me.counter = false
+			if me.guarding: me.a = _aim_angle()
+		if not me.crawl:
+			# 出口
+			if not me.transit:
+				for p in portals:
+					var d := Vector2(p.x - me.x, p.z - me.z).length()
+					if d < p.r and p.armed:
+						me.transit = true; net.send({"t": "move", "to": p.to}); break
+					if d > p.r + 1.5: p.armed = true
+			# 溜め・通常攻撃の予約・技の時間・飛ぶ斬撃（loop.js）
+			combat.tick_actions(dt, safe)
+			Hurt.hazard_tick(combat.ctx, dt)   # 毒沼は踏んでいる間ダメージ
+			if safe: me.hp = minf(S["mhp"], me.hp + S["mhp"] * 0.1 * dt); me.potions = S["maxPot"]
+	Hurt.guard_regen(combat.ctx, dt)
+	Hurt.sweep_tick(combat.ctx, dt)
+	me.sweep = Hurt.sweep_angle(me.sweepT) if me.sweepT > 0 else -1.0   # 回転なぎ払いの回った角度（player_view が読む）
+	combat.ctx.shake_v = maxf(0.0, combat.ctx.shake_v - dt * 2.5)
 	_update_teles()
 	_sync_nodes(dt)
 	send_t -= dt
@@ -564,7 +576,7 @@ func _unhandled_input(ev: InputEvent) -> void:
 		elif ev.pressed and ev.button_index == MOUSE_BUTTON_WHEEL_UP: dist = maxf(8.0, dist * 0.9)
 		elif ev.pressed and ev.button_index == MOUSE_BUTTON_WHEEL_DOWN: dist = minf(60.0, dist / 0.9)
 	if ev is InputEventKey and ev.pressed and not ev.echo:
-		if ev.physical_keycode == KEY_SPACE: _try_dodge(Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down")))
+		if ev.physical_keycode == KEY_SPACE: _try_dodge_input()
 		elif ev.physical_keycode == KEY_R: _use_potion()
 		elif ev.physical_keycode == KEY_F: _interact()
 		elif ev.physical_keycode == KEY_Q: combat.try_tree_skill(0)
@@ -671,6 +683,9 @@ func _sync_nodes(dt: float) -> void:
 		o.label.position = Vector3(o.x, y + 2.3, o.z)
 	for i in range(floats.size() - 1, -1, -1):
 		var fl = floats[i]
+		if not is_instance_valid(fl.node):   # エリアを移ると world の子ごと消える
+			floats.remove_at(i)
+			continue
 		fl.t += dt
 		fl.node.position.y += dt * 1.2
 		fl.node.modulate.a = 1.0 - fl.t
@@ -678,6 +693,7 @@ func _sync_nodes(dt: float) -> void:
 	# カメラ（第 3 世代: 俯角 45°・画角 18°・距離 33m。ホイールで距離）
 	var tgt := Vector3(me.x, gy, me.z)
 	cam.position = tgt + Vector3(0, sin(deg_to_rad(45.0)), cos(deg_to_rad(45.0))) * dist
+	if combat.ctx.shake_v > 0.0: cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * combat.ctx.shake_v * 0.35   # 画面の揺れ（被弾・ガードブレイクなど）
 	cam.look_at(tgt, Vector3.UP)
 	RenderingServer.global_shader_parameter_set("wa_occ_cam", cam.position)   # 手前の物を点描で抜く（shaders/common.gdshaderinc）
 	RenderingServer.global_shader_parameter_set("wa_occ_tgt", tgt + Vector3(0, 0.9, 0))
