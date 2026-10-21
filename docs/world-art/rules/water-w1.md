@@ -20,6 +20,10 @@
 3. 水際の砂は乾いた砂より明るく光る（W01・W04）。第 2 世代は暗くしていた（逆）
 4. 浅瀬の色は見本で分かれる: W02・W04 は明るい水色、W01・W05 は暗い灰緑（底が沈んで見える）。どちらにするかは未定
 
+## Godot（2026-10-22）
+`godot/worldart/shaders/water_w1.gdshaderinc`（waterMaterialW1 の移植。きらめき・明るみは入れない）を **地面のシェーダー（ground.gdshader）の中で**描く: 水面より下の地面の画素ごとに、カメラから水面の高さへの光線で水面の点を出して w1 の水を計算し、`水 × α + 底 × (1 − α)` を地面自身が塗る。透ける水面の板は、仕上げの板（post.gdshader）が `hint_screen_texture` を透ける物の前に写すため、上書きされて見えなかった。限界: 水に立つ岩・草は水と混ざらない。設定は `scripts/water.gd`（`WorldWater.configure`）。
+湖畔 L02 の数値: three.js 沖 0.58・197°／浅瀬 0.73・184° → Godot 沖 0.57・197°／浅瀬 0.76・186°（彩度も同じ）。撮影: `"$G" --path . res://scenes/main.tscn --resolution 1532x869 -- --map=f1_lake --shot=L02,L03 --out=<絶対パス>`（主のシーンが game.tscn なので main.tscn を明示）
+
 ## 規則（w1）
 | 項目 | 値 | 根拠 |
 |---|---|---|

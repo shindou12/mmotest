@@ -23,9 +23,18 @@ const SH_GROUND := preload("res://shaders/ground.gdshader")
 const SH_FOLIAGE := preload("res://shaders/foliage.gdshader")
 const SH_LAMBERT := preload("res://shaders/lambert.gdshader")
 const SH_ROCK := preload("res://shaders/rock.gdshader")
+const WW := preload("res://scripts/water.gd")
 
 
 @export var auto_build := true   ## ゲーム（scripts/game/game.gd）は false にして load_area で組み立てる
+
+
+## 太陽の色×強さと向きをシェーダーの全体の値に（水面 w1 が地面の材質の中で太陽の光を計算する。ビューの光の上書きも拾う）
+func _process(_dt: float) -> void:
+	if sun == null or not is_instance_valid(sun) or not sun.is_inside_tree(): return
+	var c := sun.light_color.srgb_to_linear() * (sun.light_energy * PI)   # three の色 × 強さ
+	RenderingServer.global_shader_parameter_set("wa_sun_col", Vector3(c.r, c.g, c.b))
+	RenderingServer.global_shader_parameter_set("wa_sun_dir", sun.global_transform.basis.z)
 
 
 func _ready() -> void:
@@ -194,7 +203,7 @@ func _set_globals() -> void:
 	var msaa := int(spec.get("post", {}).get("msaa", 0))
 	rs.global_shader_parameter_set("wa_alpha_cut", 0.25 if msaa > 0 else 0.5)
 	var W = spec.get("terrain", {}).get("water")
-	rs.global_shader_parameter_set("wa_water", Vector2(float(W["level"]), 1.0) if W is Dictionary else Vector2.ZERO)
+	rs.global_shader_parameter_set("wa_water", Vector2(float(W["level"]), 2.0 if String(W.get("rule", "")) == "w1" else 1.0) if W is Dictionary else Vector2.ZERO)   # y: 1 = 第 2 世代、2 = 水の規則 w1
 
 
 # ---------------------------------------------------------------- 太陽と環境
@@ -243,7 +252,8 @@ func _build_terrain() -> void:
 			xf = n.transform
 		else:
 			water = n
-	if water != null: _build_water(water)
+	if water != null and not WW.is_w1(spec): _build_water(water)   # w1 は地面の材質の中（scripts/water.gd）
+	var has_water := water != null
 	sc.free()
 	var m := ShaderMaterial.new()
 	m.shader = SH_GROUND
@@ -252,6 +262,7 @@ func _build_terrain() -> void:
 	var rk: String = {"face": "rock_face", "crack": "rock_crack"}.get(G.get("rock", ""), "rock")
 	for k in [["t_grass", "ground_grass"], ["t_dirt", "ground_dirt"], ["t_alt", alt], ["t_rock", rk], ["t_noise", "noise_soft"]]:
 		m.set_shader_parameter(k[0], _tex(k[1]))
+	if has_water and WW.is_w1(spec): WW.configure(m, self)
 	terrain_mesh = MeshInstance3D.new()
 	terrain_mesh.name = "Terrain"
 	terrain_mesh.mesh = mesh
@@ -264,12 +275,11 @@ func _build_terrain() -> void:
 
 ## 水面（world.js waterMaterial）: 作り方は scripts/water.gd（WorldWater.make）。高さマップ data/<地図>/height.png から深さを出す
 func _build_water(src: MeshInstance3D) -> void:
-	if not ResourceLoader.exists("res://scripts/water.gd"): return
 	var mi := MeshInstance3D.new()
 	mi.name = "Water"
 	mi.mesh = src.mesh
 	mi.transform = src.global_transform if src.is_inside_tree() else src.transform
-	mi.material_override = load("res://scripts/water.gd").make(self)
+	mi.material_override = WW.make(self)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 

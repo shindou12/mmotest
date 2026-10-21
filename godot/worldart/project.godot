@@ -154,6 +154,8 @@ wa_leaf_trans={"type": "float", "value": 0.0}
 wa_leaf_recv={"type": "float", "value": 1.0}
 wa_alpha_cut={"type": "float", "value": 0.25}
 wa_water={"type": "vec2", "value": Vector2(0, 0)}
+wa_sun_col={"type": "vec3", "value": Vector3(0, 0, 0)}
+wa_sun_dir={"type": "vec3", "value": Vector3(0, 1, 0)}
 wa_gb_amt={
 "type": "float",
 "value": 0.85
