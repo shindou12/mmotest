@@ -437,10 +437,10 @@ function waterMaterialW1() {
       vec3 wh = normalize(uSun + wv);
       float sheen = smoothstep(0.05, 0.4, pow(max(dot(wn, wh), 0.0), 40.0)) * open * 0.07;   // 大きな波のやわらかい明るみ（筋）
       // きらめきは細かい波（大きな波の 3.5 倍の細かさ、横に細長く）の法線で。小さく横に細長い白い点（W05）
-      vec2 gp = vW.xz * vec2(1.6, 4.5);
+      vec2 gp = vW.xz * vec2(2.6, 7.0);
       float gx = wWave(gp + e.xy, uTime * 2.0) - wWave(gp - e.xy, uTime * 2.0), gz = wWave(gp + e.yx, uTime * 2.0) - wWave(gp - e.yx, uTime * 2.0);
       vec3 gn = normalize(wn + vec3(-gx * 2.5, 0.0, -gz * 2.5));
-      float glint = smoothstep(0.45, 0.65, pow(max(dot(gn, wh), 0.0), 140.0)) * open * uWD.w;
+      float glint = smoothstep(0.75, 0.9, pow(max(dot(gn, wh), 0.0), 260.0)) * smoothstep(0.55, 0.7, nz) * open * uWD.w;   // たまに出る小さな点（ゆっくり動く斑の明るい所だけ）
       float fres = pow(1.0 - max(dot(wn, wv), 0.0), 4.0) * open;           // 空の映り
       wRefl = (uSky * (fres * 0.3 + sheen) + vec3(1.0) * glint * 0.9) * uRefl;
       diffuseColor.rgb = wc;
