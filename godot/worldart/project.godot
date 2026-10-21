@@ -172,3 +172,6 @@ wa_splat_st={
 "type": "vec3",
 "value": Vector3(0, 0, 1)
 }
+
+[audio]
+buses/default_bus_layout="res://default_bus_layout.tres"
