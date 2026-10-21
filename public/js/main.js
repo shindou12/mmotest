@@ -1,6 +1,6 @@
 // 組み立て役: 中心の処理のポートに具体的なモジュールを差し込む（ほかの処理より先に）
 import './game/wiring.js';
-import { FLOORS, migrateItem, starterWeapon, DEFAULT_WEAPON } from '../shared/data.js';
+import { FLOORS, MAX_FLOOR, migrateItem, starterWeapon, DEFAULT_WEAPON } from '../shared/data.js';
 import { AREAS } from '../shared/areas.js';
 import { makePlayer } from './models.js';
 import { OCC } from './toon.js';
@@ -9,7 +9,8 @@ import { QUEST_INDEX } from './quests.js';
 import { createUI } from './ui/app.js';
 import { now } from './game/util.js';
 import { addChat, setUI, toast, ui } from './game/ui-bridge.js';
-import { SAVE_KEY, char, characterStore, loadChar, params, saveChar, setChar, settings } from './game/save.js';
+import { DEBUG, SAVE_KEY, SOLO_WORLD_KEY, char, characterStore, loadChar, params, saveChar, setChar, settings } from './game/save.js';
+import { prepareDebugChar, startDebug } from './game/debug.js';
 import { ambient, audio, camera, fx, hemi, scene, sun, cam, tmpV } from './game/render.js';
 import { CHARGE_MAX, CHARGE_MIN, bprojs, drops, me, mobs, mouse, npcs, others, projs, setStarted, started, teles, world } from './game/state.js';
 import { S, calcStats, itemPower } from './game/stats.js';
@@ -45,10 +46,12 @@ async function startGame({ name, color, kind }) {
   char.mats = char.mats || { shard: 0, gems: {} };
   char.codex = char.codex || {};
   char.titles = char.titles || {};
+  if (DEBUG) prepareDebugChar();
   saveChar();
   const wsUrl = params.get('server') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
-  const ok = params.has('solo') || window.ETERNA_SOLO || location.protocol === 'file:' ? false : await net.connect(wsUrl);
-  if (!ok) await net.startSolo();
+  // デバッグ部屋はサーバーにつながず、自分だけのワールド（全階層解放）で動かす
+  const ok = DEBUG || params.has('solo') || window.ETERNA_SOLO || location.protocol === 'file:' ? false : await net.connect(wsUrl);
+  if (!ok) await net.startSolo(SOLO_WORLD_KEY, DEBUG ? MAX_FLOOR : 1);
   me.model = makePlayer(char.color);
   scene.add(me.model);
   setBowGuide(makeBowGuide());
@@ -56,6 +59,11 @@ async function startGame({ name, color, kind }) {
   calcStats(); me.hp = S.mhp; me.potions = S.maxPot;
   setStarted(true);
   net.send({ t: 'hello', name: char.name, color: char.color, lv: char.lv });
+  if (DEBUG) {
+    startDebug(net);
+    addChat('', 'デバッグ部屋：本番とは別のキャラです。倒れてもセーブは消えません。F2（画面上の DEBUG）で装備・ユニーク・ボス部屋へ移動。', '#ff9ab4');
+    return ok;
+  }
   addChat('', ok ? 'サーバーに接続しました。友達を誘おう！' : 'ソロモードで起動しました（npm start でサーバーを立てるとマルチプレイ）', '#9fe');
   addChat('', '町の人に話しかけると（F）サブクエストを受けられます。町の共有ボックスで仲間と装備を受け渡しできます。', '#9fe');
   addChat('', '協力ハード：3〜5人推奨。敵のHPは3人基準／回復30%・再使用8秒／戦闘不能でキャラのセーブデータを失います。', '#ffb27a');
@@ -88,7 +96,7 @@ const game = {
   resetChar() {
     try {
       localStorage.removeItem(SAVE_KEY);
-      localStorage.removeItem('eterna_coop_hard_solo_world_v1'); // ソロの階層解放状況・共有ボックスもリセット
+      localStorage.removeItem(SOLO_WORLD_KEY); // ソロの階層解放状況・共有ボックスもリセット
     } catch { /* */ }
   },
   start: startGame,

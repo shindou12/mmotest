@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { AudioEngine } from '../audio.js';
-import { FX } from '../fx.js';
+import { StyledFX } from '../fx-styles.js';
 import { AmbientParticles } from '../env.js';
 import { settings } from './save.js';
 
@@ -87,7 +87,10 @@ export function screenToGround(px, py, y, out) {
 export function setFog(color, near, far) { scene.fog = new THREE.Fog(color, near, far); }
 export function tintSun(tint, k) { sun.color.lerp(new THREE.Color(tint), k); }
 
-export const fx = new FX(scene);
+// エフェクトの見た目（設定の「エフェクト」: blend A+B / anime アニメ調 / flashy 派手 / subtle 控えめ / classic 今までの見た目）
+export const fx = new StyledFX(scene, settings.fx);
+export function applyFxStyle() { fx.setStyle(settings.fx); bloomPass.strength = fx.bloom; }
+applyFxStyle();
 export const ambient = new AmbientParticles(scene);
 export const weatherParts = new AmbientParticles(scene, 1600); // 天候（雨・霧・砂嵐）の粒子
 export const audio = new AudioEngine();

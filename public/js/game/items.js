@@ -222,4 +222,5 @@ export function setSetting(k, v) {
   state.saveSettings();
   if (['master', 'music', 'sfx', 'amb'].includes(k)) view.audio.setVolumes(state.settings);
   if (k === 'quality') { view.applyQuality(); if (state.started) field.buildEnv(state.world.area); }
+  if (k === 'fx') view.applyFxStyle();
 }

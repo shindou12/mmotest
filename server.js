@@ -14,7 +14,7 @@ const ROOTS = [
   ['/vendor/three/', path.join(__dirname, 'node_modules/three/')],
   ['/', path.join(__dirname, 'public/')],
 ];
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg' };
 
 let saved = {};
 try { saved = JSON.parse(fs.readFileSync(SAVE, 'utf8')); } catch { /* 初回 */ }

@@ -122,6 +122,7 @@ export function createUI(game) {
     SET[k] = v;
   }
   SET.quality = panels.settings.add('quality', '#set-quality').on('change', 'set:change', (e) => ({ key: 'quality', value: e.target.value }));
+  SET.fx = panels.settings.add('fx', '#set-fx').on('change', 'set:change', (e) => ({ key: 'fx', value: e.target.value }));
   for (const k of ['shake', 'dmgnum', 'occlusion']) SET[k] = panels.settings.add(k, '#set-' + k).on('change', 'set:change', (e) => ({ key: k, value: e.target.checked }));
   const MAP = {
     title: panels.map.add('title', '#map-title'), sub: panels.map.add('sub', '#map-sub'), tabs: panels.map.add('tabs', '#map-tabs'),

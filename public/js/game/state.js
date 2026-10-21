@@ -8,7 +8,7 @@ export const DODGE_CD = 0.75;
 export const me = {
   id: 0, x: 0, z: 0, a: Math.PI, hp: 100, dead: false, deadT: 0,
   crawl: false, rv: -1, downs: 0, downsAt: 0, // 這いずり / ゲージの残り（円1周=1）/ 最近倒れた回数
-  swingT: 9, swingDur: 0.4, combo: 0, lastSwing: 0, sw: 0, sk: 0, queued: 0,
+  swingT: 9, swingDur: 0.4, heavySwing: false, combo: 0, lastSwing: 0, sw: 0, sk: 0, queued: 0,
   charging: false, chargeT: 0, chargeLv: 0, guarding: false, guardStart: 0,
   dodgeT: 0, dodgeCd: 0, dodgeDir: [0, 1], iframe: 0,
   wsCd: 0, tcd: {}, skillT: -1, spin: false, dashT: 0, dashA: 0, dashSpeed: 0,
