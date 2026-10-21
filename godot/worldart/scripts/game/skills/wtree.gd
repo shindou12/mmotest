@@ -7,6 +7,8 @@ extends RefCounted
 const Common = preload("res://scripts/game/skills/common.gd")
 const Sword = preload("res://scripts/game/skills/sword.gd")
 const Greatsword = preload("res://scripts/game/skills/greatsword.gd")
+const Spear = preload("res://scripts/game/skills/spear.gd")
+const Bow = preload("res://scripts/game/skills/bow.gd")
 
 
 static func wtrees() -> Dictionary:
@@ -156,5 +158,7 @@ static func effects(ch: Dictionary, wk: String):
 	match wk:
 		"sword": Sword.mods(st, w.br, w.mods)
 		"greatsword": Greatsword.mods(st, w.br, w.mods)
+		"spear": Spear.mods(st, w.br, w.mods)
+		"bow": Bow.mods(st, w.br, w.mods)
 		_: push_error("wtree.gd: %s のツリーの mods はまだ移していない" % wk)
 	return w

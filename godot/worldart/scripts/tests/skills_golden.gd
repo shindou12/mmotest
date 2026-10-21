@@ -5,7 +5,7 @@ extends SceneTree
 ##   { keys: { <キー>: { suite, in: {入力}, ev | meta | eff } }, misc: {...} }
 ##   キーは test/golden/skill-trace.mjs と同じ（heavy/<武器>/<lv>・ws/<id>・ts/<id>・wt/<id>/<段階>・wtmeta/<id>/<段階>・eff/<id>/<段階>）
 ## suite ごとに「OK n 件」か「NG」（最初の 3 件のキー・期待・実際）を出し、全部 OK のときだけ終了コード 0。
-##   sword: 片手剣の heavy・ws・ts・wt   greatsword: 大剣の同じもの   wtree: 武器ツリーの wtmeta と eff（片手剣・大剣のノード）
+##   sword: 片手剣の heavy・ws・ts・wt   greatsword: 大剣の同じもの   spear: 盾槍   bow: 弓   wtree: 武器ツリーの wtmeta と eff（片手剣・大剣・盾槍・弓のノード）
 ##
 ## 記録する文脈 Recorder は skill-trace.mjs の recorder と同じ: 呼ばれた操作を [時刻, 名前, 引数] で書き留め、later は記録してから
 ## 待ち行列（時刻 → 登録順）へ入れる。敵の仮の値・自分・point・area・range・zone・reach・col も同じ。
@@ -17,7 +17,7 @@ const Ctx = preload("res://scripts/game/skills/ctx.gd")
 const Skills = preload("res://scripts/game/skills/skills.gd")
 const WTree = preload("res://scripts/game/skills/wtree.gd")
 const Common = preload("res://scripts/game/skills/common.gd")
-const SUITES := ["sword", "greatsword", "wtree"]
+const SUITES := ["sword", "greatsword", "spear", "bow", "wtree"]
 
 
 ## skill-trace.mjs の recorder: 呼ばれたものをすべて書き留める文脈
@@ -62,7 +62,7 @@ class Recorder extends Ctx:
 	func area() -> String: return "f1_field"
 	func range(): return 12.0
 	func zone() -> Array: return [6.0, 10.0]
-	func reach(): return 1.0
+	func reach(_normal = null): return 1.0
 	func now() -> float: return time
 	func rnd(a: float = 0.0, b: float = 1.0) -> float: return a + 0.5 * (b - a)
 

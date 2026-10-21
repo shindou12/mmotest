@@ -46,9 +46,9 @@ function recorder(W, wk) {
 }
 
 // Godot で照合する武器と範囲
-const WK_SUITE = { sword: 'sword', greatsword: 'greatsword' };
-// ts/ のうち片手剣・大剣の分（旧来のツリースキルは武器の kind を持たないので、旧スロット名で分ける。技は kind が武器）
-const TS_SUITE = (id, sk) => WK_SUITE[sk.kind] || ({ slant: 'sword', brave: 'sword', gslam: 'greatsword', fortress: 'greatsword' }[id] || '');
+const WK_SUITE = { sword: 'sword', greatsword: 'greatsword', spear: 'spear', bow: 'bow' };
+// ts/ のうち片手剣・大剣・盾槍・弓の分（旧来のツリースキルは武器の kind を持たないので、旧スロット名で分ける。技は kind が武器）
+const TS_SUITE = (id, sk) => WK_SUITE[sk.kind] || ({ slant: 'sword', brave: 'sword', gslam: 'greatsword', fortress: 'greatsword', shieldbash: 'spear', taunt: 'spear', javelin: 'spear', whirl: 'spear', backshot: 'bow', focus: 'bow' }[id] || '');
 
 const keys = {};
 const hashes = {};   // 自己確認用: キー → 生の記録のハッシュ
