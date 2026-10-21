@@ -13,6 +13,9 @@ const VOICE_MERGE_SEC := 0.03
 const VOICE_WINDOW_SEC := 0.15
 const VOICE_REPEAT_GAIN := 0.6
 const VOICE_MAX := 3
+# 対応元: public/js/sample-sfx.js の SampleBank.play() は gain を t + 0.02 秒で 0 にし、source を t + 0.03 秒で止める。
+const VOICE_FADE_SEC := 0.02
+const VOICE_STOP_DELAY_SEC := 0.03
 
 # 対応元: public/js/audio.js の AudioEngine.level() の master/music/sfx/amb 基準値。
 const BUS_BASE_LEVELS := {"Master": 0.8, "Music": 0.42, "SFX": 0.7, "Amb": 0.5}
@@ -24,6 +27,8 @@ var _entries_by_name: Dictionary = {}
 var _streams: Dictionary = {}
 var _voice_states: Dictionary = {}
 var _player_pools: Dictionary = {}
+var _fading_players: Dictionary = {}
+var _fade_tweens: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _volume_tween: Tween
 var _volumes := {"master": 1.0, "music": 1.0, "sfx": 1.0, "amb": 1.0}
@@ -131,6 +136,8 @@ func sfx(name: String, opt: Dictionary = {}) -> bool:
 	var decision := _reserve_voice(sound_name, now_sec, stream.get_length())
 	if not decision["accepted"]:
 		return false
+	if decision.has("replaced_voice"):
+		_fade_voice_out(sound_name, decision["replaced_voice"])
 
 	var player := _get_player(sound_name)
 	if player == null:
@@ -163,10 +170,10 @@ func _reserve_voice(sound_name: String, now_sec: float, duration_sec: float) -> 
 		if now_sec - float(voice["at"]) < VOICE_WINDOW_SEC:
 			repeat_count += 1
 
-	# 完了条件に合わせ、VOICE_MAX に達している間の新規再生は拒否する。
-	# 元の sample-sfx.js は最古の声をフェードしてから新しい声を鳴らす。
+	var replaced_voice: Dictionary = {}
 	if active.size() >= VOICE_MAX:
-		return {"accepted": false, "reason": "max"}
+		# 対応元: public/js/sample-sfx.js の SampleBank.play() は list.shift() で最古の声を外す。
+		replaced_voice = active.pop_front()
 
 	var gain := pow(VOICE_REPEAT_GAIN, repeat_count) * _jitter(VOLUME_JITTER)
 	var pitch := _jitter(PITCH_JITTER)
@@ -178,7 +185,10 @@ func _reserve_voice(sound_name: String, now_sec: float, duration_sec: float) -> 
 	}
 	active.append(voice)
 	_voice_states[sound_name] = active
-	return {"accepted": true, "gain": gain, "pitch": pitch, "voice": voice, "repeat_count": repeat_count}
+	var decision := {"accepted": true, "gain": gain, "pitch": pitch, "voice": voice, "repeat_count": repeat_count}
+	if not replaced_voice.is_empty():
+		decision["replaced_voice"] = replaced_voice
+	return decision
 
 
 func _jitter(amount: float) -> float:
@@ -190,7 +200,14 @@ func _get_player(sound_name: String) -> AudioStreamPlayer:
 	for player in pool:
 		if not player.playing:
 			return player
-	if pool.size() >= VOICE_MAX:
+	# 交代した声のフェード中だけ、停止待ちの声と新しい3声が一時的に重なる。
+	# 4つ目までを再利用し、次の交代時にフェード中のものを完了させる。
+	if pool.size() >= VOICE_MAX + 1:
+		var fading: Array = _fading_players.get(sound_name, [])
+		if not fading.is_empty():
+			var fading_player: AudioStreamPlayer = fading.front()
+			_finish_fading_player(sound_name, fading_player)
+			return fading_player
 		return null
 	var player := AudioStreamPlayer.new()
 	player.name = "SFX_%s_%d" % [sound_name, pool.size() + 1]
@@ -199,6 +216,40 @@ func _get_player(sound_name: String) -> AudioStreamPlayer:
 	pool.append(player)
 	_player_pools[sound_name] = pool
 	return player
+
+
+func _fade_voice_out(sound_name: String, voice: Dictionary) -> void:
+	var player: AudioStreamPlayer = voice.get("player")
+	if player == null or not player.playing:
+		return
+	var fading: Array = _fading_players.get(sound_name, [])
+	fading.append(player)
+	_fading_players[sound_name] = fading
+
+	var tween := create_tween()
+	_fade_tweens[player] = tween
+	# 対応元: SampleBank.play() の linearRampToValueAtTime(0, t + 0.02)、続いて stop(t + 0.03)。
+	tween.tween_method(Callable(self, "_set_player_linear_volume").bind(player), db_to_linear(player.volume_db), 0.0, VOICE_FADE_SEC)
+	tween.tween_interval(VOICE_STOP_DELAY_SEC - VOICE_FADE_SEC)
+	tween.tween_callback(Callable(self, "_finish_fading_player").bind(sound_name, player))
+
+
+func _set_player_linear_volume(volume: float, player: AudioStreamPlayer) -> void:
+	if not is_instance_valid(player):
+		return
+	player.volume_db = linear_to_db(maxf(volume, 0.0001))
+
+
+func _finish_fading_player(sound_name: String, player: AudioStreamPlayer) -> void:
+	var tween: Tween = _fade_tweens.get(player)
+	if tween != null and tween.is_running():
+		tween.kill()
+	_fade_tweens.erase(player)
+	if is_instance_valid(player):
+		player.stop()
+	var fading: Array = _fading_players.get(sound_name, [])
+	fading.erase(player)
+	_fading_players[sound_name] = fading
 
 
 func _remove_voice(sound_name: String, target: Dictionary) -> void:

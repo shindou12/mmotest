@@ -34,12 +34,32 @@ func _run() -> void:
 	_expect(float(repeat_second["gain"]) < float(repeat_first["gain"]) and float(repeat_third["gain"]) < float(repeat_second["gain"]), "repeatGain で2回目以降が小さくなる")
 	print("連打 gain: %.3f → %.3f → %.3f" % [repeat_first["gain"], repeat_second["gain"], repeat_third["gain"]])
 
-	var max_id := "test_max"
-	var first := audio._reserve_voice(max_id, 0.0, 1.0)
-	var second := audio._reserve_voice(max_id, 0.04, 1.0)
-	var third := audio._reserve_voice(max_id, 0.08, 1.0)
-	var fourth := audio._reserve_voice(max_id, 0.12, 1.0)
-	_expect(first["accepted"] and second["accepted"] and third["accepted"] and not fourth["accepted"] and fourth["reason"] == "max", "window 内の4回目を拒否（max 3）")
+	var max_id := "swing"
+	var now_sec := float(Time.get_ticks_usec()) / 1000000.0
+	var first := audio._reserve_voice(max_id, now_sec - 0.13, 1.0)
+	var second := audio._reserve_voice(max_id, now_sec - 0.09, 1.0)
+	var third := audio._reserve_voice(max_id, now_sec - 0.05, 1.0)
+	var players: Array[AudioStreamPlayer] = []
+	for i in range(AudioModule.VOICE_MAX):
+		var player := AudioStreamPlayer.new()
+		player.stream = audio._streams[max_id]
+		audio.add_child(player)
+		player.play()
+		players.append(player)
+	first["voice"]["player"] = players[0]
+	second["voice"]["player"] = players[1]
+	third["voice"]["player"] = players[2]
+	audio._player_pools[max_id] = players
+	var fourth_played := audio.sfx(max_id)
+	var voices_after: Array = audio._voice_states[max_id]
+	var newest_voice: Dictionary = voices_after.back()
+	var fade_tween: Tween = audio._fade_tweens.get(players[0])
+	_expect(first["accepted"] and second["accepted"] and third["accepted"] and fourth_played, "window 内の4回目も新しい声を鳴らす")
+	_expect(voices_after.size() == AudioModule.VOICE_MAX and voices_after[0] == second["voice"] and voices_after[1] == third["voice"], "上限では最古の声を外し、登録数を max 3 に保つ")
+	_expect(fade_tween != null and audio._fading_players[max_id].has(players[0]) and players[0].playing and newest_voice["player"].playing, "最古の声をフェードしながら新しい声を再生する")
+	if fade_tween != null:
+		await fade_tween.finished
+		_expect(not players[0].playing, "最古の声を 0.03 秒後に停止する")
 
 	for bus_name in AudioModule.BUS_NAMES:
 		_expect(AudioServer.get_bus_index(bus_name) >= 0, "Audio bus %s が存在する" % bus_name)
@@ -49,6 +69,15 @@ func _run() -> void:
 	_expect(_close_db(AudioServer.get_bus_volume_db(AudioServer.get_bus_index(&"Music")), linear_to_db(0.42 * 0.25)), "Music 音量を基準値に掛けて反映")
 	_expect(_close_db(AudioServer.get_bus_volume_db(AudioServer.get_bus_index(&"SFX")), linear_to_db(0.7 * 0.75)), "SFX 音量を基準値に掛けて反映")
 	_expect(_close_db(AudioServer.get_bus_volume_db(AudioServer.get_bus_index(&"Amb")), linear_to_db(0.5)), "Amb 音量を基準値に掛けて反映")
+	for player in audio._player_pools[max_id]:
+		player.stop()
+		player.stream = null
+	audio._player_pools.clear()
+	audio._voice_states.clear()
+	audio._streams.clear()
+	fade_tween = null
+	audio.free()
+	await process_frame
 
 	if _all_ok:
 		print("音の規則 全部 OK")
