@@ -547,7 +547,7 @@ func _process(dt: float) -> void:
 	if send_t <= 0:
 		send_t = 0.066
 		net.send({"t": "st", "x": snappedf(me.x, 0.01), "z": snappedf(me.z, 0.01), "a": snappedf(me.a, 0.01), "hp": int(round(me.hp)), "mhp": S["mhp"], "lv": ch["lv"],
-			"dead": me.dead, "wk": S["wk"], "wr": S["wr"], "sw": me.sw, "sk": me.sk, "dg": 1 if me.dodgeT > 0 else 0, "gd": 1 if me.guarding else 0, "wst": S.get("wst", 0), "arm": S.get("arm", 0),
+			"dead": me.dead, "wk": S["wk"], "wr": S["wr"], "sw": me.sw, "sk": me.sk, "dg": 1 if me.dodgeT > 0 else 0, "gd": 1 if me.guarding else 0, "wst": PlayerView.weapon_style(ch["eq"].get("weapon")), "arm": PlayerView.armor_look(ch["eq"].get("armor")),
 			"pm": me.motion, "pt": snappedf(float(me.motionT), 0.001), "rc": 2 if me.downT > 0 else (1 if me.hurtT > 0 else 0), "cl": 1 if WFX.fx_some("shieldBack") else 0})
 	_update_hud()
 

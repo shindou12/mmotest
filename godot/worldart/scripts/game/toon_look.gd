@@ -84,6 +84,11 @@ static func _toon_material(albedo: Color, emission: Color, unlit: bool, scale: f
 	return m
 
 
+## 線（THREE.Line + LineBasicMaterial）用の材質: 光らない単色（glow と同じ unlit の扱い）。弓の弦
+static func line_material(c: Color) -> ShaderMaterial:
+	return _toon_material(c, Color(0, 0, 0), true, 1.0, true, 0.0)
+
+
 # ---------------------------------------------------------------------------
 # プレイヤーの色から作る材質（models.js makePlayer / setPlayerArmor の式。作り方は data/models/player_color.json）
 # ---------------------------------------------------------------------------

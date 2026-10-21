@@ -14,6 +14,7 @@ const DEFAULT_CAM := {"fov": 50.0, "pos": [0.0, 4.21, 3.61], "target": [0.0, 1.0
 const DEFAULT_BG := "#7d8a95"
 
 var _model: PlayerModel = null
+var _cam_cfg: Dictionary = {}
 
 
 func _args() -> Dictionary:
@@ -57,6 +58,7 @@ func _ready() -> void:
 
 func _setup_view(cfg: Dictionary) -> void:
 	var c: Dictionary = cfg["camera"]
+	_cam_cfg = c
 	var cam: Camera3D = $Camera
 	cam.fov = float(c["fov"])
 	cam.near = 0.1
@@ -86,6 +88,9 @@ func _apply_light(l: Dictionary) -> void:
 
 
 func _shoot(job: Dictionary) -> bool:
+	if _cam_cfg.is_empty(): _cam_cfg = DEFAULT_CAM
+	var c: Dictionary = job["camera"] if job.get("camera") is Dictionary else _cam_cfg    # 姿勢ごとの視点（横から見る確かめ用）。なければ一覧の視点
+	$Camera.look_at_from_position(Vector3(c["pos"][0], c["pos"][1], c["pos"][2]), Vector3(c["target"][0], c["target"][1], c["target"][2]), Vector3.UP)
 	if _model != null and _model.root != null: _model.root.free()
 	var w: PackedStringArray = String(job["weapon"]).split(":")
 	_model = PlayerModel.new()

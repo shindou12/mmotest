@@ -16,12 +16,18 @@ static var _rigj: Dictionary
 static var _tables: Dictionary
 static var _weapon_index: Dictionary
 static var _armor_json: Dictionary
+static var _bow_parts: Dictionary
 
 var root: Node3D
 var rig                          # PlayerRig
 var nodes: Dictionary
 var grip_hand: Node3D = null
 var kind := ""
+# 弓の弦と矢（kit.js bowString の userData.bow）。弦は 3 点の折れ線（先端・sx・先端）で、引くと中央の点が sx - 引き分 に動く
+var bow_string: ImmediateMesh = null
+var bow_arrow: Node3D = null
+var bow_tip := 0.0
+var bow_sx := 0.0
 
 
 static func _json(path: String) -> Variant:
@@ -34,6 +40,7 @@ static func load_data() -> void:
 	_tables = PR.make_tables(_json("res://data/motions.json"))
 	_weapon_index = _json(MODELS + "weapons/index.json")
 	_armor_json = _json(MODELS + "armor_looks.json")
+	_bow_parts = _json(MODELS + "weapons/bow_parts.json")
 
 
 ## GLB を読む。書き出しの根（model / weaponModel / shield / armor / gripHand）のノードを、取り込みの外側の入れ物から外して返す
@@ -88,6 +95,7 @@ func build(opts: Dictionary) -> void:
 		var w := _scene("weapons/" + wfile)
 		_move_parts(w, nodes["weaponModel"])
 		w.free()
+		if kind == "bow" and _bow_parts.has("%s:%d:%d" % [kind, form, tier]): _add_bow_parts(_bow_parts["%s:%d:%d" % [kind, form, tier]])
 	# 盾（kite）
 	if nodes.has("shield"):
 		var sh := _scene("shield_kite_t%d.glb" % tier)
@@ -121,7 +129,55 @@ func build(opts: Dictionary) -> void:
 		rig._apply()
 
 
+## 弦（THREE.Line、色は bowString の引数）と矢（bow_arrow.glb）を弓の形に足す。引き具合は animate が毎フレーム入れる
+func _add_bow_parts(bp: Dictionary) -> void:
+	bow_tip = float(bp["tip"])
+	bow_sx = float(bp["sx"])
+	bow_string = ImmediateMesh.new()
+	var mi := MeshInstance3D.new()
+	mi.name = "bowString"
+	mi.mesh = bow_string
+	mi.material_override = ToonLook.line_material(Color(String(bp["color"])))
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	nodes["weaponModel"].add_child(mi)
+	bow_arrow = _scene("bow_arrow.glb") as Node3D
+	bow_arrow.visible = false
+	nodes["weaponModel"].add_child(bow_arrow)
+	_set_bow_draw(0.0, false)
+
+
+func _set_bow_draw(pull: float, arrow_visible: bool) -> void:
+	bow_string.clear_surfaces()
+	bow_string.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	bow_string.surface_add_vertex(Vector3(bow_sx, -bow_tip, 0.0))
+	bow_string.surface_add_vertex(Vector3(bow_sx - pull, 0.0, 0.0))
+	bow_string.surface_add_vertex(Vector3(bow_sx, bow_tip, 0.0))
+	bow_string.surface_end()
+	bow_arrow.visible = arrow_visible
+	bow_arrow.position.x = bow_sx - pull
+
+
+## applyBowPose / applyBowTechnique（weapons/bow.js）の弦と矢の部分。姿勢は rig が作り、ここは引き具合だけを見る
+func _update_bow(s: Dictionary) -> void:
+	var charging := bool(s.get("charging", false))
+	var swing := float(s.get("swing", -1.0))
+	var pull := 0.0
+	var show := false
+	var tid := String(s.get("motion", ""))
+	var ms: Dictionary = rig.tables["m"]["motions"]
+	if ms.has(tid) and ms[tid]["kind"] == "bow" and not (float(s.get("down", 0.0)) > 0.0 or float(s.get("dodge", 0.0)) > 0.0 or float(s.get("hurt", 0.0)) > 0.0):
+		var draw: float = rig._sample_technique(tid, float(s.get("motionT", 0.0)))["draw"]
+		pull = 0.22 * clampf(draw, 0.0, 1.0)
+		show = draw > 0.03
+	elif charging or swing >= 0.0:
+		var draw := clampf(float(s.get("charge", 1.0)), 0.0, 1.0) if charging else 1.0 - clampf(swing / 0.25, 0.0, 1.0)
+		pull = 0.22 * draw
+		show = charging or swing < 0.15
+	_set_bow_draw(pull, show)
+
+
 func animate(state: Dictionary) -> void:
 	rig.animate(state)
+	if bow_string != null: _update_bow(state)
 	# alignGripHand（grip-hands.js）: 握り手は武器と同じ向き
 	if grip_hand != null: grip_hand.quaternion = nodes["weapon"].quaternion

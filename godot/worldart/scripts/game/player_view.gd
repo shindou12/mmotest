@@ -22,8 +22,6 @@ const CHARGE_MAX := 0.9
 const OTHER_SWING := 0.35  # 他の人の通常攻撃の長さ（loop.js: o.swingT < 0.35）
 const SPIN_DUR := 0.55
 
-const ARMOR_CLS := {"light": 0, "medium": 1, "heavy": 2}
-const ARMOR_IDS := ["cloth", "tunic", "hunter", "robe", "ninja", "bard", "leather", "chain", "scale", "brigandine", "ranger", "dragonhide", "breast", "plate", "knight", "oyoroi", "paladin", "fortress"]
 
 static var _area_light: Dictionary = {}
 static var _light_area := "?"
@@ -69,25 +67,45 @@ static func create(c: Color) -> Node3D:
 # 装備 → 見た目（models.js）
 # ---------------------------------------------------------------------------
 
-## models.js weaponStyle(it): 装備から武器の形を決める。固有武器（レア度 6 以上）は固有の表があるが未移植なので、未登録の伝説・神器と同じ 3 にする
+static var _styles: Dictionary = {}
+
+
+## 固有武器の形・防具の見た目の表（data/models/weapons/styles.json。export_models.mjs が weapon-appearances.js と armorLook から作る）
+static func _style_tables() -> Dictionary:
+	if _styles.is_empty():
+		var j = JSON.parse_string(FileAccess.get_file_as_string("res://data/models/weapons/styles.json"))
+		_styles = j if j is Dictionary else {"unique": {}, "armor": {}}
+	return _styles
+
+
+## models.js weaponStyle(it): 装備から武器の形を決める。固有武器（レア度 6 以上）は固有の形（weapon-appearances.js uniqueWeaponStyle）、
+## 未登録の伝説・神器は 3、それ以外は名前から選ぶ
 static func weapon_style(it) -> int:
 	if not (it is Dictionary): return 0
-	if int(it.get("rarity", 0)) >= 6: return 3
+	if int(it.get("rarity", 0)) >= 6:
+		var u = it.get("unique")
+		var tbl: Dictionary = _style_tables()["unique"].get(String(it.get("kind", "")), {})
+		if u is String and tbl.has(u): return int(tbl[u])
+		return 3
 	var s := 7
 	for ch in String(it.get("name", "")):
-		s = (s * 31 + ch.unicode_at(0)) & 0xFFFFFFFF
+		var c := ch.unicode_at(0)
+		if c > 0xFFFF: c = 0xD800 + ((c - 0x10000) >> 10)    # JS の charCodeAt(0)（UTF-16 の先頭）
+		s = (s * 31 + c) & 0xFFFFFFFF
 	if String(it.get("kind", "")) == "greatsword":
 		if s % 8 == 0: return 4
 		if s % 8 == 1: return 5
 	return s % 3
 
 
-## models.js armorLook(it): 防具の見た目 0〜6
+## models.js armorLook(it): 防具の見た目 0〜6（cls × atype の表を JS の armorLook から書き出してある）
 static func armor_look(it) -> int:
 	if not (it is Dictionary) or String(it.get("slot", "")) != "armor": return 0
-	var cls: int = ARMOR_CLS.get(String(it.get("armor", "medium")), 1)
-	var idx := maxi(0, ARMOR_IDS.find(String(it.get("atype", ""))))
-	return cls * 2 + (idx % 2) + 1
+	var tbl: Dictionary = _style_tables()["armor"]
+	var cls := String(it.get("armor", "")) if String(it.get("armor", "")) != "" else "medium"
+	var k := "%s:%s" % [cls, String(it.get("atype", ""))]
+	if tbl.has(k): return int(tbl[k])
+	return int(tbl.get(cls + ":", 0))
 
 
 ## models.js visTier: レアリティ → 飾りの段階（0〜5）

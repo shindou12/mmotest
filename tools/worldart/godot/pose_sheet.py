@@ -90,6 +90,9 @@ def cell(a, box, bg):
 def group_of(pid):
     if pid.startswith('sw_'):
         return 'sword'
+    for pre, name in (('sp_', 'spear'), ('dg_', 'dagger'), ('ax_', 'axe'), ('bw_', 'bow')):
+        if pid.startswith(pre):
+            return name + ('-forms' if ('_form' in pid or pid.endswith('_rest')) else '-poses')
     if pid.startswith('eq_'):
         return 'equipment'
     if pid == 'gs_rest' or pid.startswith('gs_form'):

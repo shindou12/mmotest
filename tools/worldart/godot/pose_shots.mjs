@@ -23,6 +23,7 @@ const CAMERA = { fov: 50, pos: [0, 4.21, 3.61], target: [0, 1.05, 0] };
 const LIGHT = { sun_dir: [20, 40, 10], sun_color: '#fff1d6', sun_i: 2.2, sky: '#cfe8ff', ground: '#3a5a2a', hemi_i: 1.1, aces: true, exposure: 1 };
 const BG = '#7d8a95';
 const COLOR = '#448a9b';
+const SIDE_CAM = { fov: 50, pos: [1.9, 1.9, 3.2], target: [-0.2, 1.3, 0.3] };
 const TIER = 4;                       // 飾りの段階（レア度 5）。形の比較は全部これ
 
 // 姿勢の一覧: [id, ラベル, 武器 '種類:形:段階', 状態]
@@ -46,6 +47,22 @@ const POSES = [
   ['sw_rest', '片手剣 構え', `sword:0:${TIER}`, {}],
   ['sw_n1', '片手剣 通常1段(0.5)', `sword:0:${TIER}`, { swing: 0.5, combo: 0 }],
   ['sw_ch05', '片手剣 溜め 0.5', `sword:0:${TIER}`, { charging: true, charge: 0.5, swing: 0.02 }],
+  // 槍・短剣・斧・弓: 構え・通常・溜め・技 1 つ（弓は引き 0.5 と 1.0）と、全部の形の構え
+  ...[['sp', 'spear', '槍', 'spear_stake', 4], ['dg', 'dagger', '短剣', 'dagger_vital', 4], ['ax', 'axe', '斧', 'axe_execute', 4]].flatMap(([p, kind, jp, tech, nf]) => [
+    [`${p}_rest`, `${jp} 構え`, `${kind}:0:${TIER}`, {}],
+    [`${p}_n1`, `${jp} 通常1段(0.5)`, `${kind}:0:${TIER}`, { swing: 0.5, combo: 0 }],
+    [`${p}_ch05`, `${jp} 溜め 0.5`, `${kind}:0:${TIER}`, { charging: true, charge: 0.5, swing: 0.02 }],
+    [`${p}_tech`, `${jp} 技 ${TECHNIQUES[tech].name}`, `${kind}:0:${TIER}`, { motion: tech, motionT: hit(tech) }],
+    ...Array.from({ length: nf - 1 }, (_, i) => i + 1).map((f) => [`${p}_form${f}`, `${jp} 形${f} 構え`, `${kind}:${f}:${TIER}`, {}]),
+  ]),
+  ['bw_rest', '弓 構え', `bow:0:${TIER}`, {}],
+  ['bw_n1', '弓 通常(0.1 放つ)', `bow:0:${TIER}`, { swing: 0.1 }],
+  ['bw_draw05', '弓 引き 0.5', `bow:0:${TIER}`, { charging: true, charge: 0.5, swing: 0.02 }],
+  ['bw_draw10', '弓 引き 1.0', `bow:0:${TIER}`, { charging: true, charge: 1, swing: 0.02 }],
+  // 弦と矢が見える横からの画角（job.camera で上書き）。引き 0 / 0.5 / 1.0
+  ...[['0', 0], ['05', 0.5], ['10', 1]].map(([n, c]) => [`bw_side${n}`, `弓 横から 引き${c}`, `bow:0:${TIER}`, c ? { charging: true, charge: c, swing: 0.02 } : {}, 0, SIDE_CAM]),
+  ['bw_tech', `弓 技 ${TECHNIQUES.bow_double.name}`, `bow:0:${TIER}`, { motion: 'bow_double', motionT: hit('bow_double') }],
+  ...[1, 2, 3].map((f) => [`bw_form${f}`, `弓 形${f} 構え`, `bow:${f}:${TIER}`, {}]),
   // 防具の見た目 1〜6（armor-looks.js）と盾（kite、盾槍の spear）
   ...[1, 2, 3, 4, 5, 6].map((a) => [`eq_armor${a}`, `防具 見た目${a}`, `sword:0:${TIER}`, {}, a]),
   ['eq_shield', '盾 kite 構え', `spear:0:${TIER}`, {}],
@@ -60,7 +77,7 @@ fs.mkdirSync(path.join(OUT, 'godot'), { recursive: true });
 // Godot 用の一覧
 const list = {
   camera: CAMERA, light: LIGHT, bg: BG,
-  jobs: poses.map(([id, label, weapon, state, armor]) => ({ id, label, weapon, armor: armor || 0, hide_weapon: id.startsWith('eq_shield'), color: COLOR, state, out: path.join(OUT, 'godot', id + '.png') })),
+  jobs: poses.map(([id, label, weapon, state, armor, camera]) => ({ id, label, weapon, armor: armor || 0, camera, hide_weapon: id.startsWith('eq_shield'), color: COLOR, state, out: path.join(OUT, 'godot', id + '.png') })),
 };
 fs.writeFileSync(path.join(OUT, 'poses.json'), JSON.stringify(list, null, 1) + '\n');
 
@@ -93,6 +110,8 @@ fs.writeFileSync(path.join(OUT, 'poses.json'), JSON.stringify(list, null, 1) + '
       const out = {};
       for (const j of list.jobs) {
         const [kind, form, tier] = j.weapon.split(':');
+        const cam = j.camera || list.camera;
+        camera.position.set(...cam.pos); camera.lookAt(new THREE.Vector3(...cam.target));
         const model = M.makePlayer(j.color);
         M.setPlayerWeapon(model, kind, TIER_RARITY[+tier], +form);
         if (j.armor) M.setPlayerArmor(model, j.armor);
