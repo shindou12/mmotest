@@ -2,7 +2,7 @@
 # Luna（Codex CLI）を呼べる状態にする準備（docs/agents/collaboration.md）。何度実行してもよい。
 #   sh tools/agents/setup.sh            # Codex CLI を入れて、認証の有無を確かめる
 #   sh tools/agents/setup.sh --godot    # あわせて描画の確認の環境（Godot 4.3・xvfb・ソフトウェアの Vulkan）も入れる
-# 秘密情報は扱わない: 認証は環境の設定（ネットワークの秘密情報 か 環境変数 CODEX_API_KEY）で渡す。キーを表示・保存しない。
+# 認証は ChatGPT のアカウントでのログインだけ（codex login --device-auth、ユーザーが承認）。API キー（従量課金）は使わない。秘密情報を表示・保存しない。
 CODEX_VERSION=0.163.0
 if ! command -v codex >/dev/null 2>&1 || [ "$(codex --version 2>/dev/null)" != "codex-cli $CODEX_VERSION" ]; then
   npm install -g "@openai/codex@$CODEX_VERSION" >/dev/null 2>&1 || { echo "NG  Codex CLI を入れられない（npm）"; exit 1; }
@@ -18,10 +18,9 @@ if [ "$1" = "--godot" ]; then
   command -v xvfb-run >/dev/null 2>&1 || apt-get install -y -q xvfb >/dev/null 2>&1
   echo "OK  $(godot --version 2>/dev/null | head -1)  xvfb: $(command -v xvfb-run >/dev/null && echo あり || echo なし)  vulkan(lavapipe): $([ -f /usr/share/vulkan/icd.d/lvp_icd.json ] && echo あり || echo なし)"
 fi
-# 認証: 中身は見ずに、有無だけ
-if [ -n "$CODEX_API_KEY" ] || [ -n "$OPENAI_API_KEY" ] || codex login status >/dev/null 2>&1; then
-  echo "OK  認証の設定あり（環境変数 か codex login）"
+# 認証: 中身は見ずに、ログインの有無だけ
+if codex login status >/dev/null 2>&1; then
+  echo "OK  Codex にログイン済み（$(codex login status 2>&1 | head -1 | cut -c1-40)）"
 else
-  echo "--  Codex の認証の設定なし（環境変数 CODEX_API_KEY がない、codex login もしていない）。"
-  echo "    ネットワークの秘密情報（api.openai.com）で渡している場合は、tools/agents/luna.sh --check で実際に呼べるか確かめる"
+  echo "--  Codex にログインしていない。ChatGPT のアカウントで: codex login --device-auth（ユーザーがブラウザで承認）"
 fi

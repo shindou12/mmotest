@@ -17,7 +17,7 @@ if [ "${1:-}" = "--check" ]; then
   reply=$(cat "$tmp/last.txt" 2>/dev/null); rm -rf "$tmp"
   if [ "$(echo "$reply" | tr -d '[:space:]')" = "LUNA_OK" ]; then echo "OK  $MODEL を呼べた（返事: LUNA_OK）"; exit 0; fi
   if echo "$out" | grep -qE "401|Unauthorized"; then
-    echo "NG  認証がない（401）。環境の設定で api.openai.com のネットワークの秘密情報か、環境変数 CODEX_API_KEY を足してから、新しいセッションで再実行"; exit 3; fi
+    echo "NG  ログインしていない（401）。ChatGPT のアカウントでログインする: codex login --device-auth（ユーザーがブラウザで承認。API キーは使わない: docs/agents/collaboration.md の 8）"; exit 3; fi
   echo "NG  呼べない（認証以外）。最後の数行:"; echo "$out" | tail -5; exit 4
 fi
 
