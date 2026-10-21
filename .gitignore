@@ -21,3 +21,5 @@ art/shots/port/
 
 # サブエージェントの作業用の worktree（Agent の isolation: worktree）
 .claude/worktrees/
+# 姿勢の照合の生の値（4MB。node tools/worldart/godot/export_rig.mjs で作り直せる。client_test.sh がなければ作る）
+godot/worldart/data/poses_golden.json
