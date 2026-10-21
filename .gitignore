@@ -8,3 +8,13 @@ __pycache__/
 
 # Luna（codex exec）の実行の記録と依頼の札（docs/agents/collaboration.md）
 .agents/
+
+# Godot に書き出した地図とアセットのうち、まだ入れていないもの（作り直せる: python3 -I tools/worldart/godot/export_godot.py <地図…>）
+# 入っている f1_field・assets の既存のファイルは追跡のまま。新しく入れるときは git add -f
+godot/worldart/data/*/
+!godot/worldart/data/f1_field/
+!godot/worldart/data/models/
+!godot/worldart/data/tex/
+godot/worldart/data/assets/*
+# 試しの撮影
+art/shots/port/
