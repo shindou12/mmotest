@@ -168,7 +168,7 @@ g['terrain'] = {
     'hills': {'amp': 0.3, 'scale': 18},
     # 湖の窪み: 縁の半径を当たり判定の円より 1.2m 大きく（水面 -0.45 と交わる所が円にそろう）
     'basins': [{'world': [PX, PZ], 'r': r2(PR + 1.2), 'jag': 0.7, 'shelf': 3.5, 'shelfDepth': 0.9, 'depth': 3.2, 'slope': 5.0, 'beach': 3.0}],
-    'water': {'level': WATER_LV, 'rule': 'w1', 'deepAt': 2.2, 'causticAt': 3.0, 'bandAt': 0.5},
+    'water': {'level': WATER_LV, 'rule': 'w1', 'deepAt': 2.2, 'causticAt': 1.3, 'bandAt': 0.3},
     'cliffs': [{
         'world': ring(1.5), 'lowPoint': [0, 0], 'raise': True, 'drop': 3.0, 'width': 2.4, 'jag': 1.0, 'relief': 0.4, 'drape': 0.5,
         'gaps': [{'world': [[r2(e['x'] * 0.9), r2(e['z'] * 0.9)], [r2(e['x'] * 2.2), r2(e['z'] * 2.2)]], 'r': 2.9}],

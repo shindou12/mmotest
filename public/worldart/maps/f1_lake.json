@@ -127,8 +127,8 @@
    "level": -0.45,
    "rule": "w1",
    "deepAt": 2.2,
-   "causticAt": 3.0,
-   "bandAt": 0.5
+   "causticAt": 1.3,
+   "bandAt": 0.3
   },
   "cliffs": [
    {
