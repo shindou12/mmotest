@@ -1,7 +1,7 @@
 extends "res://scripts/game/skills/ctx.gd"
 ## 戦闘の実行環境。元は public/js/game/weapon-api.js が武器の効果に渡す道具（player・field・attack・tree・show・party）と、
 ## それが使う stats.js（addBuff・hasBuff・buffMod）・combat.js（later・addShake）・tree-effects.js（quietBuff・cutCds・wtEmit）・ports.js の入れ物。
-## ダメージの式（damage.gd）と武器の効果（fx_sword.gd・fx_greatsword.gd）は、この環境 api を引数に受けて動く。
+## ダメージの式（damage.gd）と武器の効果（fx_sword.gd・fx_greatsword.gd・fx_dagger.gd・fx_axe.gd）は、この環境 api を引数に受けて動く。
 ##
 ## 技の文脈（skills/ctx.gd）を土台にする: arc・line・circle・proj・dash・sfx・taunt・fx・fx.parts などは呼ばれた操作を _op に渡すだけ。
 ##   - 照合用の環境（tests/combat_golden.gd）: _op を上書きして書き留める
@@ -175,6 +175,23 @@ func parry(sec = null, pct = null):
 func primeCharge(v = null):
 	if ext.has("primeCharge"): return ext["primeCharge"].call(v)
 	return super.primeCharge(v)
+
+# 短剣の毒・出血・奇襲（fx_dagger.gd）と大斧のHP払い（fx_axe.gd）
+func poison(p1 = null, p2 = null):
+	if ext.has("poison"): return ext["poison"].call(p1, p2)
+	return super.poison(p1, p2)
+
+func bleed(p1 = null, p2 = null, p3 = null):
+	if ext.has("bleed"): return ext["bleed"].call(p1, p2, p3)
+	return super.bleed(p1, p2, p3)
+
+func ambush(p1 = null):
+	if ext.has("ambush"): return ext["ambush"].call(p1)
+	return super.ambush(p1)
+
+func pay(p1 = null, p2 = null):
+	if ext.has("pay"): return ext["pay"].call(p1, p2)
+	return super.pay(p1, p2)
 
 
 ## c.fx。ctx.gd の Fx と同じだが、flash・lightning は JavaScript の引数の数が多い（flash は x, y, z, 色, 強さ, 秒の 6 つ）

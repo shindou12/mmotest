@@ -1,7 +1,7 @@
 #!/bin/sh
 # Godot 版の試作クライアントの確認（L27）: ゲームのサーバーを別の番号で立て、画面なし（--headless）で自動操作を動かす。
 #   sh tools/worldart/godot/client_test.sh
-# 確かめること: 1) ログインして草原へ移る 2) 敵に攻撃が当たる 3) 敵を倒して経験値が入る 4) 出口から街へ移る 5) 出口から屋内（マス目）のエリアへ移る 6) 溜め斬り・武器スキル 7) 落とし物を拾い装備する（運しだい）
+# 確かめること（大剣・短剣・大斧は武器ごとの回あり）: 1) ログインして草原へ移る 2) 敵に攻撃が当たる 3) 敵を倒して経験値が入る 4) 出口から街へ移る 5) 出口から屋内（マス目）のエリアへ移る 6) 溜め斬り・武器スキル 7) 落とし物を拾い装備する（運しだい）
 cd "$(dirname "$0")/../../.."
 PORT=$((20000 + $$ % 20000))
 PORT=$PORT node server.js > /tmp/godot_client_test_server.log 2>&1 &
@@ -12,6 +12,12 @@ OUT=/tmp/godot_client_test.log
 # 大剣の回（G1-3b）: 大剣と武器ツリーを --wk・--wt・--slots で入れ、通常・溜め・強攻撃・武器スキル・Q/E を使わせる
 OUTG=/tmp/godot_client_test_gs.log
 ( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --wk=greatsword --wt=gt_wave,gt_charge:3A,gt_break:2,gt_eye,gt_armor,gt_moon,gt_rising:2,gt_broad,gt_guillo,gt_slam:2,gt_fullmoon --slots=gt_rising,gt_slam --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUTG 2>&1 )
+# 短剣の回（G3）: 瞬影（溜めきった強攻撃）・シャドウ・ダンス・影縫い（投げナイフ）・裂傷連舞（出血）・毒刃（毒の継続ダメージ）
+OUTD=/tmp/godot_client_test_dg.log
+( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --wk=dagger --wt=dk_venom,dk_burst,dk_combo:3A,dk_toxin:2,dk_shadow:2,dk_flank,dk_vital,dk_bleed:2,dk_pin:2,dk_poison --slots=dk_pin,dk_bleed --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUTD 2>&1 )
+# 大斧の回（G3）: 大地砕き・ランペイジ・引き裂き・返り刃（戻る斧）・破砕と地砕き
+OUTA=/tmp/godot_client_test_ax.log
+( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --wk=axe --wt=ax_crush,ax_quake,ax_heavy:3A,ax_swing:2,ax_brk:2,ax_hook:2,ax_stomp,ax_exec,ax_return,ax_rush,ax_lust --slots=ax_hook,ax_return --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUTA 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_town --server=ws://127.0.0.1:$PORT/ws --quit=40 >> $OUT 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_dun --server=ws://127.0.0.1:$PORT/ws --quit=50 >> $OUT 2>&1 )
 kill $SRV
@@ -35,15 +41,36 @@ grep -q "^HIT .* type=heavy" $OUTG && echo "OK  大剣: 強攻撃が当たった
 grep -q "^HIT .* type=wskill" $OUTG && echo "OK  大剣: 武器スキルが当たった（$(grep -c '^HIT .* type=wskill' $OUTG) 回）" || { echo "NG  大剣: 武器スキルが当たらない"; ok=1; }
 grep -q "^HIT .* type=tskill" $OUTG && echo "OK  大剣: ツリースキルが当たった（$(grep -c '^HIT .* type=tskill' $OUTG) 回）" || { echo "NG  大剣: ツリースキルが当たらない"; ok=1; }
 grep -E "SCRIPT ERROR" $OUTG && ok=1
+# 短剣の回: 強攻撃（瞬影）・武器スキル・Q/E・投げナイフ（影縫い lv2 = 倍率 3.40 は矢だけ）・毒の継続ダメージ（type=dot）が当たること
+grep -q "^HEAVY" $OUTD && echo "OK  短剣: 強攻撃（瞬影 $(grep -c '^HEAVY' $OUTD) 回）" || { echo "NG  短剣: 強攻撃が出ない"; ok=1; }
+grep -q "^SKILL" $OUTD && echo "OK  短剣: 武器スキル（$(grep -c '^SKILL' $OUTD) 回）" || { echo "NG  短剣: 武器スキルが出ない"; ok=1; }
+grep -q "^TSKILL" $OUTD && echo "OK  短剣: Q/E のツリースキル（$(grep -c '^TSKILL' $OUTD) 回）" || { echo "NG  短剣: Q/E が出ない"; ok=1; }
+grep -q "^HIT .* type=normal" $OUTD && echo "OK  短剣: 通常攻撃が当たった（$(grep -c '^HIT .* type=normal' $OUTD) 回）" || { echo "NG  短剣: 通常攻撃が当たらない"; ok=1; }
+grep -q "^HIT .* type=heavy" $OUTD && echo "OK  短剣: 強攻撃が当たった（$(grep -c '^HIT .* type=heavy' $OUTD) 回）: $(grep '^HIT .* type=heavy' $OUTD | head -1)" || { echo "NG  短剣: 強攻撃が当たらない"; ok=1; }
+grep -q "^HIT .* type=wskill" $OUTD && echo "OK  短剣: 武器スキルが当たった（$(grep -c '^HIT .* type=wskill' $OUTD) 回）" || { echo "NG  短剣: 武器スキルが当たらない"; ok=1; }
+grep -q "^HIT .* type=tskill" $OUTD && echo "OK  短剣: ツリースキルが当たった（$(grep -c '^HIT .* type=tskill' $OUTD) 回）" || { echo "NG  短剣: ツリースキルが当たらない"; ok=1; }
+grep -q "^HIT .* type=tskill mult=3.40" $OUTD && echo "OK  短剣: 投げナイフ（矢）が当たった（$(grep -c '^HIT .* type=tskill mult=3.40' $OUTD) 回）" || { echo "NG  短剣: 投げナイフが当たらない"; ok=1; }
+grep -q "^HIT .* type=dot" $OUTD && echo "OK  短剣: 毒・出血の継続ダメージが入った（$(grep -c '^HIT .* type=dot' $OUTD) 回）" || { echo "NG  短剣: 毒・出血が入らない"; ok=1; }
+grep -E "SCRIPT ERROR" $OUTD && ok=1
+# 大斧の回: 強攻撃（大地砕き）・武器スキル・Q/E・戻る斧（返り刃 lv1 = 倍率 2.40 は斧だけ）が当たること
+grep -q "^HEAVY" $OUTA && echo "OK  大斧: 強攻撃（$(grep -c '^HEAVY' $OUTA) 回）" || { echo "NG  大斧: 強攻撃が出ない"; ok=1; }
+grep -q "^SKILL" $OUTA && echo "OK  大斧: 武器スキル（$(grep -c '^SKILL' $OUTA) 回）" || { echo "NG  大斧: 武器スキルが出ない"; ok=1; }
+grep -q "^TSKILL" $OUTA && echo "OK  大斧: Q/E のツリースキル（$(grep -c '^TSKILL' $OUTA) 回）" || { echo "NG  大斧: Q/E が出ない"; ok=1; }
+grep -q "^HIT .* type=normal" $OUTA && echo "OK  大斧: 通常攻撃が当たった（$(grep -c '^HIT .* type=normal' $OUTA) 回）" || { echo "NG  大斧: 通常攻撃が当たらない"; ok=1; }
+grep -q "^HIT .* type=heavy" $OUTA && echo "OK  大斧: 強攻撃が当たった（$(grep -c '^HIT .* type=heavy' $OUTA) 回）: $(grep '^HIT .* type=heavy' $OUTA | head -1)" || { echo "NG  大斧: 強攻撃が当たらない"; ok=1; }
+grep -q "^HIT .* type=wskill" $OUTA && echo "OK  大斧: 武器スキルが当たった（$(grep -c '^HIT .* type=wskill' $OUTA) 回）" || { echo "NG  大斧: 武器スキルが当たらない"; ok=1; }
+grep -q "^HIT .* type=tskill" $OUTA && echo "OK  大斧: ツリースキルが当たった（$(grep -c '^HIT .* type=tskill' $OUTA) 回）" || { echo "NG  大斧: ツリースキルが当たらない"; ok=1; }
+grep -q "^HIT .* type=tskill mult=2.40" $OUTA && echo "OK  大斧: 戻る斧（返り刃）が当たった（$(grep -c '^HIT .* type=tskill mult=2.40' $OUTA) 回）" || { echo "NG  大斧: 戻る斧が当たらない"; ok=1; }
+grep -E "SCRIPT ERROR" $OUTA && ok=1
 # 式の照合（元の JavaScript で作った期待値と GDScript を比べる。JSON は node tools/worldart/godot/golden_rules.mjs で作り直せる）
 G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/rules_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"
 [ $gs -eq 0 ] || { echo "NG  式の照合（終了コード $gs）"; ok=1; }
-# 技の照合（片手剣・大剣の強攻撃・武器スキル・ツリースキルの呼び出し列を、元の JavaScript の記録と比べる。JSON は node tools/worldart/godot/golden_skills.mjs で作り直せる）
+# 技の照合（片手剣・大剣・短剣・大斧の強攻撃・武器スキル・ツリースキルの呼び出し列を、元の JavaScript の記録と比べる。JSON は node tools/worldart/godot/golden_skills.mjs で作り直せる）
 G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/skills_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"
 [ $gs -eq 0 ] || { echo "NG  技の照合（終了コード $gs）"; ok=1; }
-# 戦闘の照合（ダメージの式と、片手剣・大剣の効果の差し込み口を、元の JavaScript の結果と比べる。JSON は node tools/worldart/godot/golden_combat.mjs で作り直せる）
+# 戦闘の照合（ダメージの式と、片手剣・大剣・短剣・大斧の効果の差し込み口を、元の JavaScript の結果と比べる。JSON は node tools/worldart/godot/golden_combat.mjs で作り直せる）
 [ -f godot/worldart/data/combat_golden.json ] || node tools/worldart/godot/golden_combat.mjs > /dev/null
 G=$(cd godot/worldart && timeout -k 5 300 godot --headless --path . -s res://scripts/tests/combat_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"

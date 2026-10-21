@@ -12,8 +12,8 @@ extends "res://scripts/game/combat/api.gd"
 ##   fx.ringWave   地面に広がる輪             fx.lightning  雷                      fx.flash      光（点光源）
 ##   parts.burst   粒の破裂                    parts.emit    粒を 1 つ出す
 ##   sfx(*)        音: swing・heavy・skill・hit・block・impact・wave・charge・charged・perfect・thunder・stunHit・buff ほか全部
-##   （済み: fx.slash = 扇の斬撃の板、text / floatText = 浮かぶ文字、shake = 画面の揺れ、proj = 飛ぶ斬撃の板）
-##   武器の手の位置（hand_pos）・武器ツリーの光（wt_aura）は人物のモデル待ち（06b）。弓の矢 arrow は弓を移すとき。
+##   （済み: fx.slash = 扇の斬撃の板、text / floatText = 浮かぶ文字、shake = 画面の揺れ、proj = 飛ぶ斬撃の板・投げ斧の板、arrow = 矢の板）
+##   武器の手の位置（hand_pos）・武器ツリーの光（wt_aura）は人物のモデル待ち（06b）。矢 arrow・戻る飛び道具 boomerang・斧の形は短剣・大斧の分を入れた（見た目は板で代用）。
 ##
 ## ---- 元と違う所 ----
 ##   * スキル変化（付加効果 sv_*）は未。castWeaponSkill は常に sv なしの経路（sk.run(combat)）を通る。
@@ -126,7 +126,7 @@ func _op(name: String, args: Array):
 		"taunt": return _v(Callable(self, "net_send"), [{"t": "taunt", "r": args[0]}])
 		"setHitStop", "onVariantHit", "run": return null
 		"sfx": return _todo("sfx:" + str(args[0]))   # 音（TODO: G8）。名前ごとに数える
-		"arrow": return _todo("arrow（弓）")
+		"arrow": return _v(Callable(self, "strike_arrow"), [args[0] if args.size() > 0 and args[0] != null else {}])
 	_todo(name)
 	return null
 
@@ -230,23 +230,88 @@ func strike_dash(a: float, dist: float, dur: float, iframe: float) -> void:
 
 
 ## strikes.proj: 飛ぶ斬撃（既定は速さ 22m/s・0.7 秒・半径 1.8m・威力 1.4。同じ敵には 1 回）。
-## 形は斬撃波（PROJ_SHAPES.wave。wave = true）だけ（斧の幻影は大斧を移すとき）
+## 形は斬撃波（PROJ_SHAPES.wave。wave = true）と、投げた斧（shape = "axe"。wave = false。回りながら飛ぶ板で代用）。
+## o.boomerang があれば戻ってくる飛び道具（行き → 先で回る → 持ち主へ戻る。往復とも当たる）
 func strike_proj(o: Dictionary) -> void:
 	var color = _nn(o, "color", weapon_color())
 	var sx: float = float(_nn(o, "sx", me["x"]))
 	var sz: float = float(_nn(o, "sz", me["z"]))
 	var a: float = float(o["a"])
+	var boom = o.get("boomerang")
+	var is_axe: bool = o.get("shape") == "axe"
 	var node := MeshInstance3D.new()
-	node.mesh = GameVisuals.shape_mesh({"k": "cone", "len": 1.8, "arc": deg_to_rad(120.0), "a": a + PI}, 1.0)
-	node.material_override = GameVisuals.mat(_color(color), true, 0.7)
+	if is_axe:
+		var bm := BoxMesh.new()
+		bm.size = Vector3(1.4, 0.1, 0.5)
+		node.mesh = bm
+		node.material_override = GameVisuals.mat(_color(color), true, 0.9)
+	else:
+		node.mesh = GameVisuals.shape_mesh({"k": "cone", "len": 1.8, "arc": deg_to_rad(120.0), "a": a + PI}, 1.0)
+		node.material_override = GameVisuals.mat(_color(color), true, 0.7)
 	node.position = Vector3(sx, g.world.ground_y(sx, sz) + 1.0, sz)
+	if boom != null: node.scale = Vector3.ONE * float(_nn(o, "scale", 1.0))
 	g.world.add_child(node)
+	var life: float = (float(boom["out"]) + float(Dmg.or_(boom.get("hover"), 0.0)) + 3.0) if boom != null else float(_nn(o, "life", 0.7))
 	var w := {"node": node, "x": sx, "z": sz, "a": a, "tech": o.get("tech"), "shape": o.get("shape"), "color": color, "t": 0.0,
-		"speed": float(_nn(o, "speed", 22.0)), "life": float(_nn(o, "life", 0.7)), "rad": float(_nn(o, "rad", 1.8)), "mult": float(_nn(o, "mult", 1.4)),
-		"type": o.get("type"), "hit": {}, "sv": o.get("sv"), "cast": o.get("cast"), "wave": true, "wtNo": WFX.truthy(o.get("wtNo")),
-		"stun": o.get("stun"), "eclipse": WFX.truthy(o.get("eclipse")), "boom": null, "phase": 0, "hitT": {}}
+		"speed": float(_nn(o, "speed", 22.0)), "life": life, "rad": float(_nn(o, "rad", 1.8)), "mult": float(_nn(o, "mult", 1.4)),
+		"type": o.get("type"), "hit": {}, "sv": o.get("sv"), "cast": o.get("cast"), "wave": not is_axe, "wtNo": WFX.truthy(o.get("wtNo")),
+		"stun": o.get("stun"), "eclipse": WFX.truthy(o.get("eclipse")), "boom": boom, "phase": 0, "hitT": {}}
 	projs.append(w)
 	sfx("wave")
+
+
+## strikes.arrow: 矢（弓・投げナイフ）。射程まで飛び、敵に 1 回ずつ当たる（貫通しない矢は最初の敵で止まる）。
+## 射程: 指定がなければ、弓の通常攻撃は引かずに撃つ射程 bowBase・弓のスキルは最大射程 bowMax（弓以外の投げナイフなどは 24m）
+func strike_arrow(o: Dictionary) -> void:
+	var color = _nn(o, "color", weapon_color())
+	var a: float = float(o["a"])
+	var node := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.1, 0.1, 1.6 if WFX.truthy(o.get("big")) else 1.0)
+	node.mesh = bm
+	node.material_override = GameVisuals.mat(_color(color), true, 0.95)
+	node.position = Vector3(me["x"], g.world.ground_y(me["x"], me["z"]) + 1.2, me["z"])
+	node.rotation.y = a
+	g.world.add_child(node)
+	var ranged: bool = WFX.truthy(st["W"].get("ranged"))
+	var rng: float
+	if o.get("range") != null: rng = float(o["range"])
+	elif ranged: rng = float(st["bowBase"]) if o.get("type") == "normal" else float(st["bowMax"])
+	else: rng = 24.0
+	var speed: float = float(_nn(o, "speed", 42.0))
+	projs.append({"node": node, "arrow": true, "x": me["x"], "z": me["z"], "sx": me["x"], "sz": me["z"], "a": a, "t": 0.0, "speed": speed,
+		"life": (rng + 0.6) / speed, "range": rng, "rad": float(_nn(o, "rad", 0.7)), "mult": float(_nn(o, "mult", 1.0)), "type": o.get("type"),
+		"pierce": WFX.truthy(o.get("pierce")), "hit": {}, "color": color, "sv": o.get("sv"), "cast": o.get("cast"), "tech": o.get("tech"),
+		"poison": float(Dmg.or_(o.get("poison"), 0.0)), "crit": o.get("crit"), "snipe": o.get("snipe"), "full": o.get("full"), "onHit": o.get("onHit")})
+	sfx("swing")
+
+
+## actions.js boomerangStep: 戻ってくる飛び道具の動き（位置は update_projs が先に向きと速さで進めている）。持ち主に戻ったら true
+func boomerang_step(w: Dictionary, dt: float) -> bool:
+	var B: Dictionary = w["boom"]
+	if w["phase"] == 0 and w["t"] >= B["out"]:
+		w["phase"] = 1 if WFX.truthy(B.get("hover")) else 2
+		w["turnT"] = w["t"]
+		if w["phase"] == 2: w["hit"].clear()
+	if w["phase"] == 1:
+		w["x"] -= sin(w["a"]) * w["speed"] * dt   # 先で止まって回る
+		w["z"] -= cos(w["a"]) * w["speed"] * dt
+		if w["t"] >= float(B["out"]) + float(B["hover"]):
+			w["phase"] = 2
+			w["hit"].clear()
+		return false
+	if w["phase"] != 2: return false
+	# 持ち主へ向かって曲がりながら戻る（少し速く）
+	var tx: float = float(me["x"]) - w["x"]
+	var tz: float = float(me["z"]) - w["z"]
+	var d := sqrt(tx * tx + tz * tz)
+	w["x"] -= sin(w["a"]) * w["speed"] * dt
+	w["z"] -= cos(w["a"]) * w["speed"] * dt
+	w["a"] = atan2(tx, tz)
+	var v: float = w["speed"] * 1.15 * dt
+	w["x"] += sin(w["a"]) * minf(v, d)
+	w["z"] += cos(w["a"]) * minf(v, d)
+	return d < 1.2
 
 
 ## actions.js updateProjs（斬撃波の分）。位置は向きと速さで進め、敵に 1 回ずつ当て、壁か寿命で消える
@@ -256,30 +321,74 @@ func update_projs(dt: float) -> void:
 		w["t"] += dt
 		w["x"] += sin(w["a"]) * w["speed"] * dt
 		w["z"] += cos(w["a"]) * w["speed"] * dt
+		if w.get("arrow", false):
+			_update_arrow(w, i)
+			continue
+		var caught: bool = w["boom"] != null and boomerang_step(w, dt)
 		w["node"].position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.0, w["z"])
-		w["node"].scale = Vector3.ONE * (1.0 + w["t"] * 1.5)   # shapes wave の tick: 広がりながら消える
+		if w["shape"] == "axe": w["node"].rotation.y -= dt * 20.0   # PROJ_SHAPES.axe の tick: 回りながら飛ぶ
+		elif w["boom"] == null: w["node"].scale = Vector3.ONE * (1.0 + w["t"] * 1.5)   # shapes wave の tick: 広がりながら消える
+		var hovering: bool = w["boom"] != null and w["phase"] == 1
 		for mb in mobs.values():
-			if w["hit"].has(mb["id"]): continue
+			if w["hit"].has(mb["id"]) and not (w["boom"] != null and WFX.truthy(w["boom"].get("rehit")) and hovering and w["t"] - float(w["hitT"].get(mb["id"], -9.0)) >= w["boom"]["rehit"]): continue
 			var dx: float = float(mb["x"]) - w["x"]
 			var dz: float = float(mb["z"]) - w["z"]
 			if sqrt(dx * dx + dz * dz) < w["rad"] + float(mb["rad"]):
 				w["hit"][mb["id"]] = true
 				w["hitT"][mb["id"]] = w["t"]
-				deal(mb, w["mult"], {"type": w["type"], "tech": w["tech"], "noProc": true, "sv": w["sv"], "cast": w["cast"], "wave": w["wave"], "proj": w, "wtNo": w["wtNo"], "stun": w["stun"]})
+				var pm: float = w["mult"]
+				if hovering and w["boom"].get("hoverMult") != null: pm = w["boom"]["hoverMult"]
+				deal(mb, pm, {"type": w["type"], "tech": w["tech"], "noProc": true, "sv": w["sv"], "cast": w["cast"], "wave": w["wave"], "proj": w, "wtNo": w["wtNo"], "stun": w["stun"]})
 		proj_revive(w)
-		var c: Array = R.collide_xz(g.area, w["x"], w["z"], 0.1, g.door_open)
-		if w["t"] > w["life"] or sqrt(pow(c[0] - w["x"], 2) + pow(c[1] - w["z"], 2)) > 0.05:
+		# 戻ってくる斧は壁を抜ける（持ち主のところへ必ず帰る）
+		var c: Array = [w["x"], w["z"]] if w["boom"] != null else R.collide_xz(g.area, w["x"], w["z"], 0.1, g.door_open)
+		if caught or w["t"] > w["life"] or sqrt(pow(c[0] - w["x"], 2) + pow(c[1] - w["z"], 2)) > 0.05:
+			if caught and w["boom"].get("onCatch") is Callable: w["boom"]["onCatch"].call()
 			w["node"].queue_free()
 			projs.remove_at(i)
 
 
-## actions.js projRevive: 斬撃波が倒れている仲間に当たったら起こす
-func proj_revive(w: Dictionary) -> void:
+## 矢の毎フレーム（actions.js updateProjs の arrow の分）。i は projs の何番目か。矢を消したら true
+func _update_arrow(w: Dictionary, i: int) -> bool:
+	w["node"].position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.2, w["z"])
+	var done := false
+	WFX.fx_call("arrowTick", [w])   # 射抜き など
+	for mb in mobs.values():
+		if w["hit"].has(mb["id"]) or sqrt(pow(float(mb["x"]) - w["x"], 2) + pow(float(mb["z"]) - w["z"], 2)) > w["rad"] + float(mb["rad"]): continue
+		w["hit"][mb["id"]] = true
+		# 射程の中はどこでも本来のダメージ。遠矢（射程の端で +20%）は弓のファイル
+		var d := sqrt(pow(float(mb["x"]) - w["sx"], 2) + pow(float(mb["z"]) - w["sz"], 2))
+		var edge: bool = WFX.fx_some("arrowEdge", [w, d])
+		var hawk: bool = WFX.truthy(w.get("full")) and Dmg.tf(self, "t_hawk") and random() < 0.3
+		var opt := {"type": w["type"], "tech": w["tech"], "sv": w["sv"], "cast": w["cast"], "poison": w["poison"], "full": w["full"], "snipe": w["snipe"]}
+		if hawk or WFX.truthy(w.get("crit")): opt["crit"] = true   # crit: hawk || w.crit || undefined
+		deal(mb, w["mult"] * (1.2 if edge else 1.0), opt)
+		if w["onHit"] is Callable: w["onHit"].call(mb)
+		WFX.fx_call("arrowHit", [w, mb])   # 鷹の目・狙い澄まし など
+		if edge: float_text(mb["x"], 3.4, mb["z"], "遠矢", "info")
+		fx.parts.burst(w["x"], 1.2, w["z"], 18 if WFX.truthy(w.get("full")) else 8, {"color": 0xffd84a if WFX.truthy(w.get("full")) else 0xffffff, "speed": 5, "size": 0.4, "life": 0.3})
+		if not w["pierce"]:
+			done = true
+			break
+	if not done: done = proj_revive(w, true)
+	var c: Array = R.collide_xz(g.area, w["x"], w["z"], 0.1, g.door_open)
+	if done or w["t"] > w["life"] or sqrt(pow(c[0] - w["x"], 2) + pow(c[1] - w["z"], 2)) > 0.05:
+		WFX.fx_call("arrowGone", [w])
+		w["node"].queue_free()
+		projs.remove_at(i)
+		return true
+	return false
+
+
+## actions.js projRevive: 斬撃波・矢が倒れている仲間に当たったら起こす（貫通しない矢はそこで止まる）
+func proj_revive(w: Dictionary, arrow: bool = false) -> bool:
 	for p in downed_allies():
 		var key := "p" + str(p["id"])
 		if w["hit"].has(key) or sqrt(pow(float(p["x"]) - w["x"], 2) + pow(float(p["z"]) - w["z"], 2)) > w["rad"] + 0.6: continue
 		w["hit"][key] = true
 		revive_hit(p, {"type": w["type"], "sv": w["sv"]})
+		if arrow and not w["pierce"]: return true
+	return false
 
 
 func clear_projs() -> void:

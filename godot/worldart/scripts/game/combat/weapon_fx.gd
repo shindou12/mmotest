@@ -11,7 +11,7 @@ extends RefCounted
 ##   fx_reduce(name, acc, args)   acc を順に受け渡して変える（倍率・加算・置き換え）
 ## 呼ぶ順: 基本は登録した順（weapons/index.js の並び = 片手剣・大剣・短剣・盾槍・大斧・弓）。場面ごとの順（order）を書いた武器はそれが先。
 ## order が書いていない場面は、登録した順で、順の付いたものより後（1000 + 登録の番号）。同じ順どうしは登録した順のまま（安定）。
-## 短剣・盾槍・大斧・弓の効果はまだ移していないが、登録の番号（順）だけは同じにするため空の登録をする（register_placeholders）。
+## 効果をまだ移していない武器は、登録の番号（順）だけ同じにするため空の登録をする（register_placeholders）。
 ## 効果（Callable）は register の hooks に「場面の名前 → Callable」の辞書で渡す。引数の数は呼び出し側（JavaScript の呼び出し）と同じにそろえる。
 
 ## 登録の一覧: [{ wk, hooks: {名前: Callable}, order: {名前: 順} }]
@@ -36,13 +36,23 @@ static func register(wk: String, hooks: Dictionary, order: Dictionary = {}) -> v
 	CACHE.clear()
 
 
-## 効果を移していない武器の空の登録（呼ぶ順の番号を元と同じにする）。登録済みの武器は飛ばす
+## 効果を移していない武器の空の登録（呼ぶ順の番号を元と同じにする）。登録済みの武器は飛ばす。
+## 登録の並びは WEAPON_ORDER（weapons/index.js の並び）にそろえる（武器の install を呼ぶ順に関わらず、順の番号は元と同じ）
 static func register_placeholders() -> void:
 	for wk in WEAPON_ORDER:
 		var found := false
 		for e in LIST:
 			if e["wk"] == wk: found = true
 		if not found: register(wk, {})
+	# 安定な挿入ソート（WEAPON_ORDER の順）
+	for i in range(1, LIST.size()):
+		var x = LIST[i]
+		var j := i - 1
+		while j >= 0 and WEAPON_ORDER.find(LIST[j]["wk"]) > WEAPON_ORDER.find(x["wk"]):
+			LIST[j + 1] = LIST[j]
+			j -= 1
+		LIST[j + 1] = x
+	CACHE.clear()
 
 
 ## weapon-fx.js fns: name の効果を呼ぶ順に並べたもの

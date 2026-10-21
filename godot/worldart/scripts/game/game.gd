@@ -392,6 +392,7 @@ func _take_damage(raw0: float) -> void:
 	_float(Vector3(me.x, 2.2, me.z), str(int(dmg)), Color(1, 0.35, 0.3))
 	combat.ctx.add_shake(0.3)
 	if S.get("wt") != null: Dmg.wt_on_hurt(combat.ctx, false)
+	if me.hp <= 0 and WFX.fx_some("cheatDeath"): return   # 不死身 など（hurt.js takeDamage）
 	if me.hp <= 0: _fall()
 
 
