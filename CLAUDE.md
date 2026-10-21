@@ -28,7 +28,7 @@
 
 ## 作業の分担（Opus がリーダー、実装は Sonnet のサブエージェントか Luna）
 
-範囲の決まった実装・道具づくり・移植・自動の確認は、Sonnet 5.5 のサブエージェント（Agent の `model: "sonnet"` を必ず指定）か、ChatGPT のログインができていれば Codex（GPT-6 Luna、`sh tools/agents/luna.sh <依頼の札.md>`）に渡す。従量課金（API キー）は使わない。規則の正本は **`docs/agents/collaboration.md`**（役割・委任する作業の選び方・レビューと検証・ログ・サブエージェントの使い方・競合の避け方・相談の条件）。手順はスキル `.claude/skills/delegate`。Luna が守ることは `AGENTS.md`。
+範囲の決まった実装・道具づくり・移植・自動の確認は、**まず Codex（GPT-6 Luna、推論 max・高速。`sh tools/agents/luna.sh <依頼の札.md>`）に渡す**。任せてもだめそうだと判断したら Sonnet 5.5 のサブエージェント（Agent の `model: "sonnet"` を必ず指定）に渡し直す（ユーザー、2026-10-22）。従量課金（API キー）は使わない。規則の正本は **`docs/agents/collaboration.md`**（役割・委任する作業の選び方・レビューと検証・ログ・サブエージェントの使い方・競合の避け方・相談の条件）。手順はスキル `.claude/skills/delegate`。Luna が守ることは `AGENTS.md`。
 - 見た目の判断（見本との比較・規則の採用・構図・色・アセットの形）、統合（コミット・プッシュ）、規則集と記録の更新は Opus が自分でする
 - 描画に触れる作業は、画像と数値（比較シート・`rulecheck.py`）で確かめるまで終わりにしない。Luna の報告は `.agents/runs/` の `last.md` と変更の一覧と生のテストの出力で確かめる
 - 生成物（Blender の組み立て・Godot への書き出し・撮影）を書き換える作業は同時に 1 つだけ。並行の Luna の作業は worktree を分ける

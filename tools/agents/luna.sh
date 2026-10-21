@@ -8,12 +8,13 @@ set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 MODEL=${LUNA_MODEL:-gpt-6-luna}
 EFFORT=${LUNA_EFFORT:-max}
+TIER=${LUNA_TIER:-fast}   # 高速（Codex の service_tier。ChatGPT のプランの利用枠の範囲で、API の従量課金ではない）。ふつうは LUNA_TIER=default
 command -v codex >/dev/null 2>&1 || { echo "codex がない: sh tools/agents/setup.sh"; exit 2; }
 
 if [ "${1:-}" = "--check" ]; then
   # 返事は -o のファイルだけで判定する（標準出力には依頼の文がそのまま出るので、そこで探すと誤判定する）
   tmp=$(mktemp -d)
-  out=$(cd "$ROOT" && timeout 180 codex exec --ephemeral -s read-only -m "$MODEL" -c "model_reasoning_effort=\"low\"" -o "$tmp/last.txt" "Reply with exactly: LUNA_OK" < /dev/null 2>&1)
+  out=$(cd "$ROOT" && timeout 180 codex exec --ephemeral -s read-only -m "$MODEL" -c "model_reasoning_effort=\"low\"" -c "service_tier=\"$TIER\"" -o "$tmp/last.txt" "Reply with exactly: LUNA_OK" < /dev/null 2>&1)
   reply=$(cat "$tmp/last.txt" 2>/dev/null); rm -rf "$tmp"
   if [ "$(echo "$reply" | tr -d '[:space:]')" = "LUNA_OK" ]; then echo "OK  $MODEL を呼べた（返事: LUNA_OK）"; exit 0; fi
   if echo "$out" | grep -qE "401|Unauthorized"; then
@@ -34,8 +35,8 @@ done
 RUN="$ROOT/.agents/runs/$(date +%Y%m%d-%H%M%S)-$NAME"
 mkdir -p "$RUN"
 cp "$CARD" "$RUN/card.md"
-echo "実行: $MODEL（推論 $EFFORT）$WT → $RUN"
-( cd "$ROOT" && codex exec $WT $EPH -s workspace-write -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" \
+echo "実行: $MODEL（推論 $EFFORT・$TIER）$WT → $RUN"
+( cd "$ROOT" && codex exec $WT $EPH -s workspace-write -m "$MODEL" -c "model_reasoning_effort=\"$EFFORT\"" -c "service_tier=\"$TIER\"" \
     -o "$RUN/last.md" --json - < "$RUN/card.md" > "$RUN/events.jsonl" 2> "$RUN/stderr.txt" )
 code=$?
 ( cd "$ROOT" && git diff --stat > "$RUN/diffstat.txt"; git status --short >> "$RUN/diffstat.txt" )
