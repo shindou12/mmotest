@@ -6,7 +6,8 @@ extends RefCounted
 ## 当たりとダメージは game_ctx.gd → combat/damage.gd。試作の手写しの片手剣の技は消した（武器スキル・強攻撃は登録表から）。
 ## g は scripts/game/game.gd。式の順番・乱数を引く順は元の JavaScript と同じ。時刻は game.gd の t_now（JavaScript の now()）。
 ## 弓: 通常攻撃は矢（ctx.arrow）、溜めると足元の射程の円が広がり（bow_guide.gd）、離したときの射程まで矢が飛ぶ（release の releaseRange）。
-## まだ入れていないもの: 盾槍のガード（guarding は常に false）・ガードカウンター・回転なぎ払い・のけぞり/ダウン（staggerT・downT は 0 のまま）・スキル変化。
+## G4: 盾槍・守護騎士のガード（溜め中に自動で構える・離してガードカウンター・回転なぎ払い）は combat/hurt.gd、スキル変化は combat/variants.gd を呼ぶ。
+## 被弾・のけぞり・ダウン・吹き飛び・受け身・這いずりは game.gd が hurt.gd を呼ぶ（このファイルは入力と技の流れだけ）。
 
 const Skills = preload("res://scripts/game/skills/skills.gd")
 const GameCtx = preload("res://scripts/game/skills/game_ctx.gd")
@@ -15,6 +16,8 @@ const Sword = preload("res://scripts/game/skills/sword.gd")
 const Greatsword = preload("res://scripts/game/skills/greatsword.gd")
 const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Dmg = preload("res://scripts/game/combat/damage.gd")
+const Hurt = preload("res://scripts/game/combat/hurt.gd")
+const Variants = preload("res://scripts/game/combat/variants.gd")
 const FxSword = preload("res://scripts/game/combat/fx_sword.gd")
 const FxGreatsword = preload("res://scripts/game/combat/fx_greatsword.gd")
 const FxDagger = preload("res://scripts/game/combat/fx_dagger.gd")
@@ -64,16 +67,16 @@ func tf(id: String) -> bool:
 
 ## variants.js desperate（称号「砂王を屠りし者」）
 func desperate() -> bool:
-	return tf("t_boss3") and float(g.me["hp"]) < float(g.S["mhp"]) * 0.5
+	return Variants.desperate(ctx)
 
 
-## variants.js titleMove / titleAspd（天候の称号 t_storm は天候の表がないので未）
+## variants.js titleMove / titleAspd（天候の称号 t_storm は天候の表がないので ctx.weather = false のまま）
 func title_move() -> float:
-	return (15.0 if tf("t_delver") and Dmg.indoor_now(ctx) else 0.0) + (30.0 if tf("t_traveler") and g.t_now < float(g.me.get("travelT", 0.0)) else 0.0)
+	return Variants.title_move(ctx)
 
 
 func title_aspd() -> float:
-	return 0.0
+	return Variants.title_aspd(ctx)
 
 
 ## actions.js canAct
@@ -134,7 +137,7 @@ func bow_range() -> float:
 	return minf(float(S["bowMax"]), float(S["bowBase"]) + float(S["bowDraw"]) * float(g.me["chargeT"]))
 
 
-## 左を押した: 溜めを始める（盾槍はここでガード。未）
+## 左を押した: 溜めを始める（盾槍・守護騎士は溜め始めて少しするとガードを構える。game.gd の毎フレーム）
 func press() -> void:
 	var me: Dictionary = g.me
 	if not g.started: return
@@ -153,6 +156,7 @@ func release() -> void:
 	me["releaseRange"] = bow_range() if g.S["W"].get("ranged", false) else 0   # 弓の離したときの射程（input.js pointerUp。charging を下ろす前に決める）
 	if g.args.has("bot") and g.S["W"].get("ranged", false): print("BOW release range=%.2f charge=%.2f (bowBase %.1f bowMax %.1f)" % [me["releaseRange"], me["chargeT"], g.S["bowBase"], g.S["bowMax"]])
 	me["charging"] = false
+	Hurt.end_guard(ctx)   # 盾槍: 離したらガードを解いて強攻撃（ガードで受けていればガードカウンター）
 	if float(me["chargeT"]) < charge_min(): me["queued"] = g.t_now + 0.45   # 短押し → 通常攻撃
 	elif WFX.fx_some("heavyNeedsFull") and int(me["chargeLv"]) < 2: me["queued"] = g.t_now + 0.45   # 短剣の瞬影は溜めきったときだけ
 	else: do_heavy(int(me["chargeLv"]))
@@ -176,7 +180,16 @@ func do_heavy(lv: int) -> void:
 	ctx.sfx("heavy")
 	ctx.fx.flash(me["x"], 1.5, me["z"], ctx.col(), 30 if lv == 2 else 15, 0.3)
 	if g.args.has("bot"): print("HEAVY lv=%d" % lv)
-	# ガードカウンター（me.counterFire）は盾槍・守護騎士のガード待ち（ガードは未）
+	if me.get("counterFire", false):
+		# ガードカウンター: 演出を大きく。称号「不落の盾」はここで被ダメ軽減
+		me["counterFire"] = false
+		ctx.float_text(me["x"], 3.2, me["z"], "ガードカウンター!", "just")
+		ctx.fx.flash(me["x"], 1.5, me["z"], 0xbfe0ff, 60, 0.4)
+		ctx.fx.ringWave(me["x"], me["z"], 0xbfe0ff, 5, 0.4)
+		ctx.add_shake(0.4)
+		if tf("t_guard"): ctx.add_buff("fort", "不落の盾", 4.0, {"dr": 40}, 0xbfe0ff)
+		WFX.fx_some("guardCounter")   # 盾槍は回転なぎ払い、片手剣（守護騎士）は踏み込みの横斬り
+		return
 	if WFX.fx_some("heavyOverride", [lv]): return   # 竜騎士の跳躍・投斧 など
 	WFX.fx_call("heavyStart", [lv])   # 武器ごとの強攻撃のモーション など
 	var run: Callable = Skills.heavy(String(S["wk"]))
@@ -198,9 +211,10 @@ func try_weapon_skill() -> void:
 			start_skill(sk, Skills.weapon_skill(id), null)
 			Dmg.wt_after_cast(ctx, "ws", true)
 		return
-	me["wsCd"] = float(sk["cd"]) * (1 - float(S["cdr"]) / 100.0) * 1.0 * (0.8 if tf("t_star") else 1.0)
+	var sv = S.get("sv")
+	me["wsCd"] = float(sk["cd"]) * (1 - float(S["cdr"]) / 100.0) * (float(Variants.variant_params(sv)["cd"]) if sv != null else 1.0) * (0.8 if tf("t_star") else 1.0)
 	start_skill(sk, Skills.weapon_skill(id), null)
-	if g.args.has("bot"): print("SKILL ", id)
+	if g.args.has("bot"): print("SKILL ", id, " sv=", sv["key"] if sv != null else "")
 	Dmg.wt_after_cast(ctx, "ws")
 
 
@@ -289,7 +303,9 @@ func start_skill(sk: Dictionary, run: Callable, id) -> void:
 	ctx.sfx("skill")
 	ctx.float_text(me["x"], 3, me["z"], sk.get("name", "?"), "info")
 	ctx.fx.flash(me["x"], 2, me["z"], ctx.col(), 25, 0.4)
-	if run.is_valid(): run.call(ctx)
+	if run.is_valid():
+		if id == null: Variants.cast_weapon_skill(ctx, run)   # 武器スキル: スキル変化（sv_*）があれば包んだ環境で出す（actions.js castWeaponSkill）
+		else: run.call(ctx)
 	else: push_warning("未移植の技: " + String(sk.get("name", "?")))
 
 

@@ -28,6 +28,12 @@ var bow_string: ImmediateMesh = null
 var bow_arrow: Node3D = null
 var bow_tip := 0.0
 var bow_sx := 0.0
+# 盾のガード中に光る板（shield-models.js kite の userData.gauge。GLB へは書き出していない加算の板）。ガードゲージの残りで 青 → 黄 → 赤
+var gauge_mat: StandardMaterial3D = null
+## 光る板の形（shield-models.js kite: 五角形を厚み 0.02 で押し出し、z = 0.1 に置く）
+const GAUGE_PTS := [Vector2(-0.48, 0.61), Vector2(0.48, 0.61), Vector2(0.48, -0.13), Vector2(0.0, -0.7), Vector2(-0.48, -0.13)]
+const GAUGE_DEPTH := 0.02
+const GAUGE_Z := 0.1
 
 
 static func _json(path: String) -> Variant:
@@ -122,11 +128,58 @@ func build(opts: Dictionary) -> void:
 		if hide["shoulders"]: nodes["body"].find_child("shoulders", false, false).visible = false
 		if hide["hair"]: nodes["head"].find_child("hair", false, false).visible = false
 	ToonLook.convert(root, color)
+	if nodes.has("shield"): _add_gauge_plate()
 	rig = PR.new()
 	rig.setup(nodes, _rigj, _tables, kind, rig_style)
 	if armor > 0 and hide["cape"]:
 		rig.cape.visible = false
 		rig._apply()
+
+
+## 盾のガード中に光る板を足す。三角形 3 つの扇（上下の面）と側面。押し出しは z = ±depth/2（three の ExtrudeGeometry の translate と同じ）
+func _add_gauge_plate() -> void:
+	var h := GAUGE_DEPTH / 2.0
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := GAUGE_PTS.size()
+	for i in range(1, n - 1):   # 前の面（+z）と後ろの面（-z）。両面描画なので向きは問わない
+		for z in [h, -h]:
+			st.add_vertex(Vector3(GAUGE_PTS[0].x, GAUGE_PTS[0].y, z))
+			st.add_vertex(Vector3(GAUGE_PTS[i].x, GAUGE_PTS[i].y, z))
+			st.add_vertex(Vector3(GAUGE_PTS[i + 1].x, GAUGE_PTS[i + 1].y, z))
+	for i in n:   # 側面
+		var a: Vector2 = GAUGE_PTS[i]
+		var b: Vector2 = GAUGE_PTS[(i + 1) % n]
+		var p0 := Vector3(a.x, a.y, h)
+		var p1 := Vector3(b.x, b.y, h)
+		var p2 := Vector3(b.x, b.y, -h)
+		var p3 := Vector3(a.x, a.y, -h)
+		for v in [p0, p1, p2, p0, p2, p3]: st.add_vertex(v)
+	gauge_mat = StandardMaterial3D.new()
+	gauge_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	gauge_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	gauge_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	gauge_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	gauge_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	gauge_mat.render_priority = 2
+	gauge_mat.albedo_color = Color(0.0, 0.0, 0.0, 0.0)
+	var mi := MeshInstance3D.new()
+	mi.name = "gaugePlate"
+	mi.mesh = st.commit()
+	mi.material_override = gauge_mat
+	mi.position = Vector3(0.0, 0.0, GAUGE_Z)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	nodes["shield"].add_child(mi)
+
+
+## player-motion.js の盾の光: ガード中だけ。ガードゲージの残り（gg 0〜1）で 青 → 黄 → 赤、残りわずかで点滅
+func _update_gauge(s: Dictionary) -> void:
+	var gg := float(s.get("gg", 1.0))
+	var guard := bool(s.get("guard", false))
+	var op := 0.0
+	if guard: op = 0.35 + (absf(sin(float(s.get("t", 0.0)) * 12.0)) * 0.3 if gg < 0.3 else 0.0)
+	var c := Color("9ad8ff") if gg > 0.6 else (Color("ffd84a") if gg > 0.3 else Color("ff4a3a"))
+	gauge_mat.albedo_color = Color(c.r, c.g, c.b, op)
 
 
 ## 弦（THREE.Line、色は bowString の引数）と矢（bow_arrow.glb）を弓の形に足す。引き具合は animate が毎フレーム入れる
@@ -178,6 +231,7 @@ func _update_bow(s: Dictionary) -> void:
 
 func animate(state: Dictionary) -> void:
 	rig.animate(state)
+	if gauge_mat != null: _update_gauge(state)
 	if bow_string != null: _update_bow(state)
 	# alignGripHand（grip-hands.js）: 握り手は武器と同じ向き
 	if grip_hand != null: grip_hand.quaternion = nodes["weapon"].quaternion

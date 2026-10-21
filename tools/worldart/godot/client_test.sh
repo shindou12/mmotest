@@ -8,7 +8,8 @@ PORT=$PORT node server.js > /tmp/godot_client_test_server.log 2>&1 &
 SRV=$!
 sleep 1
 OUT=/tmp/godot_client_test.log
-( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUT 2>&1 )
+# スキル変化（G4）: 片手剣の武器スキルに爆炎（sv_blaze）を付けて、SKILL の行に sv= が出ること
+( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --sv=sv_blaze:3 --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUT 2>&1 )
 # 大剣の回（G1-3b）: 大剣と武器ツリーを --wk・--wt・--slots で入れ、通常・溜め・強攻撃・武器スキル・Q/E を使わせる
 OUTG=/tmp/godot_client_test_gs.log
 ( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --wk=greatsword --wt=gt_wave,gt_charge:3A,gt_break:2,gt_eye,gt_armor,gt_moon,gt_rising:2,gt_broad,gt_guillo,gt_slam:2,gt_fullmoon --slots=gt_rising,gt_slam --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUTG 2>&1 )
@@ -24,6 +25,9 @@ OUTS=/tmp/godot_client_test_spear.log
 # 弓の回（G3）: 狙撃手・遠見の心得・弓引きの心得・二段射ち・跳弦射撃 を振り、Q/E に二段射ちと跳弦射撃。通常攻撃も強攻撃も矢で当てる
 OUTB=/tmp/godot_client_test_bow.log
 ( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --wk=bow --wt=bw_sniper,bw_hawk,bw_zone:3B,bw_draw:2,bw_crit,bw_double:2,bw_side,bw_trap --slots=bw_double,bw_side --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUTB 2>&1 )
+# 倒れる（G4）: 15 秒で倒れて這いずり → 一人なので力尽きる → 始め直して草原へ入り直す（再接続で hello が送られること）
+OUTF=/tmp/godot_client_test_fall.log
+( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --fall=15 --server=ws://127.0.0.1:$PORT/ws --quit=60 > $OUTF 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_town --server=ws://127.0.0.1:$PORT/ws --quit=40 >> $OUT 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_dun --server=ws://127.0.0.1:$PORT/ws --quit=50 >> $OUT 2>&1 )
 kill $SRV
@@ -35,6 +39,12 @@ grep -c "LOG はじまりの街" $OUT | grep -qv "^1$" && echo "OK  出口から
 grep -q "LOG 古井戸の洞窟" $OUT && echo "OK  出口から屋内（古井戸の洞窟）へ移った" || { echo "NG  屋内へ移れない"; ok=1; }
 grep -q "^HEAVY" $OUT && echo "OK  溜め斬り（$(grep -c '^HEAVY' $OUT) 回）" || { echo "NG  溜め斬りが出ない"; ok=1; }
 grep -q "^SKILL" $OUT && echo "OK  武器スキル（$(grep -c '^SKILL' $OUT) 回）" || { echo "NG  武器スキルが出ない"; ok=1; }
+grep -q "^SKILL .* sv=sv_blaze" $OUT && echo "OK  スキル変化（爆炎）の武器スキル（$(grep -c '^SKILL .* sv=sv_blaze' $OUT) 回）" || { echo "NG  スキル変化の武器スキルが出ない"; ok=1; }
+grep -q "^HURT" $OUT && echo "OK  被弾（HURT $(grep -c '^HURT' $OUT) 回）: $(grep '^HURT' $OUT | head -1)" || { echo "NG  被弾しない（hurt.gd）"; ok=1; }
+grep -q "LOG 這いずり状態" $OUTF && echo "OK  倒れて這いずり状態になった" || { echo "NG  倒れても這いずり状態にならない"; ok=1; }
+grep -q "LOG 戦闘不能" $OUTF && echo "OK  一人で倒れて力尽きた" || { echo "NG  力尽きない"; ok=1; }
+[ "$(grep -c 'LOG ひだまりの草原' $OUTF)" -ge 2 ] && echo "OK  力尽きたあと始め直して草原へ入り直した" || { echo "NG  始め直しで草原へ入り直せない（再接続）"; ok=1; }
+grep -E "SCRIPT ERROR" $OUTF && ok=1
 grep -q "^PICKUP" $OUT && echo "OK  落とし物を拾った（$(grep -c '^PICKUP' $OUT) 個）" || echo "--  落とし物なし（運しだい）"
 grep -q "^EQUIP" $OUT && echo "OK  拾った装備を着けた: $(grep '^EQUIP' $OUT | head -1)" || echo "--  装備の変更なし（運しだい）"
 grep -E "SCRIPT ERROR" $OUT && ok=1
@@ -46,6 +56,7 @@ grep -q "^HIT .* type=normal" $OUTG && echo "OK  大剣: 通常攻撃が当た�
 grep -q "^HIT .* type=heavy" $OUTG && echo "OK  大剣: 強攻撃が当たった（$(grep -c '^HIT .* type=heavy' $OUTG) 回）: $(grep '^HIT .* type=heavy' $OUTG | head -1)" || { echo "NG  大剣: 強攻撃が当たらない"; ok=1; }
 grep -q "^HIT .* type=wskill" $OUTG && echo "OK  大剣: 武器スキルが当たった（$(grep -c '^HIT .* type=wskill' $OUTG) 回）" || { echo "NG  大剣: 武器スキルが当たらない"; ok=1; }
 grep -q "^HIT .* type=tskill" $OUTG && echo "OK  大剣: ツリースキルが当たった（$(grep -c '^HIT .* type=tskill' $OUTG) 回）" || { echo "NG  大剣: ツリースキルが当たらない"; ok=1; }
+grep -q "^HURT" $OUTG && echo "OK  大剣: 被弾・のけぞり（HURT $(grep -c '^HURT' $OUTG) 回）" || { echo "NG  大剣: 被弾しない"; ok=1; }
 grep -E "SCRIPT ERROR" $OUTG && ok=1
 # 短剣の回: 強攻撃（瞬影）・武器スキル・Q/E・投げナイフ（影縫い lv2 = 倍率 3.40 は矢だけ）・毒の継続ダメージ（type=dot）が当たること
 grep -q "^HEAVY" $OUTD && echo "OK  短剣: 強攻撃（瞬影 $(grep -c '^HEAVY' $OUTD) 回）" || { echo "NG  短剣: 強攻撃が出ない"; ok=1; }
@@ -57,6 +68,7 @@ grep -q "^HIT .* type=wskill" $OUTD && echo "OK  短剣: 武器スキルが当�
 grep -q "^HIT .* type=tskill" $OUTD && echo "OK  短剣: ツリースキルが当たった（$(grep -c '^HIT .* type=tskill' $OUTD) 回）" || { echo "NG  短剣: ツリースキルが当たらない"; ok=1; }
 grep -q "^HIT .* type=tskill mult=3.40" $OUTD && echo "OK  短剣: 投げナイフ（矢）が当たった（$(grep -c '^HIT .* type=tskill mult=3.40' $OUTD) 回）" || { echo "NG  短剣: 投げナイフが当たらない"; ok=1; }
 grep -q "^HIT .* type=dot" $OUTD && echo "OK  短剣: 毒・出血の継続ダメージが入った（$(grep -c '^HIT .* type=dot' $OUTD) 回）" || { echo "NG  短剣: 毒・出血が入らない"; ok=1; }
+grep -q "^HURT" $OUTD && echo "OK  短剣: 被弾・のけぞり（HURT $(grep -c '^HURT' $OUTD) 回）" || { echo "NG  短剣: 被弾しない"; ok=1; }
 grep -E "SCRIPT ERROR" $OUTD && ok=1
 # 大斧の回: 強攻撃（大地砕き）・武器スキル・Q/E・戻る斧（返り刃 lv1 = 倍率 2.40 は斧だけ）が当たること
 grep -q "^HEAVY" $OUTA && echo "OK  大斧: 強攻撃（$(grep -c '^HEAVY' $OUTA) 回）" || { echo "NG  大斧: 強攻撃が出ない"; ok=1; }
@@ -67,6 +79,7 @@ grep -q "^HIT .* type=heavy" $OUTA && echo "OK  大斧: 強攻撃が当たった
 grep -q "^HIT .* type=wskill" $OUTA && echo "OK  大斧: 武器スキルが当たった（$(grep -c '^HIT .* type=wskill' $OUTA) 回）" || { echo "NG  大斧: 武器スキルが当たらない"; ok=1; }
 grep -q "^HIT .* type=tskill" $OUTA && echo "OK  大斧: ツリースキルが当たった（$(grep -c '^HIT .* type=tskill' $OUTA) 回）" || { echo "NG  大斧: ツリースキルが当たらない"; ok=1; }
 grep -q "^HIT .* type=tskill mult=2.40" $OUTA && echo "OK  大斧: 戻る斧（返り刃）が当たった（$(grep -c '^HIT .* type=tskill mult=2.40' $OUTA) 回）" || { echo "NG  大斧: 戻る斧が当たらない"; ok=1; }
+grep -q "^HURT" $OUTA && echo "OK  大斧: 被弾・のけぞり（HURT $(grep -c '^HURT' $OUTA) 回）" || { echo "NG  大斧: 被弾しない"; ok=1; }
 grep -E "SCRIPT ERROR" $OUTA && ok=1
 # 盾槍・弓の回: 強攻撃（HEAVY）・武器スキル（SKILL）・Q/E（TSKILL）が出て、HIT（当たり）に 通常・強攻撃・武器スキル・ツリースキルが入っていること
 for pair in "盾槍:$OUTS" "弓:$OUTB"; do
@@ -77,6 +90,9 @@ for pair in "盾槍:$OUTS" "弓:$OUTB"; do
   for ty in normal heavy wskill tskill; do
     grep -q "^HIT .* type=$ty" $f && echo "OK  $name: $ty が当たった（$(grep -c "^HIT .* type=$ty" $f) 回）: $(grep "^HIT .* type=$ty" $f | head -1)" || { echo "NG  $name: $ty が当たらない"; ok=1; }
   done
+  grep -q "^HURT" $f && echo "OK  $name: 被弾（HURT $(grep -c '^HURT' $f) 回）" || { echo "NG  $name: 被弾しない"; ok=1; }
+  # 盾槍はガードを構えて受ける（溜め中に自動で構える）: GUARD の行（防御・カウンター準備・ガードブレイク）が出ること
+  [ "$name" = "盾槍" ] && { grep -q "^GUARD" $f && echo "OK  盾槍: ガードで受けた（GUARD $(grep -c '^GUARD' $f) 回）: $(grep '^GUARD' $f | head -1)" || { echo "NG  盾槍: ガードで受けない"; ok=1; }; }
   grep -E "SCRIPT ERROR" $f && ok=1
 done
 # 式の照合（元の JavaScript で作った期待値と GDScript を比べる。JSON は node tools/worldart/godot/golden_rules.mjs で作り直せる）

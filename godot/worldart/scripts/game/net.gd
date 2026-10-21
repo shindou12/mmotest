@@ -12,6 +12,8 @@ var was_open := false
 
 
 func connect_to(url: String) -> void:
+	# 作り直して再接続するとき（力尽きて始め直す）、前の接続の「開いていた」を引きずると opened が出ず、hello が送られない
+	was_open = false
 	ws = WebSocketPeer.new()
 	ws.inbound_buffer_size = 4 * 1024 * 1024
 	var err := ws.connect_to_url(url)

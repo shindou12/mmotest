@@ -19,6 +19,7 @@
 // 自己確認: dealDamage の式を使わずに全部を動かしている確認として、(1) actions.js の SWEEP を元のモジュールから直接読む（写さない）、
 //   (2) 乱数の列を使い切らない、(3) 数が有限、を調べる。違えば止まる。
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { wirePorts, state, rules } from '../../../public/js/game/ports.js';
 import * as D from '../../../public/shared/data.js';
@@ -717,7 +718,7 @@ if (ONLY) {
 }
 const tmp = new URL('../../../.agents/golden_combat_subset.json', import.meta.url);
 fs.mkdirSync(new URL('../../../.agents/', import.meta.url), { recursive: true });
-execFileSync(process.execPath, [new URL(import.meta.url).pathname], { env: { ...process.env, GOLDEN_ONLY: PORTED, GOLDEN_OUT: tmp.pathname }, stdio: 'inherit' });
+execFileSync(process.execPath, [fileURLToPath(import.meta.url)], { env: { ...process.env, GOLDEN_ONLY: PORTED, GOLDEN_OUT: fileURLToPath(tmp) }, stdio: 'inherit' });
 const subset = JSON.parse(fs.readFileSync(tmp, 'utf8'));
 fs.rmSync(tmp);
 const other = [];

@@ -131,9 +131,16 @@ fs.writeFileSync(path.join(OUT, 'poses.json'), JSON.stringify(list, null, 1) + '
 }
 
 if (args.godot) {
-  const env = { ...process.env, VK_ICD_FILENAMES: '/usr/share/vulkan/icd.d/lvp_icd.json' };
-  const r = spawnSync('timeout', ['-k', '5', '900', 'xvfb-run', '-a', 'godot', '--path', path.join(ROOT, 'godot/worldart'), '--resolution', `${W}x${H}`, 'scenes/pose_view.tscn', '--', '--list=' + path.join(OUT, 'poses.json')],
-    { env, encoding: 'utf8' });
+  const godotArgs = ['--path', path.join(ROOT, 'godot/worldart'), '--resolution', `${W}x${H}`, 'scenes/pose_view.tscn', '--', '--list=' + path.join(OUT, 'poses.json')];
+  let r;
+  if (process.platform === 'win32') {
+    // Windows（GPU あり・画面あり）: Godot 4.3 のコンソール版を直接呼ぶ。timeout・xvfb-run・VK_ICD は Linux 向けなので使わない。GODOT_BIN で場所を変えられる
+    const bin = process.env.GODOT_BIN || path.join(process.env.LOCALAPPDATA || '', 'Programs/Godot_4.3/Godot_v4.3-stable_win64_console.exe');
+    r = spawnSync(bin, godotArgs, { encoding: 'utf8', timeout: 900000 });
+  } else {
+    const env = { ...process.env, VK_ICD_FILENAMES: '/usr/share/vulkan/icd.d/lvp_icd.json' };
+    r = spawnSync('timeout', ['-k', '5', '900', 'xvfb-run', '-a', 'godot', ...godotArgs], { env, encoding: 'utf8' });
+  }
   const lines = (r.stdout || '').split('\n').filter((l) => /pose_view|ERROR|SCRIPT|Parse/.test(l));
   console.log('Godot:', lines.join('\n') || '(出力なし)', 'status', r.status);
   if (r.status !== 0) console.log((r.stderr || '').split('\n').filter((l) => !/ALSA|audio/i.test(l)).slice(0, 15).join('\n'));
