@@ -1,0 +1,121 @@
+{
+ "f1_town": {
+  "sun": "#fff1d6",
+  "sun_i": 2.2,
+  "sky": "#cfe8ff",
+  "ground": "#3a5a2a",
+  "hemi_i": 1.1
+ },
+ "f1_field": {
+  "sun": "#fff1d6",
+  "sun_i": 2.2,
+  "sky": "#cfe8ff",
+  "ground": "#3a5a2a",
+  "hemi_i": 1.1
+ },
+ "f1_hunt": {
+  "sun": "#e1d6c3",
+  "sun_i": 0.8800000000000001,
+  "sky": "#cfe8ff",
+  "ground": "#3a5a2a",
+  "hemi_i": 1.1
+ },
+ "f1_lake": {
+  "sun": "#e1d6c3",
+  "sun_i": 0.8800000000000001,
+  "sky": "#cfe8ff",
+  "ground": "#3a5a2a",
+  "hemi_i": 1.1
+ },
+ "f1_dun": {
+  "sun": "#fff1d6",
+  "sun_i": 0.9900000000000001,
+  "sky": "#cfe8ff",
+  "ground": "#3a5a2a",
+  "hemi_i": 0.75
+ },
+ "f1_lab": {
+  "sun": "#fff1d6",
+  "sun_i": 0.9900000000000001,
+  "sky": "#cfe8ff",
+  "ground": "#3a5a2a",
+  "hemi_i": 0.75
+ },
+ "f2_camp": {
+  "sun": "#e0f0ff",
+  "sun_i": 1.4,
+  "sky": "#b0d0d0",
+  "ground": "#203828",
+  "hemi_i": 1.1
+ },
+ "f2_field": {
+  "sun": "#ddecf8",
+  "sun_i": 1.1199999999999999,
+  "sky": "#b0d0d0",
+  "ground": "#203828",
+  "hemi_i": 1.1
+ },
+ "f2_dun": {
+  "sun": "#e0f0ff",
+  "sun_i": 0.63,
+  "sky": "#b0d0d0",
+  "ground": "#203828",
+  "hemi_i": 0.75
+ },
+ "f2_hunt": {
+  "sun": "#ddecf8",
+  "sun_i": 1.1199999999999999,
+  "sky": "#b0d0d0",
+  "ground": "#203828",
+  "hemi_i": 1.1
+ },
+ "f2_lab": {
+  "sun": "#e0f0ff",
+  "sun_i": 0.63,
+  "sky": "#b0d0d0",
+  "ground": "#203828",
+  "hemi_i": 0.75
+ },
+ "f3_camp": {
+  "sun": "#ffe0b0",
+  "sun_i": 2.6,
+  "sky": "#ffe8c8",
+  "ground": "#806040",
+  "hemi_i": 1.1
+ },
+ "f3_field": {
+  "sun": "#ffe0b0",
+  "sun_i": 2.6,
+  "sky": "#ffe8c8",
+  "ground": "#806040",
+  "hemi_i": 1.1
+ },
+ "f3_dun": {
+  "sun": "#ffe0b0",
+  "sun_i": 1.1700000000000002,
+  "sky": "#ffe8c8",
+  "ground": "#806040",
+  "hemi_i": 0.75
+ },
+ "f3_hunt": {
+  "sun": "#f4d1a0",
+  "sun_i": 1.9500000000000002,
+  "sky": "#ffe8c8",
+  "ground": "#806040",
+  "hemi_i": 1.1
+ },
+ "f3_canyon": {
+  "sun": "#f4d1a0",
+  "sun_i": 1.9500000000000002,
+  "sky": "#ffe8c8",
+  "ground": "#806040",
+  "hemi_i": 1.1
+ },
+ "f3_lab": {
+  "sun": "#ffe0b0",
+  "sun_i": 1.1700000000000002,
+  "sky": "#ffe8c8",
+  "ground": "#806040",
+  "hemi_i": 0.75
+ }
+}

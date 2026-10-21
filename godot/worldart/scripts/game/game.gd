@@ -269,6 +269,7 @@ func _on_snap(m: Dictionary) -> void:
 			world.add_child(o.node); world.add_child(o.label)
 			others[id] = o
 		o.tx = float(p[2]); o.tz = float(p[3]); o.ta = float(p[4]); o.rv = float(p[21])   # rv: 倒れている間の起こすゲージ（-1 = 立っている）
+		PlayerView.on_snap_player(o, p)
 		o.label.text = "%s Lv%d%s" % [p[1], int(p[7]), "（倒れている）" if int(p[21]) >= 0 else ""]
 	for id in others.keys():
 		if not seen_p.has(id): _remove_other(id)
@@ -679,6 +680,7 @@ func _sync_nodes(dt: float) -> void:
 	RenderingServer.global_shader_parameter_set("wa_occ_cam", cam.position)   # 手前の物を点描で抜く（shaders/common.gdshaderinc）
 	RenderingServer.global_shader_parameter_set("wa_occ_tgt", tgt + Vector3(0, 0.9, 0))
 	RenderingServer.global_shader_parameter_set("wa_occ_r", 2.2)
+	PlayerView.update_all(self, dt)   # 人物（自分と他の人）の部品ごとの動き（player_view.gd）
 
 
 func _slash_fx(a: float, rng: float, arc: float) -> void:

@@ -59,8 +59,9 @@ static func _glow(c: Color) -> Material:
 	return m
 
 
-## 人物: ゲームのモデル（なければ仮の形: 体の円柱・頭の球・向きの印）。高さ ≈1.7m
+## 人物: 入れ物（中身のモデルは PlayerView が装備に合わせて付ける）。モデルがなければ仮の形（体の円柱・頭の球・向きの印）。高さ ≈1.7m
 static func player(color: Color) -> Node3D:
+	if ResourceLoader.exists("res://data/models/player.glb"): return PlayerView.create(color)   # 名前付き部品のモデル・動き・トゥーン（player_view.gd）
 	var gm := model("player")
 	if gm != null: return gm
 	var n := Node3D.new()
