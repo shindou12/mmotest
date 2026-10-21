@@ -29,7 +29,7 @@ const SH_ROCK := preload("res://shaders/rock.gdshader")
 
 
 func _ready() -> void:
-	if auto_build: build()
+	if auto_build or Engine.is_editor_hint(): build()   # エディタでは開いた時点で組み立てて見せる
 
 
 ## ゲームのエリアを組み立てる（L27）。data/<id>/map.json があれば第 3 世代の地図、なければ仮の地面（ゲームの輪郭・当たり判定の形だけ）
@@ -188,6 +188,13 @@ func _set_globals() -> void:
 	rs.global_shader_parameter_set("wa_rock_scale", 1.6 if rk == "crack" else 4.5)
 	rs.global_shader_parameter_set("wa_rock_pix", 1.0 if G.get("rockPix", false) else 0.0)
 	rs.global_shader_parameter_set("wa_gb_on", 1.0 if F.get("groundBlend", false) else 0.0)
+	rs.global_shader_parameter_set("wa_leaf_lift", float(F.get("lift", 0.0)))
+	rs.global_shader_parameter_set("wa_leaf_trans", float(F.get("trans", 0.0)))
+	rs.global_shader_parameter_set("wa_leaf_recv", 1.0 if F.get("receiveShadow", true) else 0.0)
+	var msaa := int(spec.get("post", {}).get("msaa", 0))
+	rs.global_shader_parameter_set("wa_alpha_cut", 0.25 if msaa > 0 else 0.5)
+	var W = spec.get("terrain", {}).get("water")
+	rs.global_shader_parameter_set("wa_water", Vector2(float(W["level"]), 1.0) if W is Dictionary else Vector2.ZERO)
 
 
 # ---------------------------------------------------------------- 太陽と環境
@@ -229,10 +236,14 @@ func _build_terrain() -> void:
 	var sc: Node = load("res://data/%s/terrain.glb" % map_name).instantiate()
 	var mesh: Mesh = null
 	var xf := Transform3D.IDENTITY
+	var water: MeshInstance3D = null
 	for n in sc.find_children("*", "MeshInstance3D", true, false):
 		if not String(n.name).begins_with("water"):
 			mesh = n.mesh
 			xf = n.transform
+		else:
+			water = n
+	if water != null: _build_water(water)
 	sc.free()
 	var m := ShaderMaterial.new()
 	m.shader = SH_GROUND
@@ -249,6 +260,18 @@ func _build_terrain() -> void:
 	add_child(terrain_mesh)
 	if not Engine.is_editor_hint():
 		terrain_mesh.create_trimesh_collision()   # 歩くときの地面の高さ（scripts/main.gd が光線で引く）
+
+
+## 水面（world.js waterMaterial）: 作り方は scripts/water.gd（WorldWater.make）。高さマップ data/<地図>/height.png から深さを出す
+func _build_water(src: MeshInstance3D) -> void:
+	if not ResourceLoader.exists("res://scripts/water.gd"): return
+	var mi := MeshInstance3D.new()
+	mi.name = "Water"
+	mi.mesh = src.mesh
+	mi.transform = src.global_transform if src.is_inside_tree() else src.transform
+	mi.material_override = load("res://scripts/water.gd").make(self)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
 
 
 # アイデア01: 地形の頂点色（R=土 G=砂/石畳）を格子と同じ解像度の絵に写す（草の房の根元が引く）

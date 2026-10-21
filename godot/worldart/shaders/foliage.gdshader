@@ -6,6 +6,10 @@ shader_type spatial;
 render_mode diffuse_lambert, specular_disabled, ambient_light_disabled, cull_disabled, alpha_to_coverage;
 #include "common.gdshaderinc"
 global uniform float wa_wrap;
+global uniform float wa_leaf_lift;
+global uniform float wa_leaf_trans;
+global uniform float wa_leaf_recv;
+global uniform float wa_alpha_cut;
 global uniform float wa_leaf_sat;
 global uniform vec3 wa_leaf_tint;
 global uniform vec3 wa_tuft_tint;
@@ -65,11 +69,15 @@ void fragment() {
 		ALBEDO = wa_desat(c * wa_leaf_tint, wa_leaf_sat);   // three: 葉の色味 → 彩度の順
 	}
 	ALPHA = t.a;
-	ALPHA_SCISSOR_THRESHOLD = 0.25;
+	ALPHA_SCISSOR_THRESHOLD = wa_alpha_cut;   // MSAA ありは 0.25 + alpha to coverage、なし（第 2 世代）は 0.5
 	NORMAL = normalize(v_vn);
 	EMISSION = wa_hemi(ALBEDO, normalize(v_wn));
+	if (!is_grass) EMISSION += ALBEDO * wa_leaf_lift;   // 葉の日陰の持ち上げ（world.js uLeafLift。草の房には掛けない）
 }
 void light() {
 	float d = clamp((dot(NORMAL, LIGHT) + wa_wrap) / (1.0 + wa_wrap), 0.0, 1.0);
-	DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * d / PI;
+	d += wa_leaf_trans * pow(clamp(dot(VIEW, -LIGHT), 0.0, 1.0), 2.0);   // 日を背にした葉の透け（world.js uTrans）
+	// 影を受けない葉（第 2 世代 foliage.receiveShadow false。草の房はいつも受ける）: 平行光だけなので影の項を 1 にする
+	float att = (!is_grass && wa_leaf_recv < 0.5) ? 1.0 : ATTENUATION;
+	DIFFUSE_LIGHT += LIGHT_COLOR * att * d / PI;
 }

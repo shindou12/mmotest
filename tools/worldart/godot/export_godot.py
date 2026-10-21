@@ -14,6 +14,7 @@ for m in sys.argv[1:]:
     d = os.path.join(PROJ, 'data', m); os.makedirs(d, exist_ok=True)
     shutil.copy(os.path.join(src, m, 'terrain.glb'), os.path.join(d, 'terrain.glb'))
     shutil.copy(os.path.join(src, m, 'placements.json'), os.path.join(d, 'placements.json'))
+    if os.path.exists(os.path.join(src, m, 'height.png')): shutil.copy(os.path.join(src, m, 'height.png'), os.path.join(d, 'height.png'))   # 水の深さ
     shutil.copy(os.path.join(src, m + '.json'), os.path.join(d, 'map.json'))
     names = {k.replace('@shadow', '') for k in json.load(open(os.path.join(src, m, 'placements.json')))['assets']}
     os.makedirs(os.path.join(PROJ, 'data', 'assets'), exist_ok=True)

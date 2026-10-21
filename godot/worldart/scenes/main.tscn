@@ -9,3 +9,4 @@ script = ExtResource("1")
 [node name="World" type="Node3D" parent="."]
 script = ExtResource("2")
 map_name = "f1_field"
+auto_build = false

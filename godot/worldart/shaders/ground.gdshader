@@ -14,6 +14,7 @@ global uniform float wa_lush_bias;
 global uniform float wa_alt_scale;
 global uniform float wa_rock_scale;
 global uniform float wa_rock_pix;
+global uniform vec2 wa_water;   // 水面の高さ・水があるか（world.js uWater）
 uniform sampler2D t_grass : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D t_dirt : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D t_alt : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -50,6 +51,10 @@ void fragment() {
 	vec3 col = mix(grass, dirt, wd);
 	col = mix(col, alt, wa);
 	col = mix(col, rock * wa_rock_tint, wr);
+	if (wa_water.y > 0.5) {   // 水際の濡れた地面
+		float wet = smoothstep(0.55, 0.05, v_w.y - wa_water.x);
+		col *= mix(vec3(1.0), vec3(0.72, 0.74, 0.76), wet);
+	}
 	ALBEDO = wa_desat(col, wa_albedo_sat);
 	EMISSION = wa_hemi(ALBEDO, normalize(v_wn));
 }
