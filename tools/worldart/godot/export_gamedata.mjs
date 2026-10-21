@@ -7,6 +7,12 @@ import fs from 'node:fs';
 import * as D from '../../../public/shared/data.js';
 import { AREAS, CELL, grid, boundR, maxR, exitsOf, obstaclesOf, hazardsOf, chestsOf, spawnPoint, waypointOf, arrival } from '../../../public/shared/areas.js';
 import { BALANCE, REVIVE } from '../../../public/shared/balance.js';
+import { HEAVY, WEAPON_SKILLS, TREE_SKILLS, SKILL_CD_MULT } from '../../../public/js/skills.js';
+import { WTREES, WT_NODE, PROF_MAX, ROW_REQ } from '../../../public/js/weapon-tree.js';
+import { TECHNIQUES } from '../../../public/shared/techniques.js';
+import { TREE_MOTIONS } from '../../../public/shared/tree-motions.js';
+import { MOTION_DURATIONS } from '../../../public/shared/motion-catalog.js';
+import { SPEAR_TIMINGS } from '../../../public/shared/skill-timings.js';
 
 // 数値は丸めない（GDScript の式を元の JavaScript と 1e-6 で照合するため。丸めると輪郭・能力値が 1e-3 ずれる）
 const scalars = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => ['number', 'string', 'boolean'].includes(typeof v)));
@@ -15,6 +21,10 @@ const levels = [];
 for (let lv = 1; lv <= D.MAX_LEVEL; lv++) {
   levels.push({ lv, atk: (D.baseAtk(lv)), hp: (D.baseHp(lv)), xp: D.xpToNext(lv), wdef: Object.fromEntries(Object.keys(D.WEAPONS).map((k) => [k, (D.weaponDef(k, lv))])) });
 }
+// 技の表（G1-2）: 関数でない項目だけ（名前・kind・cd・motion・duration など）。cd は skills.js が SKILL_CD_MULT（1.2）を掛けた後の値、
+// 武器ツリーのスキル（WT_SKILLS）は最初から掛けた値。技の中身（run）は GDScript の scripts/game/skills/ に移してある
+const skillTable = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, scalars(v)]));
+const skills = { cdMult: SKILL_CD_MULT, heavy: skillTable(HEAVY), weapon: skillTable(WEAPON_SKILLS), tree: skillTable(TREE_SKILLS) };
 const hex = (c) => '#' + (c >>> 0).toString(16).padStart(6, '0');
 const floors = D.FLOORS.map((F) => ({
   n: F.n, name: F.name, ground: hex(F.ground), ground2: hex(F.ground2),
@@ -62,6 +72,7 @@ const out = {
   note: 'tools/worldart/godot/export_gamedata.mjs が public/shared/ から書く。手で直さない',
   affixes: D.AFFIXES, weightClasses: D.WEIGHT_CLASSES.map((w) => ({ ...w, max: Number.isFinite(w.max) ? w.max : 1e9 })), armorClasses: D.ARMOR_CLASSES,
   balance: BALANCE, revive: REVIVE, treasure: { id: D.TREASURE_ID, t: D.TREASURE_DEF.t, name: D.TREASURE_DEF.name, color: hex(D.TREASURE_DEF.color ?? 0xffd84a), scale: D.TREASURE_DEF.scale ?? 1 }, instinct: D.INSTINCT, defaultWeapon: D.DEFAULT_WEAPON, rarities: D.RARITIES.map((r) => ({ name: r.name, color: r.color })),
+  skills, wtrees: WTREES, wtnode: WT_NODE, wtConst: { profMax: PROF_MAX, rowReq: ROW_REQ }, techniques: TECHNIQUES, treeMotions: TREE_MOTIONS, motionDurations: MOTION_DURATIONS, skillTimings: SPEAR_TIMINGS,
   weapons, levels, floors, areas, floorHub: Object.fromEntries(D.FLOORS.map((F) => [F.n, Object.keys(AREAS).find((k) => AREAS[k].floor === F.n && (AREAS[k].type === 'town' || AREAS[k].type === 'camp'))])),
 };
 fs.writeFileSync(new URL('../../../godot/worldart/data/game.json', import.meta.url), JSON.stringify(out));

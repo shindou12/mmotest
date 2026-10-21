@@ -27,4 +27,13 @@ grep -E "SCRIPT ERROR" $OUT && ok=1
 G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/rules_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"
 [ $gs -eq 0 ] || { echo "NG  式の照合（終了コード $gs）"; ok=1; }
+# 技の照合（片手剣・大剣の強攻撃・武器スキル・ツリースキルの呼び出し列を、元の JavaScript の記録と比べる。JSON は node tools/worldart/godot/golden_skills.mjs で作り直せる）
+G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/skills_golden.gd 2>&1); gs=$?
+echo "$G" | grep -E "^(OK|NG|照合)"
+[ $gs -eq 0 ] || { echo "NG  技の照合（終了コード $gs）"; ok=1; }
+# 姿勢の照合（人物の部品の世界行列を、元の three.js と 1e-4 で比べる。生の値は大きいので git に入れず、なければここで作る）
+[ -f godot/worldart/data/poses_golden.json ] || node tools/worldart/godot/export_rig.mjs > /dev/null
+G=$(cd godot/worldart && timeout -k 5 300 godot --headless --path . -s res://scripts/tests/poses_golden.gd 2>&1); gs=$?
+echo "$G" | grep -E "^(OK|NG|照合)"
+[ $gs -eq 0 ] || { echo "NG  姿勢の照合（終了コード $gs）"; ok=1; }
 exit $ok
