@@ -27,7 +27,8 @@ THRESH = 24     # 背景との RGB 差の合計がこれ以上の画素を人物
 
 
 def font(size):
-    for p in ['/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf', '/usr/share/fonts/truetype/fonts-japanese-gothic.ttf']:
+    for p in ['/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf', '/usr/share/fonts/truetype/fonts-japanese-gothic.ttf',
+              'C:/Windows/Fonts/YuGothM.ttc', 'C:/Windows/Fonts/meiryo.ttc', 'C:/Windows/Fonts/msgothic.ttc']:   # 後ろの 3 つは Windows
         if Path(p).exists():
             return ImageFont.truetype(p, size)
     return ImageFont.load_default()
