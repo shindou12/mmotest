@@ -8,9 +8,9 @@ PORT=$PORT node server.js > /tmp/godot_client_test_server.log 2>&1 &
 SRV=$!
 sleep 1
 OUT=/tmp/godot_client_test.log
-( cd godot/worldart && timeout 200 godot --headless --path . -- --bot --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUT 2>&1 )
-( cd godot/worldart && timeout 100 godot --headless --path . -- --bot --goto=f1_town --server=ws://127.0.0.1:$PORT/ws --quit=40 >> $OUT 2>&1 )
-( cd godot/worldart && timeout 100 godot --headless --path . -- --bot --goto=f1_dun --server=ws://127.0.0.1:$PORT/ws --quit=50 >> $OUT 2>&1 )
+( cd godot/worldart && timeout -k 5 200 godot --headless --path . -- --bot --server=ws://127.0.0.1:$PORT/ws --quit=120 > $OUT 2>&1 )
+( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_town --server=ws://127.0.0.1:$PORT/ws --quit=40 >> $OUT 2>&1 )
+( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_dun --server=ws://127.0.0.1:$PORT/ws --quit=50 >> $OUT 2>&1 )
 kill $SRV
 ok=0
 grep -q "LOG ひだまりの草原" $OUT && echo "OK  草原へ移った" || { echo "NG  草原へ移れない"; ok=1; }
@@ -23,4 +23,8 @@ grep -q "^SKILL" $OUT && echo "OK  武器スキル（$(grep -c '^SKILL' $OUT) �
 grep -q "^PICKUP" $OUT && echo "OK  落とし物を拾った（$(grep -c '^PICKUP' $OUT) 個）" || echo "--  落とし物なし（運しだい）"
 grep -q "^EQUIP" $OUT && echo "OK  拾った装備を着けた: $(grep '^EQUIP' $OUT | head -1)" || echo "--  装備の変更なし（運しだい）"
 grep -E "SCRIPT ERROR" $OUT && ok=1
+# 式の照合（元の JavaScript で作った期待値と GDScript を比べる。JSON は node tools/worldart/godot/golden_rules.mjs で作り直せる）
+G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/rules_golden.gd 2>&1); gs=$?
+echo "$G" | grep -E "^(OK|NG|照合)"
+[ $gs -eq 0 ] || { echo "NG  式の照合（終了コード $gs）"; ok=1; }
 exit $ok

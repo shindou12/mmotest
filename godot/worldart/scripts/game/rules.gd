@@ -25,15 +25,14 @@ static func ang_diff(a: float, b: float) -> float:
 	return d
 
 
-## areas.js boundR（輪郭を 1° ごとに書き出した表を補間）。a は北 0・東 +（angOf = atan2(x, -z)）
+## areas.js boundR（元の式のまま。値は export_gamedata.mjs が bound に書く）。a は北 0・東 +（angOf = atan2(x, -z)）
+## 計算は 64 ビットの float だけで行う（Vector2 は 32 ビットなので使わない）
 static func bound_r(ar: Dictionary, a: float) -> float:
-	var ol: Array = ar["outline"]
-	var deg := fposmod(rad_to_deg(a), 360.0)
-	var i := int(floor(deg)) % 360
-	var j := (i + 1) % 360
-	var ri := Vector2(ol[i][0], ol[i][1]).length()
-	var rj := Vector2(ol[j][0], ol[j][1]).length()
-	return lerp(ri, rj, deg - floor(deg))
+	var b: Dictionary = ar["bound"]
+	var R := float(b["R"]); var n := float(b["sq"]); var w := float(b["wob"])
+	var dx := sin(a); var dz := -cos(a)
+	var base := 1.0 / pow(pow(absf(dx / (R * float(b["ell"][0]))), n) + pow(absf(dz / (R * float(b["ell"][1]))), n), 1.0 / n)
+	return base * (1.0 + w * (0.55 * sin(3.0 * a + float(b["p1"])) + 0.3 * sin(5.0 * a + float(b["p2"])) + 0.15 * sin(8.0 * a + float(b["p3"]))))
 
 
 static func ang_of(x: float, z: float) -> float:
@@ -56,7 +55,7 @@ static func push_out_box(b: Dictionary, x: float, z: float, rad: float):
 		var opts := [[hw + rad - lx, 0.0], [-hw - rad - lx, 0.0], [0.0, hd + rad - lz], [0.0, -hd - rad - lz]]
 		opts.sort_custom(func(p, q): return absf(p[0] + p[1]) < absf(q[0] + q[1]))
 		px = lx + opts[0][0]; pz = lz + opts[0][1]
-	return Vector2(float(b["x"]) + px * c + pz * s, float(b["z"]) - px * s + pz * c)
+	return [float(b["x"]) + px * c + pz * s, float(b["z"]) - px * s + pz * c]
 
 
 ## areas.js solidAt（屋内のマス目: 壁と閉じた扉）
@@ -66,8 +65,14 @@ static func solid_at(ar: Dictionary, c: int, r: int, door_open: bool) -> bool:
 	return ch == "#" or (ch == "D" and not door_open)
 
 
-## areas.js collide（屋外: 輪郭と当たり判定のある物。屋内: マス目の壁と扉）
+## areas.js collide を Vector2 で返す（ゲームの座標用）。照合は collide_xz の 64 ビットの値で行う
 static func collide(ar: Dictionary, x: float, z: float, rad := 0.5, door_open := false) -> Vector2:
+	var q := collide_xz(ar, x, z, rad, door_open)
+	return Vector2(q[0], q[1])
+
+
+## areas.js collide（屋外: 輪郭と当たり判定のある物。屋内: マス目の壁と扉）。[x, z] を 64 ビットの float で返す
+static func collide_xz(ar: Dictionary, x: float, z: float, rad := 0.5, door_open := false) -> Array:
 	if ar["shape"] == "grid":
 		var CELL := float(ar["cell"]); var W := int(ar["W"]); var H := int(ar["H"])
 		for _p in 2:
@@ -85,15 +90,15 @@ static func collide(ar: Dictionary, x: float, z: float, rad := 0.5, door_open :=
 							var opts := [[cx - rad - x, 0.0], [cx + CELL + rad - x, 0.0], [0.0, cz - rad - z], [0.0, cz + CELL + rad - z]]
 							opts.sort_custom(func(p, q): return absf(p[0] + p[1]) < absf(q[0] + q[1]))
 							x += opts[0][0]; z += opts[0][1]
-		return Vector2(x, z)
+		return [x, z]
 	var passes := 2 if String(ar.get("layout", "")) != "" else 1
 	for _p in passes:
 		for o in ar["obstacles"]:
 			if not o["solid"]: continue
 			if o.has("box"):
-				if Vector2(x - o["x"], z - o["z"]).length() > float(o["r"]) + rad: continue
+				if sqrt(pow(x - float(o["x"]), 2) + pow(z - float(o["z"]), 2)) > float(o["r"]) + rad: continue
 				var q = push_out_box(o["box"], x, z, rad)
-				if q != null: x = q.x; z = q.y
+				if q != null: x = q[0]; z = q[1]
 				continue
 			var dx := x - float(o["x"]); var dz := z - float(o["z"]); var d := sqrt(dx * dx + dz * dz); var mn := float(o["r"]) + rad
 			if d < mn:
@@ -101,8 +106,8 @@ static func collide(ar: Dictionary, x: float, z: float, rad := 0.5, door_open :=
 				x = float(o["x"]) + (dx if d > 1e-4 else mn) * k
 				z = float(o["z"]) + (dz if d > 1e-4 else 0.0) * k
 	var a := ang_of(x, z); var mx := bound_r(ar, a) - 1.0; var dd := sqrt(x * x + z * z)
-	if dd > mx: return Vector2(x * mx / dd, z * mx / dd)
-	return Vector2(x, z)
+	if dd > mx: return [x * mx / dd, z * mx / dd]
+	return [x, z]
 
 
 ## data.js inShape（敵の攻撃の予告の形: circle・ring・cone・line）
