@@ -7,7 +7,7 @@
 //
 // 形: { keys: { <キー>: { suite, in: {入力}, ev | meta | eff } }, misc: { trees, nodeIndex, wtrees, wtnode, treeEffects } }
 //   キーは skill-trace.mjs と同じ: heavy/<武器>/<lv>・ws/<id>・ts/<id>・wt/<id>/<段階>・wtmeta/<id>/<段階>・eff/<id>/<段階>（段階は 1・2・3A・3B）
-//   ev: 呼び出し列、meta: スキルの表の値（wtmeta）、eff: 武器ツリーの効果（eff）。suite は Godot で照合する範囲（sword・greatsword・wtree。空は照合しない）
+//   ev: 呼び出し列、meta: スキルの表の値（wtmeta）、eff: 武器ツリーの効果（eff）。suite は Godot で照合する範囲（sword・greatsword・dagger・axe・wtree。空は照合しない）
 // 照合する側は godot/worldart/scripts/tests/skills_golden.gd。
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -46,9 +46,9 @@ function recorder(W, wk) {
 }
 
 // Godot で照合する武器と範囲
-const WK_SUITE = { sword: 'sword', greatsword: 'greatsword' };
-// ts/ のうち片手剣・大剣の分（旧来のツリースキルは武器の kind を持たないので、旧スロット名で分ける。技は kind が武器）
-const TS_SUITE = (id, sk) => WK_SUITE[sk.kind] || ({ slant: 'sword', brave: 'sword', gslam: 'greatsword', fortress: 'greatsword' }[id] || '');
+const WK_SUITE = { sword: 'sword', greatsword: 'greatsword', dagger: 'dagger', axe: 'axe' };
+// ts/ のうち片手剣・大剣・短剣・大斧の分（旧来のツリースキルは武器の kind を持たないので、旧スロット名で分ける。技は kind が武器）
+const TS_SUITE = (id, sk) => WK_SUITE[sk.kind] || ({ slant: 'sword', brave: 'sword', gslam: 'greatsword', fortress: 'greatsword', poison: 'dagger', smoke: 'dagger', warstomp: 'axe', bloodlust: 'axe' }[id] || '');
 
 const keys = {};
 const hashes = {};   // 自己確認用: キー → 生の記録のハッシュ

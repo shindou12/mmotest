@@ -2,11 +2,13 @@ extends RefCounted
 ## 武器ツリー（新）の仕組みのうち、技が読む部分。元は public/js/weapon-tree.js（profOf・profLevel・wtOf・wtSpent・wtLeft・wtCanLearn・wtLearn・wtChoose・wtEffects）。
 ## 表（WTREES・WT_NODE・PROF_MAX）は data/game.json から読む（export_gamedata.mjs が書く）。手で写さない。
 ## キャラクター ch は Dictionary { lv, tree, prof, wt }（JavaScript の char と同じ形）。
-## 武器ごとの「ツリーが足す能力値」（weapons/<武器>.js の mods）は sword.gd・greatsword.gd。片手剣と大剣の分だけ移してある。
+## 武器ごとの「ツリーが足す能力値」（weapons/<武器>.js の mods）は sword.gd・greatsword.gd。片手剣・大剣・短剣・大斧の分を移してある。
 
 const Common = preload("res://scripts/game/skills/common.gd")
 const Sword = preload("res://scripts/game/skills/sword.gd")
 const Greatsword = preload("res://scripts/game/skills/greatsword.gd")
+const Dagger = preload("res://scripts/game/skills/dagger.gd")
+const Axe = preload("res://scripts/game/skills/axe.gd")
 
 
 static func wtrees() -> Dictionary:
@@ -156,5 +158,7 @@ static func effects(ch: Dictionary, wk: String):
 	match wk:
 		"sword": Sword.mods(st, w.br, w.mods)
 		"greatsword": Greatsword.mods(st, w.br, w.mods)
+		"dagger": Dagger.mods(st, w.br, w.mods)
+		"axe": Axe.mods(st, w.br, w.mods)
 		_: push_error("wtree.gd: %s のツリーの mods はまだ移していない" % wk)
 	return w

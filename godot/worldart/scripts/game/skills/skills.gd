@@ -1,12 +1,14 @@
 extends RefCounted
 ## 技の登録表（id → 関数）。元は public/js/weapons/index.js（WEAPON_DEFS）と public/js/skills.js（HEAVY・WEAPON_SKILLS・TREE_SKILLS）。
 ## 技の名前・kind・cd（skills.js が ×1.2 した後の値）・motion・duration は data/game.json の skills から読む（手で写さない）。
-## 片手剣（sword.gd）と大剣（greatsword.gd）の分だけ移してある。ほかの武器は次の作業。
+## 片手剣（sword.gd）・大剣（greatsword.gd）・短剣（dagger.gd）・大斧（axe.gd）の分を移してある。盾槍・弓は別の作業。
 ## 関数は run(c) の c（ctx.gd の文脈）を受ける。強攻撃だけ run(c, lv)。
 
 const Common = preload("res://scripts/game/skills/common.gd")
 const Sword = preload("res://scripts/game/skills/sword.gd")
 const Greatsword = preload("res://scripts/game/skills/greatsword.gd")
+const Dagger = preload("res://scripts/game/skills/dagger.gd")
+const Axe = preload("res://scripts/game/skills/axe.gd")
 
 
 ## 武器 wk の強攻撃 run(c, lv)。移していない武器は無効な Callable
@@ -14,6 +16,8 @@ static func heavy(wk: String) -> Callable:
 	match wk:
 		"sword": return Sword.heavy
 		"greatsword": return Greatsword.heavy
+		"dagger": return Dagger.heavy
+		"axe": return Axe.heavy
 	return Callable()
 
 
@@ -29,6 +33,14 @@ static func weapon_skill(id: String) -> Callable:
 		"breaker": return Greatsword.ws_breaker
 		"avalanche": return Greatsword.ws_avalanche
 		"meteor": return Greatsword.ws_meteor
+		"shadow": return Dagger.ws_shadow
+		"phantom": return Dagger.ws_phantom
+		"fan": return Dagger.ws_fan
+		"venom": return Dagger.ws_venom
+		"rampage": return Axe.ws_rampage
+		"tomahawk": return Axe.ws_tomahawk
+		"earthsplit": return Axe.ws_earthsplit
+		"bloodaxe": return Axe.ws_bloodaxe
 	return Callable()
 
 
@@ -40,10 +52,18 @@ static func tree_skill(id: String) -> Callable:
 		"brave": return brave
 		"gslam": return gslam
 		"fortress": return fortress
+		"poison": return Dagger.poison
+		"smoke": return Dagger.smoke
+		"warstomp": return Axe.warstomp
+		"bloodlust": return Axe.bloodlust
 		"sword_parry", "sword_aircut", "sword_sideturn", "sword_dance":
 			return func(c): Sword.tech(c, Common.T(id))
 		"gs_guillotine", "gs_rising", "gs_broad", "gs_recoil", "gs_siege":
 			return func(c): Greatsword.tech(c, Common.T(id))
+		"dagger_flank", "dagger_vital", "dagger_bleed", "dagger_pin", "dagger_quicken":
+			return func(c): Dagger.tech(c, Common.T(id))
+		"axe_hook", "axe_execute", "axe_return", "axe_blood", "axe_rush":
+			return func(c): Axe.tech(c, Common.T(id))
 	return Callable()
 
 
@@ -62,7 +82,27 @@ static func wt_skill(id: String) -> Callable:
 		"gt_guillo": return Greatsword.gt_guillo
 		"gt_slam": return Greatsword.gt_slam
 		"gt_siege": return Greatsword.gt_siege
+		"dk_flank": return Dagger.dk_flank
+		"dk_vital": return Dagger.dk_vital
+		"dk_bleed": return Dagger.dk_bleed
+		"dk_poison": return Dagger.dk_poison
+		"dk_smoke": return Dagger.dk_smoke
+		"dk_pin": return Dagger.dk_pin
+		"ax_hook": return Axe.ax_hook
+		"ax_return": return Axe.ax_return
+		"ax_stomp": return Axe.ax_stomp
+		"ax_exec": return Axe.ax_exec
+		"ax_lust": return Axe.ax_lust
+		"ax_rush": return Axe.ax_rush
 	return Callable()
+
+
+## 武器ツリーのスキル id（頭の文字 sw_・gt_・dk_・ax_）が属する武器のスクリプト
+static func wt_module(id: String):
+	if id.begins_with("sw_"): return Sword
+	if id.begins_with("dk_"): return Dagger
+	if id.begins_with("ax_"): return Axe
+	return Greatsword
 
 
 ## 武器ツリーのスキルの表示用の値（skill-trace.mjs の wtmeta と同じ並び）:
@@ -70,7 +110,7 @@ static func wt_skill(id: String) -> Callable:
 static func wt_meta(id: String, W) -> Array:
 	var G := Common.game()
 	var sk: Dictionary = G["skills"]["tree"][id]
-	var mod = Sword if id.begins_with("sw_") else Greatsword
+	var mod = wt_module(id)
 	var cd_of = mod.cd_of(id, W)
 	var motion_of = mod.motion_of(id, W)
 	var md = motion_of if motion_of != null else sk["motion"]

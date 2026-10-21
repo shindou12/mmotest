@@ -3,7 +3,7 @@
 // 元は public/js/game/combat.js（dealDamage・stunValue）と weapon-fx.js（差し込み口）、game/tree-effects.js（入口）、各武器の effects。
 // ポート（ports.js）には wirePorts で最小のダミー（画面・音・通信・当たり判定・回復など）を差し込む。式と状態の変化は元のモジュールをそのまま動かす。
 // 全武器の effects を登録した状態（元のゲームと同じ）で回す。ほかの 4 武器の効果が片手剣・大剣の場面で働くかは、
-// 「片手剣と大剣だけ登録した状態」でも同じ場面を回して比べ、違いがあれば報告する（Godot へ移すのは片手剣と大剣だけ）。
+// 「Godot へ移した武器（SUITE_OF）だけ登録した状態」でも同じ場面を回して比べ、違いがあれば報告する。
 //
 // 形: { base: {me}, states: { <id>: { wk, ch, S } }, scenes: [ { suite, name, in, out } ] }
 //   state: 場面が使う能力値の状態。ch はキャラクター（武器ツリーの振り分けを含む）、S は calcStats の結果（数・真偽・文字と Set は配列）。
@@ -31,7 +31,8 @@ import { WEAPON_DEFS } from '../../../public/js/weapons/index.js';
 import { WTREES, wtLearn, wtChoose, profOf } from '../../../public/js/weapon-tree.js';
 
 const ONLY = process.env.GOLDEN_ONLY ? process.env.GOLDEN_ONLY.split(',') : null; // 子プロセス用: 登録する武器を絞る
-const SUITE_OF = { sword: 'sword', greatsword: 'greatsword' };
+const SUITE_OF = { sword: 'sword', greatsword: 'greatsword', dagger: 'dagger', axe: 'axe' };
+const PORTED = Object.keys(SUITE_OF).join(','); // Godot へ移した武器（子プロセスで、この武器だけ登録した状態と比べる）
 
 // ---- 種を固定した乱数（golden_rules.mjs と同じ mulberry32） ----
 let seed = 20261021;
@@ -155,7 +156,7 @@ function varyS(S, level) {
 
 // ---- 場面の状態の一覧 ----
 const states = {};
-const stateIds = { sword: [], greatsword: [] };
+const stateIds = Object.fromEntries(Object.keys(SUITE_OF).map((wk) => [wk, []]));
 function addState(wk, label, steps, variants) {
   for (let v = 0; v < variants; v++) {
     const id = `${wk}/${label}#${v}`;
@@ -190,7 +191,7 @@ const BUFFS = [
   { id: 'b_atk', mods: { atkp: 20 } }, { id: 'b_dmg', mods: { dmgp: 25 } }, { id: 'b_crit', mods: { crit: 30 } }, { id: 'b_heavy', mods: { heavyp: 40 } },
   { id: 'b_norm', mods: { normp: 15 } }, { id: 'b_wsk', mods: { wskillp: 30 } }, { id: 'b_stun', mods: { stunp: 50 } }, { id: 'b_vamp', mods: { vamp: 8 } },
   { id: 'sw_saint', mods: {} }, { id: 'sw_dance', mods: {} }, { id: 'sw_brave', mods: {} }, { id: 'sw_parryB', mods: { atkp: 25 } }, { id: 'sw_cycleB', mods: { aspd: 12 } },
-  { id: 'gt_siege', mods: {} }, { id: 'gt_eye', mods: { dmgp: 15 } }, { id: 'gt_mirror', mods: { dmgp: 30 } }, { id: 'poison', mods: {} }, { id: 'dr_a', mods: { dr: 10 } },
+  { id: 'gt_siege', mods: {} }, { id: 'dk_poison', mods: {} }, { id: 'ax_rage', mods: { atkp: 5 } }, { id: 'gt_eye', mods: { dmgp: 15 } }, { id: 'gt_mirror', mods: { dmgp: 30 } }, { id: 'poison', mods: {} }, { id: 'dr_a', mods: { dr: 10 } },
 ];
 const mkBuff = (b, t) => ({ id: b.id, label: b.id, t, max: Math.max(t, rr(t, t + 3)), mods: b.mods, color: pick([0xffffff, 0xffd84a, 0x9affff]) });
 function genMe(t) {
@@ -214,6 +215,8 @@ function genMe(t) {
   o.parryUntil = t + pick([-1, 0.3]); o.parryDone = chance(0.4); o.saintOn = chance(0.3); o.paladinT = t - pick([0.5, 2, 9]); o.mageT = t + pick([-1, 2]);
   o.parryReadyT = t + pick([-1, 1]); o.combo = ri(0, 3); o.iframe = pick([0, 0.2, 1]); o.wsCd = pick([0, 5]); o.tcd = chance(0.5) ? { sw_aircut: 6, gt_x: 2 } : {};
   o.model = chance(0.5) ? true : null;
+  if (chance(0.3)) o.undyingT = t - pick([1, 30, 100]);
+  o.dead = chance(0.05);
   return o;
 }
 const T_OPT = ['normal', 'heavy', 'wskill', 'tskill', 'dot', 'proc'];
@@ -231,14 +234,19 @@ function genO(type) {
   if (chance(0.1)) o.threat = pick([1, 1.5, 3]);
   if (chance(0.05)) o.tech = 'tx';
   if (chance(0.1)) o.wtNo = true;
+  if (chance(0.15)) o.poison = pick([1, 2, 3]);
   if (chance(0.1)) o.a = rr(-3, 3);
   return o;
 }
 function genMobs(t) {
   const mk = (id) => {
     const mhp = pick([100, 800, 5000, 60000]);
-    return { id, x: rr(-4, 4), z: rr(-4, 4), a: rr(-3.1, 3.1), hp: pick([mhp, mhp, mhp * 0.9, mhp * 0.25, mhp * 0.05]), mhp, rad: pick([0.6, 0.8, 1.2]), kind: pick([0, 0, 1, 2]), elite: chance(0.25),
-      stunT: chance(0.25) ? rr(0.5, 3) : 0, guard: chance(0.25), act: chance(0.1) ? { p: 'burrow', age: rr(0, 2), d: rr(1.5, 3) } : null, localT: -99, flash: 0, jolt: pick([0, 0, 0.05]), joltMax: 0, joltAmp: pick([0, 0.2]), poisonUntil: 0 };
+    const m0 = { id, x: rr(-4, 4), z: rr(-4, 4), a: rr(-3.1, 3.1), hp: pick([mhp, mhp, mhp * 0.9, mhp * 0.25, mhp * 0.05]), mhp, rad: pick([0.6, 0.8, 1.2]), kind: pick([0, 0, 1, 2]), elite: chance(0.25),
+      stunT: chance(0.25) ? rr(0.5, 3) : 0, guard: chance(0.25), act: chance(0.1) ? { p: 'burrow', age: rr(0, 2), d: rr(1.5, 3) } : null, localT: pick([-99, -99, 0]), flash: 0, jolt: pick([0, 0, 0.05]), joltMax: 0, joltAmp: pick([0, 0.2]), poisonUntil: 0 };
+    if (chance(0.3)) { m0.vStack = ri(0, 5); m0.poisonUntil = t + pick([-1, 2]); }
+    if (chance(0.25)) { m0.bleedN = ri(0, 3); m0.bleedPow = pick([0.2, 0.6, 1.2]); m0.bleedUntil = t + pick([-1, 2]); }
+    if (chance(0.2)) m0.axBoom = chance(0.5);
+    return m0;
   };
   const ms = [mk(7)];
   for (let i = 0; i < ri(0, 2); i++) { const m = mk(8 + i); m.x = ms[0].x + rr(-2, 2); m.z = ms[0].z + rr(-2, 2); ms.push(m); }
@@ -283,7 +291,7 @@ function execute(suite, name, stateId, spec) {
       else if (op.kind === 'some') ret = fxSome(op.name, ...a);
       else ret = fxReduce(op.name, op.acc, ...a);
       if (spec.Sx) args.push(clean(spec.Sx));
-    } else if (op.k === 'ext') ext[op.name](...op.args);
+    } else if (op.k === 'ext') ext[op.name](...op.args.map(res));
     else if (op.k === 'entry') {
       const o = op.o ? clone(op.o) : undefined; if (o) args.push(o);
       const mb = state.mobs.get(7);
@@ -355,6 +363,13 @@ const HOOKS = (ctx) => {
     heavy: { kind: 'call', args: [pick([1, 2]), rr(-3, 3)] },
     counter: { kind: 'some', args: [flag ? MB : { x: rr(-3, 3), z: rr(-3, 3) }] },
     superArmor: { kind: 'some', args: [] }, noKnockdown: { kind: 'some', args: [] },
+    // 短剣・大斧
+    critAfter: { kind: 'some', args: [MB, o] }, ambushMult: { kind: 'reduce', acc: pick([1, 1.2]), args: [flag] },
+    finisher: { kind: 'reduce', acc: pick([1, 40, 500]), args: [MB, crit, o] },
+    poisonTick: { kind: 'reduce', acc: 0, args: [MB] }, bleedMul: { kind: 'reduce', acc: pick([1, 1.5]), args: [] },
+    stun: { kind: 'reduce', acc: pick([1.2, 6, 3]), args: [o] }, reach: { kind: 'reduce', acc: 1, args: [flag] },
+    heavyNeedsFull: { kind: 'some', args: [] }, heavyStart: { kind: 'call', args: [pick([1, 2])] }, heavyAfter: { kind: 'call', args: [pick([1, 2])] },
+    heavyOverride: { kind: 'some', args: [pick([1, 2])] }, cheatDeath: { kind: 'some', args: [] },
   };
 };
 const HOOK_NAMES = Object.keys(HOOKS({ o: {}, crit: false }));
@@ -412,6 +427,7 @@ for (const wk of Object.keys(SUITE_OF)) {
       const o = genO(); const crit = chance(0.4);
       const h = HOOKS({ o, crit, snap: states[sid].S })[name];
       const spec = scene(`hooks_${sc}`, name, sid, { randN: name === 'aura' ? 300 : 16 });
+      if (name === 'poisonTick') spec.mobs[0].vStack = ri(1, 5); // 毒の1回は毒が重なっている敵にだけ呼ばれる
       spec.op = { k: 'hook', name, ...h };
       execute(`hooks_${sc}`, `${name} ${sid}`, sid, spec);
     }
@@ -427,7 +443,10 @@ for (const wk of Object.keys(SUITE_OF)) {
       spec.op = { k: 'entry', ...e };
       execute(`hooks_${sc}`, `entry:${e.name} ${sid}`, sid, spec);
     }
-    for (const e of [{ name: 'parry', args: [pick([0.4, 0.55]), pick([70, 80])] }, { name: 'primeCharge', args: [pick([0.5, 0.8])] }]) if (chance(0.25)) {
+    const MOBREF = { $: 'mob' };
+    for (const e of [{ name: 'parry', args: [pick([0.4, 0.55]), pick([70, 80])] }, { name: 'primeCharge', args: [pick([0.5, 0.8])] },
+      { name: 'poison', args: [MOBREF, pick([1, 3, 5])] }, { name: 'bleed', args: [MOBREF, pick([0.2, 0.45]), chance(0.5)] }, { name: 'bleed', args: [MOBREF, pick([0.2, 0.45])] },
+      { name: 'ambush', args: [pick([1, 3, 4])] }, { name: 'pay', args: [pick([0.15, 0.9])] }].filter((e) => ext[e.name])) if (chance(0.25)) {
       const spec = scene(`hooks_${sc}`, e.name, sid);
       spec.op = { k: 'ext', ...e };
       execute(`hooks_${sc}`, `ext:${e.name} ${sid}`, sid, spec);
@@ -445,19 +464,19 @@ for (const wk of Object.keys(SUITE_OF)) {
   }
 }
 
-// ---- 子プロセス: 片手剣と大剣だけ登録した状態で同じ場面を回して比べる（親だけ） ----
+// ---- 子プロセス: Godot へ移した武器（SUITE_OF）だけ登録した状態で同じ場面を回して比べる（親だけ） ----
 if (ONLY) {
   fs.writeFileSync(process.env.GOLDEN_OUT, JSON.stringify(scenes.map((s) => s.out)));
   process.exit(0);
 }
 const tmp = new URL('../../../.agents/golden_combat_subset.json', import.meta.url);
 fs.mkdirSync(new URL('../../../.agents/', import.meta.url), { recursive: true });
-execFileSync(process.execPath, [new URL(import.meta.url).pathname], { env: { ...process.env, GOLDEN_ONLY: 'sword,greatsword', GOLDEN_OUT: tmp.pathname }, stdio: 'inherit' });
+execFileSync(process.execPath, [new URL(import.meta.url).pathname], { env: { ...process.env, GOLDEN_ONLY: PORTED, GOLDEN_OUT: tmp.pathname }, stdio: 'inherit' });
 const subset = JSON.parse(fs.readFileSync(tmp, 'utf8'));
 fs.rmSync(tmp);
 const other = [];
 scenes.forEach((s, i) => { if (JSON.stringify(s.out) !== JSON.stringify(subset[i])) other.push(s.name); });
-console.log(other.length ? `他の武器の効果が働いた場面: ${other.length} 件（${other.slice(0, 5).join(' / ')}）` : '他の武器の効果が働いた場面: 0 件（片手剣と大剣だけ登録した状態と全部同じ）');
+console.log(other.length ? `他の武器の効果が働いた場面: ${other.length} 件（${other.slice(0, 5).join(' / ')}）` : '他の武器の効果が働いた場面: 0 件（移した武器だけ登録した状態と全部同じ）');
 
 // ---- 自己確認と書き出し ----
 let totalUsed = 0;

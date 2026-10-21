@@ -17,6 +17,8 @@ const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Api = preload("res://scripts/game/combat/api.gd")
 const FxSword = preload("res://scripts/game/combat/fx_sword.gd")
 const FxGreatsword = preload("res://scripts/game/combat/fx_greatsword.gd")
+const FxDagger = preload("res://scripts/game/combat/fx_dagger.gd")
+const FxAxe = preload("res://scripts/game/combat/fx_axe.gd")
 
 ## 名前 → 入力の配列 a を受けて値を返す関数
 var SUITES := {
@@ -67,11 +69,13 @@ func _init() -> void:
 		print("NG  data/rules_golden.json が読めない（node tools/worldart/godot/golden_rules.mjs で書く）")
 		quit(1)
 		return
-	# 武器の効果の 'stats'・'afterStats'（片手剣・大剣）を登録する（calc_stats が呼ぶ）。道具 Api は何も起こさない代用品
+	# 武器の効果の 'stats'・'afterStats'（片手剣・大剣・短剣・大斧）を登録する（calc_stats が呼ぶ）。道具 Api は何も起こさない代用品
 	WFX.clear()
 	var api := Api.new()
 	FxSword.install(api)
 	FxGreatsword.install(api)
+	FxDagger.install(api)
+	FxAxe.install(api)
 	WFX.register_placeholders()
 	var all_ok := true
 	for name in j["suites"]:

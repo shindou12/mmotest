@@ -5,7 +5,7 @@ extends RefCounted
 ## 技そのものは移した技（scripts/game/skills/skills.gd の登録表）を、本物の文脈 GameCtx（skills/game_ctx.gd）に渡して呼ぶ。
 ## 当たりとダメージは game_ctx.gd → combat/damage.gd。試作の手写しの片手剣の技は消した（武器スキル・強攻撃は登録表から）。
 ## g は scripts/game/game.gd。式の順番・乱数を引く順は元の JavaScript と同じ。時刻は game.gd の t_now（JavaScript の now()）。
-## まだ入れていないもの: 盾槍のガード（guarding は常に false）・ガードカウンター・弓の矢・のけぞり/ダウン（staggerT・downT は 0 のまま）・スキル変化。
+## まだ入れていないもの: 盾槍のガード（guarding は常に false）・ガードカウンター・弓の引き（矢 arrow は短剣の投げナイフ用に入れた）・のけぞり/ダウン（staggerT・downT は 0 のまま）・スキル変化。
 
 const Skills = preload("res://scripts/game/skills/skills.gd")
 const GameCtx = preload("res://scripts/game/skills/game_ctx.gd")
@@ -16,6 +16,8 @@ const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Dmg = preload("res://scripts/game/combat/damage.gd")
 const FxSword = preload("res://scripts/game/combat/fx_sword.gd")
 const FxGreatsword = preload("res://scripts/game/combat/fx_greatsword.gd")
+const FxDagger = preload("res://scripts/game/combat/fx_dagger.gd")
+const FxAxe = preload("res://scripts/game/combat/fx_axe.gd")
 
 var g
 var ctx
@@ -24,10 +26,12 @@ var ctx
 func _init(game) -> void:
 	g = game
 	ctx = GameCtx.new(game)
-	# 武器ごとの効果（片手剣・大剣）を登録する。短剣・盾槍・大斧・弓は呼ぶ順の番号だけ同じにする空の登録
+	# 武器ごとの効果（片手剣・大剣・短剣・大斧）を登録する。盾槍・弓は呼ぶ順の番号だけ同じにする空の登録
 	WFX.clear()
 	FxSword.install(ctx)
 	FxGreatsword.install(ctx)
+	FxDagger.install(ctx)
+	FxAxe.install(ctx)
 	WFX.register_placeholders()
 
 
@@ -227,7 +231,7 @@ func tree_skill_run(id: String) -> Callable:
 ## skills.js の cdOf / motionOf（武器ツリーのスキルだけ）。武器ごとのファイルの関数を呼ぶ
 func _wt_mod(id: String):
 	if not Skills.wt_skill(id).is_valid(): return null
-	return Sword if id.begins_with("sw_") else Greatsword
+	return Skills.wt_module(id)
 
 
 ## tree-effects.js skillCd
@@ -319,3 +323,29 @@ func tick_actions(dt: float, safe: bool) -> void:
 		me["skillT"] += dt
 		if me["skillT"] > (me["skillDuration"] if me["skillDuration"] != 0 else 0.55): me["skillT"] = -1.0
 	ctx.update_projs(dt)
+	tick_dots(dt)   # 毒・出血（短剣）
+
+
+## loop.js の毒・出血（短剣）: 敵の継続ダメージ（0.5 秒ごと。type: dot）。毒が切れたら重ねを戻す
+func tick_dots(dt: float) -> void:
+	var t: float = g.t_now
+	for mb in g.mobs.values():
+		if float(mb.get("poisonUntil", 0.0)) > t:
+			mb["poisonT"] = float(mb.get("poisonT", 0.0)) - dt
+			if mb["poisonT"] <= 0:
+				mb["poisonT"] = 0.5
+				var pm: float = float(WFX.fx_reduce("poisonTick", 0.0, [mb])) if WFX.truthy(mb.get("vStack")) else maxf(0.12, float(Dmg.or_(mb.get("poisonPow"), 0.0)))
+				ctx.deal(mb, pm, {"type": "dot", "noProc": true})
+				ctx.fx.parts.emit(mb["x"], 1.2, mb["z"], {"color": 0x8aff5a, "size": 0.4 + float(Dmg.or_(mb.get("vStack"), 0.0)) * 0.06, "life": 0.5, "speed": 1, "gravity": 1})
+		elif WFX.truthy(mb.get("vStack")):
+			mb["vStack"] = 0
+		# 出血（短剣）
+		if float(mb.get("bleedUntil", 0.0)) > t:
+			mb["bleedT"] = float(mb.get("bleedT", 0.0)) - dt
+			if mb["bleedT"] <= 0:
+				mb["bleedT"] = 0.5
+				ctx.deal(mb, float(mb.get("bleedPow", 0.0)) * 0.5 * float(WFX.fx_reduce("bleedMul", 1.0)), {"type": "dot", "noProc": true})
+				ctx.fx.parts.emit(mb["x"], 1.0, mb["z"], {"color": 0xff4a5a, "size": 0.35, "life": 0.45, "speed": 1.4, "gravity": 4})
+		elif WFX.truthy(mb.get("bleedN")):
+			mb["bleedN"] = 0
+			mb["bleedPow"] = 0
