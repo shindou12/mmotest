@@ -23,3 +23,5 @@ art/shots/port/
 .claude/worktrees/
 # 姿勢の照合の生の値（4MB。node tools/worldart/godot/export_rig.mjs で作り直せる。client_test.sh がなければ作る）
 godot/worldart/data/poses_golden.json
+# 戦闘の照合の生の値（5MB。node tools/worldart/godot/golden_combat.mjs で作り直せる。client_test.sh がなければ作る）
+godot/worldart/data/combat_golden.json

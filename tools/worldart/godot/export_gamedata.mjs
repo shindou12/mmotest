@@ -72,6 +72,8 @@ const out = {
   note: 'tools/worldart/godot/export_gamedata.mjs が public/shared/ から書く。手で直さない',
   affixes: D.AFFIXES, weightClasses: D.WEIGHT_CLASSES.map((w) => ({ ...w, max: Number.isFinite(w.max) ? w.max : 1e9 })), armorClasses: D.ARMOR_CLASSES,
   balance: BALANCE, revive: REVIVE, treasure: { id: D.TREASURE_ID, t: D.TREASURE_DEF.t, name: D.TREASURE_DEF.name, color: hex(D.TREASURE_DEF.color ?? 0xffd84a), scale: D.TREASURE_DEF.scale ?? 1 }, instinct: D.INSTINCT, defaultWeapon: D.DEFAULT_WEAPON, rarities: D.RARITIES.map((r) => ({ name: r.name, color: r.color })),
+  // スキル変化 SV のうち戦闘の式が使う値（G1-3a）: stunValue の SV.quake(t)。t は 0〜8 の添字（ティアは 1〜7）
+  sv: { quake: Array.from({ length: 9 }, (_, t) => D.SV.quake(t)) },
   skills, wtrees: WTREES, wtnode: WT_NODE, wtConst: { profMax: PROF_MAX, rowReq: ROW_REQ }, techniques: TECHNIQUES, treeMotions: TREE_MOTIONS, motionDurations: MOTION_DURATIONS, skillTimings: SPEAR_TIMINGS,
   weapons, levels, floors, areas, floorHub: Object.fromEntries(D.FLOORS.map((F) => [F.n, Object.keys(AREAS).find((k) => AREAS[k].floor === F.n && (AREAS[k].type === 'town' || AREAS[k].type === 'camp'))])),
 };
