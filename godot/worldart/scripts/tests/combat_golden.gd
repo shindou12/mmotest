@@ -7,6 +7,9 @@ extends SceneTree
 ##   in:  state（能力値の状態）・tms（時刻 ms）・rand（Math.random の値の列）・me（base.me への上書き）・mobs・aim・op（deal / stun / hook / ext / entry）
 ##   out: ret・args（呼んだあとの引数のオブジェクト）・ev（記録だけの操作 [時刻, 名前, 引数]）・net（サーバーへの送信）・
 ##        me / mobs（場面の前との差）・shake・hitStop・used（使った乱数の数）
+## G4: hurt_<武器>（hurt.gd・ガード・回転なぎ払い・毒沼の判定）、variants（variants.gd のスキル変化）、titles（称号の補助）は op.k = "call" で、
+##   op.mod（H = hurt.js・IN = input.js・AC = actions.js sweepTick・LP = loop.js hazardAt・V = variants.js）の op.fn を呼ぶ。引数の {$: mob | mob8 | sk} は参照、
+##   普通の辞書は写して渡し、呼んだあとの形を args と比べる。場面ごとの能力値の上書き Sov（配列は Set）と sv も入力に持つ。
 ## suite ごとに「OK n 件」か「NG」（最初の 3 件の名前・どの項目・期待・実際）を出し、全部 OK のときだけ終了コード 0。
 ##   damage_<武器>（sword・greatsword・dagger・axe・spear・bow）: dealDamage・stunValue（敵・自分・バフ・オプションの組み合わせ）
 ##   hooks_<武器>: 差し込み口（fxCall・fxSome・fxReduce で呼ぶ効果）・tree-effects の入口・技の文脈に足す道具
@@ -25,7 +28,9 @@ const FxSpear = preload("res://scripts/game/combat/fx_spear.gd")
 const FxBow = preload("res://scripts/game/combat/fx_bow.gd")
 const WTree = preload("res://scripts/game/skills/wtree.gd")
 const Common = preload("res://scripts/game/skills/common.gd")
-const SUITES := ["damage_sword", "damage_greatsword", "damage_dagger", "damage_axe", "damage_spear", "damage_bow", "hooks_sword", "hooks_greatsword", "hooks_dagger", "hooks_axe", "hooks_spear", "hooks_bow"]
+const Hurt = preload("res://scripts/game/combat/hurt.gd")
+const Variants = preload("res://scripts/game/combat/variants.gd")
+const SUITES := ["damage_sword", "damage_greatsword", "damage_dagger", "damage_axe", "damage_spear", "damage_bow", "hooks_sword", "hooks_greatsword", "hooks_dagger", "hooks_axe", "hooks_spear", "hooks_bow", "hurt_sword", "hurt_greatsword", "hurt_dagger", "hurt_axe", "hurt_spear", "hurt_bow", "variants", "titles"]
 
 
 ## 呼ばれた操作を書き留める環境（golden_combat.mjs のダミー）
@@ -49,6 +54,9 @@ class Rec extends Api:
 		var v: float = rand[used]
 		used += 1
 		return v
+
+	## 武器の色（元のダミー combatD.col と同じ RARITIES[S.wr].color。文字列）
+	func col(): return weapon_color()
 
 	## world.area（照合のダミーのエリア）
 	func area() -> String: return "f1_field"
@@ -89,7 +97,7 @@ func _same(e, g) -> bool:
 
 ## 値が同じか（差分の検出用。数は ==）
 func _eq(a, b) -> bool:
-	if (a is float or a is int) and (b is float or b is int): return float(a) == float(b)
+	if (a is float or a is int) and (b is float or b is int): return absf(float(a) - float(b)) <= 1e-9   # sin/cos/atan2 や JSON の読みの最後の桁の違いは同じとみなす（JavaScript 側の diff も同じ）
 	if a is Array and b is Array:
 		if a.size() != b.size(): return false
 		for i in a.size():
@@ -129,6 +137,95 @@ func _state_s(st: Dictionary) -> Dictionary:
 	return S
 
 
+## 場面ごとの能力値の上書き Sov（配列は Set）と sv（スキル変化。null もある）
+func _apply_sov(S: Dictionary, inp: Dictionary) -> void:
+	if inp.has("Sov"):
+		for k in inp["Sov"]:
+			var v = inp["Sov"][k]
+			if v is Array:
+				var d := {}
+				for x in v: d[x] = true
+				S[k] = d
+			else:
+				S[k] = v
+	if inp.has("sv"): S["sv"] = inp["sv"]
+
+
+## 照合の技（golden_combat.mjs の TEST_SKILLS と同じ内容）。c は元のコンテキストか、スキル変化で包んだもの
+var cur_api = null
+
+
+func _skill_a(c) -> void:
+	var m: Dictionary = c.me
+	c.arc(4, 120, 1.5, {"type": "wskill", "a": 0.3})
+	c.fx.slash(m["x"], m["z"], 0.3, 4, 120, c.col(), 1.0)
+	c.line(8, 1.4, 2, {"type": "wskill", "a": 0.3})
+	c.circle(m["x"], m["z"], 3, 1.2, {"type": "wskill"})
+	c.sfx("skill")
+
+
+func _skill_b(c) -> void:
+	var m: Dictionary = c.me
+	c.proj({"a": 0.5, "mult": 2, "rad": 1.5, "type": "wskill"})
+	c.arrow({"a": 0.1, "type": "wskill", "pierce": true})
+	c.proj({"a": 0.2, "color": 0x123456, "type": "wskill"})
+	c.hit(cur_api.mobs.get(7), 1.5, {"type": "wskill"})
+	c.fx.ringWave(m["x"], m["z"], c.col(), 3, 0.3)
+	c.later(0.2, func(): c.arc(3, 90, 1, {"type": "wskill", "a": 0.2}))
+	c.dash(0.4, 3, 0.1)
+	c.arc(2, 60, 1)
+
+
+## op.k = "call": モジュールの関数を呼ぶ。a は解決した引数、結果は [戻り値] の配列（戻り値なしは空）
+func _call(api, op: Dictionary, inp: Dictionary, a: Array) -> Array:
+	var fn: String = op["fn"]
+	match fn:
+		"resolveTele": Hurt.resolve_tele(api, a[0])
+		"takeDamage": Hurt.take_damage(api, a[0], a[1], a[2], a[3])
+		"hitReaction": Hurt.hit_reaction(api, a[0], a[1], a[2])
+		"knockFrom": Hurt.knock_from(api, a[0], a[1], a[2])
+		"tryTech": return [Hurt.try_tech(api)]
+		"getUp": Hurt.get_up(api)
+		"onJustDodge": Hurt.on_just_dodge(api)
+		"fall": Hurt.fall(api)
+		"revived": Hurt.revived(api, a[0])
+		"reviveHit": Hurt.revive_hit(api, a[0], a[1])
+		"crawlTick":
+			var dx := 0.0
+			var dz := 0.0
+			var keys: Array = inp.get("keys", [])
+			if keys.has("w") or keys.has("arrowup"): dz -= 1.0
+			if keys.has("s") or keys.has("arrowdown"): dz += 1.0
+			if keys.has("a") or keys.has("arrowleft"): dx -= 1.0
+			if keys.has("d") or keys.has("arrowright"): dx += 1.0
+			var stick = op.get("stick")
+			if stick != null and sqrt(float(stick["x"]) * float(stick["x"]) + float(stick["y"]) * float(stick["y"])) > 0.12:
+				dx = stick["x"]
+				dz = stick["y"]
+			Hurt.crawl_tick(api, a[0], dx, dz)
+		"die": Hurt.die(api)
+		"startGuard": Hurt.start_guard(api)
+		"canGuard": return [Hurt.can_guard(api)]
+		"guardUp": return [Hurt.guard_up(api)]
+		"guardDamage": return [Hurt.guard_damage(api, a[0], a[1])]
+		"guardBreak": Hurt.guard_break(api)
+		"guardRegen": Hurt.guard_regen(api, a[0])
+		"armCounter": Hurt.arm_counter(api)
+		"endGuard": Hurt.end_guard(api, a[0])
+		"sweepTick": Hurt.sweep_tick(api, a[0])
+		"hazardAt": return [Hurt.hazard_at(api, a[0], a[1])]
+		"castWeaponSkill": Variants.cast_weapon_skill(api, a[0])
+		"variantParams": return [Variants.variant_params(a[0], a[1])]
+		"onVariantHit": Variants.on_variant_hit(api, a[0], a[1], a[2])
+		"titleDmg": return [Dmg.title_dmg(api, a[0])]
+		"titleMove": return [Variants.title_move(api)]
+		"titleAspd": return [Variants.title_aspd(api)]
+		"desperate": return [Variants.desperate(api)]
+		"weatherNow": return [Variants.weather_now(api)]
+		_: push_error("未知の fn " + fn)
+	return []
+
+
 ## 1 場面を動かして、期待値と比べる。違えば最初に違う項目の説明、同じなら ""
 func _run(api: Rec, base_me: Dictionary, states: Dictionary, sc: Dictionary) -> String:
 	var inp: Dictionary = sc["in"]
@@ -146,6 +243,20 @@ func _run(api: Rec, base_me: Dictionary, states: Dictionary, sc: Dictionary) -> 
 	api.used = 0
 	api.tms = inp["tms"]
 	api.st = _state_s(states[inp["state"]])
+	_apply_sov(api.st, inp)
+	if inp.get("sv") != null:   # S.sv は calcStats が { key, t, ...SKILL_VARIANTS[key] } で作る（名前・色は game.json の skillVariants）
+		var made: Dictionary = Variants.make_sv(inp["sv"]["key"], inp["sv"]["t"])
+		if not _same(inp["sv"], made): return "sv が元の形と違う: %s / %s" % [JSON.stringify(inp["sv"]), JSON.stringify(made)]
+	api.ch = states[inp["state"]]["ch"]
+	api.debug = inp.get("debug", false)
+	api.weather = inp.get("weather") != null
+	api.variants_real = sc["suite"] == "variants"
+	api.hazards = []
+	if inp.has("area"):
+		var ar: Dictionary = Common.game()["areas"][inp["area"]]
+		api.shape = ar["shape"]
+		api.hazards = ar.get("hazards", [])
+	cur_api = api
 	var me: Dictionary = base_me.duplicate(true)
 	me.merge(inp["me"].duplicate(true), true)
 	api.me = me
@@ -190,6 +301,22 @@ func _run(api: Rec, base_me: Dictionary, states: Dictionary, sc: Dictionary) -> 
 				"some": ret = WFX.fx_some(op["name"], a)
 				"reduce": ret = WFX.fx_reduce(op["name"], op["acc"], a)
 			if sx != null: args.append(sx)
+		"call":
+			var ca := []
+			for x in op["args"]:
+				if x is Dictionary and x.has("$"):
+					match x["$"]:
+						"mob": ca.append(mob)
+						"mob8": ca.append(api.mobs.get(8))
+						"sk": ca.append(_skill_a if x["id"] == "a" else _skill_b)
+				elif x is Dictionary:
+					var c2: Dictionary = x.duplicate(true)
+					ca.append(c2)
+					args.append(c2)
+				else:
+					ca.append(x)
+			var rr: Array = _call(api, op, inp, ca)
+			if not rr.is_empty(): ret = rr[0]
 		"ext":
 			var ea := []
 			for x in op["args"]:
@@ -286,6 +413,15 @@ func _init() -> void:
 			print("NG  %s: %d / %d 件が不一致" % [suite, bad.size(), cases.size()])
 			for i in mini(3, bad.size()):
 				print("    %s: %s" % [bad[i][0], bad[i][1]])
+			if OS.get_environment("GOLDEN_HIST") != "":   # 調査用: 操作の名前 × 違った項目の件数
+				var hist := {}
+				for b in bad:
+					var key := "%s / %s" % [String(b[0]).get_slice(" ", 0), String(b[1]).get_slice("\n", 0)]
+					hist[key] = int(hist.get(key, 0)) + 1
+				for k in hist: print("      %s: %d" % [k, hist[k]])
+			if OS.get_environment("GOLDEN_SHOW") != "":   # 調査用: 名前に含む場面を全部出す
+				for b in bad:
+					if String(b[0]).contains(OS.get_environment("GOLDEN_SHOW")): print("    >> %s: %s" % [b[0], b[1]])
 	WFX.clear()
 	print("照合 %s" % ("全部 OK" if all_ok else "NG あり"))
 	quit(0 if all_ok else 1)

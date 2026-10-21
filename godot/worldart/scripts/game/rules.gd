@@ -197,6 +197,13 @@ static func weapon_skill_id(wk: String, w) -> String:
 	return String(data()["weaponSkillPool"][wk][0])
 
 
+## stats.js calcStats の sv: { key, t, ...SKILL_VARIANTS[key] }（名前・アイコン・色。desc の関数は持たない）。表は game.json の skillVariants
+static func make_sv(key: String, t) -> Dictionary:
+	var o := {"key": key, "t": t}
+	o.merge(data()["skillVariants"][key], true)
+	return o
+
+
 ## data.js titleReqOk
 static func title_req_ok(req, wk: String) -> bool:
 	if req == null or String(req) == "": return true
@@ -208,7 +215,7 @@ static func title_req_ok(req, wk: String) -> bool:
 ## Set（fx・flags・actives・tfx）は「キーが値の Dictionary」（.has(キー) で JavaScript の Set.has と同じ）。
 ## 武器ごとの効果の 'stats'・'afterStats'（weapon_fx.gd に登録済みのもの）も呼ぶ。me を渡すと HP を最大 HP に切り詰める（元の calcStats と同じ）。
 ## api（戦闘の環境）を渡すと、afterStats の前に api.st を新しい S にする。
-## まだ入れていないもの: スキル変化（sv_ の付加効果。S.sv = null）、見た目 wst・arm（ゲームの外観の関数）、ほかの武器（短剣・盾槍・大斧・弓）のツリー
+## スキル変化（sv_）は S.sv に入れる（付加効果は combat/variants.gd）。まだ入れていないもの: 見た目 wst・arm（ゲームの外観の関数）、ほかの武器（短剣・盾槍・大斧・弓）のツリー
 static func calc_stats(ch: Dictionary, me = null, api = null) -> Dictionary:
 	var D := data()
 	var eq: Dictionary = ch.get("eq", {})
@@ -217,10 +224,14 @@ static func calc_stats(ch: Dictionary, me = null, api = null) -> Dictionary:
 		if eq.get(k) is Dictionary: items.append(eq[k])
 	var aff := {}
 	var fxs := {}
+	var sv = null   # 武器のスキル変化
 	for it in items:
 		for a in it.get("affixes", []):
 			var key := String(a[0])
-			if not D["affixes"].has(key): continue   # スキル変化（sv_*）は未
+			if key.begins_with("sv_"):   # data.js isVariant
+				if it.get("slot") == "weapon": sv = make_sv(key, int(a[1]))
+				continue
+			if not D["affixes"].has(key): continue
 			aff[key] = float(aff.get(key, 0.0)) + float(D["affixes"][key]["tiers"][int(a[1]) - 1])
 		for f in it.get("fx", []): fxs[String(f)] = true
 	var arm = eq.get("armor")
@@ -263,7 +274,7 @@ static func calc_stats(ch: Dictionary, me = null, api = null) -> Dictionary:
 		"crit": 5.0 + m.call("crit"), "critd": 150.0 + m.call("critd"), "aspd": m.call("aspd"), "move": m.call("move"),
 		"vamp": m.call("vamp") + (4.0 if fxs.has("vamp") else 0.0), "cdr": minf(60.0, m.call("cdr") + (35.0 if fxs.has("star") else 0.0)),
 		"def": def, "wr": int(w["rarity"]) if w is Dictionary else 0,
-		"sv": null, "title": title, "titleOn": title_on, "tfx": tfx,
+		"sv": sv, "title": title, "titleOn": title_on, "tfx": tfx,
 		"normp": m.call("normp"), "heavyp": m.call("heavyp"), "wskillp": m.call("wskillp"), "dodgecd": minf(60.0, m.call("dodgecd")),
 		"justbuff": m.call("justbuff"), "counter": m.call("counter"), "backwater": m.call("backwater"), "maxPot": 3 + int(m.call("potion")) + int(ch.get("potBonus", 0)),
 		"ws": D["skills"]["weapon"][ws_id], "skill": ws_id, "weight": weight, "wc": wc,

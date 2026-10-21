@@ -14,6 +14,9 @@ import { TECHNIQUES } from '../../../public/shared/techniques.js';
 import { TREE_MOTIONS } from '../../../public/shared/tree-motions.js';
 import { MOTION_DURATIONS } from '../../../public/shared/motion-catalog.js';
 import { SPEAR_TIMINGS } from '../../../public/shared/skill-timings.js';
+import * as HU from '../../../public/js/game/hurt.js';
+import * as IN from '../../../public/js/game/input.js';
+import * as AC from '../../../public/js/game/actions.js';
 
 // 数値は丸めない（GDScript の式を元の JavaScript と 1e-6 で照合するため。丸めると輪郭・能力値が 1e-3 ずれる）
 const scalars = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => ['number', 'string', 'boolean'].includes(typeof v)));
@@ -50,7 +53,7 @@ function boundParams(def) {
 }
 const areas = {};
 for (const [id, def] of Object.entries(AREAS)) {
-  const a = { id, name: def.name, floor: def.floor, type: def.type, shape: def.shape, layout: def.layout || '', exits: exitsOf(def).map((e) => ({ to: e.to, x: (e.x), z: (e.z), r: e.r })) };
+  const a = { id, name: def.name, floor: def.floor, type: def.type, shape: def.shape, layout: def.layout || '', weather: def.weather || null, exits: exitsOf(def).map((e) => ({ to: e.to, x: (e.x), z: (e.z), r: e.r })) };
   if (def.shape === 'open') {
     a.outline = [];
     for (let i = 0; i < 360; i++) { const ang = i * Math.PI / 180, r = boundR(def, ang); a.outline.push([(Math.sin(ang) * r), (-Math.cos(ang) * r)]); }
@@ -74,7 +77,11 @@ const out = {
   affixes: D.AFFIXES, weightClasses: D.WEIGHT_CLASSES.map((w) => ({ ...w, max: Number.isFinite(w.max) ? w.max : 1e9 })), armorClasses: D.ARMOR_CLASSES,
   balance: BALANCE, revive: REVIVE, treasure: { id: D.TREASURE_ID, t: D.TREASURE_DEF.t, name: D.TREASURE_DEF.name, color: hex(D.TREASURE_DEF.color ?? 0xffd84a), scale: D.TREASURE_DEF.scale ?? 1 }, instinct: D.INSTINCT, defaultWeapon: D.DEFAULT_WEAPON, rarities: D.RARITIES.map((r) => ({ name: r.name, color: r.color })),
   // スキル変化 SV のうち戦闘の式が使う値（G1-3a）: stunValue の SV.quake(t)。t は 0〜8 の添字（ティアは 1〜7）
-  sv: { quake: Array.from({ length: 9 }, (_, t) => D.SV.quake(t)) },
+  // G4: SV の全部（関数は t = 0〜8 の添字で並べた配列、定数はそのまま）。スキル変化の名前・色は skillVariants
+  sv: Object.fromEntries(Object.entries(D.SV).map(([k, v]) => [k, typeof v === 'function' ? Array.from({ length: 9 }, (_, t) => v(t)) : v])),
+  skillVariants: Object.fromEntries(Object.entries(D.SKILL_VARIANTS).map(([k, v]) => [k, { name: v.name, icon: v.icon, ...(v.color !== undefined ? { color: v.color } : {}) }])),
+  // G4: 被弾・ガード・回転なぎ払いの表（hurt.js REACT / input.js GUARD・GUARD_BY / actions.js SWEEP）
+  hurt: { REACT: HU.REACT, GUARD: IN.GUARD, GUARD_BY: IN.GUARD_BY, SWEEP: AC.SWEEP },
   skills, wtrees: WTREES, wtnode: WT_NODE, wtConst: { profMax: PROF_MAX, rowReq: ROW_REQ }, techniques: TECHNIQUES, treeMotions: TREE_MOTIONS, motionDurations: MOTION_DURATIONS, skillTimings: SPEAR_TIMINGS,
   // G1-3b: 武器スキルの候補・旧スキルツリー（stat・style）・状態の定数・自分の状態の初期値（state.js の me。モデルは除く）
   weaponSkillPool: D.WEAPON_SKILL_POOL, trees: TREES, consts: { chargeMin: ST0.CHARGE_MIN, chargeMax: ST0.CHARGE_MAX, dodgeCd: ST0.DODGE_CD },

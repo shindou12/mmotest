@@ -23,6 +23,7 @@ extends "res://scripts/game/combat/api.gd"
 const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Dmg = preload("res://scripts/game/combat/damage.gd")
 const R = preload("res://scripts/game/rules.gd")
+const Strikes = preload("res://scripts/game/skills/strikes.gd")
 
 ## game.gd（自分の状態 me・能力値 S・敵 mobs・他の人 others・時刻 t_now・世界 world）
 var g
@@ -166,67 +167,19 @@ func deal(mb, mult: float, o: Dictionary) -> void:
 		print("HIT %s %d type=%s mult=%.2f%s hp=%d" % [mb.get("name", "?"), int(before - float(mb["hp"])), String(o.get("type", "")), mult, " crit" if last_hit.get("crit", false) else "", int(mb["hp"])])
 
 
-## strikes.arc: 扇形（range・deg）。倒れている仲間も起こす
+## strikes.arc: 扇形（range・deg）。倒れている仲間も起こす。形の判定は strikes.gd（照合: tests/strikes_golden.gd）
 func strike_arc(rng: float, deg: float, mult: float, o: Dictionary) -> void:
-	var a: float = float(_nn(o, "a", me["a"]))
-	var arc_ := deg * PI / 180.0 / 2.0
-	for mb in mobs.values():
-		var dx: float = float(mb["x"]) - float(me["x"])
-		var dz: float = float(mb["z"]) - float(me["z"])
-		var d := sqrt(dx * dx + dz * dz)
-		if d > rng + float(mb["rad"]): continue
-		if absf(R.ang_diff(atan2(dx, dz), a)) <= arc_ + float(mb["rad"]) / maxf(d, 0.5) or d < float(mb["rad"]) + 0.6:
-			deal(mb, mult, WFX.fx_reduce("hitOpts", o, [d / (rng + float(mb["rad"]))]))
-	for p in downed_allies():
-		var dx2: float = float(p["x"]) - float(me["x"])
-		var dz2: float = float(p["z"]) - float(me["z"])
-		var d2 := sqrt(dx2 * dx2 + dz2 * dz2)
-		if d2 < rng + 0.6 and (absf(R.ang_diff(atan2(dx2, dz2), a)) <= arc_ + 0.6 / maxf(d2, 0.5) or d2 < 1.2): revive_hit(p, o)
+	Strikes.arc(me, mobs, downed_allies(), rng, deg, mult, o, Callable(self, "deal"), Callable(self, "revive_hit"))
 
 
 ## strikes.line: 細長い当たり（len・w）。o.sx・o.sz で始点
 func strike_line(length: float, w: float, mult: float, o: Dictionary) -> void:
-	var a: float = float(_nn(o, "a", me["a"]))
-	var sx: float = float(_nn(o, "sx", me["x"]))
-	var sz: float = float(_nn(o, "sz", me["z"]))
-	var fx_ := sin(a)
-	var fz := cos(a)
-	for mb in mobs.values():
-		var dx: float = float(mb["x"]) - sx
-		var dz: float = float(mb["z"]) - sz
-		var along := dx * fx_ + dz * fz
-		var side := absf(dx * fz - dz * fx_)
-		if along > -float(mb["rad"]) and along < length + float(mb["rad"]) and side < w / 2.0 + float(mb["rad"]):
-			deal(mb, mult, WFX.fx_reduce("hitOpts", o, [along / (length + float(mb["rad"]))]))
-	for p in downed_allies():
-		var dx2: float = float(p["x"]) - sx
-		var dz2: float = float(p["z"]) - sz
-		var along2 := dx2 * fx_ + dz2 * fz
-		var side2 := absf(dx2 * fz - dz2 * fx_)
-		if along2 > -0.6 and along2 < length + 0.6 and side2 < w / 2.0 + 0.6: revive_hit(p, o)
+	Strikes.line(me, mobs, downed_allies(), length, w, mult, o, Callable(self, "deal"), Callable(self, "revive_hit"))
 
 
 ## strikes.circle: 円。o.reach で o.a の向きへ縦に引き伸ばす（横幅は r のまま）
 func strike_circle(x: float, z: float, r: float, mult: float, o: Dictionary) -> void:
-	var reach: float = float(_nn(o, "reach", 0.0))
-	var a: float = float(_nn(o, "a", me["a"]))
-	var fx_ := sin(a)
-	var fz := cos(a)
-	var skip = o.get("skip")
-	for mb in mobs.values():
-		if skip != null and is_same(mb, skip): continue
-		if _reach_dist(float(mb["x"]), float(mb["z"]), x, z, fx_, fz, reach) < r + float(mb["rad"]): deal(mb, mult, o)
-	for p in downed_allies():
-		if _reach_dist(float(p["x"]), float(p["z"]), x, z, fx_, fz, reach) < r + 0.6: revive_hit(p, o)
-
-
-func _reach_dist(px: float, pz: float, x: float, z: float, fx_: float, fz: float, reach: float) -> float:
-	var dx := px - x
-	var dz := pz - z
-	var t := clampf(dx * fx_ + dz * fz, 0.0, reach)
-	var ex := dx - fx_ * t
-	var ez := dz - fz * t
-	return sqrt(ex * ex + ez * ez)
+	Strikes.circle(me, mobs, downed_allies(), x, z, r, mult, o, Callable(self, "deal"), Callable(self, "revive_hit"))
 
 
 ## strikes.dash
@@ -243,9 +196,7 @@ func strike_dash(a: float, dist: float, dur: float, iframe: float) -> void:
 ## o.boomerang があれば戻ってくる飛び道具（行き → 先で回る → 持ち主へ戻る。往復とも当たる）
 func strike_proj(o: Dictionary) -> void:
 	var color = _nn(o, "color", weapon_color())
-	var sx: float = float(_nn(o, "sx", me["x"]))
-	var sz: float = float(_nn(o, "sz", me["z"]))
-	var a: float = float(o["a"])
+	var w := Strikes.make_proj(o, me, color)
 	var boom = o.get("boomerang")
 	var is_axe: bool = o.get("shape") == "axe"
 	var node := MeshInstance3D.new()
@@ -255,16 +206,12 @@ func strike_proj(o: Dictionary) -> void:
 		node.mesh = bm
 		node.material_override = GameVisuals.mat(_color(color), true, 0.9)
 	else:
-		node.mesh = GameVisuals.shape_mesh({"k": "cone", "len": 1.8, "arc": deg_to_rad(120.0), "a": a + PI}, 1.0)
+		node.mesh = GameVisuals.shape_mesh({"k": "cone", "len": 1.8, "arc": deg_to_rad(120.0), "a": float(o["a"]) + PI}, 1.0)
 		node.material_override = GameVisuals.mat(_color(color), true, 0.7)
-	node.position = Vector3(sx, g.world.ground_y(sx, sz) + 1.0, sz)
+	node.position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.0, w["z"])
 	if boom != null: node.scale = Vector3.ONE * float(_nn(o, "scale", 1.0))
 	g.world.add_child(node)
-	var life: float = (float(boom["out"]) + float(Dmg.or_(boom.get("hover"), 0.0)) + 3.0) if boom != null else float(_nn(o, "life", 0.7))
-	var w := {"node": node, "x": sx, "z": sz, "a": a, "tech": o.get("tech"), "shape": o.get("shape"), "color": color, "t": 0.0,
-		"speed": float(_nn(o, "speed", 22.0)), "life": life, "rad": float(_nn(o, "rad", 1.8)), "mult": float(_nn(o, "mult", 1.4)),
-		"type": o.get("type"), "hit": {}, "sv": o.get("sv"), "cast": o.get("cast"), "wave": not is_axe, "wtNo": WFX.truthy(o.get("wtNo")),
-		"stun": o.get("stun"), "eclipse": WFX.truthy(o.get("eclipse")), "boom": boom, "phase": 0, "hitT": {}}
+	w["node"] = node
 	projs.append(w)
 	sfx("wave")
 
@@ -282,16 +229,9 @@ func strike_arrow(o: Dictionary) -> void:
 	node.position = Vector3(me["x"], g.world.ground_y(me["x"], me["z"]) + 1.2, me["z"])
 	node.rotation.y = a
 	g.world.add_child(node)
-	var ranged: bool = WFX.truthy(st["W"].get("ranged"))
-	var rng: float
-	if o.get("range") != null: rng = float(o["range"])
-	elif ranged: rng = float(st["bowBase"]) if o.get("type") == "normal" else float(st["bowMax"])
-	else: rng = 24.0
-	var speed: float = float(_nn(o, "speed", 42.0))
-	projs.append({"node": node, "arrow": true, "x": me["x"], "z": me["z"], "sx": me["x"], "sz": me["z"], "a": a, "t": 0.0, "speed": speed,
-		"life": (rng + 0.6) / speed, "range": rng, "rad": float(_nn(o, "rad", 0.7)), "mult": float(_nn(o, "mult", 1.0)), "type": o.get("type"),
-		"pierce": WFX.truthy(o.get("pierce")), "hit": {}, "color": color, "sv": o.get("sv"), "cast": o.get("cast"), "tech": o.get("tech"),
-		"poison": float(Dmg.or_(o.get("poison"), 0.0)), "crit": o.get("crit"), "snipe": o.get("snipe"), "full": o.get("full"), "onHit": o.get("onHit")})
+	var w := Strikes.make_arrow(o, me, st, color)
+	w["node"] = node
+	projs.append(w)
 	var fx0: float = me["x"] + sin(a) * 0.9
 	var fz0: float = me["z"] + cos(a) * 0.9
 	fx_flash_arrow(fx0, fz0, color, WFX.truthy(o.get("big")))   # 射出の閃光
@@ -303,110 +243,40 @@ func fx_flash_arrow(x: float, z: float, color, big: bool) -> void:
 	fx.parts.burst(x, 1.25, z, 18 if big else 8, {"color": color, "speed": 5, "size": 0.35, "life": 0.25, "gravity": 0})
 
 
-## actions.js boomerangStep: 戻ってくる飛び道具の動き（位置は update_projs が先に向きと速さで進めている）。持ち主に戻ったら true
-func boomerang_step(w: Dictionary, dt: float) -> bool:
-	var B: Dictionary = w["boom"]
-	if w["phase"] == 0 and w["t"] >= B["out"]:
-		w["phase"] = 1 if WFX.truthy(B.get("hover")) else 2
-		w["turnT"] = w["t"]
-		if w["phase"] == 2: w["hit"].clear()
-	if w["phase"] == 1:
-		w["x"] -= sin(w["a"]) * w["speed"] * dt   # 先で止まって回る
-		w["z"] -= cos(w["a"]) * w["speed"] * dt
-		if w["t"] >= float(B["out"]) + float(B["hover"]):
-			w["phase"] = 2
-			w["hit"].clear()
-		return false
-	if w["phase"] != 2: return false
-	# 持ち主へ向かって曲がりながら戻る（少し速く）
-	var tx: float = float(me["x"]) - w["x"]
-	var tz: float = float(me["z"]) - w["z"]
-	var d := sqrt(tx * tx + tz * tz)
-	w["x"] -= sin(w["a"]) * w["speed"] * dt
-	w["z"] -= cos(w["a"]) * w["speed"] * dt
-	w["a"] = atan2(tx, tz)
-	var v: float = w["speed"] * 1.15 * dt
-	w["x"] += sin(w["a"]) * minf(v, d)
-	w["z"] += cos(w["a"]) * minf(v, d)
-	return d < 1.2
-
-
-## actions.js updateProjs（斬撃波の分）。位置は向きと速さで進め、敵に 1 回ずつ当て、壁か寿命で消える
+## actions.js updateProjs（斬撃波・矢の分）。位置は向きと速さで進め、敵に 1 回ずつ当て、壁か寿命で消える。
+## 当たりと動きは strikes.gd の proj_step（照合済み）。ここは見た目のノードの更新と片づけだけ
 func update_projs(dt: float) -> void:
+	var env := {"me": me, "mobs": mobs, "allies": Callable(self, "downed_allies"), "deal": Callable(self, "deal"), "revive": Callable(self, "revive_hit"),
+		"collide": Callable(self, "_proj_collide"), "tf": Callable(self, "_proj_tf"), "rand": Callable(self, "random"), "vis": Callable(self, "_proj_vis")}
 	for i in range(projs.size() - 1, -1, -1):
 		var w: Dictionary = projs[i]
-		w["t"] += dt
-		w["x"] += sin(w["a"]) * w["speed"] * dt
-		w["z"] += cos(w["a"]) * w["speed"] * dt
-		if w.get("arrow", false):
-			_update_arrow(w, i)
+		var gone := Strikes.proj_step(w, dt, env)
+		if gone:
+			w["node"].queue_free()
+			projs.remove_at(i)
 			continue
-		var caught: bool = w["boom"] != null and boomerang_step(w, dt)
+		if w.get("arrow", false):
+			w["node"].position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.2, w["z"])
+			continue
 		w["node"].position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.0, w["z"])
 		if w["shape"] == "axe": w["node"].rotation.y -= dt * 20.0   # PROJ_SHAPES.axe の tick: 回りながら飛ぶ
 		elif w["boom"] == null: w["node"].scale = Vector3.ONE * (1.0 + w["t"] * 1.5)   # shapes wave の tick: 広がりながら消える
-		var hovering: bool = w["boom"] != null and w["phase"] == 1
-		for mb in mobs.values():
-			if w["hit"].has(mb["id"]) and not (w["boom"] != null and WFX.truthy(w["boom"].get("rehit")) and hovering and w["t"] - float(w["hitT"].get(mb["id"], -9.0)) >= w["boom"]["rehit"]): continue
-			var dx: float = float(mb["x"]) - w["x"]
-			var dz: float = float(mb["z"]) - w["z"]
-			if sqrt(dx * dx + dz * dz) < w["rad"] + float(mb["rad"]):
-				w["hit"][mb["id"]] = true
-				w["hitT"][mb["id"]] = w["t"]
-				var pm: float = w["mult"]
-				if hovering and w["boom"].get("hoverMult") != null: pm = w["boom"]["hoverMult"]
-				deal(mb, pm, {"type": w["type"], "tech": w["tech"], "noProc": true, "sv": w["sv"], "cast": w["cast"], "wave": w["wave"], "proj": w, "wtNo": w["wtNo"], "stun": w["stun"]})
-		proj_revive(w)
-		# 戻ってくる斧は壁を抜ける（持ち主のところへ必ず帰る）
-		var c: Array = [w["x"], w["z"]] if w["boom"] != null else R.collide_xz(g.area, w["x"], w["z"], 0.1, g.door_open)
-		if caught or w["t"] > w["life"] or sqrt(pow(c[0] - w["x"], 2) + pow(c[1] - w["z"], 2)) > 0.05:
-			if caught and w["boom"].get("onCatch") is Callable: w["boom"]["onCatch"].call()
-			w["node"].queue_free()
-			projs.remove_at(i)
 
 
-## 矢の毎フレーム（actions.js updateProjs の arrow の分）。i は projs の何番目か。矢を消したら true
-func _update_arrow(w: Dictionary, i: int) -> bool:
-	w["node"].position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.2, w["z"])
-	var done := false
-	if random() < 0.7: fx.parts.emit(w["x"], 1.2, w["z"], {"color": w["color"], "size": 0.35, "life": 0.25, "speed": 0.4, "gravity": 0})
-	WFX.fx_call("arrowTick", [w])   # 射抜き など
-	for mb in mobs.values():
-		if w["hit"].has(mb["id"]) or sqrt(pow(float(mb["x"]) - w["x"], 2) + pow(float(mb["z"]) - w["z"], 2)) > w["rad"] + float(mb["rad"]): continue
-		w["hit"][mb["id"]] = true
-		# 射程の中はどこでも本来のダメージ。遠矢（射程の端で +20%）は弓のファイル
-		var d := sqrt(pow(float(mb["x"]) - w["sx"], 2) + pow(float(mb["z"]) - w["sz"], 2))
-		var edge: bool = WFX.fx_some("arrowEdge", [w, d])
-		var hawk: bool = WFX.truthy(w.get("full")) and Dmg.tf(self, "t_hawk") and random() < 0.3
-		var opt := {"type": w["type"], "tech": w["tech"], "sv": w["sv"], "cast": w["cast"], "poison": w["poison"], "full": w["full"], "snipe": w["snipe"]}
-		if hawk or WFX.truthy(w.get("crit")): opt["crit"] = true   # crit: hawk || w.crit || undefined
-		deal(mb, w["mult"] * (1.2 if edge else 1.0), opt)
-		if w["onHit"] is Callable: w["onHit"].call(mb)
-		WFX.fx_call("arrowHit", [w, mb])   # 鷹の目・狙い澄まし など
-		if edge: float_text(mb["x"], 3.4, mb["z"], "遠矢", "info")
-		fx.parts.burst(w["x"], 1.2, w["z"], 18 if WFX.truthy(w.get("full")) else 8, {"color": 0xffd84a if WFX.truthy(w.get("full")) else 0xffffff, "speed": 5, "size": 0.4, "life": 0.3})
-		if not w["pierce"]:
-			done = true
-			break
-	if not done: done = proj_revive(w, true)
-	var c: Array = R.collide_xz(g.area, w["x"], w["z"], 0.1, g.door_open)
-	if done or w["t"] > w["life"] or sqrt(pow(c[0] - w["x"], 2) + pow(c[1] - w["z"], 2)) > 0.05:
-		WFX.fx_call("arrowGone", [w])
-		w["node"].queue_free()
-		projs.remove_at(i)
-		return true
-	return false
+func _proj_collide(x: float, z: float) -> Array:
+	return R.collide_xz(g.area, x, z, 0.1, g.door_open)
 
 
-## actions.js projRevive: 斬撃波・矢が倒れている仲間に当たったら起こす（貫通しない矢はそこで止まる）
-func proj_revive(w: Dictionary, arrow: bool = false) -> bool:
-	for p in downed_allies():
-		var key := "p" + str(p["id"])
-		if w["hit"].has(key) or sqrt(pow(float(p["x"]) - w["x"], 2) + pow(float(p["z"]) - w["z"], 2)) > w["rad"] + 0.6: continue
-		w["hit"][key] = true
-		revive_hit(p, {"type": w["type"], "sv": w["sv"]})
-		if arrow and not w["pierce"]: return true
-	return false
+func _proj_tf(id: String) -> bool:
+	return Dmg.tf(self, id)
+
+
+## proj_step の見た目（矢の軌跡・当たりの粒・遠矢の文字）
+func _proj_vis(kind: String, a, b) -> void:
+	match kind:
+		"arrow_trail": fx.parts.emit(a["x"], 1.2, a["z"], {"color": a["color"], "size": 0.35, "life": 0.25, "speed": 0.4, "gravity": 0})
+		"arrow_burst": fx.parts.burst(a["x"], 1.2, a["z"], 18 if WFX.truthy(a.get("full")) else 8, {"color": 0xffd84a if WFX.truthy(a.get("full")) else 0xffffff, "speed": 5, "size": 0.4, "life": 0.3})
+		"far_text": float_text(a["x"], 3.4, a["z"], "遠矢", "info")
 
 
 func clear_projs() -> void:

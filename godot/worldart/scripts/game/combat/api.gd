@@ -12,6 +12,7 @@ extends "res://scripts/game/skills/ctx.gd"
 
 const Common = preload("res://scripts/game/skills/common.gd")
 const Ctx = preload("res://scripts/game/skills/ctx.gd")
+const Variants = preload("res://scripts/game/combat/variants.gd")
 
 ## stats.js の S（Dictionary）。wt は武器ツリーの効果（wtree.gd の WtEff）、W は武器の表（game.json の weapons）
 var st: Dictionary = {}
@@ -36,6 +37,14 @@ var tms := 0.0
 var aim_v := 0.0
 ## 粒の蓄積（tree-effects.js wtAuraAcc）
 var wt_aura_acc: Dictionary = {"mom": 0.0, "saint": 0.0, "rev": 0.0, "thunder": 0.0, "soar": 0.0, "bers": 0.0}
+## G4（hurt.gd・variants.gd が読む）: キャラクター（state.char。防具の重さ kbScale に使う）、デバッグ部屋（state.DEBUG）、
+## エリアに天候があるか（state.world.def.weather）、エリアの毒沼・流砂（areas.js hazardsOf）
+var ch: Dictionary = {}
+var debug := false
+var weather := false
+var hazards: Array = []
+## スキル変化 sv の付加効果（variants.gd onVariantHit）を本当に動かすか。照合の damage・hooks の場面は記録だけ（元のダミーと同じ）にする
+var variants_real := true
 
 
 func _init() -> void:
@@ -72,7 +81,20 @@ func set_hit_stop(v: float) -> void:
 
 ## 武器スキルの変化が当たった（rules.onVariantHit）
 func on_variant_hit(mb: Dictionary, dmg: float, o: Dictionary) -> void:
-	_op("onVariantHit", [mb["id"], dmg, o["sv"]["key"]])
+	if variants_real: Variants.on_variant_hit(self, mb, dmg, o)
+	else: _op("onVariantHit", [mb["id"], dmg, o["sv"]["key"]])
+
+## hurt.gd が外へ頼む操作（画面の知らせ・移動・回避・強攻撃・セーブの削除）。ゲームの環境が実際の処理につなぐ
+func banner(title, sub, color, sec): return _op("banner", _args([title, sub, color, sec]))
+func toast(msg, color = null): return _op("toast", _args([msg, color]))
+func ui_hurt(): return _op("ui.hurt", [])
+func move_me(dx, dz): return _op("moveMe", _args([dx, dz]))
+func try_dodge(): return _op("tryDodge", [])
+func do_heavy(lv): return _op("doHeavy", _args([lv]))
+## characterStore.discard(): セーブを消せたか
+func character_discard() -> bool:
+	_op("characterDiscard", [])
+	return true
 
 ## 武器の手の位置（handTracker が作る関数）。ゲームではモデルから求める
 func hand_pos(_model) -> Dictionary:
@@ -215,5 +237,5 @@ func banner_visual(_x, _z, _old): return {"position": {"set": "fn"}}
 ## c.fx。ctx.gd の Fx と同じだが、flash・lightning は JavaScript の引数の数が多い（flash は x, y, z, 色, 強さ, 秒の 6 つ）
 class Fx2 extends Ctx.Fx:
 	func lightning(x = null, z = null, p3 = null, p4 = null): return c._op("fx.lightning", c._args([x, z, p3, p4]))
-	func flash(x = null, y = null, z = null, color = null, p5 = null, p6 = null): return c._op("fx.flash", c._args([x, y, z, color, p5, p6]))
+	func flash(x = null, y = null, z = null, color = null, p5 = null, p6 = null, p7 = null): return c._op("fx.flash", c._args([x, y, z, color, p5, p6, p7]))
 	func beam(x = null, z = null, color = null, p4 = null, p5 = null, p6 = null): return c._op("fx.beam", c._args([x, z, color, p4, p5, p6]))

@@ -92,6 +92,11 @@ echo "$G" | grep -E "^(OK|NG|照合)"
 G=$(cd godot/worldart && timeout -k 5 300 godot --headless --path . -s res://scripts/tests/combat_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"
 [ $gs -eq 0 ] || { echo "NG  戦闘の照合（終了コード $gs）"; ok=1; }
+# 当たりの照合（strikes の arc・line・circle・proj・arrow・戻る斧・罠と、飛び道具の毎フレームを、元の JavaScript の記録と比べる。生の値は大きいので git に入れず、なければここで作る）
+[ -f godot/worldart/data/strikes_golden.json ] || node tools/worldart/godot/golden_strikes.mjs > /dev/null
+G=$(cd godot/worldart && timeout -k 5 300 godot --headless --path . -s res://scripts/tests/strikes_golden.gd 2>&1); gs=$?
+echo "$G" | grep -E "^(OK|NG|照合)"
+[ $gs -eq 0 ] || { echo "NG  当たりの照合（終了コード $gs）"; ok=1; }
 # 姿勢の照合（人物の部品の世界行列を、元の three.js と 1e-4 で比べる。生の値は大きいので git に入れず、なければここで作る）
 [ -f godot/worldart/data/poses_golden.json ] || node tools/worldart/godot/export_rig.mjs > /dev/null
 G=$(cd godot/worldart && timeout -k 5 300 godot --headless --path . -s res://scripts/tests/poses_golden.gd 2>&1); gs=$?
