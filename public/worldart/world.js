@@ -181,8 +181,8 @@ function groundMaterial() {
         col = mix(col, rock * uRockTint, wr);
         if (uWater.y > 1.5) {
           float hw = vW.y - uWater.x;
-          float wet = smoothstep(0.45, 0.0, hw) * smoothstep(-0.12, 0.02, hw);   // 水の上の水際だけ明るく
-          col = mix(col, col * 1.18 + vec3(0.10, 0.10, 0.07), wet * 0.8);
+          float wet = smoothstep(0.16, 0.0, hw) * smoothstep(-0.12, 0.02, hw);   // 水の上の水際（≈0.5m の帯）だけ明るく
+          col = mix(col, col * 1.12 + vec3(0.06, 0.06, 0.04), wet * 0.7);
           col *= mix(1.0, 0.5, smoothstep(0.0, -0.7, hw));                        // 水の下の底は沈んで暗い
         } else if (uWater.y > 0.5) {
           float wet = smoothstep(0.55, 0.05, vW.y - uWater.x);
@@ -374,7 +374,7 @@ function waterMaterialW1() {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { tH: { value: heightTex }, tN: { value: T.noise }, uTime: TIME,
       uT: { value: new THREE.Vector4(TM.x0, TM.z0, TM.size, TM.shoreMax || 0) }, uHR: { value: new THREE.Vector3(TM.hmin, TM.hmax, W.level) },
-      uShallow: { value: new THREE.Color(W.shallowW1 || '#3f8a8e') }, uDeep: { value: new THREE.Color(W.colorW1 || '#1f5a7c') },
+      uShallow: { value: new THREE.Color(W.shallowW1 || '#629aa3') }, uDeep: { value: new THREE.Color(W.colorW1 || '#40778f') },
       uWD: { value: new THREE.Vector4(num('wdeep', W.deepAt ?? 2.6), num('wcaus', W.causticAt ?? 1.6), num('wband', W.bandAt ?? 0.28), num('wglint', W.glint ?? 1.0)) } });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvW = (modelMatrix * vec4(position,1.0)).xyz;');
@@ -400,7 +400,8 @@ function waterMaterialW1() {
       float nz2 = texture2D(tN, vW.xz * vec2(0.09, 0.22) - uTime * vec2(0.004, 0.012)).r;
       float dd = depth + (nz - 0.5) * 0.5;
       // 深さの帯: 岸の浅瀬は暗い灰緑（底が沈んで見える。W01・W05 の網の目の中）→ 沖の青（hue 195〜210°）
-      vec3 wc = mix(uShallow, uDeep, smoothstep(uWD.y * 0.5, uWD.x, dd));
+      // 深さか岸からの距離の深い方で決める（底の浅い海でも沖が青くなる。south_coast_g3 は深さ 1.2〜1.6m）
+      vec3 wc = mix(uShallow, uDeep, max(smoothstep(uWD.y * 0.5, uWD.x, dd), smoothstep(2.5, 7.0, sdist + (nz - 0.5) * 1.5)));
       // 波の筋（沖の明るさの揺れ ±8%）
       wc *= 0.92 + 0.16 * nz2;
       // 寄せる波の泡（W01・W04）: 岸からの距離場の等しい距離の線（= 岸と同じ形の白い線）が寄せては引く。
@@ -429,7 +430,7 @@ function waterMaterialW1() {
       wc = mix(wc, vec3(1.0), glint);
       diffuseColor.rgb = wc;
       // 浅瀬は底が透ける。沖は不透明に近い
-      diffuseColor.a = mix(0.62, 0.97, smoothstep(0.05, 1.4, depth)) + edge * 0.4 + glint;`);
+      diffuseColor.a = mix(0.62, 0.97, max(smoothstep(0.05, 1.4, depth), smoothstep(1.0, 5.0, sdist))) + edge * 0.4 + glint;`);
   };
   return m;
 }

@@ -89,6 +89,11 @@
    1.12,
    1.05,
    0.8
+  ],
+  "altTint": [
+   0.98,
+   0.93,
+   0.8
   ]
  },
  "terrain": {
@@ -114,14 +119,8 @@
     "shelf": 3.5,
     "shelfDepth": 0.9,
     "depth": 3.2,
-    "slope": 5.0
-   }
-  ],
-  "bands": [
-   {
-    "mat": "sand",
-    "below": -0.2,
-    "noise": 0.25
+    "slope": 5.0,
+    "beach": 3.0
    }
   ],
   "water": {

@@ -167,14 +167,15 @@ g['terrain'] = {
     'size': 160, 'cell': 0.5, 'center': [r2((xs.min() + xs.max()) / 2), 0.0], 'ground': 'grass',
     'hills': {'amp': 0.3, 'scale': 18},
     # 湖の窪み: 縁の半径を当たり判定の円より 1.2m 大きく（水面 -0.45 と交わる所が円にそろう）
-    'basins': [{'world': [PX, PZ], 'r': r2(PR + 1.2), 'jag': 0.7, 'shelf': 3.5, 'shelfDepth': 0.9, 'depth': 3.2, 'slope': 5.0}],
-    'bands': [{'mat': 'sand', 'below': -0.2, 'noise': 0.25}],
+    'basins': [{'world': [PX, PZ], 'r': r2(PR + 1.2), 'jag': 0.7, 'shelf': 3.5, 'shelfDepth': 0.9, 'depth': 3.2, 'slope': 5.0, 'beach': 3.0}],
     'water': {'level': WATER_LV, 'rule': 'w1', 'deepAt': 2.2, 'causticAt': 3.0, 'bandAt': 0.5},
     'cliffs': [{
         'world': ring(1.5), 'lowPoint': [0, 0], 'raise': True, 'drop': 3.0, 'width': 2.4, 'jag': 1.0, 'relief': 0.4, 'drape': 0.5,
         'gaps': [{'world': [[r2(e['x'] * 0.9), r2(e['z'] * 0.9)], [r2(e['x'] * 2.2), r2(e['z'] * 2.2)]], 'r': 2.9}],
     }],
 }
+# 浜の砂の色を rulebook 6.1 の砂の日なた (223〜243, 183〜195, 119〜125) に（既定の絵のままでは青みが強く (236, 203, 147)）
+g['ground'] = dict(g['ground'], altTint=[0.98, 0.93, 0.8])
 g['paths'] = paths
 g['zones'] = [{
     'kind': 'forest', 'world': ring(24.0), 'exclude': ring(3.0), 'noRock': True,

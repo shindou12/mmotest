@@ -180,6 +180,7 @@ for cl in TS.get('cliffs', []):
         DRAPE.append(face * upper * smooth(0.5 - cl['drape'] * 0.3, 0.6 - cl['drape'] * 0.3, N1(X * 0.9, Z * 0.9, 9)))
     CLIFF_LINES.append((poly, cl, ref))
 
+BASIN_INN = []
 for bs in TS.get('basins', []):
     # 湖の窪み（f1_lake）: 中心 world・半径 r の縁から内へ、shelf m は浅瀬（0 → shelfDepth）、その先は depth までなだらかに下がる。
     # 縁はノイズで jag m だけ揺らす（岸の形）。寄せる波の線（水の規則 w1）が岸と同じ形の一本になるよう、浅瀬の傾きはそろえる
@@ -189,6 +190,7 @@ for bs in TS.get('basins', []):
     shelf = bs.get('shelf', 3.0); sdep = bs.get('shelfDepth', 0.6)
     prof = np.where(inn < shelf, sdep * smooth(-0.6, shelf, inn), sdep + (bs['depth'] - sdep) * smooth(shelf, shelf + bs.get('slope', 6.0), inn))
     H = np.where(inn > -0.6, np.minimum(H, H * smooth(0.0, -0.6, inn) - prof), H)
+    BASIN_INN.append((inn, bs))
 
 # 注目点（カメラの target）の地面を高さ 0 にそろえる。画面の位置からの逆算は高さ 0 を前提にしているため
 if TS.get('anchor', False):   # 地図で "anchor": true のときだけ（水面・砂の帯の高さの基準も動くため。F20）
@@ -208,6 +210,11 @@ for p in SPEC.get('paths', []):
 if TS.get('ground') in ('sand', 'alt'): ALT = np.maximum(ALT, 1.0 - DIRT)
 for w_ in GRASSP:
     ALT = np.minimum(ALT, 1 - w_); DIRT = np.minimum(DIRT, 1 - w_)
+for inn, bs in BASIN_INN:
+    # 浜: 湖の縁の外 beach m を砂に（高さで塗ると、起伏の低い所すべてに砂が出た）。縁はノイズで崩す（rulebook 6.2: 草 → 砂は ≈2m のまだら）
+    if bs.get('beach'):
+        w = 1 - smooth(bs['beach'] - 1.0, bs['beach'] + 1.0, -inn + (N1(X * 0.8, Z * 0.8, 12) - 0.5) * 2 * 1.4)
+        ALT = np.maximum(ALT, w)
 for band in TS.get('bands', []):
     # 高さで塗り分ける（例: 浜の砂は高さ below より下）
     edge = H + (N1(X * 2.3, Z * 2.3, 4) - 0.5) * 2 * band.get('noise', 0.4)
