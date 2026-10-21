@@ -16,6 +16,14 @@
 | Pillow | 13.0.0 | ユーザーの site-packages | `py -m pip install --user pillow` |
 | Git for Windows（Git Bash） | 2.53.0.windows.1 | もとから入っていた | — |
 | Godot MCP | コミット `1209744fad78f3998f98c7394fd0f6ef50da5281` | `%LOCALAPPDATA%\godot-mcp\build\index.js` | クローン → checkout → `npm ci` → `npm run build`（Node 22 で）。npm の公開版は使わない |
+| numpy | 2.5.4 | Python313 の本体の site-packages（Pillow も同じ所に入れ直した） | `python.exe -I -m pip install pillow numpy` |
+| playwright | 1.64.1 | `%LOCALAPPDATA%\Programs\node22\node_modules\playwright` | Node 22 で `npm i -g playwright`。リポジトリの package.json は変えない |
+| Chromium（playwright 用） | Chrome Headless Shell 156.0.8078.4 | `%LOCALAPPDATA%\ms-playwright\chromium_headless_shell-1248` | `playwright install chromium` |
+| Blender | 4.2.23 LTS | `%LOCALAPPDATA%\Programs\blender-4.2.23-windows-x64\blender.exe` | 公式の zip（SHA256 を照合）を展開。もとから入っていた Blender 5.2 は使わない（リポジトリの検証は 4.2.23） |
+| Codex CLI（Luna） | 0.163.0 | `%APPDATA%\npm\codex` | 0.133.0 から `npm i -g @openai/codex@latest` で上げた（0.133 は `~/.codex/config.toml` の `max` を読めなかった）。ChatGPT のアカウントでログイン済み |
+
+- playwright を使うときは `PLAYWRIGHT_MODULE=file:///C:/Users/shind/AppData/Local/Programs/node22/node_modules/playwright/index.mjs` を置く（`e2e/lib/harness.mjs` が読む）
+- `python -I`（スクリプトの書き方）はユーザーの site-packages（`pip --user`）を読まない。だから Pillow と numpy は本体の側に入れる。`-I` は `PYTHONUTF8` も読まないので、日本語のファイルを読むスクリプトは `-X utf8` を付ける（付けないと cp932 で `UnicodeDecodeError`）
 
 - もとから入っていた Node v24.13.1（`C:\Program Files\nodejs`）はそのまま。この作業では Node 22 を PATH の先頭に置いて使う: Git Bash なら `export PATH="$LOCALAPPDATA/Programs/node22:$PATH"`
 - Python を入れた直後は、開いていたシェルの PATH に入っていない（`py` が見つからない）。`py.exe` のフルパスで呼ぶか、シェルを開き直す
@@ -62,7 +70,11 @@ cd C:\Users\shind\mmotest\godot\worldart
 - `node tools/worldart/godot/pose_shots.mjs --only=gs_rest,gs_walk` は `out/godot-pose/poses.json` を書いたあと、playwright が無いので three.js の側で止まる（`playwright が見つかりません`）。この PC に playwright は入れていない
 - `--godot` の部分は Linux 向け（`timeout -k 5 900 xvfb-run -a godot ...` と `VK_ICD_FILENAMES`）なので、同じ引数で手で呼んだ:
   `& $g --path . --resolution 960x720 scenes/pose_view.tscn -- '--list=C:\Users\shind\mmotest\out\godot-pose\poses.json'` → `pose_view: 2 枚 撮影（失敗 0）`、1.08 秒
-- three.js の側が無いので `pose_sheet.py` は流していない
+- そのあと playwright を入れて three.js の側も撮った（2 枚で 4 秒）。`python.exe -I -X utf8 tools/worldart/godot/pose_sheet.py` → 大剣の休み・歩きで平均 IoU 0.996、輝度差の平均 1.81。このスクリプトは git に入っている `art/shots/godot-pose/` に書くので、結果は `.agents/windows-check/pose-sheet/` に移し、`pose_numbers.md` は元に戻した
+
+### Blender と Luna
+- Blender 4.2.23 で `build_assets.py -- --out .agents/windows-check/assets --blend .agents/windows-check/assets.blend`（8 秒）→ 70 個のうち 68 個が `public/worldart/assets/` の GLB とバイト単位で一致。`statue.glb`・`statue2.glb` の 2 つだけが違う（Linux で作ったものと比べたのか、元から違うのかはまだ見ていない）
+- `sh tools/agents/luna.sh --check` → `OK  gpt-6-luna を呼べた（返事: LUNA_OK）`
 
 ### ゲームの自動の確認（client_test.sh）
 Git Bash で、スクリプトは変えずに PATH の先頭へ小さな呼び出し口を置いて流した（`godot` → Godot 4.3 のコンソール版、`python3` → Python313 の `python.exe`、それと Node 22）:
