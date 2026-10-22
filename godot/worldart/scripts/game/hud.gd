@@ -2,6 +2,7 @@ extends RefCounted
 ## Browser HUD の表示と状態反映。寸法・色は public/style.css と public/js/ui/panels/hud.js を参照。
 
 const MiniMap = preload("res://scripts/game/minimap.gd")
+const GameWTree = preload("res://scripts/game/skills/wtree.gd")
 
 
 class TopButton extends Control:
@@ -696,7 +697,7 @@ func _build_topbar() -> void:
 		btn.add_child(kbd)
 		kbd.reset_size()
 		kbd.position = Vector2((42.0 - kbd.size.x) * 0.5, 42.0 + 15.0 - kbd.size.y)
-		# #sp-badge（style.css L483）: 右上 -4px、最小幅 16px・高さ 16px・#ff5a4a。スキルポイントが残るときだけ。TODO: ツリーの移植（G7-4）で表示を結ぶ
+		# #sp-badge: public/style.css L483。右上 -4px、最小幅・高さ16px、背景 #ff5a4a。
 		if String(spec[0]) == "tree":
 			var badge := PanelContainer.new()
 			badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -726,7 +727,10 @@ func _build_topbar() -> void:
 func _on_top_button(which: String) -> void:
 	print("HUD top button ", which)
 	if which == "inv" and game.items != null:
-		game.items.toggle()
+		game._toggle_inventory()
+		return
+	if which == "tree":
+		game._toggle_tree()
 		return
 	var names := {"tree": "スキルツリー", "map": "エリアマップ", "set": "設定"}
 	toast("%s の画面はまだありません（準備中）" % String(names.get(which, which)), Color.html("#8fa0b8"))
@@ -742,6 +746,7 @@ func update() -> void:
 	var stats: Dictionary = game.S
 	var character: Dictionary = game.ch
 	var screen: Vector2 = _screen_size()
+	_update_tree_badge(character, stats)
 
 	labels.lv.text = "Lv %d" % int(character.get("lv", 1))
 	labels.name.text = String(character.get("name", ""))
@@ -965,6 +970,21 @@ func _update_buffs(me: Dictionary, stats: Dictionary) -> void:
 		var value: Dictionary = values[i]
 		var row: Dictionary = buff_rows[i]
 		row.timer.text = "%.1fs" % float(value.time) if float(value.time) <= 1000000.0 and float(value.time) > 0.0 else ""
+
+
+func _update_tree_badge(character: Dictionary, stats: Dictionary) -> void:
+	var button: TopButton = top_buttons.get("tree")
+	if button == null or button.badge == null:
+		return
+	var wk := String(stats.get("wk", "sword"))
+	var legacy_left := maxi(0, int(character.get("lv", 1)) - 1 - int(game._tree_spent_total()))
+	var weapon_left := maxi(0, int(GameWTree.wt_left(character, wk))) if GameWTree.has_wtree(wk) else 0
+	var left := legacy_left + weapon_left # public/js/ui/panels/hud.js: spTotal - spSpent + wtLeft
+	button.badge.text = str(left)
+	var badge_box := button.badge.get_parent() as PanelContainer
+	badge_box.reset_size()
+	badge_box.visible = left > 0
+	badge_box.position = Vector2(46.0 - badge_box.size.x, -4.0)
 
 
 func _make_buff_row(value: Dictionary) -> Dictionary:

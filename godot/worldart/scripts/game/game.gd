@@ -42,6 +42,7 @@ const Dmg = preload("res://scripts/game/combat/damage.gd")
 const Hurt = preload("res://scripts/game/combat/hurt.gd")
 const AudioModule = preload("res://scripts/game/audio.gd")
 const GameHud = preload("res://scripts/game/hud.gd")
+const GameTreePanel = preload("res://scripts/game/tree_panel.gd")
 
 @onready var world: Node3D = $World
 var net := GameNet.new()
@@ -74,6 +75,7 @@ var items: GameItems
 var audio: GameAudio
 var hud_ui
 var hud_demo_applied := false
+var tree_panel
 
 # HUD
 var ui := {}
@@ -189,7 +191,7 @@ func _recalc() -> void:
 
 
 func _save_char() -> void:
-	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
+	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo") or args.has("tree-demo"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
 	var f := FileAccess.open(SAVE, FileAccess.WRITE)
 	f.store_string(JSON.stringify(ch))
 
@@ -599,6 +601,17 @@ func _process(real_dt: float) -> void:
 
 func _unhandled_input(ev: InputEvent) -> void:
 	if not started: return
+	if ev is InputEventKey and ev.pressed and not ev.echo:
+		if ev.physical_keycode == KEY_K:
+			_toggle_tree()
+			get_viewport().set_input_as_handled()
+			return
+		if ev.physical_keycode == KEY_I:
+			_toggle_inventory()
+			get_viewport().set_input_as_handled()
+			return
+		if _modal_panel_open():
+			return
 	if ev is InputEventMouseButton:
 		if ev.button_index == MOUSE_BUTTON_LEFT:
 			if ev.pressed: combat.press()
@@ -613,7 +626,277 @@ func _unhandled_input(ev: InputEvent) -> void:
 		elif ev.physical_keycode == KEY_F: _interact()
 		elif ev.physical_keycode == KEY_Q: combat.try_tree_skill(0)
 		elif ev.physical_keycode == KEY_E: combat.try_tree_skill(1)
-		elif ev.physical_keycode == KEY_I: items.toggle()
+
+
+func _modal_panel_open() -> bool:
+	var inventory_open: bool = items != null and items.inventory_panel != null and items.inventory_panel.panel.visible
+	var tree_open: bool = tree_panel != null and tree_panel.is_open()
+	return inventory_open or tree_open
+
+
+func _toggle_inventory() -> void:
+	if items == null:
+		return
+	if tree_panel != null and tree_panel.is_open():
+		tree_panel.close()
+	items.toggle()
+
+
+func _toggle_tree() -> void:
+	if tree_panel != null:
+		tree_panel.toggle()
+
+
+func _sync_modal_ui() -> void:
+	if hud_ui == null or hud_ui.toast_stack == null:
+		return
+	# CSS の z-index:20 の画面を HUD の通知より手前に置き、透過面から文字が見えないようにする。
+	hud_ui.toast_stack.visible = not _modal_panel_open()
+
+
+func _tree_spent_total() -> float:
+	var total := 0.0
+	for value in ch.get("tree", {}).values():
+		total += float(value)
+	return total
+
+
+func _tree_spent_tab(tab_id: String) -> float:
+	var trees: Dictionary = GameRules.data().get("trees", {})
+	if not trees.has(tab_id):
+		return 0.0
+	var total := 0.0
+	var levels: Dictionary = ch.get("tree", {})
+	for node in trees[tab_id].get("nodes", []):
+		total += float(levels.get(String(node.get("id", "")), 0))
+	return total
+
+
+func _on_tree_action(event_name: String, payload: Dictionary) -> void:
+	match event_name:
+		"tree:tab":
+			tree_panel.tree_tab = String(payload.get("tab", tree_panel.tree_tab))
+			_sfx("ui")
+		"tree:learn": _learn_legacy_node(String(payload.get("node", "")))
+		"tree:refund": _refund_legacy_node(String(payload.get("node", "")))
+		"tree:slot": _set_tree_slot(int(payload.get("slot", -1)), String(payload.get("skill", "")))
+		"tree:reset":
+			if GameWTree.has_wtree(tree_panel.tree_tab): _reset_weapon_tree(tree_panel.tree_tab)
+			else: _reset_legacy_tree()
+		"wt:learn": _learn_weapon_node(String(payload.get("node", "")))
+		"wt:refund": _refund_weapon_node(String(payload.get("node", "")))
+		"wt:choose": _choose_weapon_branch(String(payload.get("node", "")), String(payload.get("b", "")))
+	_tree_panel_refresh()
+
+
+func _tree_panel_refresh() -> void:
+	if tree_panel != null and tree_panel.is_open():
+		tree_panel.refresh()
+	if hud_ui != null:
+		hud_ui.update()
+
+
+func _can_learn_legacy_node(id: String) -> bool:
+	var index: Dictionary = GameRules.node_index()
+	if not index.has(id):
+		return false
+	var node: Dictionary = index[id]
+	var levels: Dictionary = ch.get("tree", {})
+	if int(levels.get(id, 0)) >= int(node.get("max", 1)):
+		return false
+	if _tree_spent_total() >= maxf(0.0, float(ch.get("lv", 1)) - 1.0):
+		return false
+	return _tree_spent_tab(String(node.get("tree", ""))) >= float(node.get("tier", 0)) * 2.0
+
+
+func _learn_legacy_node(id: String) -> void:
+	if not _can_learn_legacy_node(id):
+		_sfx("ui")
+		return
+	if not ch.get("tree") is Dictionary: ch["tree"] = {}
+	ch["tree"][id] = int(ch["tree"].get(id, 0)) + 1
+	var node: Dictionary = GameRules.node_index()[id]
+	var active := String(node.get("active", ""))
+	if active != "":
+		var slots: Array = ch.get("slots", [null, null])
+		if not slots.has(active):
+			var empty := slots.find(null)
+			if empty >= 0: slots[empty] = active
+		ch["slots"] = slots
+	_sfx("levelup")
+	_calc()
+	_save_char()
+
+
+func _refund_legacy_node(id: String) -> void:
+	var index: Dictionary = GameRules.node_index()
+	var levels: Dictionary = ch.get("tree", {})
+	if not index.has(id) or int(levels.get(id, 0)) <= 0:
+		_sfx("ui")
+		return
+	var node: Dictionary = index[id]
+	var after: Dictionary = levels.duplicate()
+	after[id] = int(after[id]) - 1
+	var learned: Array = []
+	for key in after.keys():
+		if int(after[key]) > 0 and index.get(String(key), {}).get("tree") == node.get("tree"):
+			learned.append(String(key))
+	for key in learned:
+		var tier := int(index[key].get("tier", 0))
+		if tier <= 0:
+			continue
+		var below := 0
+		for lower_id in learned:
+			if int(index[lower_id].get("tier", 0)) < tier:
+				below += int(after[lower_id])
+		if below < tier * 2:
+			hud_ui.toast("上の段のノードの前提になっているため戻せません", Color.html("#f88"))
+			_sfx("ui")
+			return
+	if int(after[id]) <= 0:
+		after.erase(id)
+		var active := String(node.get("active", ""))
+		if active != "":
+			var slots: Array = ch.get("slots", [null, null])
+			for i in range(slots.size()):
+				if slots[i] == active: slots[i] = null
+			ch["slots"] = slots
+	ch["tree"] = after
+	_sfx("ui")
+	_calc()
+	_save_char()
+	hud_ui.toast("%sを1ポイント戻しました" % String(node.get("name", id)), Color.html("#9fe"))
+
+
+func _reset_legacy_tree() -> void:
+	ch["tree"] = {}
+	ch["slots"] = [null, null]
+	_sfx("ui")
+	_calc()
+	_save_char()
+	hud_ui.toast("スキルポイントを振り直しました", Color.html("#9fe"))
+
+
+func _set_tree_slot(slot_index: int, skill_id: String) -> void:
+	if slot_index < 0 or slot_index > 1 or skill_id == "":
+		return
+	var learned := false
+	for state_value in ch.get("wt", {}).values():
+		if state_value is Dictionary and state_value.get("lv", {}) is Dictionary and int(state_value["lv"].get(skill_id, 0)) > 0:
+			learned = true
+			break
+	if not learned:
+		var index: Dictionary = GameRules.node_index()
+		for id in ch.get("tree", {}):
+			if int(ch["tree"][id]) > 0 and String(index.get(String(id), {}).get("active", "")) == skill_id:
+				learned = true
+				break
+	if not learned:
+		return
+	var slots: Array = ch.get("slots", [null, null])
+	while slots.size() < 2: slots.append(null)
+	var other := slots.find(skill_id)
+	if other >= 0: slots[other] = null
+	slots[slot_index] = skill_id
+	ch["slots"] = slots
+	_sfx("equip")
+	_save_char()
+
+
+func _learn_weapon_node(id: String) -> void:
+	if not GameWTree.wt_learn(ch, id):
+		_sfx("ui")
+		return
+	var node: Dictionary = GameWTree.wtnode()[id]
+	var state: Dictionary = GameWTree.wt_of(ch, String(node["wk"]))
+	var level := int(state["lv"].get(id, 0))
+	if node.get("kind") == "skill" and level == 1:
+		var slots: Array = ch.get("slots", [null, null])
+		if not slots.has(id):
+			var empty := slots.find(null)
+			if empty >= 0: slots[empty] = id
+		ch["slots"] = slots
+	if level == 3:
+		hud_ui.toast("%s：形を A・B から選べます" % String(node.get("name", id)), Color.html("#ffd84a"))
+	_sfx("levelup")
+	_calc()
+	_save_char()
+
+
+func _choose_weapon_branch(id: String, branch: String) -> void:
+	if not GameWTree.wt_choose(ch, id, branch):
+		_sfx("ui")
+		return
+	var node: Dictionary = GameWTree.wtnode()[id]
+	_sfx("perfect")
+	hud_ui.toast("%sが「%s」に変化" % [String(node.get("name", id)), String(node.get(branch, {}).get("name", ""))], Color.html("#ffd84a"))
+	_calc()
+	_save_char()
+
+
+func _refund_weapon_node(id: String) -> void:
+	var index: Dictionary = GameWTree.wtnode()
+	if not index.has(id):
+		_sfx("ui")
+		return
+	var node: Dictionary = index[id]
+	var wk := String(node["wk"])
+	var state: Dictionary = GameWTree.wt_of(ch, wk)
+	var kind := String(node.get("kind", ""))
+	var can_refund := false
+	if kind == "ks1": can_refund = state.get("ks1") == id and state.get("ks2") == null
+	elif kind == "ks2": can_refund = state.get("ks2") == id
+	else: can_refund = int(state["lv"].get(id, 0)) > 0
+	if not can_refund:
+		_sfx("ui")
+		return
+	var spent := int(GameWTree.wt_spent(state))
+	var cost := 30 + spent * 5 # weapon-tree.js WT_REFUND_COST: 30 + spent * 5
+	if int(ch.get("gold", 0)) < cost:
+		hud_ui.toast("1ポイント戻すには %dG 必要です" % cost, Color.html("#f88"))
+		_sfx("ui")
+		return
+	ch["gold"] = int(ch.get("gold", 0)) - cost
+	if kind == "ks1" or kind == "ks2":
+		state[kind] = null
+	else:
+		if int(state["lv"].get(id, 0)) == 3: state["br"].erase(id)
+		state["lv"][id] = int(state["lv"][id]) - 1
+		if int(state["lv"][id]) <= 0:
+			state["lv"].erase(id)
+			var slots: Array = ch.get("slots", [null, null])
+			for i in range(slots.size()):
+				if slots[i] == id: slots[i] = null
+			ch["slots"] = slots
+	_sfx("ui")
+	hud_ui.toast("%sを1ポイント戻しました（-%dG）" % [String(node.get("name", id)), cost], Color.html("#9fe"))
+	_calc()
+	_save_char()
+
+
+func _reset_weapon_tree(wk: String) -> void:
+	var state: Dictionary = GameWTree.wt_of(ch, wk)
+	var spent := int(GameWTree.wt_spent(state))
+	if spent <= 0:
+		return
+	var cost := 100 + spent * 20 # weapon-tree.js WT_RESET_COST: 100 + spent * 20
+	if int(ch.get("gold", 0)) < cost:
+		hud_ui.toast("振り直しには %dG 必要です" % cost, Color.html("#f88"))
+		_sfx("ui")
+		return
+	ch["gold"] = int(ch.get("gold", 0)) - cost
+	var own := {}
+	for id in state["lv"].keys(): own[String(id)] = true
+	ch["wt"][wk] = {"lv": {}, "br": {}, "ks1": null, "ks2": null}
+	var slots: Array = ch.get("slots", [null, null])
+	for i in range(slots.size()):
+		if slots[i] != null and own.has(String(slots[i])): slots[i] = null
+	ch["slots"] = slots
+	WFX.fx_call("treeReset")
+	_sfx("ui")
+	hud_ui.toast("%sのツリーを振り直しました（-%dG）" % [String(GameRules.data()["weapons"][wk]["name"]), cost], Color.html("#9fe"))
+	_calc()
+	_save_char()
 
 
 func _update_mouse() -> void:
@@ -780,7 +1063,14 @@ func _setup_hud() -> void:
 	hud_ui = GameHud.new()
 	hud_ui.build(root, self)
 	items.build_ui(root)
+	tree_panel = GameTreePanel.new(self)
+	tree_panel.action_sent.connect(_on_tree_action)
+	tree_panel.build_ui(root)
 	if args.has("inv") or args.has("inv-demo"): items.toggle()   # 確認用: --inv-demo はサンプルの持ち物と説明も開く
+	if args.has("tree-demo"):
+		tree_panel.open(tree_panel.tree_tab)
+		print("TREE_DEMO_STATE_JSON=", JSON.stringify(ch))
+		tree_panel.call_deferred("log_demo_layout")
 	# はじめの画面（名前とサーバー）
 	ui.menu = PanelContainer.new()
 	root.add_child(ui.menu)

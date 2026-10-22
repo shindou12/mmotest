@@ -386,10 +386,7 @@ func build_ui(parent: Control) -> void:
 	var close_button := _button("×")
 	close_button.custom_minimum_size = Vector2(32.0, 30.0)
 	close_button.add_theme_font_size_override("font_size", 15)
-	close_button.pressed.connect(func() -> void:
-		panel.visible = false
-		hide_tooltip()
-	)
+	close_button.pressed.connect(close)
 	header.add_child(close_button)
 
 	body = HBoxContainer.new()
@@ -569,6 +566,15 @@ func toggle() -> void:
 			call_deferred("_show_demo_tooltip")
 	else:
 		hide_tooltip()
+	g._sync_modal_ui()
+
+
+func close() -> void:
+	if panel == null:
+		return
+	panel.visible = false
+	hide_tooltip()
+	g._sync_modal_ui()
 
 
 func _show_demo_tooltip() -> void:
@@ -597,6 +603,10 @@ func _log_demo_layout() -> void:
 	var left_minimum := left_content.get_combined_minimum_size()
 	var grid_minimum := grid.get_combined_minimum_size()
 	var column_minimum: Vector2 = (panel.get_child(0) as VBoxContainer).get_combined_minimum_size()
+	var tier_badges := []
+	for badge_node in tooltip.find_children("TierBadge", "PanelContainer", true, false):
+		var badge_rect := (badge_node as Control).get_global_rect()
+		tier_badges.append({"rect": [roundf(badge_rect.position.x), roundf(badge_rect.position.y), roundf(badge_rect.size.x), roundf(badge_rect.size.y)]})
 	print("INV_UI_LAYOUT_JSON=", JSON.stringify({
 		"viewport": [roundi(viewport.x), roundi(viewport.y)],
 		"panel": [roundf(panel_rect.position.x), roundf(panel_rect.position.y), roundf(panel_rect.size.x), roundf(panel_rect.size.y)],
@@ -610,6 +620,8 @@ func _log_demo_layout() -> void:
 		"statsContent": [roundf(stats_content.size.x), roundf(stats_content.size.y)],
 		"equipment": equipment.size(), "items": grid.get_child_count(), "gridColumns": grid.columns,
 		"weight": float(g.S.get("weight", 0.0)), "tooltipVisible": tooltip.visible,
+		"tierBadges": tier_badges, "panelZ": panel.z_index, "tooltipZ": tooltip.z_index,
+		"toastsHidden": not g.hud_ui.toast_stack.visible,
 	}))
 
 
@@ -909,7 +921,11 @@ func _add_affix_tip(affix: Array) -> void:
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tooltip_content.add_child(row)
 	var badge := PanelContainer.new()
-	badge.custom_minimum_size.x = 30.0
+	badge.name = "TierBadge"
+	# public/style.css .afx .tier: min-width:30px、font-size:10px、上下padding:1px。
+	# HBoxContainer の行高へ引き伸ばされないよう、高さ14pxで中央に置く。
+	badge.custom_minimum_size = Vector2(30.0, 14.0)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var style := StyleBoxFlat.new()
 	style.bg_color = badge_color
 	style.set_corner_radius_all(3)
