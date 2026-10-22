@@ -73,16 +73,34 @@ func _build_legacy(id: String, ar: Dictionary) -> bool:
 	var entry: Dictionary = index.get("areas", {}).get(id, {})
 	var light: Dictionary = entry.get("light", {})
 	if not light.is_empty():
-		# ゲームの後段露出を通した旧エリアの明るさをブラウザ版に合わせる。
+		# 正本は public/shared/data.js FLOORS と public/js/env.js buildArea の light。
+		# sun_dir=(20,40,10)、色・sun_i・hemi・fog は export_areas.mjs が index.json に書き出す。
+		var sun_dir := _v3(light.get("sun_dir", [20, 40, 10]))
+		var sun_color := Color.html(String(light.get("sun_color", "#fff1d6")))
+		var sun_i := float(light.get("sun_i", 2.2))
 		ToonLook.set_light({
-			"sun_dir": _v3(light.get("sun_dir", [20, 40, 10])),
-			"sun_color": Color.html(String(light.get("sun_color", "#fff1d6"))),
-			"sun_i": float(light.get("sun_i", 2.2)),
+			"sun_dir": sun_dir,
+			"sun_color": sun_color,
+			"sun_i": sun_i,
 			"sky": Color.html(String(light.get("sky", "#cfe8ff"))),
 			"ground": Color.html(String(light.get("ground", "#3a5a2a"))),
 			"hemi_i": float(light.get("hemi_i", 1.1)),
+			# 既存の旧エリア ToonLook 値。ゲームの post.gdshader はエリアの exposure=1.25 を使う。
 			"aces": true, "exposure": 0.75, "outline_scale": 1.0,
 		})
+		# render.js の太陽方向・色・影を Godot Light3D にも入れる。
+		# Godot の light() は LIGHT_COLOR=color×energy×PI なので、energy=sun_i/PI で Three.js の強さを保つ。
+		if sun != null:
+			sun.light_color = sun_color
+			sun.light_energy = sun_i / PI
+			if sun_dir.length_squared() > 0.0:
+				sun.basis = Basis.looking_at(-sun_dir.normalized(), Vector3.UP if absf(sun_dir.y) < sun_dir.length() * 0.99 else Vector3.FORWARD)
+			# public/js/game/render.js: castShadow=true, PCFSoftShadowMap、2048²、±30、near=1/far=120、bias=-0.0005。
+			# Godot 4.3 では分割影 2 段とプロジェクト既定の影解像度・soft filter を使う。
+			sun.shadow_enabled = true
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+			sun.directional_shadow_max_distance = 80.0
+			sun.directional_shadow_split_1 = 0.45
 		if env != null and env.environment != null:
 			var environment: Environment = env.environment
 			environment.background_color = Color.html(String(light.get("sky_bot", "#d8f0ff")))
@@ -105,8 +123,12 @@ func _build_legacy(id: String, ar: Dictionary) -> bool:
 		push_error("legacy GLB の scene を作れません: %s" % id)
 		return false
 	scene.name = "LegacyArea"
+	# export_areas.mjs の LegacySky はブラウザの背景用で、three.js の既定どおり影を落とさない。
+	# GLB では castShadow が保持されないため、Godot の既定値を戻す。
+	for n in scene.find_children("LegacySky", "MeshInstance3D", true, false):
+		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(scene)
-	ToonLook.convert(scene)
+	ToonLook.convert(scene, Color("448a9b"), true)
 	door_nodes.clear()
 	for n in scene.find_children("LegacyDoor", "Node3D", true, false): door_nodes.append(n)
 	if ar["shape"] == "grid":

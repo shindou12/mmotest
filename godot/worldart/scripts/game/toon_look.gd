@@ -6,6 +6,7 @@ extends RefCounted
 ## 元の関数: toon.js の toon() / glow() / outlineMat() / hullGeo() / outline()。
 
 const SHADER := preload("res://shaders/toon.gdshader")
+const LEGACY_SHADER := preload("res://shaders/legacy_toon.gdshader")
 const OUTLINE := preload("res://shaders/toon_outline.gdshader")
 const COLOR_RECIPES := "res://data/models/player_color.json"
 
@@ -53,43 +54,50 @@ static func _apply_outline_light(m: ShaderMaterial) -> void:
 	m.set_shader_parameter("exposure", _light["exposure"])
 
 
-static func _shader_variant(double_sided: bool, vertex_colors: bool, has_texture: bool, transparent: bool, additive: bool) -> Shader:
-	var key := "%s|%s|%s|%s|%s" % [double_sided, vertex_colors, has_texture, transparent, additive]
+static func _shader_variant(double_sided: bool, vertex_colors: bool, has_texture: bool, transparent: bool, additive: bool, legacy: bool) -> Shader:
+	var key := "%s|%s|%s|%s|%s|%s" % [double_sided, vertex_colors, has_texture, transparent, additive, legacy]
 	if _shader_cache.has(key): return _shader_cache[key]
-	var code := SHADER.code
-	var mode := "render_mode unshaded, cull_disabled;" if double_sided else "render_mode unshaded, cull_back;"
+	var code := LEGACY_SHADER.code if legacy else SHADER.code
+	var source_mode := "render_mode cull_back;" if legacy else "render_mode unshaded, cull_back;"
+	var mode := ("render_mode cull_disabled;" if double_sided else source_mode) if legacy else ("render_mode unshaded, cull_disabled;" if double_sided else source_mode)
 	if transparent: mode = mode.replace(";", ", %s, depth_draw_never;" % ("blend_add" if additive else "blend_mix"))
-	code = code.replace("render_mode unshaded, cull_back;", mode)
+	code = code.replace(source_mode, mode)
 	var base := "albedo.rgb"
+	var alpha := "albedo.a"
 	if has_texture:
 		code = code.replace("uniform vec4 albedo : source_color", "uniform sampler2D albedo_tex : source_color;\nuniform vec4 albedo : source_color")
 		code = code.replace("void fragment() {", "void fragment() {\n\tvec4 tex_col = texture(albedo_tex, UV);")
 		base += " * tex_col.rgb"
-	if vertex_colors: base += " * COLOR.rgb"
-	code = code.replace("col = albedo.rgb * color_scale;", "col = %s * color_scale;" % base)
-	code = code.replace("col = albedo.rgb / PI * irr + emission_col.rgb;", "col = %s / PI * irr + emission_col.rgb;" % base)
-	if transparent:
-		var alpha := "albedo.a"
-		if has_texture: alpha += " * tex_col.a"
-		if vertex_colors: alpha += " * COLOR.a"
-		code = code.replace("ALBEDO = col;", "ALBEDO = col;\n\tALPHA = %s;" % alpha)
+		alpha += " * tex_col.a"
+	if vertex_colors:
+		base += " * COLOR.rgb"
+		alpha += " * COLOR.a"
+	if legacy:
+		code = code.replace("col = albedo.rgb * color_scale;", "col = %s * color_scale;" % base)
+		code = code.replace("col = albedo.rgb;", "col = %s;" % base)
+		code = code.replace("// legacy_transparent_alpha", "ALPHA = %s;" % alpha if transparent else "")
+	else:
+		code = code.replace("col = albedo.rgb * color_scale;", "col = %s * color_scale;" % base)
+		code = code.replace("col = albedo.rgb / PI * irr + emission_col.rgb;", "col = %s / PI * irr + emission_col.rgb;" % base)
+		if transparent: code = code.replace("ALBEDO = col;", "ALBEDO = col;\n\tALPHA = %s;" % alpha)
 	var shader := Shader.new()
 	shader.code = code
 	_shader_cache[key] = shader
 	return shader
 
 
-static func _toon_material(albedo: Color, emission: Color, unlit: bool, scale: float, double_sided: bool, ow: float, vertex_colors := false, tex: Texture2D = null, transparent := false, additive := false) -> ShaderMaterial:
-	var key := "%s|%s|%s|%.3f|%s|%.2f|%s|%s|%s|%s" % [albedo.to_html(true), emission.to_html(false), unlit, scale, double_sided, ow, vertex_colors, tex.get_instance_id() if tex != null else 0, transparent, additive]
+static func _toon_material(albedo: Color, emission: Color, unlit: bool, scale: float, double_sided: bool, ow: float, vertex_colors := false, tex: Texture2D = null, transparent := false, additive := false, legacy := false) -> ShaderMaterial:
+	var key := "%s|%s|%s|%.3f|%s|%.2f|%s|%s|%s|%s|%s" % [albedo.to_html(true), emission.to_html(false), unlit, scale, double_sided, ow, vertex_colors, tex.get_instance_id() if tex != null else 0, transparent, additive, legacy]
 	if _mat_cache.has(key): return _mat_cache[key]
 	var m := ShaderMaterial.new()
-	m.shader = _shader_variant(double_sided, vertex_colors, tex != null, transparent, additive)
+	m.shader = _shader_variant(double_sided, vertex_colors, tex != null, transparent, additive, legacy)
 	m.set_shader_parameter("albedo", albedo)
 	if tex != null: m.set_shader_parameter("albedo_tex", tex)
 	m.set_shader_parameter("emission_col", emission)
 	m.set_shader_parameter("color_scale", scale)
 	m.set_shader_parameter("unlit", unlit)
 	_apply_light(m)
+	if legacy and transparent: m.render_priority = 101   # post.gdshader は優先度 100。加算・透過材質をその後に描き、画面写しに消されないようにする。
 	if ow > 0.0:
 		var okey := "%.2f" % ow
 		if not _outline_cache.has(okey):
@@ -197,7 +205,7 @@ static var _re_gm: RegEx
 
 
 ## root 以下の MeshInstance3D の材質を、トゥーン + 輪郭線に置き換える。player: プレイヤーの色（sRGB）
-static func convert(root: Node, player: Color = Color("448a9b")) -> void:
+static func convert(root: Node, player: Color = Color("448a9b"), legacy := false) -> void:
 	if _re_ow == null:
 		_re_ow = RegEx.new(); _re_ow.compile("ow(\\d+)_")
 		_re_gm = RegEx.new(); _re_gm.compile("gm(\\d+)_")
@@ -229,7 +237,7 @@ static func convert(root: Node, player: Color = Color("448a9b")) -> void:
 			var colors = arrays[Mesh.ARRAY_COLOR]
 			var vertex_colors: bool = colors != null and colors.size() > 0
 			var tex: Texture2D = b.albedo_texture
-			var transparent := b.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA or alb.a < 0.999
+			var transparent := b.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA or alb.a < 0.999 or (legacy and additive)
 			if o > 0.0: use_hull = true
-			mi.set_surface_override_material(s, _toon_material(alb, emi, glow, gm, b.cull_mode == BaseMaterial3D.CULL_DISABLED, o, vertex_colors, tex, transparent, additive))
+			mi.set_surface_override_material(s, _toon_material(alb, emi, glow, gm, b.cull_mode == BaseMaterial3D.CULL_DISABLED, o, vertex_colors, tex, transparent, additive, legacy))
 		if use_hull: mi.mesh = add_hull(src_mesh)
