@@ -11,6 +11,7 @@
   暗    輝度 40 未満の画素の数（輪郭線・暗い部品。輪郭線の太さの目安）。比 = Godot / three
 """
 import json
+import fnmatch
 import sys
 from pathlib import Path
 
@@ -89,6 +90,8 @@ def cell(a, box, bg):
 
 
 def group_of(pid):
+    if pid.startswith('mob_'):
+        return 'mobs'
     if pid.startswith('sw_'):
         return 'sword'
     for pre, name in (('sp_', 'spear'), ('dg_', 'dagger'), ('ax_', 'axe'), ('bw_', 'bow')):
@@ -102,11 +105,20 @@ def group_of(pid):
 
 
 def main():
+    only = None
+    for arg in sys.argv[1:]:
+        if arg.startswith('--only='):
+            only = arg.split('=', 1)[1].split(',')
     cfg = json.loads((SRC / 'poses.json').read_text())
     bg = hex_rgb(cfg['bg'])
+    selection = only if only is not None else cfg.get('selection', 'all')
+    partial = selection != 'all'
+    jobs = cfg['jobs']
+    if only is not None:
+        jobs = [j for j in jobs if any(fnmatch.fnmatchcase(j['id'], p) for p in only)]
     DST.mkdir(parents=True, exist_ok=True)
     rows, groups = [], {}
-    for j in cfg['jobs']:
+    for j in jobs:
         pa, pb = SRC / 'three' / (j['id'] + '.png'), SRC / 'godot' / (j['id'] + '.png')
         if not (pa.exists() and pb.exists()):
             print('skip (画像なし):', j['id'])
@@ -115,14 +127,16 @@ def main():
         st, union = stats(a, b, bg)
         box = crop_box(union, (a.shape[1], a.shape[0]))
         d = np.clip(np.abs(a - b) * 4, 0, 255)
-        r = {'id': j['id'], 'label': j['label'], 'weapon': j['weapon'], 'st': st,
+        r = {'id': j['id'], 'label': j['label'], 'weapon': j.get('weapon', ''), 'mob': j.get('mob'),
+             'color': j.get('color', ''), 'color_source': j.get('color_source', ''), 'st': st,
              'imgs': (cell(a, box, bg), cell(b, box, bg), cell(d, box, np.array([0, 0, 0])))}
         rows.append(r)
         groups.setdefault(group_of(j['id']), []).append(r)
     f_l, f_s, f_h = font(15), font(12), font(16)
     files = []
     for g, rs in groups.items():
-        chunks = [rs[i:i + CHUNK] for i in range(0, len(rs), CHUNK)]
+        chunk_size = len(rs) if g == 'mobs' else CHUNK
+        chunks = [rs[i:i + chunk_size] for i in range(0, len(rs), chunk_size)]
         for ci, ch in enumerate(chunks):
             W = LABEL_W + CELL[0] * 3
             H = 28 + len(ch) * (CELL[1] + 4)
@@ -141,22 +155,64 @@ def main():
                     dr.text((8, y + 56 + k * 18), ln, fill=(200, 215, 235), font=f_s)
                 for k, im in enumerate(r['imgs']):
                     sheet.paste(im, (LABEL_W + k * CELL[0], y))
-            name = f'pose-{g}-{ci + 1}.png' if len(chunks) > 1 else f'pose-{g}.png'
+            name = 'pose-mobs.png' if g == 'mobs' else (f'pose-{g}-{ci + 1}.png' if len(chunks) > 1 else f'pose-{g}.png')
             sheet.save(DST / name)
             files.append(name)
             print('シート:', DST / name)
-    # 数の表
-    md = ['# 人物の姿勢: three.js と Godot の比較（pose_sheet.py が書く）', '',
-          '| 姿勢 | 武器 | 輝度 three | 輝度 Godot | 輝度差 | 面積比 | IoU | 差(RGB) | 暗 three | 暗 Godot | 暗比 |', '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
-    for r in rows:
-        s = r['st']
-        md.append(f"| {r['label']} | {r['weapon']} | {s['lum_a']:.1f} | {s['lum_b']:.1f} | {s['lum_b'] - s['lum_a']:+.1f} | {s['area_b'] / max(1, s['area_a']):.3f} | {s['iou']:.3f} | {s['diff']:.1f} | {s['dark_a']} | {s['dark_b']} | {s['dark_b'] / max(1, s['dark_a']):.2f} |")
-    if rows:
-        ious = [r['st']['iou'] for r in rows]
-        lds = [abs(r['st']['lum_b'] - r['st']['lum_a']) for r in rows]
-        md += ['', f'平均 IoU {np.mean(ious):.3f}（最小 {min(ious):.3f}）、輝度差の絶対値の平均 {np.mean(lds):.2f}（最大 {max(lds):.2f}）、姿勢 {len(rows)} 件']
-    (DST / 'pose_numbers.md').write_text('\n'.join(md) + '\n')
-    print('\n'.join(md))
+    def make_numbers(rs, is_mob):
+        if is_mob:
+            md = ['## 敵の色と形: three.js と Godot の比較', '',
+                  '| 敵 | 色 | 色の出典 | 輝度 three | 輝度 Godot | 輝度差 | 面積比 | IoU | 差(RGB) | 暗 three | 暗 Godot | 暗比 |',
+                  '|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
+        else:
+            md = ['# 人物の姿勢: three.js と Godot の比較（pose_sheet.py が書く）', '',
+                  '| 姿勢 | 武器 | 輝度 three | 輝度 Godot | 輝度差 | 面積比 | IoU | 差(RGB) | 暗 three | 暗 Godot | 暗比 |',
+                  '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
+        for r in rs:
+            s = r['st']
+            if is_mob:
+                md.append(f"| {r['mob']} | {r['color']} | {r['color_source']} | {s['lum_a']:.1f} | {s['lum_b']:.1f} | {s['lum_b'] - s['lum_a']:+.1f} | {s['area_b'] / max(1, s['area_a']):.3f} | {s['iou']:.3f} | {s['diff']:.1f} | {s['dark_a']} | {s['dark_b']} | {s['dark_b'] / max(1, s['dark_a']):.2f} |")
+            else:
+                md.append(f"| {r['label']} | {r['weapon']} | {s['lum_a']:.1f} | {s['lum_b']:.1f} | {s['lum_b'] - s['lum_a']:+.1f} | {s['area_b'] / max(1, s['area_a']):.3f} | {s['iou']:.3f} | {s['diff']:.1f} | {s['dark_a']} | {s['dark_b']} | {s['dark_b'] / max(1, s['dark_a']):.2f} |")
+        if rs:
+            ious = [r['st']['iou'] for r in rs]
+            lds = [abs(r['st']['lum_b'] - r['st']['lum_a']) for r in rs]
+            md += ['', f'平均 IoU {np.mean(ious):.3f}（最小 {min(ious):.3f}）、輝度差の絶対値の平均 {np.mean(lds):.2f}（最大 {max(lds):.2f}）、撮影 {len(rs)} 件']
+        return '\n'.join(md)
+
+    numbers_path = DST / 'pose_numbers.md'
+    if partial:
+        mob_rows = [r for r in rows if r['mob']]
+        key = 'mobs' if mob_rows and len(mob_rows) == len(rows) else 'partial'
+        start, end = f'<!-- pose_sheet:{key}:begin -->', f'<!-- pose_sheet:{key}:end -->'
+        block = f'{start}\n{make_numbers(rows, key == "mobs")}\n{end}'
+        old = numbers_path.read_text() if numbers_path.exists() else ''
+        if start in old and end in old:
+            before, tail = old.split(start, 1)
+            _, after = tail.split(end, 1)
+            new = before.rstrip() + '\n\n' + block + after
+        else:
+            new = old.rstrip() + ('\n\n' if old.strip() else '') + block + '\n'
+        numbers_path.write_text(new)
+        print(make_numbers(rows, key == 'mobs'))
+    else:
+        people = [r for r in rows if not r['mob']]
+        mob_rows = [r for r in rows if r['mob']]
+        if people:
+            numbers_path.write_text(make_numbers(people, False) + '\n')
+            print(make_numbers(people, False))
+        if mob_rows:
+            start, end = '<!-- pose_sheet:mobs:begin -->', '<!-- pose_sheet:mobs:end -->'
+            block = f'{start}\n{make_numbers(mob_rows, True)}\n{end}'
+            old = numbers_path.read_text() if numbers_path.exists() else ''
+            if start in old and end in old:
+                before, tail = old.split(start, 1)
+                _, after = tail.split(end, 1)
+                new = before.rstrip() + '\n\n' + block + after
+            else:
+                new = old.rstrip() + ('\n\n' if old.strip() else '') + block + '\n'
+            numbers_path.write_text(new)
+            print(make_numbers(mob_rows, True))
 
 
 if __name__ == '__main__':

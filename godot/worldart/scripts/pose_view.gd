@@ -11,9 +11,11 @@ extends Node3D
 const BASE_STATE := {"t": 1.0, "moving": false, "walkT": 0.0, "combo": 0, "swing": -1.0, "spin": -1.0, "sweep": -1.0, "dodge": 0.0, "down": 0.0, "hurt": 0.0}
 ## 既定のカメラ: ゲームのカメラの向き（game/loop.js: 俯角 pitch、注視点は人物の 1.2m 上）で、人物が画面に大きく入る距離に寄せたもの
 const DEFAULT_CAM := {"fov": 50.0, "pos": [0.0, 4.21, 3.61], "target": [0.0, 1.05, 0.0]}
+const DEFAULT_MOB_CAM := {"fov": 50.0, "pos": [0.0, 4.8, 4.4], "target": [0.0, 1.45, 0.0]}
 const DEFAULT_BG := "#7d8a95"
 
 var _model: PlayerModel = null
+var _mob_model: Node3D = null
 var _cam_cfg: Dictionary = {}
 
 
@@ -36,6 +38,22 @@ func _ready() -> void:
 			get_tree().quit(1)
 			return
 		for k in j: cfg[k] = j[k]
+	elif args.has("mob"):
+		var mob_args := String(args["mob"]).split(":")
+		if mob_args.size() < 2:
+			push_error("--mob は <種類>:<色> の形で指定する")
+			get_tree().quit(1)
+			return
+		var body_color := String(mob_args[1])
+		if not body_color.begins_with("#"): body_color = "#" + body_color
+		cfg["camera"] = DEFAULT_MOB_CAM
+		var mob_job := {"id": "mob_" + mob_args[0], "mob": mob_args[0], "color": body_color,
+			"scale": 1.0, "state": {}, "out": args.get("out", "")}
+		if mob_args.size() > 2:
+			var accent_color := String(mob_args[2])
+			if not accent_color.begins_with("#"): accent_color = "#" + accent_color
+			mob_job["accent"] = accent_color
+		cfg["jobs"] = [mob_job]
 	else:
 		var st = JSON.parse_string(args.get("state", "{}"))
 		cfg["jobs"] = [{"id": "single", "weapon": args.get("weapon", "sword:0:0"), "armor": int(args.get("armor", "0")),
@@ -92,6 +110,18 @@ func _shoot(job: Dictionary) -> bool:
 	var c: Dictionary = job["camera"] if job.get("camera") is Dictionary else _cam_cfg    # 姿勢ごとの視点（横から見る確かめ用）。なければ一覧の視点
 	$Camera.look_at_from_position(Vector3(c["pos"][0], c["pos"][1], c["pos"][2]), Vector3(c["target"][0], c["target"][1], c["target"][2]), Vector3.UP)
 	if _model != null and _model.root != null: _model.root.free()
+	_model = null
+	if _mob_model != null: _mob_model.free()
+	_mob_model = null
+	if job.has("mob"):
+		var accent_color: Variant = Color(String(job["accent"])) if job.has("accent") else null
+		_mob_model = GameVisuals.mob(String(job["mob"]), Color(String(job.get("color", "#448a9b"))),
+			float(job.get("scale", 1.0)), bool(job.get("boss", false)), accent_color)
+		add_child(_mob_model)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		return _save_shot(job)
 	var w: PackedStringArray = String(job["weapon"]).split(":")
 	_model = PlayerModel.new()
 	_model.build({"kind": w[0], "form": int(w[1]) if w.size() > 1 else 0, "tier": int(w[2]) if w.size() > 2 else 0,
@@ -105,6 +135,10 @@ func _shoot(job: Dictionary) -> bool:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
+	return _save_shot(job)
+
+
+func _save_shot(job: Dictionary) -> bool:
 	var img := get_viewport().get_texture().get_image()
 	var out := String(job.get("out", ""))
 	if out == "": return true
@@ -113,5 +147,5 @@ func _shoot(job: Dictionary) -> bool:
 	if err != OK:
 		push_error("保存できない: " + out)
 		return false
-	print("撮影 %s %s -> %s" % [job.get("id", ""), job["weapon"], out])
+	print("撮影 %s %s -> %s" % [job.get("id", ""), job.get("weapon", job.get("mob", "")), out])
 	return true

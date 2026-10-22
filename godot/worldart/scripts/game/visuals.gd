@@ -36,11 +36,20 @@ static func _part(parent: Node3D, mesh: Mesh, m: Material, pos: Vector3, scl := 
 ## ゲームのモデル（data/models/<名>.glb。tools/worldart/godot/export_models.mjs が models.js の形を書き出したもの）。
 ## 材質は色だけなので、地図と同じ光の式の単色（flat.gdshader）に、光る部品（目など）は光るまま（unshaded）に置き換える。なければ null
 static var _model_cache := {}
-static func model(name: String) -> Node3D:
+static var _mob_alpha_shaders := {}
+
+
+static func _instantiate_model(name: String) -> Node3D:
 	var path := "res://data/models/%s.glb" % name
 	if not ResourceLoader.exists(path): return null
 	if not _model_cache.has(name): _model_cache[name] = load(path)
-	var n: Node3D = _model_cache[name].instantiate()
+	var packed: PackedScene = _model_cache[name]
+	return packed.instantiate() as Node3D
+
+
+static func model(name: String) -> Node3D:
+	var n := _instantiate_model(name)
+	if n == null: return null
 	for mi in n.find_children("*", "MeshInstance3D", true, false):
 		for s in mi.mesh.get_surface_count():
 			var src: Material = mi.get_active_material(s)
@@ -75,10 +84,105 @@ static func player(color: Color) -> Node3D:
 	return n
 
 
-## 敵（仮）: 形の種類 t ごとに単純な形。色と大きさは階層の表
-static func mob(t: String, color: Color, sc: float, boss := false) -> Node3D:
-	var gm := model(("boss_" if boss else "mob_") + t)
+## mob-models.js の body / mD / mL / ac の色計算を、glTF の役割名から再現する。
+static func _mob_role_color(role: String, color: Color, accent: Color) -> Color:
+	var c := color.srgb_to_linear()
+	match role:
+		"mob_body", "mob_body_glow": return color
+		"mob_body_dark50": return (c * 0.5).linear_to_srgb()
+		"mob_body_dark55": return (c * 0.55).linear_to_srgb()
+		"mob_body_dark60": return (c * 0.6).linear_to_srgb()
+		"mob_body_light35": return c.lerp(Color.WHITE, 0.35).linear_to_srgb()
+		"mob_accent", "mob_accent_glow": return accent
+	return Color.WHITE
+
+
+## GameRules.data() が持つ FLOORS / treasure（public/shared/data.js の書き出し）から、敵と本体色が一致するアクセントを探す。
+static func _mob_table_accent(t: String, color: Color) -> Color:
+	var rows: Array = []
+	for floor in GameRules.data().get("floors", []):
+		rows.append_array(floor.get("mobs", []))
+		rows.append_array(floor.get("elites", []))
+		var boss = floor.get("boss")
+		if boss is Dictionary:
+			rows.append(boss)
+			rows.append_array(boss.get("minions", []))
+	rows.append(GameRules.data().get("treasure", {}))
+	for row in rows:
+		if not row is Dictionary or String(row.get("t", "")) != t or not row.has("accent"): continue
+		if Color(String(row.get("color", "#000000"))) == color:
+			return Color(String(row["accent"]))
+	return Color("ff4030")
+
+
+## GLB の mob_palette_<本体色>_<アクセント色> から、呼び出し側が省略したアクセントを補う。
+static func _mob_asset_accent(root: Node3D, color: Color) -> Variant:
+	var target := color.to_html(false).to_lower()
+	var found: Variant = null
+	var markers: Array[Node] = []
+	for child in root.find_children("*", "Node3D", true, false):
+		var child_name := String(child.name)
+		if child_name.begins_with("mob_palette_") and child_name.trim_prefix("mob_palette_").split("_").size() == 2:
+			markers.append(child)
+	# 名前を先に全部読んでから消す（目印が目印の子にあると、親を消した時点で子も消え、あとで読むと previously freed になる）
+	for marker in markers:
+		var parts := String(marker.name).trim_prefix("mob_palette_").split("_")
+		if parts.size() == 2 and parts[0].to_lower() == target:
+			found = Color("#" + parts[1])
+	for marker in markers:
+		if is_instance_valid(marker): marker.free()
+	return found
+
+
+static func _mob_alpha_shader(source: Shader) -> Shader:
+	var key := str(source.get_instance_id())
+	if _mob_alpha_shaders.has(key): return _mob_alpha_shaders[key]
+	var shader := Shader.new()
+	var code := source.code
+	code = code.replace("unshaded, cull_back;", "unshaded, cull_back, blend_mix;")
+	code = code.replace("unshaded, cull_disabled;", "unshaded, cull_disabled, blend_mix;")
+	code = code.replace("ALBEDO = col;", "ALBEDO = col;\n\tALPHA = albedo.a;")
+	shader.code = code
+	_mob_alpha_shaders[key] = shader
+	return shader
+
+
+## 敵: mob-models.js の形を使い、GLB の部品役割から階層色とアクセントを差し替える。
+## 色の式: makeMob() の m / mD / mL / ac。トゥーンと輪郭線は toon_look.gd の ToonLook.convert。
+static func mob(t: String, color: Color, sc: float, boss := false, accent: Variant = null) -> Node3D:
+	var accent_color: Color = _mob_table_accent(t, color)
+	if accent is Color: accent_color = accent
+	var gm := _instantiate_model(("boss_" if boss else "mob_") + t)
 	if gm != null:
+		if not accent is Color:
+			var asset_accent: Variant = _mob_asset_accent(gm, color)
+			if asset_accent is Color: accent_color = asset_accent
+		ToonLook.convert(gm)
+		for mi in gm.find_children("*", "MeshInstance3D", true, false):
+			var role := String(mi.name).get_slice("__", 0)
+			if not role.begins_with("mob_") or mi.mesh == null: continue
+			for s in mi.mesh.get_surface_count():
+				var src: Material = mi.get_active_material(s)
+				if not (src is ShaderMaterial): continue
+				var source_albedo: Color = (src as ShaderMaterial).get_shader_parameter("albedo")
+				var recolored := (src as ShaderMaterial).duplicate() as ShaderMaterial
+				var new_albedo := _mob_role_color(role, color, accent_color)
+				new_albedo.a = source_albedo.a
+				# 半透明殻の輝度を three.js の撮影値に合わせる。
+				if t == "wisp" and source_albedo.a < 0.999: new_albedo.a *= 0.85
+				recolored.set_shader_parameter("albedo", new_albedo)
+				if source_albedo.a < 0.999:
+					recolored.shader = _mob_alpha_shader(recolored.shader)
+				var old_emission: Color = (src as ShaderMaterial).get_shader_parameter("emission_col")
+				var old_base_linear := source_albedo.srgb_to_linear()
+				var old_emission_linear := old_emission.srgb_to_linear()
+				if old_base_linear.r > 0.0001:
+					var emission_scale := old_emission_linear.r / old_base_linear.r
+					if emission_scale > 0.0 and absf(old_emission_linear.g - old_base_linear.g * emission_scale) < 0.01 and absf(old_emission_linear.b - old_base_linear.b * emission_scale) < 0.01:
+						var new_emission := (new_albedo.srgb_to_linear() * emission_scale).linear_to_srgb()
+						new_emission.a = old_emission.a
+						recolored.set_shader_parameter("emission_col", new_emission)
+				mi.set_surface_override_material(s, recolored)
 		gm.scale = Vector3.ONE * sc
 		return gm
 	var n := Node3D.new()

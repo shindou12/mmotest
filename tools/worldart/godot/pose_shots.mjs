@@ -13,6 +13,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadPlaywright, startServer } from '../../../e2e/lib/harness.mjs';
+import { FLOORS, TREASURE_DEF } from '../../../public/shared/data.js';
 import { MOTION_DURATIONS } from '../../../public/shared/motion-catalog.js';
 import { TECHNIQUES } from '../../../public/shared/techniques.js';
 
@@ -24,7 +25,27 @@ const LIGHT = { sun_dir: [20, 40, 10], sun_color: '#fff1d6', sun_i: 2.2, sky: '#
 const BG = '#7d8a95';
 const COLOR = '#448a9b';
 const SIDE_CAM = { fov: 50, pos: [1.9, 1.9, 3.2], target: [-0.2, 1.3, 0.3] };
+const MOB_CAMERA = { fov: 50, pos: [0, 4.8, 4.4], target: [0, 1.45, 0] };
 const TIER = 4;                       // 飾りの段階（レア度 5）。形の比較は全部これ
+const MOB_TYPES = ['slime', 'beast', 'golem', 'wisp', 'bat', 'mushroom', 'scorpion', 'lizard', 'rootknot', 'mage', 'knight'];
+
+const floorMobSources = [];
+FLOORS.forEach((floor, i) => {
+  for (const [kind, rows] of [['mobs', floor.mobs || []], ['elites', floor.elites || []], ['boss.minions', floor.boss?.minions || []]]) {
+    for (const mob of rows) floorMobSources.push({ mob, source: `FLOORS[${i}].${kind}` });
+  }
+});
+const mobExamples = new Map();
+for (const row of floorMobSources) if (!mobExamples.has(row.mob.t)) mobExamples.set(row.mob.t, row);
+if (!mobExamples.has(TREASURE_DEF.t)) mobExamples.set(TREASURE_DEF.t, { mob: TREASURE_DEF, source: 'TREASURE_DEF' });
+const hexColor = (value) => '#' + Number(value).toString(16).padStart(6, '0').slice(-6);
+const mobJobs = MOB_TYPES.map((t) => {
+  const example = mobExamples.get(t);
+  if (!example) throw new Error(`敵の色が見つからない: ${t}`);
+  const accent = example.mob.accent == null ? '#ff4030' : hexColor(example.mob.accent);
+  return [`mob_${t}`, `${t} (${example.source})`, '', {}, 0, MOB_CAMERA,
+    { mob: t, color: hexColor(example.mob.color), accent, color_source: example.source, scale: 1.0 }];
+});
 
 // 姿勢の一覧: [id, ラベル, 武器 '種類:形:段階', 状態]
 const GS = `greatsword:0:${TIER}`;
@@ -67,17 +88,21 @@ const POSES = [
   ...[1, 2, 3, 4, 5, 6].map((a) => [`eq_armor${a}`, `防具 見た目${a}`, `sword:0:${TIER}`, {}, a]),
   ['eq_shield', '盾 kite 構え', `spear:0:${TIER}`, {}],
   ['eq_shield_guard', '盾 kite ガード', `spear:0:${TIER}`, { guard: true, gg: 1 }],
+  ...mobJobs,
 ];
 const args = Object.fromEntries(process.argv.slice(2).map((a) => (a.startsWith('--') ? [a.slice(2).split('=')[0], a.includes('=') ? a.slice(a.indexOf('=') + 1) : true] : [a, true])));
 const only = args.only ? new Set(String(args.only).split(',')) : null;
-const poses = POSES.filter((p) => !only || only.has(p[0]));
+const selected = (id) => !only || [...only].some((pattern) => pattern.endsWith('*') ? id.startsWith(pattern.slice(0, -1)) : pattern === id);
+const poses = POSES.filter((p) => selected(p[0]));
 fs.mkdirSync(path.join(OUT, 'three'), { recursive: true });
 fs.mkdirSync(path.join(OUT, 'godot'), { recursive: true });
 
 // Godot 用の一覧
 const list = {
-  camera: CAMERA, light: LIGHT, bg: BG,
-  jobs: poses.map(([id, label, weapon, state, armor, camera]) => ({ id, label, weapon, armor: armor || 0, camera, hide_weapon: id.startsWith('eq_shield'), color: COLOR, state, out: path.join(OUT, 'godot', id + '.png') })),
+  camera: CAMERA, light: LIGHT, bg: BG, selection: args.only ? String(args.only) : 'all',
+  jobs: poses.map(([id, label, weapon, state, armor, camera, mob]) => ({ id, label, weapon, armor: armor || 0, camera,
+    hide_weapon: id.startsWith('eq_shield'), color: mob?.color || COLOR, state,
+    ...(mob || {}), out: path.join(OUT, 'godot', id + '.png') })),
 };
 fs.writeFileSync(path.join(OUT, 'poses.json'), JSON.stringify(list, null, 1) + '\n');
 
@@ -108,7 +133,23 @@ fs.writeFileSync(path.join(OUT, 'poses.json'), JSON.stringify(list, null, 1) + '
       camera.position.set(...list.camera.pos); camera.lookAt(new THREE.Vector3(...list.camera.target));
       const base = { t: 1, moving: false, walkT: 0, combo: 0, swing: -1, spin: -1, sweep: -1, dodge: 0, down: 0, hurt: 0 };
       const out = {};
+      const seededMob = (t, make) => {
+        const originalRandom = Math.random;
+        let seed = [...t].reduce((n, ch) => (Math.imul(n ^ ch.charCodeAt(0), 16777619) >>> 0), 2166136261);
+        Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 0x100000000);
+        try { return make(); } finally { Math.random = originalRandom; }
+      };
       for (const j of list.jobs) {
+        if (j.mob) {
+          const cam = j.camera || list.camera;
+          camera.position.set(...cam.pos); camera.lookAt(new THREE.Vector3(...cam.target));
+          const model = seededMob(j.mob, () => M.makeMob(j.mob, j.color, j.scale || 1, j.accent, !!j.boss));
+          scene.add(model);
+          renderer.render(scene, camera);
+          out[j.id] = cv.toDataURL('image/png').split(',')[1];
+          scene.remove(model);
+          continue;
+        }
         const [kind, form, tier] = j.weapon.split(':');
         const cam = j.camera || list.camera;
         camera.position.set(...cam.pos); camera.lookAt(new THREE.Vector3(...cam.target));
