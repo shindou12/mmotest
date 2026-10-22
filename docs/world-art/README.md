@@ -1,6 +1,6 @@
 # ワールドアート研究（参考画像のアートスタイルを再現・展開する）
 
-再開するときは **`rulebook.md`（第 3 世代の規則集）→ このファイル → `goal-mihon2.md` の最新のループ** の順に読む。
+再開するときは **`docs/handoff/2026-10-22-art-style.md`（引継ぎ: 今の状態・残っている差・進め方）→ `rulebook.md`（第 3 世代の規則集）→ このファイル** の順に読む。
 
 ## 目標
 参考画像（Ragnarok Online 3 のキャプチャ、`art/ref/` と `observations.md`）のワールドマップの見た目を解明し、
@@ -52,13 +52,15 @@ python3 -I tools/worldart/pack_shots.py   # PNG を webp にしてからコミ�
 ```
 依存: Blender 4.2.23 LTS、Node 22、three 0.160、Python 3（numpy, PIL）、playwright（/opt/node22 の全体インストール）。
 
-## 現在の状態（L23）
+## 現在の状態（L26。最新のまとめと次の候補は `docs/handoff/2026-10-22-art-style.md`）
 - **見本②（`mihon2`）**: 区画つきの地図で B01〜B04 を再現（`art/shots/mihon2/L23/sheet.webp`）。明暗比・彩度・緑の色相が B01・B02・B04 で見本とほぼ一致（rules/ab-L23.md）。残りは B03 の明暗比と B01 の色相（rulebook 16）。
 - 歩ける比較ページ: https://claude.ai/artifact/A31scCgQs9tWLQ1dhMAgZQ （L20・L21・L21 修正・L22 を同じ場所で切り替え、アイデア 01・02・04・05 の入／切）。
 - 第 2 世代の地図（orc_meadow・south_coast・town_plaza・forest_path・palm_clearing）に第 3 世代の規則を当てた `<名>_g3` を作った（`tools/worldart/maps/to_gen3.py`、L24、結果は `rules/gen3-maps-L24.md`）。元の地図は残している（試遊: https://claude.ai/artifact/4RJANYkdaxpV6FNCyB4smZ ）。比較ページで第 2 世代と第 3 世代を同じ場所で切り替えられる。
+- ゲームの第 1 層「ひだまりの草原」を遊びの形のまま第 3 世代で作り直した `f1_field`（L25、`goal-f1_field.md`）。7 ビュー中 6 つが目標の範囲。
+- f1_field を Godot 4 で同じ式で描き、three.js と輝度 ±0.03 で一致（L26、`godot/worldart/README.md`）。研究の判断は three.js の画面で行う。
+- **水の規則 w1**（見本 `art/ref/W01〜W05`、`rules/water-w1.md`、条件付き）と湖畔 `f1_lake`（`make_f1_lake.py`）。湖では見本の範囲、海辺 south_coast_g3 は浅瀬が明るすぎ。
 - 詳細と経緯は `goal-mihon2.md`（L01〜L22）と `experiments.md`（E01〜E34）。
-
-- **ゲームの第 1 層「ひだまりの草原」（`f1_field`）** を第 3 世代で作り直した（L25、`goal-f1_field.md`）。ゲームの今の絵との比較は `art/shots/f1_field/compare_game.webp`、比較ページの地図「ひだまりの草原」で歩ける。
+- ゲームの今の絵との比較は `art/shots/f1_field/compare_game.webp`、比較ページの地図「ひだまりの草原」で歩ける。
 
 ## 次にやること（優先順）
 rulebook.md の「16. 未解決・未検証」が正。要約:
