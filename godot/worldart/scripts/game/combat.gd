@@ -120,7 +120,7 @@ func do_swing() -> void:
 		return
 	var rng: float = float(W["range"]) * float(WFX.fx_reduce("reach", 1.0, [true]))
 	ctx.fx.slash(me["x"], me["z"], me["a"], rng, W["arc"], WFX.fx_reduce("swingColor", col), 1.0, int(me["combo"]) % 2 == 1)
-	ctx.sfx("swing", {"heavy": W.get("twoHanded", false) or me["combo"] == 2})
+	ctx.sfx("swing", {"heavy": W.get("twoHanded", false) or me["combo"] == 2}) # actions.js doSwing L151: audio.sfx('swing', {heavy})
 	ctx.later(0.06, func(): ctx.arc(rng, W["arc"], mult, {"a": a, "type": "normal"}))
 	WFX.fx_call("swingExtra", [a, rng, col])   # 連突き・一点突破 など
 	var waved: bool = me["combo"] == 2 and S["fx"].has("wave")
@@ -177,7 +177,7 @@ func do_heavy(lv: int) -> void:
 	me["combo"] = 2
 	me["sw"] += 1
 	me["heavySwing"] = true   # 強攻撃の振り（大剣は溜めの振りかぶりから振り下ろす）
-	ctx.sfx("heavy")
+	ctx.sfx("heavy") # actions.js doHeavy L175: audio.sfx('heavy')
 	ctx.fx.flash(me["x"], 1.5, me["z"], ctx.col(), 30 if lv == 2 else 15, 0.3)
 	if g.args.has("bot"): print("HEAVY lv=%d" % lv)
 	if me.get("counterFire", false):
@@ -300,7 +300,7 @@ func start_skill(sk: Dictionary, run: Callable, id) -> void:
 		me["combo"] = 2
 		me["sw"] += 1
 	me["charging"] = false
-	ctx.sfx("skill")
+	ctx.sfx("skill") # actions.js tryWeaponSkill L262: audio.sfx('skill')
 	ctx.float_text(me["x"], 3, me["z"], sk.get("name", "?"), "info")
 	ctx.fx.flash(me["x"], 2, me["z"], ctx.col(), 25, 0.4)
 	if run.is_valid():
@@ -342,7 +342,7 @@ func tick_actions(dt: float, safe: bool) -> void:
 			var lv := 2 if me["chargeT"] >= S["chargeMax"] else 1
 			if lv != me["chargeLv"]:
 				me["chargeLv"] = lv
-				ctx.sfx("charged" if lv == 2 else "charge", {"lv": lv})
+				ctx.sfx("charged" if lv == 2 else "charge", {"lv": lv}) # loop.js update L206: audio.sfx(lv === 2 ? 'charged' : 'charge', {lv})
 				if lv == 2:
 					ctx.fx.ringWave(me["x"], me["z"], ctx.col(), 2.5, 0.3)
 					ctx.fx.flash(me["x"], 1.5, me["z"], ctx.col(), 20, 0.3)

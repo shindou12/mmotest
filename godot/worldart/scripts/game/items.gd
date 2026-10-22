@@ -36,6 +36,9 @@ func on_loot(m: Dictionary) -> void:
 		lb.position = n.position + Vector3(0, 0.8, 0)
 		g.world.add_child(lb)
 		drops.append({"it": it, "x": x, "z": z, "t": 0.0, "node": n, "label": lb})
+		if Vector2(x - g.me.x, z - g.me.z).length() < 40.0:
+			var stars := _transcend_count(it)
+			g._sfx("drop", {"rarity": int(it.get("rarity", 0)), "slot": String(it.get("slot", "")), "stars": stars}) # loot.js landDrop L31: audio.sfx('drop', {rarity, slot, stars})
 
 
 func clear() -> void:
@@ -66,6 +69,7 @@ func pickup(i: int) -> void:
 	g._save_char()
 	var r := int(d.it.get("rarity", 0))
 	g._log("%s「%s」を入手" % [GameRules.data()["rarities"][r]["name"], d.it.get("name", "?")], rarity_color(r))
+	g._sfx("pickup") # loot.js pickupDrop L61: audio.sfx('pickup')
 	if g.args.has("bot"): print("PICKUP %s %s" % [d.it.get("slot"), d.it.get("name")])
 	d.node.queue_free(); d.label.queue_free(); drops.remove_at(i)
 	refresh()
@@ -101,7 +105,16 @@ func build_ui(root: Control) -> void:
 
 func toggle() -> void:
 	panel.visible = not panel.visible
+	if panel.visible: g._sfx("ui") # ui/app.js panelState.enter L246: game.sfx('ui')
 	refresh()
+
+
+## public/shared/data.js transcendCount と同じ条件で、ドロップ音の stars を求める。
+func _transcend_count(it: Dictionary) -> int:
+	var count := 0
+	for a in it.get("affixes", []):
+		if GameRules.data()["skillVariants"].has(String(a[0])) or int(a[1]) >= 6: count += 1
+	return count
 
 
 func describe(it: Dictionary) -> String:
@@ -130,6 +143,7 @@ func equip(i: int) -> void:
 	g.ch["eq"] = eq
 	g.ch["inv"] = inv
 	g._recalc()
+	g._sfx("equip") # items.js equip L18: audio.sfx('equip')
 	g._log("装備: " + String(it.get("name", "?")))
 	refresh()
 

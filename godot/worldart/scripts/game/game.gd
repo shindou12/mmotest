@@ -6,7 +6,7 @@ extends Node3D
 ## G4: 被弾・ガード・のけぞり／ダウン／吹き飛び・受け身・這いずり・復活・力尽きる・毒沼は combat/hurt.gd（元は hurt.js・input.js のガード・actions.js sweepTick）を
 ## 本物の文脈 combat.ctx で呼ぶ（このファイルに手写しはない）。スキル変化は combat.gd → combat/variants.gd。
 ## CP5（combat.gd・items.gd）: 溜め斬り（強攻撃）・片手剣の武器スキル 5 種・飛ぶ斬撃・踏み込み、落とし物を拾う・持ち物・装備（能力値の計算）。
-## まだないもの: ボスの弾（bprojs）と演出・敵の本当のモデル・音・粒の見た目（G8）。屋内のエリアは仮の壁と床。
+## まだないもの: ボスの弾（bprojs）と演出・敵の本当のモデル・粒の見た目（G8）。屋内のエリアは仮の壁と床。
 ## 操作: WASD / 矢印 移動、マウス 狙い、左クリック 攻撃（長押しで溜め斬り）、右クリック 武器スキル、Space 回避、R 回復薬、F 調べる（レバー・宝箱）、I 持ち物、ホイール カメラの距離。
 ## G1-3b: 技は移した技（scripts/game/skills/）を本物の文脈（skills/game_ctx.gd）でつないだ。戦闘の流れは combat.gd（通常 3 段・溜め・強攻撃・武器スキル・Q/E・バフ・待ち時間・飛ぶ斬撃）。
 ## 操作の追加: Q / E ツリーのスキル（ch.slots）。キャラクターの保存に tree・prof・wt・slots を足した（ブラウザ版の character-store.js と同じ形）。
@@ -39,6 +39,7 @@ const GameWTree = preload("res://scripts/game/skills/wtree.gd")
 const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Dmg = preload("res://scripts/game/combat/damage.gd")
 const Hurt = preload("res://scripts/game/combat/hurt.gd")
+const AudioModule = preload("res://scripts/game/audio.gd")
 
 @onready var world: Node3D = $World
 var net := GameNet.new()
@@ -68,6 +69,7 @@ var bot_t := 0.0
 var door_open := false
 var combat: GameCombat
 var items: GameItems
+var audio: GameAudio
 
 # HUD
 var ui := {}
@@ -79,6 +81,9 @@ func _ready() -> void:
 			var kv := a.substr(2).split("=", true, 1)
 			args[kv[0]] = kv[1] if kv.size() > 1 else "1"
 	world.auto_build = false
+	audio = AudioModule.new()
+	audio.name = "GameAudio"
+	add_child(audio)
 	combat = GameCombat.new(self)
 	items = GameItems.new(self)
 	add_child(net)
@@ -89,6 +94,12 @@ func _ready() -> void:
 	_setup_hud()
 	if args.has("auto") or args.has("bot"):
 		_start(args.get("name", ch.get("name", "Godot")), args.get("server", "ws://127.0.0.1:8080/ws"))
+
+
+## 効果音は実ゲームの文脈からだけ再生する。照合用の文脈は _op を記録するため機器に触れない。
+func _sfx(name: String, opt: Dictionary = {}) -> void:
+	if audio == null or not audio.sfx(name, opt): return
+	if args.has("bot"): print("SFX ", name)
 
 
 # ---------------------------------------------------------------- キャラクター（保存は user://。ブラウザ版のセーブとは別）
@@ -186,7 +197,7 @@ func _reset_me() -> void:
 		"dodgeT": 0.0, "dodgeCd": 0.0, "dodgeDir": Vector2.ZERO, "iframe": 0.0, "potions": S["maxPot"], "potCd": 0.0,
 		"hurtT": 0.0, "transit": false, "deathAt": 0.0, "charging": false, "chargeT": 0.0, "chargeLv": 0, "wsCd": 0.0, "tcd": {}, "buffs": [],
 		"skillT": -1.0, "skillDuration": 0.55, "spin": false, "motion": "", "motionT": 0.0, "heavySwing": false, "bulletT": 0.0,
-		"dashT": 0.0, "dashA": 0.0, "dashSpeed": 0.0, "moving": false, "walkT": 0.0,
+		"dashT": 0.0, "dashA": 0.0, "dashSpeed": 0.0, "moving": false, "walkT": 0.0, "stepT": 0.0,
 		"gg": Hurt.GUARD()["max"], "counter": false, "counterFire": false, "guardLockT": 0.0, "guardEndT": 0.0, "ggHitT": 0.0, "brokenT": 0.0,
 		"sweepT": 0.0, "sweepHit": false, "sweep": -1.0, "hazT": 0.0, "hazKind": null}, true)
 	combat.bind()
@@ -211,7 +222,9 @@ func _on_msg(m: Dictionary) -> void:
 			my_id = int(m.id)
 			_enter_area(m.area, m.x, m.z)
 			if not args.has("town"): net.send({"t": "wp", "to": args.get("start", "f1_field")})   # 試作は草原から
-		"warped": _enter_area(m.area, m.x, m.z)
+		"warped":
+			_sfx("warp") # loop.js update L191: 出口を通ったとき audio.sfx('warp')
+			_enter_area(m.area, m.x, m.z)
 		"snap": _on_snap(m)
 		"tele": _on_tele(m)
 		"die": _on_mob_die(m)
@@ -351,6 +364,7 @@ func _remove_other(id) -> void:
 func _on_mob_die(m: Dictionary) -> void:
 	var mb = mobs.get(int(m.id))
 	if mb == null: return
+	if not bool(m.get("boss", int(mb.get("kind", 0)) == 2)): _sfx("mobdie") # snapshot.js onMobDie L182: audio.sfx('mobdie')
 	mobs.erase(int(m.id))
 	mb.label.queue_free()
 	var tw := create_tween()
@@ -370,6 +384,10 @@ func _on_tele(m: Dictionary) -> void:
 		fill.position = Vector3(s["x"], y + 0.01, s["z"]); world.add_child(fill)
 		meshes.append(out); meshes.append(fill)
 	teles.append({"meshes": meshes, "sh": m.sh, "start": t_now, "dur": float(m.d) / 1000.0, "dmg": float(m.dmg), "src": int(m.get("src", 0)), "kd": bool(m.get("kd", false)), "color": col})
+	for s in m.sh:
+		if Vector2(float(s["x"]) - me.x, float(s["z"]) - me.z).length() < 25.0:
+			_sfx("telegraph") # hurt.js onTele L15: 近くの攻撃予告で audio.sfx('telegraph')
+			break
 
 
 func _update_teles() -> void:
@@ -403,6 +421,7 @@ func _try_dodge(dir: Vector2) -> void:
 	# 待ち時間は必ず無敵より長い（連打で無敵をつなげない）
 	me.dodgeCd = maxf(float(S["dodgeCd"]) * (0.25 if after else 1.0), me.iframe + 0.15)
 	me.swingT = 9.0; me.skillT = -1.0; me.motion = ""; me.charging = false; me.guarding = false
+	_sfx("dodge") # actions.js tryDodge L408: audio.sfx('dodge')
 	WFX.fx_call("onDodge")   # 速射・罠師 など
 	if combat.tf("t_wind"):
 		var keep := []
@@ -427,6 +446,7 @@ func _use_potion() -> void:
 	me.potions -= 1; me.potCd = float(GameRules.data()["balance"]["potionCooldown"])
 	var h := minf(S["mhp"] - me.hp, S["mhp"] * float(GameRules.data()["balance"]["potionHeal"]))
 	me.hp += h
+	_sfx("potion") # actions.js usePotion L418: audio.sfx('potion')
 	_float(Vector3(me.x, 2.2, me.z), "+%d" % int(h), Color(0.5, 1, 0.6))
 
 
@@ -451,6 +471,7 @@ func _gain_xp(n: int) -> void:
 		ch["xp"] = int(ch["xp"]) - GameRules.xp_to_next(int(ch["lv"])); ch["lv"] = int(ch["lv"]) + 1; leveled = true
 	if leveled:
 		_calc(); me.hp = S["mhp"]
+		_sfx("levelup") # actions.js gainXp L441: audio.sfx('levelup')
 		_banner("LEVEL UP  Lv %d" % int(ch["lv"]))
 	_save_char()
 
@@ -533,10 +554,15 @@ func _process(real_dt: float) -> void:
 				_moveme(n.x * spd * dt, n.y * spd * dt)
 				me.moving = true
 				me.walkT += dt
+				me.stepT -= dt
+				if me.stepT <= 0.0:
+					me.stepT = 0.32
+					_sfx("step") # loop.js update L179: audio.sfx('step')
 				if not busy and not me.charging and not me.guarding: me.a = atan2(n.x, n.y)
 			# 盾槍: 強攻撃を溜めている間はガードを構える
 			if me.charging and me.chargeT >= GameCombat.charge_min() and Hurt.can_guard(combat.ctx):
 				me.guarding = true; me.guardStart = t_now; me.counter = false
+				_sfx("equip") # loop.js update L182: auto-guard starts and audio.sfx('equip')
 			if me.guarding: me.a = _aim_angle()
 		if not me.crawl:
 			# 出口

@@ -4,14 +4,15 @@ extends "res://scripts/game/combat/api.gd"
 ## combat/api.gd（ctx.gd を土台にした戦闘の環境）を継ぎ、呼ばれた操作 _op を実際の処理につなぐ:
 ##   arc・line・circle・proj・dash・hit は、敵（game.gd の mobs）に damage.gd の deal_damage で当てる（サーバーへの hit の送信は damage.gd の結果のまま）。
 ##   later はゲームの時刻（game.gd の t_now）の待ち行列（g.pending。game.gd が毎フレーム回す）。
-##   fx・sfx・text・shake は、今ある見た目の関数があればそれを使い、なければ何もしない（下の TODO の一覧）。
+##   sfx は実ゲームでは GameAudio に送る。照合用の _op は記録だけを行う。
+##   fx・text・shake は、今ある見た目の関数があればそれを使い、なければ何もしない（下の TODO の一覧）。
 ## ゲームの状態は game.gd の me・S（能力値）・mobs・others を、bind() で参照として受ける（同じ Dictionary を共有する）。
 ## 数値の計算は 64 ビットの float だけで行う（Vector2 / Vector3 は 32 ビットなので使わない）。
 ##
-## ---- 見た目・音の TODO（エフェクトと音は G8。名前ごと。呼ばれた回数は todo に数え、確認用の --bot の終了時に FXTODO の行で出す）----
+## ---- 見た目の TODO（確認用の --bot の終了時に FXTODO の行で出す）----
 ##   fx.ringWave   地面に広がる輪             fx.lightning  雷                      fx.flash      光（点光源）
 ##   parts.burst   粒の破裂                    parts.emit    粒を 1 つ出す
-##   sfx(*)        音: swing・heavy・skill・hit・block・impact・wave・charge・charged・perfect・thunder・stunHit・buff ほか全部
+##   （音: combat/skills の既存呼び出しを実ゲームの GameAudio に接続）
 ##   （済み: fx.slash = 扇の斬撃の板、text / floatText = 浮かぶ文字、shake = 画面の揺れ、proj = 飛ぶ斬撃の板・投げ斧の板、arrow = 矢の板）
 ##   武器の手の位置（hand_pos）・武器ツリーの光（wt_aura）は人物のモデル待ち（06b）。矢 arrow・戻る飛び道具 boomerang・斧の形は短剣・大斧の分を入れた（見た目は板で代用）。
 ##   （済み: arrow = 矢の板。細長い板が飛び、update_projs が当てる。罠・旗は部品を置く）
@@ -146,7 +147,12 @@ func _op(name: String, args: Array):
 		"tryDodge": return _v(Callable(g, "_try_dodge_input"), [])
 		"doHeavy": return _v(Callable(g.combat, "do_heavy"), [int(args[0])])
 		"characterDiscard": return _v(Callable(g, "_discard_char"), [])
-		"sfx": return _todo("sfx:" + str(args[0]))   # 音（TODO: G8）。名前ごとに数える
+		"sfx":
+			# actions.js の c.sfx 公開口 L103。照合用の _op は記録だけを行い、ゲーム実行時だけ GameAudio へ送る。
+			var opt: Dictionary = args[1] if args.size() > 1 and args[1] is Dictionary else {}
+			if g.has_method("_sfx"): g._sfx(String(args[0]), opt)
+			else: return _todo("sfx:" + str(args[0]))
+			return null
 		"arrow": return _v(Callable(self, "strike_arrow"), [args[0] if args.size() > 0 and args[0] != null else {}])
 	_todo(name)
 	return null
@@ -224,7 +230,7 @@ func strike_proj(o: Dictionary) -> void:
 	g.world.add_child(node)
 	w["node"] = node
 	projs.append(w)
-	sfx("wave")
+	sfx("wave") # actions.js buildCombat L80: audio.sfx('wave')
 
 
 ## strikes.arrow: 矢（弓・投げナイフ）。射程まで飛び、敵に 1 回ずつ当たる（貫通しない矢は最初の敵で止まる）。
@@ -246,7 +252,7 @@ func strike_arrow(o: Dictionary) -> void:
 	var fx0: float = me["x"] + sin(a) * 0.9
 	var fz0: float = me["z"] + cos(a) * 0.9
 	fx_flash_arrow(fx0, fz0, color, WFX.truthy(o.get("big")))   # 射出の閃光
-	sfx("swing")
+	sfx("swing") # actions.js buildCombat L93: audio.sfx('swing')
 
 
 func fx_flash_arrow(x: float, z: float, color, big: bool) -> void:

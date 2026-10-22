@@ -35,6 +35,13 @@ ok=0
 grep -q "LOG ひだまりの草原" $OUT && echo "OK  草原へ移った" || { echo "NG  草原へ移れない"; ok=1; }
 grep -q "^HIT " $OUT && echo "OK  攻撃が当たった（$(grep -c '^HIT ' $OUT) 回）" || { echo "NG  攻撃が当たらない"; ok=1; }
 grep -q "^XP " $OUT && echo "OK  敵を倒して経験値（$(grep -c '^XP ' $OUT) 回）" || { echo "NG  経験値が入らない"; ok=1; }
+# 効果音（G8-3）: 操作・当たり・被弾・歩行が GameAudio に届くこと
+grep -q "^SFX swing$" $OUT && echo "OK  SFX swing" || { echo "NG  SFX swing が出ない"; ok=1; }
+grep -q "^SFX hit$" $OUT && echo "OK  SFX hit" || { echo "NG  SFX hit が出ない"; ok=1; }
+grep -q "^SFX hurt$" $OUT && echo "OK  SFX hurt" || { echo "NG  SFX hurt が出ない"; ok=1; }
+grep -q "^SFX step$" $OUT && echo "OK  SFX step" || { echo "NG  SFX step が出ない"; ok=1; }
+grep -q "^SFX telegraph$" $OUT && echo "OK  SFX telegraph" || { echo "NG  SFX telegraph が出ない"; ok=1; }
+grep -q "^SFX mobdie$" $OUT && echo "OK  SFX mobdie" || { echo "NG  SFX mobdie が出ない"; ok=1; }
 grep -c "LOG はじまりの街" $OUT | grep -qv "^1$" && echo "OK  出口から街へ移った" || { echo "NG  出口から街へ移れない"; ok=1; }
 grep -q "LOG 古井戸の洞窟" $OUT && echo "OK  出口から屋内（古井戸の洞窟）へ移った" || { echo "NG  屋内へ移れない"; ok=1; }
 grep -q "^HEAVY" $OUT && echo "OK  溜め斬り（$(grep -c '^HEAVY' $OUT) 回）" || { echo "NG  溜め斬りが出ない"; ok=1; }
@@ -93,6 +100,7 @@ for pair in "盾槍:$OUTS" "弓:$OUTB"; do
   grep -q "^HURT" $f && echo "OK  $name: 被弾（HURT $(grep -c '^HURT' $f) 回）" || { echo "NG  $name: 被弾しない"; ok=1; }
   # 盾槍はガードを構えて受ける（溜め中に自動で構える）: GUARD の行（防御・カウンター準備・ガードブレイク）が出ること
   [ "$name" = "盾槍" ] && { grep -q "^GUARD" $f && echo "OK  盾槍: ガードで受けた（GUARD $(grep -c '^GUARD' $f) 回）: $(grep '^GUARD' $f | head -1)" || { echo "NG  盾槍: ガードで受けない"; ok=1; }; }
+  [ "$name" = "盾槍" ] && { grep -q "^SFX block$" $f && echo "OK  盾槍: SFX block" || { echo "NG  盾槍: SFX block が出ない"; ok=1; }; }
   grep -E "SCRIPT ERROR" $f && ok=1
 done
 # 式の照合（元の JavaScript で作った期待値と GDScript を比べる。JSON は node tools/worldart/godot/golden_rules.mjs で作り直せる）
