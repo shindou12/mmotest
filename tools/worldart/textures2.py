@@ -24,6 +24,16 @@ def lerp(a, b, t): a = np.asarray(a, float); b = np.asarray(b, float); return a 
 def col(c, a=255): return tuple(int(max(0, min(1, x)) * 255) for x in c) + (a,)
 
 
+def periodic_noise(n, bx, seed, by=None):
+    """FFT の周期ノイズ。端が自然につながる大きなむらを作る"""
+    by = bx if by is None else by
+    w = rng(seed).standard_normal((n, n))
+    fx = np.fft.fftfreq(n)[None, :]; fy = np.fft.fftfreq(n)[:, None]
+    f = np.exp(-((fx * n / bx) ** 2 + (fy * n / by) ** 2))
+    v = np.real(np.fft.ifft2(np.fft.fft2(w) * f))
+    return (v - v.min()) / (v.max() - v.min() + 1e-8)
+
+
 def canvas(w, h): return Image.new('RGBA', (w * SS, h * SS), (0, 0, 0, 0))
 def finish(img, w, h, name):
     img.resize((w, h), Image.LANCZOS).save(os.path.join(OUT, name))
@@ -351,6 +361,62 @@ def rock_face(n=1024, seed=114):
     base = base * (0.35 + 0.65 * crack[..., None])
     base = base * (0.94 + 0.06 * r.standard_normal((n, n, 1)).clip(-1, 1))
     Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'rock_face.png'))
+
+
+def rock_mass(n=1024, seed=116):
+    """崖の丸い岩塊。周期ノイズの重ね合わせを滑らかな明暗にし、閉じた割れ目は描かない"""
+    r = rng(seed)
+    yy, xx = np.mgrid[0:n, 0:n] / n
+    warp_x = periodic_noise(n, 4.5, seed + 1) - 0.5
+    warp_y = periodic_noise(n, 3.8, seed + 2) - 0.5
+    height = np.zeros((n, n), dtype=float)
+    for _ in range(7):
+        cx, cy = r.random(2); rx, ry = r.uniform(0.12, 0.23, 2); amp = r.uniform(0.78, 1.2)
+        dx = np.abs(xx - cx + warp_x * 0.035); dy = np.abs(yy - cy + warp_y * 0.035)
+        dx = np.minimum(dx, 1.0 - dx); dy = np.minimum(dy, 1.0 - dy)
+        d = (dx / rx) ** 2 + (dy / ry) ** 2
+        bump = amp * np.exp(-1.45 * d)
+        height = np.maximum(height, bump) + np.log1p(np.exp(-12.0 * np.abs(height - bump))) / 12.0
+    height = 0.88 * (height - height.min()) / (height.max() - height.min() + 1e-8) + 0.12 * periodic_noise(n, 3.5, seed + 3)
+    gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * n * 0.5
+    gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * n * 0.5
+    top = 0.5 + 0.5 * np.cos(2 * np.pi * yy)  # 周期の境目も明るさをそろえる
+    upper_face = 0.5 + 0.5 * np.tanh(0.48 * gy - 0.08 * gx)
+    light = np.clip(0.36 + 0.12 * top + 0.40 * upper_face + 0.18 * height, 0.12, 0.98)
+    cool = np.array((0.24, 0.31, 0.40))[None, None, :]
+    warm = np.array((0.75, 0.71, 0.64))[None, None, :]
+    base = cool + (warm - cool) * light[..., None]
+    moss_noise = periodic_noise(n, 7.0, seed + 4)
+    upper = np.clip(0.58 * top + 0.42 * upper_face, 0, 1)
+    moss = np.clip((moss_noise - 0.55) * 3.2, 0, 1) * np.clip((upper - 0.48) * 2.4, 0, 1) * 0.30
+    moss_color = np.array((0.40, 0.45, 0.29))[None, None, :]
+    base = base * (1 - moss[..., None]) + moss_color * moss[..., None]
+    grain = periodic_noise(n, 26.0, seed + 5)
+    base *= (0.97 + 0.06 * grain[..., None])
+    Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'rock_mass.png'))
+
+
+def crate2_tex(n=512, seed=117):
+    """木箱・荷車・樽用。暖色の板に、曲がった浅い継ぎ目と細い木目を入れる"""
+    yy, xx = np.mgrid[0:n, 0:n] / n
+    broad = periodic_noise(n, 4.0, seed)
+    grain = periodic_noise(n, 14.0, seed + 1)
+    bend = periodic_noise(n, 3.0, seed + 2)
+    warp = 0.018 * np.sin(2 * np.pi * (xx * 1.7 + 0.25 * bend)) + 0.012 * (bend - 0.5)
+    phase = (yy * 4.0 + warp) % 1.0
+    edge = np.minimum(phase, 1.0 - phase)
+    seam = np.exp(-((edge / 0.027) ** 2))
+    lip = np.exp(-(((phase - 0.075) / 0.040) ** 2))
+    grain_line = np.sin(2 * np.pi * (xx * 25.0 + 0.18 * broad + 0.07 * np.sin(2 * np.pi * yy * 3.0)))
+    value = np.clip(0.48 + 0.30 * broad + 0.16 * grain + 0.035 * grain_line, 0, 1)
+    dark = np.array((0.38, 0.25, 0.15))[None, None, :]
+    light = np.array((0.76, 0.53, 0.32))[None, None, :]
+    base = dark + (light - dark) * value[..., None]
+    seam_color = np.array((0.34, 0.23, 0.15))[None, None, :]
+    base = base * (1 - 0.50 * seam[..., None]) + seam_color * (0.50 * seam[..., None])
+    edge_light = np.array((0.84, 0.63, 0.39))[None, None, :]
+    base = base * (1 - 0.14 * lip[..., None]) + edge_light * (0.14 * lip[..., None])
+    Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'crate2.png'))
 
 
 def lavender(n=256, seed=112):

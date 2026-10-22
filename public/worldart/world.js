@@ -120,14 +120,15 @@ const tex = (name, srgb = true) => {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 };
-const T = { flag: tex('ground_flagstone'), noise: tex('noise_soft', false), crack: tex('rock_crack'), face: tex('rock_face'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
+const T = { flag: tex('ground_flagstone'), noise: tex('noise_soft', false), crack: tex('rock_crack'), face: tex('rock_face'), mass: tex('rock_mass'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
 
 // ---------------------------------------------------------------- 地面の材質
 // 頂点色 R=土の道 G=砂/石畳 B=岩肌。境目は草の絵の明るさで崩してぎざぎざにする
 const GROUND = spec.ground || {};
 const altTex = GROUND.alt === 'cobble' ? T.cobble : GROUND.alt === 'flagstone' ? T.flag : T.sand;
-const rockTex = GROUND.rock === 'face' ? T.face : GROUND.rock === 'crack' ? T.crack : T.rock;   // 急な面の岩肌（crack: 第 2 世代 1.6m、face: 角ばった板と真っすぐな割れ目 L15、4.5m）
-const rockScale = GROUND.rock === 'face' ? 4.5 : GROUND.rock === 'crack' ? 1.6 : 4.5;
+const rockMode = q.get('rock') || GROUND.rock;
+const rockTex = rockMode === 'mass' ? T.mass : rockMode === 'face' ? T.face : rockMode === 'crack' ? T.crack : T.rock;   // mass: 量感のある岩塊 4m
+const rockScale = rockMode === 'mass' ? 4.0 : rockMode === 'face' ? 4.5 : rockMode === 'crack' ? 1.6 : 4.5;
 function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
   m.onBeforeCompile = (sh) => {
@@ -566,10 +567,13 @@ if (GBLEND && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // �
 
 const SKIP = new Set(flag('grass') ? [] : ['grass_a']);
 const assetNames = Object.keys(placed.assets).filter((a) => !SKIP.has(a));
+const assetSwap = new Map((q.get('aswap') || '').split(',').map((pair) => pair.split(':')).filter(([from, to]) => from && to));
 const dummy = new THREE.Object3D();
 await Promise.all(assetNames.map(async (name) => {
   const shadowOnly = name.endsWith('@shadow');          // 映らないが影だけ落とす
-  const g = await load(`${BASE}${q.get('adir') || 'assets'}/${name.replace('@shadow', '')}.glb`);
+  const sourceName = name.replace('@shadow', '');
+  const loadName = assetSwap.get(sourceName) || sourceName;
+  const g = await load(`${BASE}${q.get('adir') || 'assets'}/${loadName}.glb`);
   const items = placed.assets[name];
   g.scene.updateMatrixWorld(true);
   g.scene.traverse((o) => {

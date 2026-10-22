@@ -56,6 +56,8 @@ def material(name, tex, alpha=False, rough=1.0):
 M_BARK = lambda: material('bark', 'wood.png')
 M_WOOD = lambda: material('wood', 'wood.png')
 M_CRATE = lambda: material('crate', 'crate.png')
+M_WOOD2 = lambda: material('wood2', 'crate2.png')
+M_CRATE2 = lambda: material('crate2', 'crate2.png')
 M_LEAF = lambda: material('leaf_broad', 'leaf_broad.png', alpha=True)
 M_FROND = lambda: material('leaf_frond', 'leaf_frond.png', alpha=True)
 M_GRASS = lambda: material('grass', 'grass_blades.png', alpha=True)
@@ -440,6 +442,54 @@ def crate(name, size=0.8):
             ca.data[l].color = (a, a * 0.97, a * 0.92, 1)
     bpy.ops.object.transform_apply(location=True)
     ob.select_set(False)
+    return ob
+
+
+def fit_mesh_bounds(ob, lo, hi):
+    """メッシュの外寸を保ちながら、少し崩した輪郭を指定寸法へ合わせる"""
+    for axis in range(3):
+        values = [v.co[axis] for v in ob.data.vertices]
+        mn, mx = min(values), max(values)
+        scale = (hi[axis] - lo[axis]) / (mx - mn)
+        for v in ob.data.vertices:
+            v.co[axis] = lo[axis] + (v.co[axis] - mn) * scale
+
+
+def wooden_block(name, center, size, mat, seed, bevel_width, cuts=1, uv_size=0.8):
+    """少しゆがませて角を丸めた木の板を作る"""
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=center)
+    ob = bpy.context.object; ob.name = name; ob.dimensions = size
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.subdivide(number_cuts=cuts)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    R_ = random.Random(seed)
+    for v in ob.data.vertices:
+        for axis in range(3): v.co[axis] += R_.uniform(-0.018, 0.018) * size[axis]
+    ob.data.materials.append(mat)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.cube_project(cube_size=uv_size)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    md = ob.modifiers.new('丸い縁', 'BEVEL'); md.width = bevel_width; md.segments = 3
+    bpy.ops.object.modifier_apply(modifier=md.name)
+    return ob
+
+
+def wood_colors(ob, height, base=0.66):
+    ca = ob.data.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+    for poly in ob.data.polygons:
+        for l in poly.loop_indices:
+            z = ob.data.vertices[ob.data.loops[l].vertex_index].co.z
+            a = base + (1.0 - base) * min(1.0, max(0.0, z / height))
+            ca.data[l].color = (a, a * 0.97, a * 0.92, 1.0)
+
+
+def crate2(name, size=0.8):
+    ob = wooden_block(name, (0, 0, size / 2), (size, size, size), M_CRATE2(), 2051, 0.035, cuts=3, uv_size=size)
+    fit_mesh_bounds(ob, (-size / 2, -size / 2, 0.0), (size / 2, size / 2, size))
+    wood_colors(ob, size, 0.65)
+    ob.data.name = name; ob.select_set(False)
     return ob
 
 
@@ -995,6 +1045,42 @@ def barrel(name, seed, r=0.38, h=0.9):
     return B.build(name, smooth=True)
 
 
+def barrel2(name, seed, r=0.38, h=0.9):
+    """樽の試作。丸い胴、浅い木色の帯、明るい木口"""
+    R_ = random.Random(seed); B = Builder(); n = 16
+    zs = [0.0, 0.12, 0.16, 0.30, 0.48, 0.52, 0.70, 0.84, 0.88, 1.0]
+    phase = R_.uniform(0, math.tau)
+    waves = [1.0 + 0.025 * math.sin(3 * 2 * math.pi * i / n + phase) + 0.008 * math.sin(5 * 2 * math.pi * i / n - phase) for i in range(n)]
+    peak = max(waves)
+    rings = []
+    for z in zs:
+        band = max(max(0.0, 1.0 - abs(z - c) / 0.045) for c in (0.14, 0.50, 0.86))
+        rr = r * min(1.0, 0.86 + 0.14 * math.sin(math.pi * z) + 0.012 * band)
+        rings.append([B.add_v(Vector((math.cos(2 * math.pi * i / n) * rr * waves[i % n] / peak,
+                                      math.sin(2 * math.pi * i / n) * rr * waves[i % n] / peak, z * h))) for i in range(n + 1)])
+    for j in range(len(zs) - 1):
+        zc = (zs[j] + zs[j + 1]) / 2
+        band = any(abs(zc - c) < 0.055 for c in (0.14, 0.50, 0.86))
+        ao = 0.72 + 0.28 * zc
+        shade = 0.78 if band else 0.96
+        for i in range(n):
+            B.face([rings[j][i], rings[j][i + 1], rings[j + 1][i + 1], rings[j + 1][i]],
+                   [(i / n, zs[j]), ((i + 1) / n, zs[j]), ((i + 1) / n, zs[j + 1]), (i / n, zs[j + 1])],
+                   [(ao * shade,) * 3] * 4, None, M_WOOD2())
+    top = rings[-1]; cidx = B.add_v(Vector((0, 0, h)))
+    for i in range(n):
+        a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+        B.face([top[i], top[i + 1], cidx],
+               [((math.cos(a0) + 1) * 0.5, (math.sin(a0) + 1) * 0.5), ((math.cos(a1) + 1) * 0.5, (math.sin(a1) + 1) * 0.5), (0.5, 0.5)],
+               [(1.06, 1.03, 0.98)] * 3, None, M_WOOD2())
+    ob = B.build(name, smooth=True)
+    fit_mesh_bounds(ob, (-r, -r, 0.0), (r, r, h))
+    md = ob.modifiers.new('丸い縁', 'BEVEL'); md.width = 0.012; md.segments = 2
+    bpy.ops.object.modifier_apply(modifier=md.name)
+    ob.data.name = name; ob.select_set(False)
+    return ob
+
+
 def cart_frame(name, seed):
     """木の荷車の枠（B01 中央）: 床板と、すき間のある板の囲い（四辺）、角の柱"""
     B = Builder(); L, W, H = 1.8, 1.25, 0.95
@@ -1009,6 +1095,29 @@ def cart_frame(name, seed):
         for sx in (-1, 1):
             box(B, sx * L / 2 - 0.03, -W / 2, z, sx * L / 2 + 0.03, W / 2, z + 0.11, M_CRATE(), (1.2, 1.2), ao)
     return B.build(name, smooth=False)
+
+
+def cart_frame2(name, seed):
+    """荷車の試作。丸い板の縁と少し不ぞろいな輪郭を保ち、外寸は旧型に合わせる"""
+    R_ = random.Random(seed); parts = []; k = 0
+    def add(center, size, mat, bevel):
+        nonlocal k
+        parts.append(wooden_block(f'{name}_part_{k:02d}', center, size, mat, seed + k * 17, bevel, cuts=1, uv_size=0.8)); k += 1
+    L, W, H = 1.8, 1.25, 0.95
+    add((0, 0, 0.29), (L, W, 0.08), M_CRATE2(), 0.018)
+    for sx in (-1, 1):
+        for sy in (-1, 1): add((sx * L / 2, sy * W / 2, H / 2), (0.12, 0.12, H), M_WOOD2(), 0.018)
+    for z in (0.45, 0.65, 0.85):
+        for sy in (-1, 1): add((0, sy * (W / 2 + 0.03), z + 0.055), (L, 0.06, 0.11), M_CRATE2(), 0.014)
+        for sx in (-1, 1): add((sx * L / 2, 0, z + 0.055), (0.06, W, 0.11), M_CRATE2(), 0.014)
+    bpy.ops.object.select_all(action='DESELECT')
+    for ob in parts: ob.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]; bpy.ops.object.join()
+    ob = bpy.context.object; ob.name = name; ob.data.name = name
+    fit_mesh_bounds(ob, (-0.96, -0.685, 0.0), (0.96, 0.685, 0.96))
+    wood_colors(ob, 0.96, 0.72)
+    ob.select_set(False)
+    return ob
 
 
 def stump(name, seed, r=0.42, h=0.55):
@@ -1433,6 +1542,7 @@ ASSETS = {
     'rock_c': lambda n: rock(n, 503, size=(0.5, 0.4, 0.3), facet=0.2),
     'fence_spike': lambda n: fence_spike(n, 601),
     'crate': lambda n: crate(n),
+    'crate2': lambda n: crate2(n),
     'maple_a': lambda n: maple(n, 901),
     'maple_b': lambda n: maple(n, 902, width=3.8, height=5.4, base=1.8, clusters=12),
     'maple_c': lambda n: maple(n, 903, width=3.0, height=4.2, base=1.4),
@@ -1463,7 +1573,9 @@ ASSETS = {
     'slab_b': lambda n: rock(n, 1022, size=(1.3, 1.0, 0.65), facet=0.24),
     'tarp_tent': lambda n: tarp_tent(n, 1002),
     'barrel': lambda n: barrel(n, 1003),
+    'barrel2': lambda n: barrel2(n, 2053),
     'cart_frame': lambda n: cart_frame(n, 1004),
+    'cart_frame2': lambda n: cart_frame2(n, 2055),
     'stump': lambda n: stump(n, 1005),
     'lavender': lambda n: lavender_bush(n, 1006),
     'stone_steps': lambda n: stone_steps(n, 1007),
