@@ -43,6 +43,11 @@ const Hurt = preload("res://scripts/game/combat/hurt.gd")
 const AudioModule = preload("res://scripts/game/audio.gd")
 const GameHud = preload("res://scripts/game/hud.gd")
 const GameTreePanel = preload("res://scripts/game/tree_panel.gd")
+const GameSettingsPanel = preload("res://scripts/game/settings_panel.gd")
+const GameMapPanel = preload("res://scripts/game/map_panel.gd")
+
+const SETTINGS_KEY := "eterna_settings_v1"
+const SETTINGS_PATH := "user://eterna_settings_v1.json"
 
 @onready var world: Node3D = $World
 var net := GameNet.new()
@@ -56,6 +61,8 @@ var S := {}               # 計算済みの能力値（rules.gd calc_stats）
 var me := {}              # 自分の状態（ブラウザ版の state.me にあたる）
 var area_id := ""
 var area := {}
+var unlocked := 1
+var settings := {}
 var my_id := 0
 var mobs := {}            # id → {node, label, x, z, tx, tz, a, ta, hp, mhp, lv, rad, kind, name, localT, stunT}
 var others := {}          # id → {node, label, x, z, tx, tz, a, ta, name}
@@ -76,6 +83,7 @@ var audio: GameAudio
 var hud_ui
 var hud_demo_applied := false
 var tree_panel
+var shot_panel_applied := false
 
 # HUD
 var ui := {}
@@ -90,6 +98,12 @@ func _ready() -> void:
 	audio = AudioModule.new()
 	audio.name = "GameAudio"
 	add_child(audio)
+	settings = _load_settings()
+	if args.has("settings-defaults"): settings = _default_settings()
+	if args.has("settings-sample"):
+		var sample := clampf(float(args["settings-sample"]) / 100.0, 0.0, 1.0)
+		for key in ["master", "music", "sfx", "amb"]: settings[key] = sample
+	GameSettingsPanel.apply_volumes(audio, settings)
 	combat = GameCombat.new(self)
 	items = GameItems.new(self)
 	add_child(net)
@@ -100,6 +114,49 @@ func _ready() -> void:
 	_setup_hud()
 	if args.has("auto") or args.has("bot"):
 		_start(args.get("name", ch.get("name", "Godot")), args.get("server", "ws://127.0.0.1:8080/ws"))
+
+
+func _default_settings() -> Dictionary:
+	return {"master": 1.0, "music": 1.0, "sfx": 1.0, "amb": 1.0, "quality": "low" if args.has("low") else "high", "fx": "blend", "shake": true, "dmgnum": true, "occlusion": true}
+
+
+func _load_settings() -> Dictionary:
+	var values := _default_settings()
+	if not FileAccess.file_exists(SETTINGS_PATH): return values
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
+	if not parsed is Dictionary: return values
+	for key in ["master", "music", "sfx", "amb"]:
+		var raw: Variant = parsed.get(key, null)
+		if typeof(raw) in [TYPE_INT, TYPE_FLOAT]: values[key] = clampf(float(raw), 0.0, 1.0)
+	for key in ["shake", "dmgnum", "occlusion"]:
+		var raw: Variant = parsed.get(key, null)
+		if typeof(raw) == TYPE_BOOL: values[key] = raw
+	var quality: Variant = parsed.get("quality", null)
+	if quality is String and quality in ["high", "mid", "low"]: values["quality"] = quality
+	var fx_style: Variant = parsed.get("fx", null)
+	if fx_style is String and fx_style in ["blend", "anime", "flashy", "subtle", "classic"]: values["fx"] = fx_style
+	return values
+
+
+func _save_settings() -> void:
+	if args.has("shot"): return
+	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if file != null: file.store_string(JSON.stringify(settings))
+
+
+func _set_setting(key: String, value: Variant) -> void:
+	if key in ["master", "music", "sfx", "amb"]:
+		settings[key] = clampf(float(value), 0.0, 1.0)
+	elif key == "quality" and value in ["high", "mid", "low"]:
+		settings[key] = value
+	elif key == "fx" and value in ["blend", "anime", "flashy", "subtle", "classic"]:
+		settings[key] = value
+	elif key in ["shake", "dmgnum", "occlusion"] and typeof(value) == TYPE_BOOL:
+		settings[key] = value
+	else:
+		return
+	GameSettingsPanel.apply_volumes(audio, settings)
+	_save_settings()
 
 
 ## 効果音は実ゲームの文脈からだけ再生する。照合用の文脈は _op を記録するため機器に触れない。
@@ -124,6 +181,10 @@ func _load_char() -> void:
 	if not ch.get("wt") is Dictionary: ch["wt"] = {}
 	if not ch.get("slots") is Array: ch["slots"] = [null, null]
 	_apply_test_args()
+	if args.has("map-demo"):
+		ch["waypoints"] = {"f1_town": true, "f1_field": true}
+		ch["areas"] = {"f1_town": {"done": true, "k": GameMapPanel.CLEAR_KILLS}, "f1_field": {"done": true, "k": GameMapPanel.CLEAR_KILLS}}
+		ch["pin"] = {"area": "f1_field", "x": -21.0, "z": 20.0}
 	if args.has("inv-demo"): items.apply_inventory_demo()
 	_calc()
 
@@ -191,7 +252,7 @@ func _recalc() -> void:
 
 
 func _save_char() -> void:
-	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo") or args.has("tree-demo"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
+	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo") or args.has("tree-demo") or args.has("shot"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
 	var f := FileAccess.open(SAVE, FileAccess.WRITE)
 	f.store_string(JSON.stringify(ch))
 
@@ -227,11 +288,14 @@ func _on_msg(m: Dictionary) -> void:
 	match String(m.t):
 		"welcome":
 			my_id = int(m.id)
+			unlocked = int(m.get("unlocked", 1))
 			_enter_area(m.area, m.x, m.z)
 			if not args.has("town"): net.send({"t": "wp", "to": args.get("start", "f1_field")})   # 試作は草原から
 		"warped":
 			_sfx("warp") # loop.js update L191: 出口を通ったとき audio.sfx('warp')
 			_enter_area(m.area, m.x, m.z)
+		"roster": unlocked = int(m.get("unlocked", unlocked))
+		"unlock": unlocked = int(m.get("unlocked", unlocked))
 		"snap": _on_snap(m)
 		"tele": _on_tele(m)
 		"die": _on_mob_die(m)
@@ -491,15 +555,18 @@ func _moveme(dx: float, dz: float) -> void:
 
 # ---------------------------------------------------------------- 毎フレーム（loop.js update）
 func _process(real_dt: float) -> void:
-	t_now += real_dt
 	var dt := real_dt
+	if args.has("panel"):
+		dt = 0.0
+	else:
+		t_now += real_dt
 	if combat.ctx.hit_stop > 0.0:   # ヒットストップ: 被弾の瞬間だけ動きをほぼ止めて、手応えを出す（loop.js loop。時刻は止めない）
 		combat.ctx.hit_stop -= real_dt
 		dt *= 0.1
 	if args.has("quit") and t_now > float(args["quit"]):
 		if args.has("bot"): print("FXTODO ", JSON.stringify(combat.ctx.todo))   # 見た目・音で呼ばれたが未実装の名前と回数（G8）
 		get_tree().quit()
-	if args.has("shot") and area_id == args.get("shotarea", "f1_field") and (mobs.size() > 0 or area["type"] in ["town", "camp"]):
+	if args.has("shot") and area_id == args.get("shotarea", "f1_field") and (args.has("panel") or mobs.size() > 0 or area["type"] in ["town", "camp"]):
 		# 撮影（確認用）: そのエリアに入って敵が見えてから <フレーム数> 後に撮って終わる。--shot=<フレーム数>:<出力.png>
 		var sp: PackedStringArray = String(args["shot"]).split(":", true, 1)
 		args["_frames"] = int(args.get("_frames", 0)) + 1
@@ -508,6 +575,8 @@ func _process(real_dt: float) -> void:
 			print("SHOT ", sp[1])
 			get_tree().quit()
 	if not started or area.is_empty(): return
+	_apply_requested_panel()
+	_tick_waypoint()
 	if args.has("fall") and not args.has("_fell") and t_now > float(args["fall"]) and not me.dead and not me.crawl:
 		# 確認用: その秒に倒れる（這いずり → 一人なら力尽きる → 始め直す、の流れを確かめる）。--fall=<秒>
 		args["_fell"] = "1"; me.hp = 0.0; Hurt.fall(combat.ctx)
@@ -602,6 +671,14 @@ func _process(real_dt: float) -> void:
 func _unhandled_input(ev: InputEvent) -> void:
 	if not started: return
 	if ev is InputEventKey and ev.pressed and not ev.echo:
+		if ev.physical_keycode == KEY_M:
+			_toggle_map()
+			get_viewport().set_input_as_handled()
+			return
+		if ev.keycode == KEY_ESCAPE:
+			_toggle_settings()
+			get_viewport().set_input_as_handled()
+			return
 		if ev.physical_keycode == KEY_K:
 			_toggle_tree()
 			get_viewport().set_input_as_handled()
@@ -631,20 +708,127 @@ func _unhandled_input(ev: InputEvent) -> void:
 func _modal_panel_open() -> bool:
 	var inventory_open: bool = items != null and items.inventory_panel != null and items.inventory_panel.panel.visible
 	var tree_open: bool = tree_panel != null and tree_panel.is_open()
-	return inventory_open or tree_open
+	var map_open: bool = hud_ui != null and hud_ui.map_panel != null and hud_ui.map_panel.is_open()
+	var settings_open: bool = hud_ui != null and hud_ui.settings_panel != null and hud_ui.settings_panel.is_open()
+	return inventory_open or tree_open or map_open or settings_open
 
 
 func _toggle_inventory() -> void:
 	if items == null:
 		return
+	_close_map_settings()
 	if tree_panel != null and tree_panel.is_open():
 		tree_panel.close()
 	items.toggle()
 
 
 func _toggle_tree() -> void:
+	_close_map_settings()
+	if items != null and items.inventory_panel != null and items.inventory_panel.panel.visible: items.toggle()
 	if tree_panel != null:
 		tree_panel.toggle()
+	_sync_modal_ui()
+
+
+func _toggle_map() -> void:
+	if hud_ui == null or hud_ui.map_panel == null: return
+	if hud_ui.map_panel.is_open():
+		hud_ui.map_panel.close_panel()
+	else:
+		_open_map("area")
+	_sync_modal_ui()
+
+
+func _open_map(tab: String) -> void:
+	if hud_ui == null or hud_ui.map_panel == null: return
+	_close_inventory_tree_map()
+	hud_ui.map_panel.show_tab(tab)
+	hud_ui.map_panel.open()
+	_sync_modal_ui()
+
+
+func _toggle_settings() -> void:
+	if hud_ui == null or hud_ui.settings_panel == null: return
+	if hud_ui.settings_panel.is_open():
+		hud_ui.settings_panel.close_panel()
+	else:
+		_open_settings()
+	_sync_modal_ui()
+
+
+func _open_settings() -> void:
+	if hud_ui == null or hud_ui.settings_panel == null: return
+	_close_inventory_tree_map()
+	hud_ui.settings_panel.open()
+	_sync_modal_ui()
+
+
+func _close_map_settings() -> void:
+	if hud_ui == null: return
+	if hud_ui.map_panel != null: hud_ui.map_panel.close_panel()
+	if hud_ui.settings_panel != null: hud_ui.settings_panel.close_panel()
+
+
+func _close_inventory_tree_map() -> void:
+	_close_map_settings()
+	if items != null and items.inventory_panel != null and items.inventory_panel.panel.visible: items.toggle()
+	if tree_panel != null and tree_panel.is_open(): tree_panel.close()
+
+
+func _map_pin(world_pos: Vector2) -> void:
+	if hud_ui == null or hud_ui.map_panel == null: return
+	var scale := float(hud_ui.map_panel.area_canvas.tf.get("sc", 0.0))
+	if scale <= 0.0: return
+	var old: Variant = ch.get("pin", null)
+	var remove := old is Dictionary and String(old.get("area", "")) == area_id and Vector2(float(old.get("x", 0.0)) - world_pos.x, float(old.get("z", 0.0)) - world_pos.y).length() < 14.0 / scale
+	if remove:
+		ch["pin"] = null
+	else:
+		ch["pin"] = {"area": area_id, "x": snappedf(world_pos.x, 0.1), "z": snappedf(world_pos.y, 0.1)}
+		var area_name := String(area.get("name", area_id))
+		hud_ui.toast("📍 ピンを立てた（%s）" % area_name, Color.html("#ffd84a"))
+	_save_char()
+	_sfx("ui")
+	hud_ui.map_panel.refresh_now()
+
+
+func _map_warp(destination: String) -> void:
+	if not GameRules.data().get("areas", {}).has(destination): return
+	var target: Dictionary = GameRules.area(destination)
+	var meta: Dictionary = GameMapPanel.MAP_META.get(destination, {})
+	var waypoint_ok := bool(meta.get("gate", false)) or bool(ch.get("waypoints", {}).get(destination, false))
+	if not waypoint_ok or int(target.get("floor", 1)) > unlocked or destination == area_id or bool(me.get("dead", false)) or bool(me.get("crawl", false)):
+		return
+	net.send({"t": "wp", "to": destination})
+	if hud_ui != null and hud_ui.map_panel != null: hud_ui.map_panel.close_panel()
+	_sync_modal_ui()
+
+
+func _apply_requested_panel() -> void:
+	if shot_panel_applied or not args.has("panel") or area_id != String(args.get("shotarea", "f1_field")): return
+	match String(args["panel"]):
+		"map-area": _open_map("area")
+		"map-floor": _open_map("floor")
+		"settings": _open_settings()
+		_: return
+	# 比較撮影ではエリア移動時の一時バナーを消し、ブラウザ capture-browser.mjs と同じ状態にする。
+	if hud_ui != null: hud_ui.banner("")
+	if hud_ui != null: hud_ui.help_panel.visible = false
+	shot_panel_applied = true
+
+
+func _tick_waypoint() -> void:
+	var waypoint: Variant = area.get("waypoint", null)
+	if not waypoint is Dictionary or bool(ch.get("waypoints", {}).get(area_id, false)): return
+	var distance := Vector2(float(waypoint.x) - float(me.x), float(waypoint.z) - float(me.z)).length()
+	if distance > 3.0: return
+	if not ch.get("waypoints") is Dictionary: ch["waypoints"] = {}
+	ch["waypoints"][area_id] = true
+	_save_char()
+	_sfx("levelup")
+	if hud_ui != null:
+		hud_ui.toast("◇ ワープポイントを解放した（%s）" % String(area.get("name", area_id)), Color.html("#9ae8ff"))
+		if hud_ui.map_panel != null: hud_ui.map_panel.refresh_now()
 
 
 func _sync_modal_ui() -> void:
@@ -1012,11 +1196,11 @@ func _sync_nodes(dt: float) -> void:
 	# カメラ（第 3 世代: 俯角 45°・画角 18°・距離 33m。ホイールで距離）
 	var tgt := Vector3(me.x, gy, me.z)
 	cam.position = tgt + Vector3(0, sin(deg_to_rad(45.0)), cos(deg_to_rad(45.0))) * dist
-	if combat.ctx.shake_v > 0.0: cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * combat.ctx.shake_v * 0.35   # 画面の揺れ（被弾・ガードブレイクなど）
+	if combat.ctx.shake_v > 0.0 and bool(settings.get("shake", true)): cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * combat.ctx.shake_v * 0.35   # 画面の揺れ（被弾・ガードブレイクなど）
 	cam.look_at(tgt, Vector3.UP)
 	RenderingServer.global_shader_parameter_set("wa_occ_cam", cam.position)   # 手前の物を点描で抜く（shaders/common.gdshaderinc）
 	RenderingServer.global_shader_parameter_set("wa_occ_tgt", tgt + Vector3(0, 0.9, 0))
-	RenderingServer.global_shader_parameter_set("wa_occ_r", 2.2)
+	RenderingServer.global_shader_parameter_set("wa_occ_r", 2.2 if bool(settings.get("occlusion", true)) else 0.0)
 	PlayerView.update_all(self, dt)   # 人物（自分と他の人）の部品ごとの動き（player_view.gd）
 
 
@@ -1032,6 +1216,9 @@ func _slash_fx(a: float, rng: float, arc: float) -> void:
 
 
 func _float(pos: Vector3, text: String, col: Color) -> void:
+	if not bool(settings.get("dmgnum", true)):
+		var is_hidden_class := col == Color.WHITE or col == Color(0.6, 1.0, 0.45) or (col == Color(1.0, 0.85, 0.3) and not text.ends_with(" G"))
+		if is_hidden_class: return
 	var l := GameVisuals.label(text, col)
 	l.font_size = 64
 	l.position = pos + Vector3(0, world.ground_y(pos.x, pos.z), 0)

@@ -3,6 +3,8 @@ extends RefCounted
 
 const MiniMap = preload("res://scripts/game/minimap.gd")
 const GameWTree = preload("res://scripts/game/skills/wtree.gd")
+const GameMapPanel = preload("res://scripts/game/map_panel.gd")
+const GameSettingsPanel = preload("res://scripts/game/settings_panel.gd")
 
 
 class TopButton extends Control:
@@ -220,6 +222,8 @@ var floor_label: Label
 var quests_box: VBoxContainer
 var topbar: HBoxContainer
 var top_buttons := {}
+var map_panel
+var settings_panel
 var quests_signature: String = ""
 var quests_list: Array = []   # [{name, desc, p, n, done}]。TODO: クエストの移植（G7 の NPC とクエスト）で game 側のデータをここへ渡す
 
@@ -244,6 +248,7 @@ func build(parent: Control, owner) -> void:
 	_build_death()
 	_build_nav()
 	_build_topbar()
+	_build_panels()
 
 
 func _build_vitals() -> void:
@@ -723,6 +728,20 @@ func _build_topbar() -> void:
 		top_buttons[String(spec[0])] = btn
 
 
+func _build_panels() -> void:
+	map_panel = GameMapPanel.new()
+	map_panel.name = "MapPanelHost"
+	content.add_child(map_panel)
+	map_panel.build(game)
+	map_panel.warp_requested.connect(game._map_warp)
+	map_panel.pin_requested.connect(game._map_pin)
+	settings_panel = GameSettingsPanel.new()
+	settings_panel.name = "SettingsPanelHost"
+	content.add_child(settings_panel)
+	settings_panel.build(game)
+	settings_panel.setting_changed.connect(game._set_setting)
+
+
 ## 上のボタン。持ち物は inventory_panel.gd を開閉し、ほかの画面は準備中と知らせる。
 func _on_top_button(which: String) -> void:
 	print("HUD top button ", which)
@@ -732,8 +751,11 @@ func _on_top_button(which: String) -> void:
 	if which == "tree":
 		game._toggle_tree()
 		return
-	var names := {"tree": "スキルツリー", "map": "エリアマップ", "set": "設定"}
-	toast("%s の画面はまだありません（準備中）" % String(names.get(which, which)), Color.html("#8fa0b8"))
+	if which == "map":
+		game._toggle_map()
+		return
+	if which == "set":
+		game._toggle_settings()
 
 
 func update() -> void:
@@ -742,6 +764,7 @@ func update() -> void:
 	content.visible = bool(game.started)
 	if not game.started or game.area.is_empty():
 		return
+	if map_panel != null: map_panel.tick()
 	var me: Dictionary = game.me
 	var stats: Dictionary = game.S
 	var character: Dictionary = game.ch
@@ -888,7 +911,8 @@ func _update_charge(me: Dictionary, stats: Dictionary) -> void:
 func _update_prompt() -> void:
 	var message := ""
 	var me: Dictionary = game.me
-	if bool(me.get("dead", false)):
+	var map_open: bool = game.hud_ui != null and game.hud_ui.map_panel != null and game.hud_ui.map_panel.is_open()
+	if bool(me.get("dead", false)) or map_open:
 		prompt_panel.visible = false
 		return
 	if game.area.get("shape", "") == "grid" and game.area.get("gimmick", "") == "lever" and not game.door_open:
@@ -1109,6 +1133,37 @@ func _label(text: String, font_size: int, color: Color) -> Label:
 	style.shadow_offset = Vector2(0.0, 2.0)
 	label.label_settings = style
 	return label
+
+
+func add_panel_backdrop(host: Control) -> ColorRect:
+	# public/style.css .panel の rgba 背景と backdrop-filter: blur(6px) を再現する。
+	var backdrop := ColorRect.new()
+	backdrop.name = "PanelBackdrop"
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shader := Shader.new()
+	shader.code = """
+shader_type canvas_item;
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+uniform vec2 panel_size = vec2(760.0, 586.0);
+uniform vec4 panel_tint : source_color = vec4(0.0470588, 0.0705882, 0.1254902, 0.72);
+uniform float blur_lod : hint_range(0.0, 4.0, 0.1) = 2.6;
+void fragment() {
+	vec2 half_size = panel_size * 0.5;
+	vec2 q = abs(UV * panel_size - half_size) - (half_size - vec2(9.0));
+	float corner = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - 9.0;
+	if (corner > 0.0) discard;
+	vec3 scene = textureLod(screen_texture, SCREEN_UV, blur_lod).rgb;
+	COLOR = vec4(mix(scene, panel_tint.rgb, panel_tint.a), 1.0);
+}
+"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	if game != null and game.args.has("blur-lod"):
+		material.set_shader_parameter("blur_lod", clampf(float(game.args["blur-lod"]), 0.0, 4.0))
+	backdrop.material = material
+	backdrop.visible = false
+	host.add_child(backdrop)
+	return backdrop
 
 
 func _panel_style(border: Color, border_width: int, radius: int, left: float, top: float, right: float, bottom: float, shadow: Color = Color.TRANSPARENT, shadow_size: int = 0) -> StyleBoxFlat:
