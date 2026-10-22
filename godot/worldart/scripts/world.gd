@@ -126,14 +126,30 @@ func _build_legacy(id: String, ar: Dictionary) -> bool:
 		push_error("legacy GLB の scene を作れません: %s" % id)
 		return false
 	scene.name = "LegacyArea"
-	# export_areas.mjs の LegacySky はブラウザの背景用で、three.js の既定どおり影を落とさない。
-	# GLB では castShadow が保持されないため、Godot の既定値を戻す。
-	for n in scene.find_children("LegacySky", "MeshInstance3D", true, false):
-		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# three.js の Sprite（エリア名の札。export_areas.mjs が AreaLabel<連番> の板にする）は影を落とさない。
-	# 板のまま落とすと、地上 5m の薄い板が長い線の影になる（f2_field・f3_field の台座の横）。
-	for n in scene.find_children("AreaLabel*", "MeshInstance3D", true, false):
-		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Godot 4.3 は glTF extras を Node の meta に取り込まないため、末尾の __cs0 / __cs1 を読む。
+	# 先に名前を元へ戻し、LegacyGround・LegacyDoor など既存の検索名を保つ。
+	var shadow_count := 0
+	var tagged_meshes := 0
+	var tag_re := RegEx.new()
+	tag_re.compile("__cs([01])[0-9]*$")  # Godot は同名ノードの末尾に連番を足すため、連番つきも読む
+	for n in scene.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := n as MeshInstance3D
+		var m := tag_re.search(String(mesh_node.name))
+		if m == null:
+			continue
+		var on := m.get_string(1) == "1"
+		mesh_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if on else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mesh_node.name = String(mesh_node.name).substr(0, m.get_start())
+		if on:
+			shadow_count += 1
+		tagged_meshes += 1
+	var total_meshes := scene.find_children("*", "MeshInstance3D", true, false).size()
+	if tagged_meshes != total_meshes:
+		push_error("legacy GLB の影タグ数が合いません: %s (%d/%d)" % [id, tagged_meshes, total_meshes])
+	var browser_shadow_count := int(entry.get("cast_shadow_meshes", -1))
+	print("LEGACY_SHADOWS %s: Godot=%d Browser=%d" % [id, shadow_count, browser_shadow_count])
+	if browser_shadow_count >= 0 and shadow_count != browser_shadow_count:
+		push_error("legacy GLB の影を落とす Mesh 数が合いません: %s (%d/%d)" % [id, shadow_count, browser_shadow_count])
 	add_child(scene)
 	ToonLook.convert(scene, Color("448a9b"), true)
 	door_nodes.clear()

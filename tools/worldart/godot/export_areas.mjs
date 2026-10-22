@@ -260,7 +260,11 @@ try {
         });
         o.material = Array.isArray(o.material) ? converted : converted[0];
       });
-      root.traverse((o) => { o.userData = {}; });
+      root.traverse((o) => {
+        // Godot 4.3 でも確実に残るよう、各 Mesh の影設定を名前の末尾へ記録する。
+        if (o.isMesh) o.name = `${o.name}__cs${o.castShadow === true ? '1' : '0'}`;
+        o.userData = {};
+      });
       return root;
     };
 
@@ -305,15 +309,22 @@ try {
         const g = o.geometry, v = g.getAttribute('position'); if (!v) return;
         const count = g.index ? g.index.count : v.count;
         triangles += Math.floor(count / 3); vertices += v.count; surfaces++;
-        if (o.name === 'LegacyGround') groundVertices += v.count;
+        if (o.name.replace(/__cs[01]$/, '') === 'LegacyGround') groundVertices += v.count;
       });
+      let castShadowMeshes = 0;
+      const countVisibleShadowMeshes = (o, parentVisible) => {
+        const visible = parentVisible && o.visible;
+        if (visible && o.isMesh && o.geometry?.getAttribute('position') && o.castShadow === true) castShadowMeshes++;
+        for (const child of o.children) countVisibleShadowMeshes(child, visible);
+      };
+      for (const child of exportGroup.children) countVisibleShadowMeshes(child, exportGroup.visible);
       const light = {
         sun_dir: [20, 40, 10], sun_color: `#${floor.sun.toString(16).padStart(6, '0')}`, sun_i: env.light.sun,
         sky: `#${floor.hemi[0].toString(16).padStart(6, '0')}`, ground: `#${floor.hemi[1].toString(16).padStart(6, '0')}`, hemi_i: env.light.hemi,
         fog: `#${Number(env.light.fog).toString(16).padStart(6, '0')}`, fog_near: env.light.fogNear, fog_far: env.light.fogFar,
         sky_top: `#${floor.skyTop.toString(16).padStart(6, '0')}`, sky_bot: `#${floor.skyBot.toString(16).padStart(6, '0')}`,
       };
-      records[id] = { file: `${id}.glb`, bytes: bytes.byteLength, triangles, vertices, surfaces, ground_vertices: groundVertices, shape: def.shape, floor: def.floor, light };
+      records[id] = { file: `${id}.glb`, bytes: bytes.byteLength, triangles, vertices, surfaces, cast_shadow_meshes: castShadowMeshes, ground_vertices: groundVertices, shape: def.shape, floor: def.floor, light };
       const tmp = exportGroup;
       tmp.traverse((o) => { if (o.geometry) o.geometry.dispose?.(); if (o.material) for (const m of (Array.isArray(o.material) ? o.material : [o.material])) m?.dispose?.(); });
       env.group.clear();
@@ -323,7 +334,7 @@ try {
   const index = { source: 'public/js/env.js buildArea → env/open.js buildOpen / env/grid.js buildGrid', quality: result.quality, frozen: result.frozen, areas: result.records };
   fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 2) + '\n');
   console.log(`書き出し: ${Object.keys(result.records).length} エリア / grass quality=${result.quality}`);
-  for (const [id, r] of Object.entries(result.records)) console.log(`${id}: ${(r.bytes / 1024 / 1024).toFixed(2)} MiB, ${r.triangles} triangles, ${r.ground_vertices} ground vertices`);
+  for (const [id, r] of Object.entries(result.records)) console.log(`${id}: ${(r.bytes / 1024 / 1024).toFixed(2)} MiB, ${r.triangles} triangles, ${r.ground_vertices} ground vertices, castShadow=${r.cast_shadow_meshes}`);
   console.log(`停止して書き出した動き: ${result.frozen.join('、')}`);
   if (SHOTS) console.log(`ブラウザ撮影 (${result.shotAreas.length}): ${SHOTS}`);
   console.log(errors.length ? errors.join(' | ') : 'no browser errors');
