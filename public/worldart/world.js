@@ -31,7 +31,8 @@ const P = Object.assign({ sat: 1.0, contrast: 1.0, lift: [0, 0, 0], gain: [1, 1,
 
 // ---------------------------------------------------------------- レンダラー
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+// 内部の解像度（L27 仮説 C）: rscale=0.67 などで小さく描き、ブラウザが引き伸ばす（現代のゲームの解像度の倍率 + 時間方向の AA のやわらかさの代わり）
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5) * num('rscale', 1));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = flag('shadow');
 renderer.shadowMap.type = { pcfsoft: THREE.PCFSoftShadowMap, pcf: THREE.PCFShadowMap, vsm: THREE.VSMShadowMap }[q.get('smap') || spec.shadowMap || 'pcfsoft'];
@@ -131,7 +132,7 @@ function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
-      tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
+      tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
       uAltTint: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) },
       uLushTint: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmt: { value: num('lush', GROUND.lushAmt ?? 0) }, uLushBias: { value: num('lushBias', GROUND.lushBias ?? 0) },
       uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
@@ -145,7 +146,7 @@ function groundMaterial() {
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale, uRockPix; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale, uRockPix, uRockSoft; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -164,6 +165,9 @@ function groundMaterial() {
         vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
         vec3 alt = texture2D(tAlt, wp / uAltScale).rgb * uAltTint;
         vec3 rock = texture2D(tRock, vW.zy / uRockScale).rgb * an.x + texture2D(tRock, vW.xy / uRockScale).rgb * an.z + texture2D(tRock, vW.xz / uRockScale).rgb * an.y;
+        // 岩の細部のコントラストを弱める（L27 仮説 D「直線を残さない」）: 粗いミップ（bias 4）の大きな明暗へ uRockSoft だけ寄せ、割れ目の線を浅くする
+        vec3 rockLo = texture2D(tRock, vW.zy / uRockScale, 4.0).rgb * an.x + texture2D(tRock, vW.xy / uRockScale, 4.0).rgb * an.z + texture2D(tRock, vW.xz / uRockScale, 4.0).rgb * an.y;
+        rock = mix(rock, rockLo, uRockSoft);
         float n = dot(g1, vec3(0.33)) - 0.33;
         float wd = smoothstep(0.4, 0.6, vSplat.r + n * 0.9);
         float wa = smoothstep(0.4, 0.6, vSplat.g + n * 0.9);
