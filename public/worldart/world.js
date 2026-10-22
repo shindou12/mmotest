@@ -309,6 +309,56 @@ function addGroundBlend(sh) {
         diffuseColor.rgb = mix(diffuseColor.rgb, gcol, kb);
       }`);
 }
+// 頂点 AO を環境光にも掛ける（L27）: アセットの頂点色の AO は地色に掛かるので、日なたと日陰を同じ割合で暗くし、明暗比を変えない。
+// 定番の AO（three の aoMap と同じ）は間接光だけを遮る。間接光に頂点色の明るさの uAoAmb 乗を掛け、葉の塊の奥・幹の日陰を深くする。
+// aoamb=<乗数>（URL）か spec.foliage.aoAmb。対象は aoset=leaf（葉。草の房は除く、既定）か all（頂点色のあるアセット全部）
+const AO_AMB = { value: num('aoamb', spec.foliage?.aoAmb ?? 0) };
+const AO_ALL = (q.get('aoset') || spec.foliage?.aoSet || 'leaf') === 'all';
+// 葉の絵の縁の色を外へ広げる（L27 仮説 A、alpha bleeding）: 透明な所の色が黒なので、ミップマップと補間で黒が縁に混ざり、
+// 葉の縁が暗い線・点々になる。不透明な画素（a >= 200）の色を透明側へ広げる（alpha は変えない）。ldil=1（URL）か spec.foliage.dilate
+const LDIL = num('ldil', spec.foliage?.dilate ? 1 : 0) > 0;
+const dilCache = new Map();
+function dilateMap(tex) {
+  if (!tex?.image || dilCache.has(tex)) return dilCache.get(tex) || tex;
+  const img = tex.image, w = img.width, h = img.height;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(img, 0, 0);
+  const id = cx.getImageData(0, 0, w, h), d = id.data, n = w * h;
+  const A = new Uint8Array(n); for (let i = 0; i < n; i++) A[i] = d[i * 4 + 3];
+  const filled = new Uint8Array(n); for (let i = 0; i < n; i++) filled[i] = A[i] >= 200 ? 1 : 0;
+  // 1 画素ずつ外へ: まだ埋まっていない画素に、埋まった 8 近傍の平均の色を入れる（32 回、絵の端は折り返し）
+  for (let pass = 0; pass < 32; pass++) {
+    const next = filled.slice(); let any = false;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x; if (filled[i]) continue;
+      let r = 0, g = 0, b = 0, c = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const j = ((y + dy + h) % h) * w + ((x + dx + w) % w);
+        if (filled[j]) { r += d[j * 4]; g += d[j * 4 + 1]; b += d[j * 4 + 2]; c++; }
+      }
+      if (c) { d[i * 4] = r / c; d[i * 4 + 1] = g / c; d[i * 4 + 2] = b / c; next[i] = 1; any = true; }
+    }
+    filled.set(next); if (!any) break;
+  }
+  for (let i = 0; i < n; i++) d[i * 4 + 3] = A[i];
+  cx.putImageData(id, 0, 0);
+  const t = tex.clone(); t.image = cv; t.needsUpdate = true;
+  dilCache.set(tex, t); return t;
+}
+// 葉の絵の差し替え（L27 仮説 A2）: ltex=<フォルダ>（public/worldart の下）の index.json に書いた名前の絵を、GLB の中の同じ名前の絵の代わりに使う。
+// アセットを組み直さずに、描き方を変えた葉の絵を入／切で比べるため
+const LTEX = new Map();
+if (q.get('ltex')) {
+  const dir = `${BASE}${q.get('ltex')}`;
+  const names = await (await fetch(`${dir}/index.json`)).json();
+  await Promise.all(names.map(async (nm) => LTEX.set(nm, await texLoader.loadAsync(`${dir}/${nm}.png`))));
+}
+function swapMap(tex) {
+  const t = tex && LTEX.get(tex.name);
+  if (!t) return tex;
+  const c = t.clone(); c.flipY = tex.flipY; c.colorSpace = tex.colorSpace; c.wrapS = tex.wrapS; c.wrapT = tex.wrapT;
+  c.anisotropy = tex.anisotropy; c.name = tex.name; c.needsUpdate = true; return c;
+}
 const MSAA = num('msaa', spec.post?.msaa ?? 0);   // 0 = なし（前の撮影と同じ）、4 = 第 3 世代の規則
 function fixMaterial(mesh, assetName = '') {
   const src = mesh.material;
@@ -319,15 +369,23 @@ function fixMaterial(mesh, assetName = '') {
     alphaToCoverage: isLeaf && MSAA > 0,   // 切り抜きの縁を MSAA の標本で半透明に（見本の葉の縁はなめらか）
   });
   m.name = src.name;
+  if (isLeaf && LTEX.size && m.map) m.map = swapMap(m.map);
+  if (isLeaf && LDIL && m.map) m.map = dilateMap(m.map);
   if (isLeaf && FNORM_CARD) mesh.geometry.computeVertexNormals();   // 比較用: 板の向きの法線
   const isGrassMat = /grass/.test(src.name);
   const isRock2 = src.name === 'rock_crack';
   if (isRock2) { m.map = null; m.vertexColors = true; }
   const gbOn = GBLEND && GB_ASSETS.test(assetName);
   // three はシェーダーを onBeforeCompile の文字列で使い回すので、分岐ごとにキーを分ける（分けないとアイデア01が別の材質のシェーダーに埋もれる）
-  m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}`;
+  const aoOn = m.vertexColors && !isGrassMat && (isLeaf || AO_ALL);
+  m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}:${aoOn}`;
   m.onBeforeCompile = (sh) => {
     addDesat(sh, isLeaf && !isGrassMat ? LEAF_SAT : ALBEDO_SAT);
+    if (aoOn) {
+      sh.uniforms.uAoAmb = AO_AMB;
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uAoAmb;')
+        .replace('#include <aomap_fragment>', '#include <aomap_fragment>\nreflectedLight.indirectDiffuse *= pow(clamp(dot(vColor.rgb, vec3(0.3333)), 0.0, 1.0), uAoAmb);');
+    }
     if (isLeaf && !isGrassMat) {   // 葉の色味（草の房には掛けない）
       sh.uniforms.uLeafTint = LEAF_TINT;
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uLeafTint;')
