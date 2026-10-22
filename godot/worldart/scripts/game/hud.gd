@@ -1,6 +1,34 @@
 extends RefCounted
 ## Browser HUD の表示と状態反映。寸法・色は public/style.css と public/js/ui/panels/hud.js を参照。
 
+const MiniMap = preload("res://scripts/game/minimap.gd")
+
+
+class TopButton extends Control:
+	## #topbar .slot: public/style.css L479-482。直径 42px の丸、背景 rgba(10,14,24,.45)、枠 1px rgba(255,255,255,.3)、ホバーで #6ad0ff。
+	signal pressed
+	var hover := false
+	var badge: Label
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(42.0, 42.0)
+		size = custom_minimum_size
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		mouse_entered.connect(func(): hover = true; queue_redraw())
+		mouse_exited.connect(func(): hover = false; queue_redraw())
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			pressed.emit()
+			accept_event()
+
+	func _draw() -> void:
+		var c := size * 0.5
+		draw_circle(c, 21.0, Color(10.0 / 255.0, 14.0 / 255.0, 24.0 / 255.0, 0.45))
+		draw_arc(c, 20.5, 0.0, TAU, 48, Color.html("#6ad0ff") if hover else Color(1.0, 1.0, 1.0, 0.3), 1.0, true)
+
+
 class HudBar extends Control:
 	var ratio: float = 0.0
 	var low: bool = false
@@ -185,6 +213,14 @@ var prompt_panel: PanelContainer
 var charge_box: Control
 var charge_fill: HudBar
 var stamina_ring: Control
+var minimap
+var minimap_t: float = 0.0
+var floor_label: Label
+var quests_box: VBoxContainer
+var topbar: HBoxContainer
+var top_buttons := {}
+var quests_signature: String = ""
+var quests_list: Array = []   # [{name, desc, p, n, done}]。TODO: クエストの移植（G7 の NPC とクエスト）で game 側のデータをここへ渡す
 
 
 func build(parent: Control, owner) -> void:
@@ -205,6 +241,8 @@ func build(parent: Control, owner) -> void:
 	_build_messages()
 	_build_help()
 	_build_death()
+	_build_nav()
+	_build_topbar()
 
 
 func _build_vitals() -> void:
@@ -544,6 +582,156 @@ func _build_death() -> void:
 	death_overlay.visible = false
 
 
+func _bold_label(text: String, font_size: int, color: Color) -> Label:
+	var label := _label(text, font_size, color)
+	var font := FontVariation.new()
+	font.base_font = ThemeDB.fallback_font
+	font.variation_embolden = 0.7
+	label.label_settings.font = font
+	return label
+
+
+func _build_nav() -> void:
+	# #nav: public/style.css L465-469。左 16・上 16、幅 172、縦並び・中央、隙間 4px。
+	# ミニマップ 164px（#nav #minimap）、現在地 12px #f2ead2（#nav #me-floor）、クエスト欄は幅 220px・左寄せ（#nav #quests）。
+	minimap = MiniMap.new()
+	minimap.name = "Minimap"
+	minimap.position = Vector2(16.0 + 4.0, 16.0)
+	content.add_child(minimap)
+	floor_label = _label("", 12, Color.html("#f2ead2"))
+	floor_label.name = "MeFloor"
+	floor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	floor_label.position = Vector2(16.0, 16.0 + 164.0 + 4.0)
+	floor_label.size = Vector2(172.0, 18.0)
+	floor_label.label_settings.shadow_size = 3
+	floor_label.label_settings.shadow_offset = Vector2(0.0, 1.0)
+	content.add_child(floor_label)
+	# #quests（style.css L273-277・L468-469）: 幅 220px、文字 12px、行の隙間 6px。受注中が無いときは非表示（hud.js P.quests の visible）
+	quests_box = VBoxContainer.new()
+	quests_box.name = "Quests"
+	quests_box.position = Vector2(16.0, 16.0 + 164.0 + 4.0 + 18.0 + 4.0 + 4.0)
+	quests_box.custom_minimum_size = Vector2(220.0, 0.0)
+	quests_box.add_theme_constant_override("separation", 6)
+	quests_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	quests_box.visible = false
+	content.add_child(quests_box)
+
+
+func set_quests(list: Array) -> void:
+	## list: [{name, desc, p, n, done}]（受注中で報告前のもの）。screen.renderQuests にあたる。
+	quests_list = list
+	_render_quests()
+
+
+func _render_quests() -> void:
+	var parts: PackedStringArray = []
+	for q in quests_list:
+		parts.append("%s|%s|%s|%s|%s" % [q.get("name", ""), q.get("desc", ""), q.get("p", 0), q.get("n", 0), q.get("done", false)])
+	var signature := "\n".join(parts)
+	if signature == quests_signature:
+		return
+	quests_signature = signature
+	for child in quests_box.get_children():
+		quests_box.remove_child(child)
+		child.queue_free()
+	quests_box.visible = quests_list.size() > 0
+	if quests_list.is_empty():
+		return
+	quests_box.add_child(_label("クエスト", 12, Color.html("#8fa0b8")))   # .dim: style.css L12
+	for q in quests_list:
+		var done := bool(q.get("done", false))
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 0)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var top := HBoxContainer.new()
+		top.add_theme_constant_override("separation", 6)
+		top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var mark := _label("◆", 9, Color.html("#ffd27a"))   # #nav #quests .qi b::before
+		top.add_child(mark)
+		var title := _bold_label(String(q.get("name", "")), 12, Color.html("#ffd84a") if done else Color.html("#e8eef8"))
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.clip_text = true
+		top.add_child(title)
+		var prog := _label("達成！報告しよう" if done else "%d / %d" % [int(q.get("p", 0)), int(q.get("n", 0))], 12, Color.html("#ffd84a") if done else Color.html("#6ad0ff"))
+		top.add_child(prog)
+		row.add_child(top)
+		var desc := _label(String(q.get("desc", "")), 10, Color.html("#8fa0b8"))
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.custom_minimum_size.x = 220.0
+		row.add_child(desc)
+		quests_box.add_child(row)
+
+
+func _build_topbar() -> void:
+	# #topbar: public/style.css L478-482、index.html L57-62。右 16・上 16、丸 42px、隙間 10px、記号 19px、キー表示 9px（下 -15px）。
+	topbar = HBoxContainer.new()
+	topbar.name = "Topbar"
+	topbar.add_theme_constant_override("separation", 10)
+	topbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(topbar)
+	for spec in [["inv", "🎒", "I", "装備（I）"], ["tree", "✧", "K", "スキルツリー（K）"], ["map", "🗺", "M", "エリアマップ（M）"], ["set", "⚙", "Esc", "設定（Esc）"]]:
+		var btn := TopButton.new()
+		btn.name = "Top_" + String(spec[0])
+		btn.tooltip_text = String(spec[3])
+		var glyph := _label(String(spec[1]), 19, Color.html("#e8eef8"))
+		glyph.label_settings.shadow_color = Color.TRANSPARENT
+		glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		glyph.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		glyph.position = Vector2.ZERO
+		glyph.size = Vector2(42.0, 42.0)
+		btn.add_child(glyph)
+		var kbd := PanelContainer.new()
+		kbd.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var kstyle := StyleBoxFlat.new()
+		kstyle.bg_color = Color(0.0, 0.0, 0.0, 0.5)
+		kstyle.set_corner_radius_all(4)
+		kstyle.content_margin_left = 4.0
+		kstyle.content_margin_right = 4.0
+		kstyle.content_margin_top = 0.0
+		kstyle.content_margin_bottom = 0.0
+		kbd.add_theme_stylebox_override("panel", kstyle)
+		var klabel := _label(String(spec[2]), 9, Color.html("#8fa0b8"))
+		klabel.label_settings.shadow_color = Color.TRANSPARENT
+		kbd.add_child(klabel)
+		btn.add_child(kbd)
+		kbd.reset_size()
+		kbd.position = Vector2((42.0 - kbd.size.x) * 0.5, 42.0 + 15.0 - kbd.size.y)
+		# #sp-badge（style.css L483）: 右上 -4px、最小幅 16px・高さ 16px・#ff5a4a。スキルポイントが残るときだけ。TODO: ツリーの移植（G7-4）で表示を結ぶ
+		if String(spec[0]) == "tree":
+			var badge := PanelContainer.new()
+			badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var bstyle := StyleBoxFlat.new()
+			bstyle.bg_color = Color.html("#ff5a4a")
+			bstyle.set_corner_radius_all(8)
+			bstyle.content_margin_left = 4.0
+			bstyle.content_margin_right = 4.0
+			bstyle.content_margin_top = 0.0
+			bstyle.content_margin_bottom = 0.0
+			badge.add_theme_stylebox_override("panel", bstyle)
+			badge.custom_minimum_size = Vector2(16.0, 16.0)
+			var blabel := _label("", 10, Color.WHITE)
+			blabel.label_settings.shadow_color = Color.TRANSPARENT
+			blabel.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			badge.add_child(blabel)
+			badge.position = Vector2(42.0 + 4.0 - 16.0, -4.0)
+			badge.visible = false
+			btn.add_child(badge)
+			btn.badge = blabel
+		btn.pressed.connect(_on_top_button.bind(String(spec[0])))
+		topbar.add_child(btn)
+		top_buttons[String(spec[0])] = btn
+
+
+## 上のボタン。持ち物（仮の画面）だけ開く。ほかの画面は G7-4 以降で作るまで知らせるだけ。
+func _on_top_button(which: String) -> void:
+	print("HUD top button ", which)
+	if which == "inv" and game.items != null:
+		game.items.toggle()
+		return
+	var names := {"tree": "スキルツリー", "map": "エリアマップ", "set": "設定"}
+	toast("%s の画面はまだありません（準備中）" % String(names.get(which, which)), Color.html("#8fa0b8"))
+
+
 func update() -> void:
 	if game == null or game.me.is_empty() or game.S.is_empty():
 		return
@@ -573,6 +761,22 @@ func update() -> void:
 	_update_stamina(me, stats, screen)
 	_update_death(me)
 	_layout_vitals(screen)
+	_update_nav(screen)
+
+
+func _update_nav(screen: Vector2) -> void:
+	# hud.js L55: 名前が「第」で始まらなければ「第N層 名前」
+	var area_name := String(game.area.get("name", ""))
+	floor_label.text = area_name if area_name.begins_with("第") else "第%d層 %s" % [int(game.area.get("floor", 1)), area_name]
+	minimap.tick_explore(game)
+	var now_s := Time.get_ticks_msec() / 1000.0
+	if now_s - minimap_t >= 1.0 / 15.0:
+		minimap_t = now_s
+		minimap.build_shapes(game)
+	_render_quests()
+	var tb_size := topbar.get_combined_minimum_size()
+	topbar.size = tb_size
+	topbar.position = Vector2(screen.x - 16.0 - tb_size.x, 16.0)
 
 
 func _update_hotbar(me: Dictionary, stats: Dictionary, character: Dictionary) -> void:
@@ -610,7 +814,7 @@ func _update_hotbar(me: Dictionary, stats: Dictionary, character: Dictionary) ->
 		var is_usable := skill_id != "" and active.has(skill_id)
 		var skill: Dictionary = GameRules.data()["skills"]["tree"].get(skill_id, {})
 		entry.name.text = String(skill.get("name", "未設定")) if skill_id != "" else "未設定"
-		entry.icon.texture = _icon(skill_id if icon_index.has(skill_id) else "tag_light")
+		entry.icon.texture = _icon(_skill_icon(skill_id))
 		var cooldown := float(me.get("tcd", {}).get(skill_id, 0.0)) if is_usable else 1.0
 		var cooldown_max: float = float(game.combat.skill_cd(skill_id)) if is_usable else 1.0
 		_set_slot(entry, cooldown, cooldown_max, is_usable, false)
@@ -793,6 +997,43 @@ func _buff_icon(id: String, mods) -> String:
 	if mods.has("move"): return "tag_move"
 	if mods.has("crit") or mods.has("atkp"): return "tag_crit"
 	return "tag_light"
+
+
+## スロットの技 id → アイコンの鍵。アイコンは武器ツリーのノード id（ax_stomp など）で作ってあるので、旧ツリーの id（warstomp など）は
+## ① 同じ名前の技 ② 接頭辞の読み替え（axe_→ax_ …）③ 対応する印、の順で探す。見つからないときだけ tag_light。
+const SKILL_PREFIX := {"axe_": "ax_", "bow_": "bw_", "dagger_": "dk_", "spear_": "sp_", "gs_": "gt_", "sword_": "sw_"}
+const SKILL_FALLBACK := {  # 絵の無い旧ツリーの技: 効果に近い印
+	"focus": "tag_charge", "slant": "tag_thrust", "brave": "tag_recv", "fortress": "tag_shield", "javelin": "tag_throw", "whirl": "tag_zone",
+	"afterimage": "tag_dodge", "warcry": "tag_cd", "berserk": "tag_blood", "spear_press": "sp_bash", "dagger_quicken": "tag_move",
+}
+var skill_icon_cache := {}
+
+
+func _skill_icon(id: String) -> String:
+	if id == "":
+		return "tag_light"
+	if skill_icon_cache.has(id):
+		return skill_icon_cache[id]
+	var found := ""
+	if icon_index.has(id):
+		found = id
+	else:
+		var tree: Dictionary = GameRules.data()["skills"]["tree"]
+		var nm := String(tree.get(id, {}).get("name", ""))
+		for key in tree.keys():
+			if key != id and icon_index.has(key) and String(tree[key].get("name", "")) == nm and nm != "":
+				found = key
+				break
+		if found == "":
+			for prefix in SKILL_PREFIX.keys():
+				if id.begins_with(prefix) and icon_index.has(SKILL_PREFIX[prefix] + id.substr(prefix.length())):
+					found = SKILL_PREFIX[prefix] + id.substr(prefix.length())
+					break
+		if found == "":
+			var fb := String(SKILL_FALLBACK.get(id, "tag_light"))
+			found = fb if icon_index.has(fb) else "tag_light"
+	skill_icon_cache[id] = found
+	return found
 
 
 func _weapon_icon(kind: String, skill_id: String) -> String:

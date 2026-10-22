@@ -825,6 +825,8 @@ func _apply_hud_demo() -> void:
 		me["dead"] = true
 		me["deathAt"] = t_now + 12.3
 	hud_ui.help_panel.visible = false
+	# 撮影用のクエスト欄（ブラウザ版の QUESTS の q_slime・q_boarと同じ文）。クエスト自体の移植は G7 の NPC とクエストで
+	hud_ui.set_quests([{"name": "スライム退治", "desc": "ひだまりの草原でグリーンスライムを8体倒す", "p": 3, "n": 8, "done": false}, {"name": "猪狩り", "desc": "イノシシの丘でフレンジーボアを15体倒す", "p": 15, "n": 15, "done": true}])
 	for toast in hud_ui.toast_stack.get_children():
 		hud_ui.toast_stack.remove_child(toast)
 		toast.queue_free()
