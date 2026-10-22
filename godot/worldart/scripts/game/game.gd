@@ -70,6 +70,7 @@ var S := {}               # 計算済みの能力値（rules.gd calc_stats）
 var me := {}              # 自分の状態（ブラウザ版の state.me にあたる）
 var area_id := ""
 var area := {}
+var boss_fighting := false
 var unlocked := 1
 var settings := {}
 var my_id := 0
@@ -527,6 +528,9 @@ func _enter_area(id: String, x: float, z: float) -> void:
 	var previous_area := area_id
 	area_id = id
 	area = GameRules.area(id)
+	boss_fighting = false
+	var music_name := audio.set_area(area)
+	if args.has("bot") and not music_name.is_empty(): print("MUSIC ", music_name)
 	for k in mobs.keys(): _remove_mob(k)
 	for k in others.keys(): _remove_other(k)
 	for te in teles:
@@ -579,6 +583,12 @@ func _add_marker_nodes() -> void:
 # ---------------------------------------------------------------- スナップショット（snapshot.js onSnap）
 func _on_snap(m: Dictionary) -> void:
 	if m.ar != area_id: return
+	var next_boss_fighting := String(m.get("bs", "idle")) == "fight"
+	if next_boss_fighting != boss_fighting:
+		boss_fighting = next_boss_fighting
+		_update_boss_music()
+	elif boss_fighting:
+		_update_boss_music() # ブラウザ版と同じく、戦闘中の部屋への出入りも反映する
 	if bool(int(m.get("door", 0))) != door_open:
 		door_open = bool(int(m.get("door", 0))); world.set_door_open(door_open)
 	var seen_p := {}
@@ -647,12 +657,60 @@ func _remove_other(id) -> void:
 func _on_mob_die(m: Dictionary) -> void:
 	var mb = mobs.get(int(m.id))
 	if mb == null: return
-	if not bool(m.get("boss", int(mb.get("kind", 0)) == 2)): _sfx("mobdie") # snapshot.js onMobDie L182: audio.sfx('mobdie')
+	var is_boss := bool(m.get("boss", int(mb.get("kind", 0)) == 2))
+	if not is_boss: _sfx("mobdie") # snapshot.js onMobDie L182: audio.sfx('mobdie')
 	mobs.erase(int(m.id))
 	mb.label.queue_free()
+	if is_boss and boss_fighting:
+		boss_fighting = false
+		_update_boss_music()
 	var tw := create_tween()
 	tw.tween_property(mb.node, "scale", Vector3.ONE * 0.01, 0.35)
 	tw.tween_callback(mb.node.queue_free)
+
+
+func _update_boss_music() -> void:
+	if audio == null: return
+	var music_name := audio.set_boss_state(boss_fighting, _is_in_boss_lair())
+	if args.has("bot") and not music_name.is_empty(): print("MUSIC ", music_name)
+
+
+# 対応元: public/shared/areas.js lairOf() / inLair(pad=20)。迷宮 B 点と細長い部屋の範囲を使う。
+func _is_in_boss_lair() -> bool:
+	if String(area.get("type", "")) != "labyrinth": return false
+	var pts: Dictionary = area.get("pts", {})
+	var boss_points: Array = pts.get("B", [])
+	if boss_points.is_empty() or not boss_points[0] is Dictionary: return false
+	var boss_point: Dictionary = boss_points[0]
+	var center := Vector2(float(boss_point.get("x", 0.0)), float(boss_point.get("z", 0.0)))
+	if not bool(area.get("longArena", false)):
+		return Vector2(me.get("x", 0.0), me.get("z", 0.0)).distance_to(center) < 40.0
+
+	var rows: Array = area.get("rows", [])
+	var width := int(area.get("W", 0))
+	var height := int(area.get("H", 0))
+	var bc := int(boss_point.get("c", -1))
+	var br := int(boss_point.get("r", -1))
+	if rows.is_empty() or width <= 0 or height <= 0 or bc < 0 or br < 0: return false
+	var c0 := bc; var c1 := bc; var r0 := br; var r1 := br
+	while _boss_cell_open(c0 - 1, br, rows, width, height): c0 -= 1
+	while _boss_cell_open(c1 + 1, br, rows, width, height): c1 += 1
+	while _boss_cell_open(bc, r0 - 1, rows, width, height): r0 -= 1
+	while _boss_cell_open(bc, r1 + 1, rows, width, height): r1 += 1
+	var cell := float(area.get("cell", 4.0))
+	var half := cell * 0.5
+	var x0 := (float(c0) - float(width) * 0.5 + 0.5) * cell - half - 20.0
+	var x1 := (float(c1) - float(width) * 0.5 + 0.5) * cell + half + 20.0
+	var z0 := (float(r0) - float(height) * 0.5 + 0.5) * cell - half - 20.0
+	var z1 := (float(r1) - float(height) * 0.5 + 0.5) * cell + half + 20.0
+	return me.x > x0 and me.x < x1 and me.z > z0 and me.z < z1
+
+
+func _boss_cell_open(c: int, r: int, rows: Array, width: int, height: int) -> bool:
+	if r < 0 or r >= height or c < 0 or c >= width: return false
+	var row := String(rows[r])
+	var cell := row.substr(c, 1)
+	return cell == "." or cell == "B"
 
 
 # ---------------------------------------------------------------- 予告と被弾（hurt.js）
