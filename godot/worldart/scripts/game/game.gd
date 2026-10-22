@@ -980,6 +980,7 @@ func _process(real_dt: float) -> void:
 		# 撮影（確認用）: そのエリアに入って敵が見えてから <フレーム数> 後に撮って終わる。--shot=<フレーム数>:<出力.png>
 		var sp: PackedStringArray = String(args["shot"]).split(":", true, 1)
 		args["_frames"] = int(args.get("_frames", 0)) + 1
+		if args.has("fxdemo") and int(args["_frames"]) == 60: _fx_demo(String(args["fxdemo"]))   # 確認用（コルーチン。撮り終えたら自分で終了）
 		if int(args["_frames"]) == int(sp[0]):
 			get_viewport().get_texture().get_image().save_png(sp[1])
 			print("SHOT ", sp[1])
@@ -1690,6 +1691,70 @@ func _sync_nodes(dt: float) -> void:
 	RenderingServer.global_shader_parameter_set("wa_occ_tgt", tgt + Vector3(0, 0.9, 0))
 	RenderingServer.global_shader_parameter_set("wa_occ_r", 2.2 if bool(settings.get("occlusion", true)) else 0.0)
 	PlayerView.update_all(self, dt)   # 人物（自分と他の人）の部品ごとの動き（player_view.gd）
+
+
+## 確認用 --fxdemo=<種類>:<刻み,刻み,...> --fxstyles=<様式,...> --fxout=<出力の前半>（--shot の 2 フレーム前に始まり、撮り終えたら終了する）。
+## 見た目の部品（slash・ring・lightning・beam・burst・flash・all）は決まった並びで出し、1/60 秒ずつ <刻み> 回進めた所を <前半>_<様式>_<種類>_<刻み>.png に撮る（ブラウザ版の撮り方と同じ）。
+## 実際の攻撃・技（swing・heavy・ws・q・e）は出してから <刻み> ミリ秒（実時間）後に撮る。
+func _fx_demo(spec: String) -> void:
+	var parts := spec.split(":")
+	var kind := parts[0]
+	var marks: Array = []
+	for t in (parts[1] if parts.size() > 1 else "6").split(","): marks.append(int(t))
+	var styles := String(args.get("fxstyles", settings.get("fx", "blend"))).split(",")
+	var out := String(args.get("fxout", ""))
+	var label := String(args.get("fxlabel", kind))
+	var c = combat.ctx
+	hud.visible = false
+	print("CAM fov=%s keep=%s dist=%s pos=%s me=%s,%s size=%s" % [cam.fov, cam.keep_aspect, dist, cam.position, me.x, me.z, get_viewport().get_visible_rect().size])
+	for style in styles:
+		settings["fx"] = style
+		var fx: GameFx = c._fx()
+		fx.clear()
+		mouse_ground = Vector3(me.x, 0, me.z + 10.0)
+		me.a = 0.0
+		if kind in ["swing", "heavy", "ws", "q", "e"]:
+			match kind:
+				"swing": combat.do_swing()
+				"heavy": combat.do_heavy(2)
+				"ws": combat.try_weapon_skill()
+				"q": combat.try_tree_skill(0)
+				"e": combat.try_tree_skill(1)
+			var t0 := t_now   # ゲームの時刻で待つ（ブラウザ版の撮影も仮の時計で 1/60 秒ずつ進める）
+			for m in marks:
+				while t_now - t0 < float(m) / 60.0: await get_tree().process_frame
+				await get_tree().process_frame
+				print("FXDEMO t=%.3f pending=%d fx_items=%d parts=%d" % [t_now, pending.size(), fx._items.size(), fx._n])
+				_fx_save("%s_%s_%s_%d.png" % [out, style, label, m])
+			me.wsCd = 0.0
+			await get_tree().create_timer(1.5).timeout
+			continue
+		fx.manual = true
+		for mb in mobs.values():   # 部品の確認は見やすいように敵を隠す
+			mb["node"].visible = false; mb["label"].visible = false
+		var x: float = me.x
+		var z: float = me.z
+		if kind in ["slash", "all"]: fx.slash(x, z, 0.0, 3.0, 110.0, 0xffd84a, 1.0, false)
+		if kind in ["ring", "all"]: fx.ring_wave(x, z + 5.0, 0x6ab0ff, 4.0, 0.45)
+		if kind in ["lightning", "all"]: fx.lightning(x + 5.0, z + 4.0, 0xbfd8ff)
+		if kind in ["beam", "all"]: fx.beam(x - 5.0, z + 4.0, 0xffd84a, 8.0, 0.8, 1.2)
+		if kind in ["burst", "all"]:
+			fx.burst(x, 1.2, z + 4.0, 18, {"color": 0xffd84a, "speed": 9, "size": 0.5, "life": 0.4})
+			fx.burst(x - 3.0, 0.8, z + 4.0, 25, {"color": 0xff6a20, "speed": 4, "size": 0.6, "life": 0.7, "gravity": 3})
+		if kind in ["flash", "all"]: fx.flash(x + 2.0, 1.0, z + 3.0, 0xfff0a0, 30.0, 0.5, 12.0)
+		var done := 0
+		for m in marks:
+			while done < m:
+				fx.update(1.0 / 60.0); done += 1
+			await get_tree().process_frame
+			await get_tree().process_frame
+			_fx_save("%s_%s_%s_%d.png" % [out, style, label, m])
+	get_tree().quit()
+
+
+func _fx_save(path: String) -> void:
+	get_viewport().get_texture().get_image().save_png(path)
+	print("SHOT ", path)
 
 
 func _slash_fx(a: float, rng: float, arc: float) -> void:

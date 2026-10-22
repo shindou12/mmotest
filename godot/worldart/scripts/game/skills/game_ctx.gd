@@ -9,13 +9,11 @@ extends "res://scripts/game/combat/api.gd"
 ## ゲームの状態は game.gd の me・S（能力値）・mobs・others を、bind() で参照として受ける（同じ Dictionary を共有する）。
 ## 数値の計算は 64 ビットの float だけで行う（Vector2 / Vector3 は 32 ビットなので使わない）。
 ##
-## ---- 見た目の TODO（確認用の --bot の終了時に FXTODO の行で出す）----
-##   fx.ringWave   地面に広がる輪             fx.lightning  雷                      fx.flash      光（点光源）
-##   parts.burst   粒の破裂                    parts.emit    粒を 1 つ出す
+## ---- 見た目（G8-5: scripts/game/fx.gd。fx.js・fx-styles.js の 5 様式。設定の「エフェクト」に従う）----
+##   fx.slash・ringWave・lightning・flash・beam・parts.burst・parts.emit と、飛ぶ斬撃の板（waveMesh）は fx.gd。text / floatText = 浮かぶ文字、shake = 画面の揺れ、proj = 飛ぶ斬撃・投げ斧の板、arrow = 矢の板。
+##   未: 武器の振りの軌跡（swordTrail）と残像（ghost）は人物の武器モデル待ち（06b）。Bloom（仕上げのにじみ）は仕上げの板にない。
 ##   （音: combat/skills の既存呼び出しを実ゲームの GameAudio に接続）
-##   （済み: fx.slash = 扇の斬撃の板、text / floatText = 浮かぶ文字、shake = 画面の揺れ、proj = 飛ぶ斬撃の板・投げ斧の板、arrow = 矢の板）
 ##   武器の手の位置（hand_pos）・武器ツリーの光（wt_aura）は人物のモデル待ち（06b）。矢 arrow・戻る飛び道具 boomerang・斧の形は短剣・大斧の分を入れた（見た目は板で代用）。
-##   （済み: arrow = 矢の板。細長い板が飛び、update_projs が当てる。罠・旗は部品を置く）
 ##
 ## ---- 元と違う所 ----
 ##   * スキル変化（付加効果 sv_*）は combat.gd の start_skill が variants.gd の cast_weapon_skill を通して付ける（G4）。
@@ -127,7 +125,13 @@ func _op(name: String, args: Array):
 		"proj": return _v(Callable(self, "strike_proj"), [args[0] if args.size() > 0 and args[0] != null else {}])
 		"hit": return _v(Callable(self, "deal"), [args[0], float(args[1]), args[2] if args.size() > 2 and args[2] != null else {}])
 		"dash": return _v(Callable(self, "strike_dash"), [float(args[0]), float(args[1]), float(args[2]), float(args[3]) if args.size() > 3 and args[3] != null else 0.0])
-		"fx.slash": return _v(Callable(self, "fx_slash"), [float(args[0]), float(args[1]), float(args[2]), float(args[3]), float(args[4]), args[5]])
+		"fx.slash": return _v(Callable(self, "fx_slash"), [float(args[0]), float(args[1]), float(args[2]), float(args[3]), float(args[4]), args[5], float(args[6]) if args.size() > 6 and args[6] != null else 1.0, bool(args[7]) if args.size() > 7 and args[7] != null else false])
+		"fx.ringWave": return _v(Callable(self, "fx_ring"), [args])
+		"fx.lightning": return _v(Callable(self, "fx_lightning"), [args])
+		"fx.flash": return _v(Callable(self, "fx_flash"), [args])
+		"fx.beam": return _v(Callable(self, "fx_beam"), [args])
+		"parts.burst": return _v(Callable(self, "fx_burst"), [args])
+		"parts.emit": return _v(Callable(self, "fx_emit"), [args])
 		"text": return _v(Callable(self, "float_text"), [me["x"], 3, me["z"], args[0], args[1] if args.size() > 1 else null])
 		"floatText": return _v(Callable(self, "float_text"), [args[0], args[1], args[2], args[3], args[4] if args.size() > 4 else null])
 		"shake": return _v(Callable(self, "add_shake"), [float(args[0])])
@@ -216,15 +220,15 @@ func strike_proj(o: Dictionary) -> void:
 	var w := Strikes.make_proj(o, me, color)
 	var boom = o.get("boomerang")
 	var is_axe: bool = o.get("shape") == "axe"
-	var node := MeshInstance3D.new()
+	var node := MeshInstance3D.new()   # 斧以外は下で fx.waveMesh に置き換える
 	if is_axe:
 		var bm := BoxMesh.new()
 		bm.size = Vector3(1.4, 0.1, 0.5)
 		node.mesh = bm
 		node.material_override = GameVisuals.mat(_color(color), true, 0.9)
 	else:
-		node.mesh = GameVisuals.shape_mesh({"k": "cone", "len": 1.8, "arc": deg_to_rad(120.0), "a": float(o["a"]) + PI}, 1.0)
-		node.material_override = GameVisuals.mat(_color(color), true, 0.7)
+		node = _fx().wave_mesh(color)   # fx.waveMesh（様式で形が変わる三日月。前 = +z）
+		node.rotation.y = float(o["a"])
 	node.position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.0, w["z"])
 	if boom != null: node.scale = Vector3.ONE * float(_nn(o, "scale", 1.0))
 	g.world.add_child(node)
@@ -277,7 +281,10 @@ func update_projs(dt: float) -> void:
 			continue
 		w["node"].position = Vector3(w["x"], g.world.ground_y(w["x"], w["z"]) + 1.0, w["z"])
 		if w["shape"] == "axe": w["node"].rotation.y -= dt * 20.0   # PROJ_SHAPES.axe の tick: 回りながら飛ぶ
-		elif w["boom"] == null: w["node"].scale = Vector3.ONE * (1.0 + w["t"] * 1.5)   # shapes wave の tick: 広がりながら消える
+		elif w["boom"] == null:   # shapes wave の tick: 広がりながら消える（classic は薄くなる）
+			w["node"].scale = Vector3.ONE * (1.0 + w["t"] * 1.5)
+			var wm = w["node"].material_override
+			if fxs != null and fxs.st == null and wm is ShaderMaterial: wm.set_shader_parameter("uA", 0.9 * (1.0 - float(w["t"]) / float(w["life"])))
 
 
 func _proj_collide(x: float, z: float) -> Array:
@@ -325,16 +332,43 @@ func _color(c) -> Color:
 	return Color.hex((int(c) << 8) | 0xFF)
 
 
-## fx.slash(x, z, a, r, deg, color, ...): 扇の斬撃の板（0.12 秒で消える）
-func fx_slash(x: float, z: float, a: float, r: float, deg: float, color) -> void:
-	var m := MeshInstance3D.new()
-	m.mesh = GameVisuals.shape_mesh({"k": "cone", "len": r, "arc": deg * PI / 180.0, "a": a}, 1.0)
-	m.material_override = GameVisuals.mat(_color(color).lerp(Color.WHITE, 0.5), true, 0.5)
-	m.position = Vector3(x, g.world.ground_y(x, z) + 0.9, z)
-	g.world.add_child(m)
-	var tw: Tween = g.create_tween()
-	tw.tween_interval(0.12)
-	tw.tween_callback(m.queue_free)
+## 技の見た目（fx.gd）。設定の「エフェクト」が変わっていたら様式を切り替える
+var fxs: GameFx
+func _fx() -> GameFx:
+	if fxs == null or not is_instance_valid(fxs):
+		fxs = GameFx.new()
+		fxs.ground = func(x, z): return g.world.ground_y(x, z)
+		g.add_child(fxs)
+	var want := String(g.settings.get("fx", "blend"))
+	if fxs.style_name != want: fxs.set_style(want)
+	return fxs
+
+
+func _n(args: Array, i: int, d = null):
+	return args[i] if args.size() > i and args[i] != null else d
+
+
+## fx.slash(x, z, a, r, deg, color, y = 1, reverse = false)
+func fx_slash(x: float, z: float, a: float, r: float, deg: float, color, y := 1.0, reverse := false) -> void:
+	_fx().slash(x, z, a, r, deg, color, y, reverse)
+
+func fx_ring(args: Array) -> void:
+	_fx().ring_wave(float(args[0]), float(args[1]), args[2], float(_n(args, 3, 6.0)), float(_n(args, 4, 0.45)), float(_n(args, 5, 0.15)), float(_n(args, 6, 0.6)))
+
+func fx_lightning(args: Array) -> void:
+	_fx().lightning(float(args[0]), float(args[1]), _n(args, 2, 0xbfd8ff))
+
+func fx_flash(args: Array) -> void:
+	_fx().flash(float(args[0]), float(args[1]), float(args[2]), args[3], float(_n(args, 4, 30.0)), float(_n(args, 5, 0.25)), float(_n(args, 6, 12.0)))
+
+func fx_beam(args: Array) -> void:
+	_fx().beam(float(args[0]), float(args[1]), args[2], float(_n(args, 3, 14.0)), float(_n(args, 4, 0.45)), float(_n(args, 5, 1.0)))
+
+func fx_burst(args: Array) -> void:
+	_fx().burst(float(args[0]), float(args[1]), float(args[2]), float(args[3]), _n(args, 4, {}))
+
+func fx_emit(args: Array) -> void:
+	_fx().emit(float(args[0]), float(args[1]), float(args[2]), _n(args, 3, {}))
 
 
 # ---------------------------------------------------------------- 罠・旗の見た目（meshes.js trapMesh・bannerMesh と fx.add）
