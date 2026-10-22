@@ -16,7 +16,7 @@ extends Node3D
 const MAXP := 3000
 const PRIO := 110
 ## 点光源の強さの係数。three の PointLight（階調の前に足されて圧縮される）に見た目を合わせる（比べて決めた値）
-const LIGHT_K := 0.3
+const LIGHT_K := 0.15
 
 ## fx-styles.js FX_STYLES。classic は null（今までの見た目）
 const STYLES := {
@@ -37,7 +37,7 @@ const STYLES := {
 const PART_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, skip_vertex_transform;
-vec3 fxm(vec3 c) { return c / (1.0 + 0.35 * c); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
+vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform float world_k = 0.31;   // 粒の大きさ 1 あたりのワールドの大きさ（m）
 uniform int shape = 0;   // 0 = 以前の見た目、1 = 星形、2 = にじむ光、3 = 小さな点
 varying vec3 vC;
@@ -86,7 +86,7 @@ void fragment() {
 const BAND_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
-vec3 fxm(vec3 c) { return c / (1.0 + 0.35 * c); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
+vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform vec3 uColor : source_color = vec3(1.0);
 uniform float uHead = 0.0;
 uniform float uTail = 0.75;
@@ -119,7 +119,7 @@ void fragment() {
 const RING_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, depth_test_disabled, cull_disabled;
-vec3 fxm(vec3 c) { return c / (1.0 + 0.35 * c); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
+vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform vec3 uColor : source_color = vec3(1.0);
 uniform float uK = 0.0;
 uniform float uWidth = 0.3;
@@ -132,7 +132,7 @@ void fragment() {
 	float band = mix(wave, step(abs(1.0 - uWidth - r), uWidth), uHard);
 	float fill = uFill * smoothstep(0.2, 1.0, r) * step(r, 1.0);
 	float a = (band + fill) * (1.0 - uK);
-	vec3 c = mix(uColor * uGain, vec3(1.0), band * (1.0 - uK) * mix(0.25, 0.4, uHard));
+	vec3 c = mix(uColor * uGain, vec3(1.0), band * (1.0 - uK) * mix(0.4, 0.55, uHard));
 	ALBEDO = fxm(c);
 	ALPHA = a;
 }
@@ -142,7 +142,7 @@ void fragment() {
 const FLAT_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
-vec3 fxm(vec3 c) { return c / (1.0 + 0.35 * c); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
+vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform vec3 uColor : source_color = vec3(1.0);
 uniform float uA = 1.0;
 void fragment() { ALBEDO = fxm(uColor); ALPHA = uA; }
@@ -150,7 +150,7 @@ void fragment() { ALBEDO = fxm(uColor); ALPHA = uA; }
 const FLAT_NODEPTH_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, depth_test_disabled, cull_disabled;
-vec3 fxm(vec3 c) { return c / (1.0 + 0.35 * c); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
+vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform vec3 uColor : source_color = vec3(1.0);
 uniform float uA = 1.0;
 void fragment() { ALBEDO = fxm(uColor); ALPHA = uA; }
@@ -160,14 +160,14 @@ void fragment() { ALBEDO = fxm(uColor); ALPHA = uA; }
 const BEAM_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
-vec3 fxm(vec3 c) { return c / (1.0 + 0.35 * c); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
+vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform vec3 uColor : source_color = vec3(1.0);
 uniform float uTime = 0.0;
 uniform float uFade = 1.0;
 void fragment() {
 	float h = UV.y;   // 0 = 根元 … 1 = 先（_tube が作る向き）
 	float a = pow(1.0 - h, 1.6) * (0.6 + 0.4 * sin(h * 20.0 - uTime * 6.0));
-	ALBEDO = fxm(uColor * 1.6);
+	ALBEDO = fxm(uColor * 1.6 * 0.85);
 	ALPHA = a * uFade;
 }
 """
@@ -176,7 +176,7 @@ void fragment() {
 const LINE_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
-vec3 fxm(vec3 c) { return c / (1.0 + 0.35 * c); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
+vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 void fragment() { ALBEDO = fxm(COLOR.rgb); ALPHA = COLOR.a; }
 """
 

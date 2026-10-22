@@ -1805,6 +1805,8 @@ func _fx_demo(spec: String) -> void:
 			while done < m:
 				fx.update(1.0 / 60.0); done += 1
 			await get_tree().process_frame
+			for te in teles:   # 敵の予告（赤い扇）は部品の確認の邪魔なので隠す
+				for tm in te.meshes: tm.visible = false
 			await get_tree().process_frame
 			_fx_save("%s_%s_%s_%d.png" % [out, style, label, m])
 	get_tree().quit()
