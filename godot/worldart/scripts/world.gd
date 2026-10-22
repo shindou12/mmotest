@@ -96,11 +96,14 @@ func _build_legacy(id: String, ar: Dictionary) -> bool:
 			if sun_dir.length_squared() > 0.0:
 				sun.basis = Basis.looking_at(-sun_dir.normalized(), Vector3.UP if absf(sun_dir.y) < sun_dir.length() * 0.99 else Vector3.FORWARD)
 			# public/js/game/render.js: castShadow=true, PCFSoftShadowMap、2048²、±30、near=1/far=120、bias=-0.0005。
-			# Godot 4.3 では分割影 2 段とプロジェクト既定の影解像度・soft filter を使う。
+			# Three.js は normalBias 未指定。共通の normal_bias=1.0 は影が浮きやすいため 0 にする。
 			sun.shadow_enabled = true
 			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-			sun.directional_shadow_max_distance = 80.0
-			sun.directional_shadow_split_1 = 0.45
+			sun.directional_shadow_max_distance = 60.0
+			sun.directional_shadow_split_1 = 0.5
+			sun.shadow_bias = 0.03
+			sun.shadow_normal_bias = 0.0
+			sun.shadow_blur = 1.0
 		if env != null and env.environment != null:
 			var environment: Environment = env.environment
 			environment.background_color = Color.html(String(light.get("sky_bot", "#d8f0ff")))
@@ -126,6 +129,10 @@ func _build_legacy(id: String, ar: Dictionary) -> bool:
 	# export_areas.mjs の LegacySky はブラウザの背景用で、three.js の既定どおり影を落とさない。
 	# GLB では castShadow が保持されないため、Godot の既定値を戻す。
 	for n in scene.find_children("LegacySky", "MeshInstance3D", true, false):
+		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# three.js の Sprite（エリア名の札。export_areas.mjs が AreaLabel<連番> の板にする）は影を落とさない。
+	# 板のまま落とすと、地上 5m の薄い板が長い線の影になる（f2_field・f3_field の台座の横）。
+	for n in scene.find_children("AreaLabel*", "MeshInstance3D", true, false):
 		(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(scene)
 	ToonLook.convert(scene, Color("448a9b"), true)
