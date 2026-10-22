@@ -41,6 +41,7 @@ const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Dmg = preload("res://scripts/game/combat/damage.gd")
 const Hurt = preload("res://scripts/game/combat/hurt.gd")
 const AudioModule = preload("res://scripts/game/audio.gd")
+const GameHud = preload("res://scripts/game/hud.gd")
 
 @onready var world: Node3D = $World
 var net := GameNet.new()
@@ -71,6 +72,8 @@ var door_open := false
 var combat: GameCombat
 var items: GameItems
 var audio: GameAudio
+var hud_ui
+var hud_demo_applied := false
 
 # HUD
 var ui := {}
@@ -276,7 +279,6 @@ func _enter_area(id: String, x: float, z: float) -> void:
 	if area["type"] == "town" or area["type"] == "camp": me.potions = S["maxPot"]
 	if args.has("at") and id == "f1_field":
 		var p := String(args["at"]).split(","); me.x = float(p[0]); me.z = float(p[1])
-	ui.area.text = "第%d層 ・ %s" % [int(area["floor"]), area["name"]]
 	_banner(area["name"])
 
 
@@ -769,30 +771,13 @@ func _setup_camera() -> void:
 	cam.add_child(post)
 
 
-# ---------------------------------------------------------------- HUD（最小限: HP・レベルと経験値・回復薬・お金・エリア名・通知）
+# ---------------------------------------------------------------- HUD（browser 版の配置・状態表示は scripts/game/hud.gd）
 func _setup_hud() -> void:
 	add_child(hud)
 	var root := Control.new(); root.set_anchors_preset(Control.PRESET_FULL_RECT); root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(root)
-	var box := VBoxContainer.new(); box.position = Vector2(16, 16)
-	root.add_child(box)
-	ui.area = Label.new(); box.add_child(ui.area)
-	ui.hp = ProgressBar.new(); ui.hp.custom_minimum_size = Vector2(320, 22); ui.hp.show_percentage = false
-	var sb := StyleBoxFlat.new(); sb.bg_color = Color(0.85, 0.25, 0.25); ui.hp.add_theme_stylebox_override("fill", sb)
-	box.add_child(ui.hp)
-	ui.hpl = Label.new(); box.add_child(ui.hpl)
-	ui.xp = ProgressBar.new(); ui.xp.custom_minimum_size = Vector2(320, 8); ui.xp.show_percentage = false
-	box.add_child(ui.xp)
-	ui.info = Label.new(); box.add_child(ui.info)
-	ui.banner = Label.new(); ui.banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; ui.banner.add_theme_font_size_override("font_size", 34)
-	root.add_child(ui.banner)
-	ui.banner.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE); ui.banner.offset_top = 90; ui.banner.offset_bottom = 140
-	ui.log = RichTextLabel.new(); ui.log.scroll_following = true; ui.log.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(ui.log)
-	ui.log.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT); ui.log.offset_left = 16; ui.log.offset_right = 540; ui.log.offset_top = -190; ui.log.offset_bottom = -16
-	ui.help = Label.new(); ui.help.text = "WASD 移動  左 攻撃（長押し 溜め斬り）  右 武器スキル\nSpace 回避  R 回復薬  F 調べる  I 持ち物  ホイール 距離"; ui.help.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	root.add_child(ui.help)
-	ui.help.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT); ui.help.offset_left = -560; ui.help.offset_top = -64; ui.help.offset_right = -16; ui.help.offset_bottom = -12
+	hud_ui = GameHud.new()
+	hud_ui.build(root, self)
 	items.build_ui(root)
 	if args.has("inv"): items.toggle()   # 確認用: 持ち物の画面を開いて始める
 	# はじめの画面（名前とサーバー）
@@ -810,21 +795,51 @@ func _setup_hud() -> void:
 
 
 func _update_hud() -> void:
-	ui.hp.max_value = S["mhp"]; ui.hp.value = me.hp
-	ui.hpl.text = "HP %d / %d   %s" % [int(me.hp), int(S["mhp"]), "（倒れている）" if me.crawl else ""]
-	ui.xp.max_value = GameRules.xp_to_next(int(ch["lv"])); ui.xp.value = int(ch["xp"])
-	var wsn: String = String(S["ws"].get("name", "?")) if S.has("ws") else "?"
-	ui.info.text = "%s  Lv %d   回復薬 %d   %d G\n武器スキル %s %s%s" % [ch["name"], int(ch["lv"]), int(me.potions), int(ch.get("gold", 0)), wsn,
-		"（あと %.1f 秒）" % me.wsCd if me.wsCd > 0 else "（使える）", "   溜め %d%%" % int(minf(1.0, me.chargeT / S["chargeMax"]) * 100) if me.charging and me.chargeT >= GameCombat.charge_min() else ""]
-	if ui.banner.has_meta("t") and t_now > float(ui.banner.get_meta("t")): ui.banner.text = ""
+	if args.has("hud-demo") and not hud_demo_applied and started and area_id == String(args.get("shotarea", "f1_field")):
+		hud_demo_applied = true
+		_apply_hud_demo()
+	hud_ui.update()
+
+
+## --hud-demo の撮影用に HUD の状態だけを一時設定する。セーブはしない。
+func _apply_hud_demo() -> void:
+	ch["lv"] = 5
+	ch["xp"] = 130
+	ch["gold"] = 1234
+	ch["slots"] = ["focus", "warstomp"]
+	_calc()
+	S["actives"] = {"focus": true, "warstomp": true}
+	me["hp"] = float(S["mhp"]) * 0.68
+	me["potions"] = 2
+	me["potCd"] = 0.62
+	me["dodgeCd"] = float(S["dodgeCd"]) * 0.55
+	me["wsCd"] = float(S["ws"]["cd"]) * 0.4
+	me["tcd"] = {"focus": 5.8, "warstomp": 2.1}
+	me["buffs"] = [{"id": "focus", "label": "集中", "t": 6.4, "max": 8.0, "mods": {"chargeRate": 100}, "color": 0x9ae8ff}]
+	me["charging"] = true
+	me["chargeT"] = GameCombat.charge_min() + (float(S["chargeMax"]) - GameCombat.charge_min()) * 0.68
+	me["chargeLv"] = 1
+	var death_demo := String(args["hud-demo"]) == "death"
+	if death_demo:
+		me["hp"] = 0.0
+		me["dead"] = true
+		me["deathAt"] = t_now + 12.3
+	hud_ui.help_panel.visible = false
+	for toast in hud_ui.toast_stack.get_children():
+		hud_ui.toast_stack.remove_child(toast)
+		toast.queue_free()
+	if death_demo:
+		hud_ui.banner("")
+	else:
+		hud_ui.banner("G7-2  HUD 比較")
+		hud_ui.toast("HUD 表示比較", Color.html("#9affc8"))
 
 
 func _banner(text: String) -> void:
-	ui.banner.text = text
-	ui.banner.set_meta("t", t_now + 2.5)
+	hud_ui.banner(text)
 	_log(text)
 
 
 func _log(text: String, col := Color(1, 0.95, 0.75)) -> void:
-	ui.log.push_color(col); ui.log.add_text(text + "\n"); ui.log.pop()
+	hud_ui.toast(text, col)
 	print("LOG ", text)
