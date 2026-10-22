@@ -114,3 +114,5 @@ sh tools/worldart/godot/client_test.sh
 - ChatGPT のプランの利用枠で動く（API の従量課金ではない）。使い方の決まりは `docs/agents/collaboration.md`（UI のアイコンなどで使う、見本にはしない）
 - Luna の既定は推論 max・高速（`tools/agents/luna.sh` の `LUNA_TIER=fast` = `service_tier="fast"`）
 - Luna に札を渡す流れ（`sh tools/agents/luna.sh .agents/cards/<札>.md --name <名>`）は Windows（Git Bash）でそのまま動いた。記録は `.agents/runs/<日時>-<名>/`（last.md・diffstat.txt など）。最初の札 G8-1（効果音の WAV の書き出し）は合格（85 音、Opus が WAV を検査）
+- 2026-10-22 の午後、Luna（推論 max・高速）の ChatGPT のプランの利用上限に達した（`You've hit your usage limit`）。高速は枠を速く使う。上限の間は Sonnet のサブエージェントに渡す（追加のクレジットは買わない）。上限が戻ったら、急がない札は `LUNA_TIER=default` で流すことも考える
+- 従来版のエリアの GLB（`godot/worldart/data/legacy/`、約 133 MiB）は git に入れない。各 PC で `node tools/worldart/godot/export_areas.mjs` → `--import`
