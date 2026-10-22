@@ -3,6 +3,7 @@ extends Node
 
 const INDEX_PATH := "res://assets/sfx/index.json"
 const SFX_PATH := "res://assets/sfx/"
+const MusicModule = preload("res://scripts/game/music.gd")
 
 # 対応元: public/js/sample-sfx.js の jitter(range) と SampleBank.play() の既定値 pitch=0.05, vol=0.05。
 const PITCH_JITTER := 0.05
@@ -33,12 +34,24 @@ var _rng := RandomNumberGenerator.new()
 var _volume_tween: Tween
 var _volumes := {"master": 1.0, "music": 1.0, "sfx": 1.0, "amb": 1.0}
 var index_loaded := false
+var music: GameMusic
 
 
 func _ready() -> void:
 	_rng.randomize()
 	load_index()
 	set_volumes(_volumes["master"], _volumes["music"], _volumes["sfx"], _volumes["amb"])
+	music = MusicModule.new()
+	music.name = "Music"
+	add_child(music)
+
+
+func set_area(area: Dictionary) -> String:
+	return music.set_area(area) if music != null else ""
+
+
+func set_boss_state(fighting: bool, near_lair: bool) -> String:
+	return music.set_boss_state(fighting, near_lair) if music != null else ""
 
 
 func load_index() -> bool:

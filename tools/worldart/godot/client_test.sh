@@ -66,6 +66,7 @@ grep -q "^SFX hurt$" $OUT && echo "OK  SFX hurt" || { echo "NG  SFX hurt が出�
 grep -q "^SFX step$" $OUT && echo "OK  SFX step" || { echo "NG  SFX step が出ない"; ok=1; }
 grep -q "^SFX telegraph$" $OUT && echo "OK  SFX telegraph" || { echo "NG  SFX telegraph が出ない"; ok=1; }
 grep -q "^SFX mobdie$" $OUT && echo "OK  SFX mobdie" || { echo "NG  SFX mobdie が出ない"; ok=1; }
+grep -q "^MUSIC area_01$" $OUT && echo "OK  MUSIC area_01" || { echo "NG  MUSIC area_01 が出ない"; ok=1; }
 grep -c "LOG はじまりの街" $OUT | grep -qv "^1$" && echo "OK  出口から街へ移った" || { echo "NG  出口から街へ移れない"; ok=1; }
 grep -q "LOG 古井戸の洞窟" $OUT && echo "OK  出口から屋内（古井戸の洞窟）へ移った" || { echo "NG  屋内へ移れない"; ok=1; }
 grep -q "^HEAVY" $OUT && echo "OK  溜め斬り（$(grep -c '^HEAVY' $OUT) 回）" || { echo "NG  溜め斬りが出ない"; ok=1; }
