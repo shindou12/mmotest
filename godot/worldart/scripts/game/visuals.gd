@@ -147,6 +147,72 @@ static func _mob_alpha_shader(source: Shader) -> Shader:
 	return shader
 
 
+## export_models.mjs が出した GLB の子順を、models.js の部品名に結び付ける。
+static func _mob_anim_part(root: Node3D, name: String, path: Array) -> Node3D:
+	var node: Node = root
+	for index in path:
+		if index < 0 or index >= node.get_child_count(): return null
+		node = node.get_child(index)
+	var part := node as Node3D
+	if part != null:
+		part.name = "MobAnim_" + name
+		part.rotation_order = EULER_ORDER_XYZ
+	return part
+
+
+static func _mob_anim_parts(root: Node3D, t: String, boss: bool) -> void:
+	var body := _mob_anim_part(root, "body", [0, 0])
+	root.set_meta("mob_anim_float", t == "bat" or t == "wisp")
+	root.set_meta("mob_anim_hover", t == "mage")
+	root.set_meta("mob_anim_flap", t == "bat")
+	match t:
+		"slime", "rootknot":
+			_mob_anim_part(root, "squash", [0, 0, 0])
+		"beast":
+			_mob_anim_part(root, "head", [0, 0, 1])
+			for i in 4: _mob_anim_part(root, "legs_%d" % i, [0, 0, i + 2])
+			_mob_anim_part(root, "tail", [0, 0, 6])
+		"golem":
+			for i in 2: _mob_anim_part(root, "arms_%d" % i, [0, 0, i])
+		"wisp":
+			_mob_anim_part(root, "shell", [0, 0, 0, 3])
+		"bat":
+			for i in 2: _mob_anim_part(root, "wings_%d" % i, [0, 0, 0, i + 1])
+		"mushroom":
+			_mob_anim_part(root, "squash", [0, 0, 0])
+			_mob_anim_part(root, "cap", [0, 0, 0, 1])
+		"scorpion":
+			for i in 6: _mob_anim_part(root, "legs_%d" % i, [0, 0, i + 1])
+			for i in 2: _mob_anim_part(root, "arms_%d" % i, [0, 0, i + 7])
+			_mob_anim_part(root, "tail", [0, 0, 9])
+		"lizard":
+			_mob_anim_part(root, "head", [0, 0, 0, 1])
+			for i in 4: _mob_anim_part(root, "legs_%d" % i, [0, 0, 0, i + 2])
+			_mob_anim_part(root, "tail", [0, 0, 0, 6])
+		"mage":
+			_mob_anim_part(root, "head", [0, 0, 2])
+			_mob_anim_part(root, "arm", [0, 0, 3])
+			_mob_anim_part(root, "shell", [0, 0, 4])
+		"knight":
+			for i in 2: _mob_anim_part(root, "legs2_%d" % i, [0, 0, i + 3])
+			_mob_anim_part(root, "arm", [0, 0, 5])
+			if boss:
+				_mob_anim_part(root, "guardArm", [0, 0, 6])
+				_mob_anim_part(root, "cape", [0, 0, 7])
+				_mob_anim_part(root, "tail", [0, 0, 8])
+	if boss:
+		for light in root.find_children("*", "OmniLight3D", true, false):
+			light.name = "MobAnim_aura"
+			light.rotation_order = EULER_ORDER_XYZ
+		if body != null and root.get_child_count() > 0:
+			var imported_root := root.get_child(0)
+			for child in imported_root.get_children():
+				if child == body or String(child.name).begins_with("mob_palette_"): continue
+				if child is MeshInstance3D:
+					child.name = "MobAnim_sigil"
+					(child as Node3D).rotation_order = EULER_ORDER_XYZ
+
+
 ## 敵: mob-models.js の形を使い、GLB の部品役割から階層色とアクセントを差し替える。
 ## 色の式: makeMob() の m / mD / mL / ac。トゥーンと輪郭線は toon_look.gd の ToonLook.convert。
 static func mob(t: String, color: Color, sc: float, boss := false, accent: Variant = null) -> Node3D:
@@ -183,6 +249,7 @@ static func mob(t: String, color: Color, sc: float, boss := false, accent: Varia
 						new_emission.a = old_emission.a
 						recolored.set_shader_parameter("emission_col", new_emission)
 				mi.set_surface_override_material(s, recolored)
+		_mob_anim_parts(gm, t, boss)
 		gm.scale = Vector3.ONE * sc
 		return gm
 	var n := Node3D.new()

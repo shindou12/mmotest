@@ -36,6 +36,7 @@ extends Node3D
 
 const SAVE := "user://eterna_godot_char.json"
 const GameWTree = preload("res://scripts/game/skills/wtree.gd")
+const MobAnim = preload("res://scripts/game/mob_anim.gd")
 const WFX = preload("res://scripts/game/combat/weapon_fx.gd")
 const Dmg = preload("res://scripts/game/combat/damage.gd")
 const Hurt = preload("res://scripts/game/combat/hurt.gd")
@@ -334,11 +335,13 @@ func _on_snap(m: Dictionary) -> void:
 				sc = float(mds) if mds != null else (0.8 if kind == 1 else (1.9 if elite == 3 else (1.3 if elite > 0 else 1.0)))
 				nm = ("門番" if elite == 2 else ("精鋭 " if elite > 0 else "") + String(md["name"]))
 				rad = 0.75 * sc
-			mb = {"node": GameVisuals.mob(String(md["t"]), Color.html(String(md["color"])), sc, kind == 2), "label": GameVisuals.label(nm),
+			var mob_node: Node3D = GameVisuals.mob(String(md["t"]), Color.html(String(md["color"])), sc, kind == 2)
+			MobAnim.setup(mob_node)
+			mb = {"node": mob_node, "label": GameVisuals.label(nm),
 				"id": id, "x": float(r[2]), "z": float(r[3]), "a": float(r[4]), "rad": rad, "kind": kind, "name": nm, "localT": -9.0, "hp": float(r[5]), "elite": elite, "flash": 0.0}
 			world.add_child(mb.node); world.add_child(mb.label)
 			mobs[id] = mb
-		mb.tx = float(r[2]); mb.tz = float(r[3]); mb.ta = float(r[4]); mb.mhp = float(r[6]); mb.lv = int(r[7]); mb.stunT = float(r[15])
+		mb.tx = float(r[2]); mb.tz = float(r[3]); mb.ta = float(r[4]); mb.mhp = float(r[6]); mb.lv = int(r[7]); mb.st = int(r[8]); mb.enraged = int(r[10]) != 0; mb.stunT = float(r[15])
 		mb.guard = r.size() > 16 and int(r[16]) != 0   # 番兵の盾（正面からの攻撃は 3 割）
 		if t_now - mb.localT > 0.4: mb.hp = float(r[5])
 		else: mb.hp = minf(mb.hp, float(r[5]))
@@ -699,6 +702,10 @@ func _sync_nodes(dt: float) -> void:
 		mb.a = mb.a + GameRules.ang_diff(mb.ta, mb.a) * f
 		var y: float = world.ground_y(mb.x, mb.z)
 		mb.node.position = Vector3(mb.x, y, mb.z); mb.node.rotation.y = mb.a
+		var since_hit := t_now - float(mb.get("localT", -9.0))
+		var hit_flash := maxf(0.0, 1.0 - maxf(0.0, since_hit) * 6.0)
+		MobAnim.animate(mb.node, {"t": t_now + float(mb.id), "st": int(mb.get("st", 0)), "stun": float(mb.get("stunT", 0.0)) > 0.0,
+			"flash": maxf(float(mb.get("flash", 0.0)), hit_flash), "enraged": bool(mb.get("enraged", false))})
 		mb.label.position = Vector3(mb.x, y + 2.4 * mb.node.scale.y + 0.4, mb.z)
 	for id in others:
 		var o = others[id]

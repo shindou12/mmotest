@@ -46,6 +46,15 @@ const mobJobs = MOB_TYPES.map((t) => {
   return [`mob_${t}`, `${t} (${example.source})`, '', {}, 0, MOB_CAMERA,
     { mob: t, color: hexColor(example.mob.color), accent, color_source: example.source, scale: 1.0 }];
 });
+const mobMotionJobs = [
+  ['mob_anim_bat', 'bat', { t: 0.13, st: 1 }],
+  ['mob_anim_wisp', 'wisp', { t: 0.6, st: 0 }],
+  ['mob_anim_beast', 'beast', { t: 0.13, st: 1 }],
+  ['mob_anim_mage', 'mage', { t: 0.05, st: 2 }],
+].map(([id, type, mob_state]) => {
+  const source = mobJobs.find((job) => job[6].mob === type);
+  return [id, `${type} animateMob ${JSON.stringify(mob_state)}`, '', {}, 0, MOB_CAMERA, { ...source[6], mob_state }];
+});
 
 // 姿勢の一覧: [id, ラベル, 武器 '種類:形:段階', 状態]
 const GS = `greatsword:0:${TIER}`;
@@ -88,7 +97,7 @@ const POSES = [
   ...[1, 2, 3, 4, 5, 6].map((a) => [`eq_armor${a}`, `防具 見た目${a}`, `sword:0:${TIER}`, {}, a]),
   ['eq_shield', '盾 kite 構え', `spear:0:${TIER}`, {}],
   ['eq_shield_guard', '盾 kite ガード', `spear:0:${TIER}`, { guard: true, gg: 1 }],
-  ...mobJobs,
+  ...mobJobs, ...mobMotionJobs,
 ];
 const args = Object.fromEntries(process.argv.slice(2).map((a) => (a.startsWith('--') ? [a.slice(2).split('=')[0], a.includes('=') ? a.slice(a.indexOf('=') + 1) : true] : [a, true])));
 const only = args.only ? new Set(String(args.only).split(',')) : null;
@@ -144,6 +153,7 @@ fs.writeFileSync(path.join(OUT, 'poses.json'), JSON.stringify(list, null, 1) + '
           const cam = j.camera || list.camera;
           camera.position.set(...cam.pos); camera.lookAt(new THREE.Vector3(...cam.target));
           const model = seededMob(j.mob, () => M.makeMob(j.mob, j.color, j.scale || 1, j.accent, !!j.boss));
+          if (j.mob_state) M.animateMob(model, j.mob_state);
           scene.add(model);
           renderer.render(scene, camera);
           out[j.id] = cv.toDataURL('image/png').split(',')[1];

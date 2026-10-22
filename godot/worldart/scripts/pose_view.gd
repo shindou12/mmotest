@@ -1,5 +1,6 @@
 extends Node3D
 ## 人物の姿勢を並べて撮るための場面（G2-2）。ブラウザ版（tools/worldart/godot/pose_shots.mjs）と同じ条件で撮り、pose_sheet.py で並べて比べる。
+const MobAnim = preload("res://scripts/game/mob_anim.gd")
 ##   godot --path . --resolution 960x720 scenes/pose_view.tscn -- --weapon=greatsword:3:4 --state='{"swing":0.5,"combo":1}' --out=/abs/a.png
 ##   godot --path . --resolution 960x720 scenes/pose_view.tscn -- --list=/abs/poses.json          # 一覧（pose_shots.mjs が書く）
 ## 引数: --weapon=<武器>:<形>:<飾りの段階>  --state=<animatePlayer に渡す状態の JSON（モーションは {"motion":"heavy","motionT":0.4}）>
@@ -117,6 +118,9 @@ func _shoot(job: Dictionary) -> bool:
 		var accent_color: Variant = Color(String(job["accent"])) if job.has("accent") else null
 		_mob_model = GameVisuals.mob(String(job["mob"]), Color(String(job.get("color", "#448a9b"))),
 			float(job.get("scale", 1.0)), bool(job.get("boss", false)), accent_color)
+		if job.has("mob_state"):
+			MobAnim.setup(_mob_model)
+			MobAnim.animate(_mob_model, job["mob_state"])
 		add_child(_mob_model)
 		await get_tree().process_frame
 		await get_tree().process_frame

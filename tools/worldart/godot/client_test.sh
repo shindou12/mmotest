@@ -126,4 +126,9 @@ echo "$G" | grep -E "^(OK|NG|照合)"
 G=$(cd godot/worldart && timeout -k 5 300 godot --headless --path . -s res://scripts/tests/poses_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"
 [ $gs -eq 0 ] || { echo "NG  姿勢の照合（終了コード $gs）"; ok=1; }
+# 敵の動きの照合（JavaScript の animateMob が出した部品値・発光を 1e-4 で比べる）
+[ -f godot/worldart/data/mobs_golden.json ] || node tools/worldart/godot/golden_mobs.mjs > /dev/null
+G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/mobs_golden.gd 2>&1); gs=$?
+echo "$G" | grep -E "^(OK|NG|照合)"
+[ $gs -eq 0 ] || { echo "NG  敵の動きの照合（終了コード $gs）"; ok=1; }
 exit $ok

@@ -27,3 +27,5 @@ godot/worldart/data/poses_golden.json
 godot/worldart/data/combat_golden.json
 # 当たりの照合の生の値（node tools/worldart/godot/golden_strikes.mjs で作り直せる。client_test.sh がなければ作る）
 godot/worldart/data/strikes_golden.json
+# 敵の動きの照合用、生の期待値
+godot/worldart/data/mobs_golden.json
