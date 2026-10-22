@@ -8,7 +8,7 @@ set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 MODEL=${LUNA_MODEL:-gpt-6-luna}
 EFFORT=${LUNA_EFFORT:-max}
-TIER=${LUNA_TIER:-fast}   # 高速（Codex の service_tier。ChatGPT のプランの利用枠の範囲で、API の従量課金ではない）。ふつうは LUNA_TIER=default
+TIER=${LUNA_TIER:-default}   # 速さ（Codex の service_tier）。1 週間の枠を長持ちさせるため既定はふつう（2026-10-22 夜）。急ぐ札だけ LUNA_TIER=fast
 command -v codex >/dev/null 2>&1 || { echo "codex がない: sh tools/agents/setup.sh"; exit 2; }
 
 if [ "${1:-}" = "--check" ]; then
