@@ -122,6 +122,7 @@ func _load_char() -> void:
 	if not ch.get("wt") is Dictionary: ch["wt"] = {}
 	if not ch.get("slots") is Array: ch["slots"] = [null, null]
 	_apply_test_args()
+	if args.has("inv-demo"): items.apply_inventory_demo()
 	_calc()
 
 
@@ -188,7 +189,7 @@ func _recalc() -> void:
 
 
 func _save_char() -> void:
-	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall"): return   # 確認用に武器・ツリーを引数で入れたキャラは保存しない（本物のセーブを書き換えない）
+	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
 	var f := FileAccess.open(SAVE, FileAccess.WRITE)
 	f.store_string(JSON.stringify(ch))
 
@@ -779,7 +780,7 @@ func _setup_hud() -> void:
 	hud_ui = GameHud.new()
 	hud_ui.build(root, self)
 	items.build_ui(root)
-	if args.has("inv"): items.toggle()   # 確認用: 持ち物の画面を開いて始める
+	if args.has("inv") or args.has("inv-demo"): items.toggle()   # 確認用: --inv-demo はサンプルの持ち物と説明も開く
 	# はじめの画面（名前とサーバー）
 	ui.menu = PanelContainer.new()
 	root.add_child(ui.menu)

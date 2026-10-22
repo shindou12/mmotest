@@ -722,7 +722,7 @@ func _build_topbar() -> void:
 		top_buttons[String(spec[0])] = btn
 
 
-## 上のボタン。持ち物（仮の画面）だけ開く。ほかの画面は G7-4 以降で作るまで知らせるだけ。
+## 上のボタン。持ち物は inventory_panel.gd を開閉し、ほかの画面は準備中と知らせる。
 func _on_top_button(which: String) -> void:
 	print("HUD top button ", which)
 	if which == "inv" and game.items != null:
