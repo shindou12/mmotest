@@ -50,6 +50,9 @@ const GameNpcPanel = preload("res://scripts/game/npc_panel.gd")
 const GameSmithPanel = preload("res://scripts/game/smith_panel.gd")
 const GameBoxPanel = preload("res://scripts/game/box_panel.gd")
 const GameGatePanel = preload("res://scripts/game/gate_panel.gd")
+const GameLoginPanel = preload("res://scripts/game/login_panel.gd")
+const GameChatPanel = preload("res://scripts/game/chat_panel.gd")
+const GameDebugPanel = preload("res://scripts/game/debug_panel.gd")
 
 const SETTINGS_KEY := "eterna_settings_v1"
 const SETTINGS_PATH := "user://eterna_settings_v1.json"
@@ -62,6 +65,7 @@ var hud := CanvasLayer.new()
 
 var args := {}
 var ch := {}              # キャラクター（保存する）: name・color・lv・xp・gold・wk・watk
+var has_saved_character := false
 var S := {}               # 計算済みの能力値（rules.gd calc_stats）
 var me := {}              # 自分の状態（ブラウザ版の state.me にあたる）
 var area_id := ""
@@ -93,6 +97,10 @@ var npc_panel
 var smith_panel
 var box_panel
 var gate_panel
+var login_panel
+var chat_panel
+var debug_panel
+var preview_t := 0.0
 var box_items: Array = []
 var box_max := 60
 var box_loaded := false
@@ -125,6 +133,8 @@ func _ready() -> void:
 	net.closed.connect(func(): _log("サーバーとの接続が切れました", Color(1, 0.4, 0.4)))
 	_load_char()
 	_setup_camera()
+	if not args.has("auto") and not args.has("bot"):
+		_setup_login_preview()
 	_setup_hud()
 	if args.has("auto") or args.has("bot"):
 		_start(args.get("name", ch.get("name", "Godot")), args.get("server", "ws://127.0.0.1:8080/ws"))
@@ -181,21 +191,25 @@ func _sfx(name: String, opt: Dictionary = {}) -> void:
 
 # ---------------------------------------------------------------- キャラクター（保存は user://。ブラウザ版のセーブとは別）
 func _load_char() -> void:
+	has_saved_character = false
 	if args.has("demo-ui") or args.has("test-ui"):
-		ch = {"name": "NpcTest", "color": "#448a9b", "lv": 1, "xp": 0, "gold": 0}
+		ch = {"name": "NpcTest", "color": "#3aa0ff", "lv": 1, "xp": 0, "gold": 0}
+	elif args.has("login-new"):
+		ch = _new_character("Godot", "#3aa0ff", String(args.get("wk", GameRules.data().get("defaultWeapon", "sword"))))
+	elif args.has("login-existing"):
+		ch = _new_character("G7-8", "#3aa0ff", String(args.get("wk", GameRules.data().get("defaultWeapon", "sword"))))
+		ch["lv"] = 5
+		has_saved_character = true
+	elif args.has("debug"):
+		ch = _new_character(String(args.get("name", "Debug")), String(args.get("color", "#3aa0ff")), String(GameRules.data().get("defaultWeapon", "sword")))
 	elif FileAccess.file_exists(SAVE):
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(SAVE))
-		ch = parsed if parsed is Dictionary else {}
+		if parsed is Dictionary:
+			ch = parsed
+			has_saved_character = true
 	if ch.is_empty():
-		ch = {"name": "Godot", "color": "#448a9b", "lv": 1, "xp": 0, "gold": 0}
-	if not ch.has("eq"):   # 初心者の片手剣（ブラウザ版の新しいキャラと同じ: data.js starterWeapon）
-		ch["eq"] = {"weapon": {"slot": "weapon", "kind": "sword", "rarity": 1, "ilvl": 1, "affixes": [], "enh": 0, "atk": 6, "name": "初心者の片手剣", "skill": "retreat"}}
-	if not ch.has("inv"): ch["inv"] = []
-	# 武器ツリー・旧ツリー・熟練度・Q/E のスロット（ブラウザ版 character-store.js と同じ形）
-	if not ch.get("tree") is Dictionary: ch["tree"] = {}
-	if not ch.get("prof") is Dictionary: ch["prof"] = {}
-	if not ch.get("wt") is Dictionary: ch["wt"] = {}
-	if not ch.get("slots") is Array: ch["slots"] = [null, null]
+		ch = _new_character("Godot", "#3aa0ff", String(GameRules.data().get("defaultWeapon", "sword")))
+	_normalize_character()
 	_apply_test_args()
 	if args.has("map-demo"):
 		ch["waypoints"] = {"f1_town": true, "f1_field": true}
@@ -204,6 +218,58 @@ func _load_char() -> void:
 	if args.has("inv-demo"): items.apply_inventory_demo()
 	if args.has("demo-ui"): _apply_g7_7_demo_character()
 	_calc()
+
+
+## Browser character-store.js と同じフィールド名で新しいキャラを作る。
+func _new_character(pname: String, color: String, kind: String) -> Dictionary:
+	var safe_kind := kind if GameRules.data()["weapons"].has(kind) else String(GameRules.data().get("defaultWeapon", "sword"))
+	return {
+		"name": pname, "color": color, "lv": 1, "xp": 0, "gold": 0,
+		"inv": [], "eq": {"weapon": _starter_weapon(safe_kind), "armor": null, "acc": null, "title": null},
+		"tree": {}, "slots": [null, null], "quests": {}, "mats": {"shard": 0, "gems": {}},
+		"codex": {}, "titles": {}, "areas": {}, "waypoints": {}, "explored": {}, "chests": {}, "pin": null,
+		"potBonus": 0, "autoSalvage": -1, "prof": {}, "profBest": 0, "wt": {},
+	}
+
+
+func _normalize_character() -> void:
+	if not ch.get("eq") is Dictionary: ch["eq"] = {}
+	var eq: Dictionary = ch["eq"]
+	var weapon: Variant = eq.get("weapon", null)
+	var default_kind := String(GameRules.data().get("defaultWeapon", "sword"))
+	if weapon is Dictionary and GameRules.data()["weapons"].has(String(weapon.get("kind", ""))):
+		default_kind = String(weapon["kind"])
+	else:
+		eq["weapon"] = _starter_weapon(default_kind)
+	for slot in ["armor", "acc", "title"]:
+		if not eq.has(slot): eq[slot] = null
+	ch["eq"] = eq
+	if not ch.get("inv") is Array: ch["inv"] = []
+	for key in ["tree", "quests", "codex", "titles", "areas", "waypoints", "explored", "chests", "prof", "wt"]:
+		if not ch.get(key) is Dictionary: ch[key] = {}
+	if not ch.get("slots") is Array: ch["slots"] = [null, null]
+	while ch["slots"].size() < 2: ch["slots"].append(null)
+	ch["slots"] = ch["slots"].slice(0, 2)
+	if not ch.get("mats") is Dictionary: ch["mats"] = {"shard": 0, "gems": {}}
+	if not ch["mats"].get("gems") is Dictionary: ch["mats"]["gems"] = {}
+	if not ch.has("pin"): ch["pin"] = null
+	if not ch.has("potBonus"): ch["potBonus"] = 0
+	if not ch.has("autoSalvage"): ch["autoSalvage"] = -1
+	if not ch.has("profBest"): ch["profBest"] = 0
+	ch["name"] = String(ch.get("name", "Godot"))
+	if ch["name"].is_empty(): ch["name"] = "Godot"
+	var color := Color.from_string(String(ch.get("color", "#3aa0ff")), Color.html("#3aa0ff"))
+	ch["color"] = "#" + color.to_html(false)
+	ch["lv"] = clampi(int(ch.get("lv", 1)), 1, GameRules.data()["levels"].size())
+	ch["xp"] = maxi(0, int(ch.get("xp", 0)))
+	ch["gold"] = maxi(0, int(ch.get("gold", 0)))
+
+
+func _setup_login_preview() -> void:
+	area_id = "f1_town"
+	area = GameRules.area(area_id)
+	world.load_area(area_id)
+	preview_t = 0.0
 
 
 func _apply_g7_7_demo_character() -> void:
@@ -266,7 +332,13 @@ func _apply_test_args() -> void:
 ## 初心者の武器（data.js starterWeapon の簡略: 攻撃力 6・並・先頭の武器スキル）
 func _starter_weapon(kind: String) -> Dictionary:
 	var D := GameRules.data()
-	return {"slot": "weapon", "kind": kind, "rarity": 1, "ilvl": 1, "affixes": [], "enh": 0, "atk": 6, "name": "初心者の" + String(D["weapons"][kind]["name"]), "skill": D["weaponSkillPool"][kind][0]}
+	var weapon_kind := kind if D["weapons"].has(kind) else String(D.get("defaultWeapon", "sword"))
+	var weapon := {"id": "starter_%s_%d" % [weapon_kind, Time.get_ticks_usec()], "slot": "weapon", "kind": weapon_kind,
+		"rarity": 1, "ilvl": 1, "bm": 1.2, "affixes": [], "enh": 0, "v": 3,
+		"weight": float(D["weapons"][weapon_kind].get("weight", 4)), "atk": 6,
+		"name": "初心者の" + String(D["weapons"][weapon_kind]["name"]), "skill": D["weaponSkillPool"][weapon_kind][0]}
+	if weapon_kind == "sword": weapon["starterSkillVersion"] = 1
+	return weapon
 
 
 ## 能力値を計算し直す（stats.js calcStats）。戦闘の環境（combat.ctx）にも渡す
@@ -282,9 +354,13 @@ func _recalc() -> void:
 
 
 func _save_char() -> void:
-	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo") or args.has("tree-demo") or args.has("shot") or args.has("test-ui") or args.has("demo-ui"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
+	if args.has("debug") or args.has("login-new") or args.has("login-existing") or args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo") or args.has("tree-demo") or args.has("shot") or args.has("test-ui") or args.has("demo-ui"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
 	var f := FileAccess.open(SAVE, FileAccess.WRITE)
+	if f == null:
+		push_warning("キャラクターを保存できません: " + SAVE)
+		return
 	f.store_string(JSON.stringify(ch))
+	has_saved_character = true
 
 
 func _reset_me() -> void:
@@ -302,15 +378,49 @@ func _reset_me() -> void:
 	_calc()   # me.hp を最大 HP に切り詰める・afterStats
 
 
-func _start(pname: String, url: String) -> void:
-	ch["name"] = pname
+func _start(pname: String, url: String, color_hex: String = "", kind: String = "") -> void:
+	var chosen_name := pname.strip_edges()
+	if chosen_name.is_empty(): chosen_name = "プレイヤー"
+	if not has_saved_character and not (args.has("auto") or args.has("bot")):
+		var chosen_color := color_hex if not color_hex.is_empty() else String(ch.get("color", "#3aa0ff"))
+		var current_kind := String(ch.get("eq", {}).get("weapon", {}).get("kind", GameRules.data().get("defaultWeapon", "sword")))
+		var chosen_kind := kind if not kind.is_empty() else current_kind
+		ch = _new_character(chosen_name, chosen_color, chosen_kind)
+	else:
+		_normalize_character()
+		ch["name"] = chosen_name
+		if not color_hex.is_empty():
+			var parsed_color := Color.from_string(color_hex, Color.html("#3aa0ff"))
+			ch["color"] = "#" + parsed_color.to_html(false)
+	if ui.menu != null: ui.menu.visible = false
 	_save_char()
 	_reset_me()
-	ui.menu.visible = false
 	started = true
+	if chat_panel != null: chat_panel.root.visible = true
+	if debug_panel != null:
+		debug_panel.set_active(args.has("debug"))
+		if args.has("debug") and args.has("debug-panel"): debug_panel.panel.visible = true
 	_log("接続中: " + url)
 	net.connect_to(url)
 	net.opened.connect(func(): net.send({"t": "hello", "name": ch["name"], "color": ch["color"], "lv": ch["lv"]}), CONNECT_ONE_SHOT)
+
+
+func _prepare_fresh_character(pname: String, color: Color, kind: String) -> void:
+	if FileAccess.file_exists(SAVE):
+		var err := DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
+		if err != OK:
+			push_warning("古いキャラクターを削除できません: %s" % err)
+	has_saved_character = false
+	var fresh_name := pname.strip_edges() if not pname.strip_edges().is_empty() else "Godot"
+	ch = _new_character(fresh_name, "#" + color.to_html(false), kind)
+	_normalize_character()
+
+
+func _send_chat(text: String) -> void:
+	if args.get("test-ui", "") == "chat":
+		args["_chat_test_text"] = text
+		print("G7_8 CHAT SEND OK t=chat field=text")
+	net.send({"t": "chat", "text": text})
 
 
 # ---------------------------------------------------------------- サーバーからのメッセージ（net-client.js onMsg）
@@ -321,6 +431,12 @@ func _on_msg(m: Dictionary) -> void:
 			unlocked = int(m.get("unlocked", 1))
 			_enter_area(m.area, m.x, m.z)
 			if not args.has("town"): net.send({"t": "wp", "to": args.get("start", "f1_field")})   # 試作は草原から
+			if chat_panel != null:
+				chat_panel.add_message("", "サーバーに接続しました。友達を誘おう！", Color.html("#99ffee"))
+				chat_panel.add_message("", "町の人に話しかけると（F）サブクエストを受けられます。町の共有ボックスで仲間と装備を受け渡しできます。", Color.html("#99ffee"))
+				chat_panel.add_message("", "協力ハード：3〜5人推奨。敵のHPは3人基準／回復30%・再使用8秒／戦闘不能でキャラのセーブデータを失います。", Color.html("#ffb27a"))
+			if args.has("chat-demo"):
+				call_deferred("_send_chat_demo")
 			if args.has("test-ui") and not args.has("_ui_test_started"):
 				args["_ui_test_started"] = "1"
 				call_deferred("_run_ui_test")
@@ -379,7 +495,16 @@ func _on_msg(m: Dictionary) -> void:
 				_save_char()
 				_sfx("pickup")
 			if box_panel != null: box_panel.refresh()
-		"chat": _log(("%s: " % m.from if m.from != "" else "") + String(m.text), Color.html(m.get("color", "#ffffff")))
+		"chat":
+			var chat_from := String(m.get("from", ""))
+			var chat_text := String(m.get("text", ""))
+			var chat_color := Color.from_string(String(m.get("color", "#ffffff")), Color.WHITE)
+			if chat_panel != null: chat_panel.add_message(chat_from, chat_text, chat_color)
+			var expected_chat := String(args.get("_chat_test_text", ""))
+			if not expected_chat.is_empty() and chat_from == String(ch.get("name", "")) and chat_text == expected_chat:
+				args["_chat_test_received"] = "1"
+				print("G7_8 CHAT RECEIVE OK from=%s text=%s" % [chat_from, chat_text])
+				if args.has("chat-demo"): chat_panel.call_deferred("open_input")
 		"leave": _remove_other(int(m.id))
 		"revived": Hurt.revived(combat.ctx, String(m.by))
 		"bleed":
@@ -785,10 +910,25 @@ func _run_ui_test() -> void:
 			_interact()
 			await get_tree().create_timer(0.5).timeout
 			print("G7_7 BOX OPEN %s" % ("OK" if box_panel.panel.visible and box_loaded else "NG"))
+		"chat":
+			var message := "G7-8 chat roundtrip"
+			chat_panel.open_input()
+			chat_panel.input.text = message
+			chat_panel.input.emit_signal("text_submitted", message)
+			await get_tree().create_timer(0.6).timeout
+			print("G7_8 CHAT ROUNDTRIP %s" % ("OK" if args.get("_chat_test_received", "") == "1" else "NG"))
 		_:
 			print("G7_7 UI TEST NG unknown=%s" % check)
 	await get_tree().create_timer(0.2).timeout
 	get_tree().quit()
+
+
+func _send_chat_demo() -> void:
+	if chat_panel == null: return
+	chat_panel.open_input()
+	var message := "G7-8 chat preview"
+	chat_panel.input.text = message
+	chat_panel.input.emit_signal("text_submitted", message)
 
 
 func _find_button(root: Node, text: String) -> Button:
@@ -832,6 +972,10 @@ func _process(real_dt: float) -> void:
 	if args.has("quit") and t_now > float(args["quit"]):
 		if args.has("bot"): print("FXTODO ", JSON.stringify(combat.ctx.todo))   # 見た目・音で呼ばれたが未実装の名前と回数（G8）
 		get_tree().quit()
+	if not started and area_id == "f1_town":
+		preview_t += real_dt * 0.05
+		cam.position = Vector3(sin(preview_t) * 40.0, 16.0, cos(preview_t) * 40.0)
+		cam.look_at(Vector3(0.0, 2.0, 0.0), Vector3.UP)
 	if args.has("shot") and area_id == args.get("shotarea", "f1_field") and (args.has("panel") or mobs.size() > 0 or area["type"] in ["town", "camp"]):
 		# 撮影（確認用）: そのエリアに入って敵が見えてから <フレーム数> 後に撮って終わる。--shot=<フレーム数>:<出力.png>
 		var sp: PackedStringArray = String(args["shot"]).split(":", true, 1)
@@ -937,13 +1081,24 @@ func _process(real_dt: float) -> void:
 func _unhandled_input(ev: InputEvent) -> void:
 	if not started: return
 	if ev is InputEventKey and ev.pressed and not ev.echo:
+		if ev.keycode == KEY_F2 and args.has("debug"):
+			debug_panel.toggle()
+			get_viewport().set_input_as_handled()
+			return
+		if ev.keycode in [KEY_ENTER, KEY_KP_ENTER]:
+			if _modal_panel_open(): return
+			chat_panel.open_input()
+			get_viewport().set_input_as_handled()
+			return
 		if ev.physical_keycode == KEY_M:
 			if _modal_panel_open(): return
 			_toggle_map()
 			get_viewport().set_input_as_handled()
 			return
 		if ev.keycode == KEY_ESCAPE:
-			if _modal_panel_open():
+			if chat_panel != null and chat_panel.is_editing():
+				chat_panel.close_input()
+			elif _modal_panel_open():
 				_close_top_panel()
 			else:
 				_toggle_settings()
@@ -982,11 +1137,15 @@ func _modal_panel_open() -> bool:
 	var tree_open: bool = tree_panel != null and tree_panel.is_open()
 	var map_open: bool = hud_ui != null and hud_ui.map_panel != null and hud_ui.map_panel.is_open()
 	var settings_open: bool = hud_ui != null and hud_ui.settings_panel != null and hud_ui.settings_panel.is_open()
-	return inventory_open or tree_open or map_open or settings_open or (npc_panel != null and npc_panel.panel.visible) or (smith_panel != null and smith_panel.panel.visible) or (box_panel != null and box_panel.panel.visible) or (gate_panel != null and gate_panel.panel.visible)
+	var chat_editing: bool = chat_panel != null and chat_panel.is_editing()
+	var debug_open: bool = debug_panel != null and debug_panel.is_open()
+	return inventory_open or tree_open or map_open or settings_open or chat_editing or debug_open or (npc_panel != null and npc_panel.panel.visible) or (smith_panel != null and smith_panel.panel.visible) or (box_panel != null and box_panel.panel.visible) or (gate_panel != null and gate_panel.panel.visible)
 
 
 func _close_top_panel() -> void:
-	if npc_panel != null and npc_panel.panel.visible: npc_panel.close()
+	if debug_panel != null and debug_panel.is_open(): debug_panel.close()
+	elif chat_panel != null and chat_panel.is_editing(): chat_panel.close_input()
+	elif npc_panel != null and npc_panel.panel.visible: npc_panel.close()
 	elif smith_panel != null and smith_panel.panel.visible: smith_panel.close()
 	elif box_panel != null and box_panel.panel.visible: box_panel.close()
 	elif gate_panel != null and gate_panel.panel.visible: gate_panel.close()
@@ -1590,23 +1749,24 @@ func _setup_hud() -> void:
 	box_panel.build_ui(root)
 	gate_panel = GameGatePanel.new(self)
 	gate_panel.build_ui(root)
+	chat_panel = GameChatPanel.new()
+	chat_panel.build(root)
+	chat_panel.send_requested.connect(_send_chat)
+	debug_panel = GameDebugPanel.new()
+	debug_panel.build(root, self)
+	login_panel = GameLoginPanel.new()
+	var fresh_kind := String(ch.get("eq", {}).get("weapon", {}).get("kind", GameRules.data().get("defaultWeapon", "sword")))
+	var fresh_color := Color.from_string(String(args.get("color", "#3aa0ff")), Color.html("#3aa0ff"))
+	ui.menu = login_panel.build(root, ch, has_saved_character, fresh_kind, fresh_color)
+	login_panel.start_requested.connect(func(pname: String, picked_color: Color, kind: String):
+		_start(pname, String(args.get("server", "ws://127.0.0.1:8080/ws")), "#" + picked_color.to_html(false), kind)
+	)
+	login_panel.fresh_requested.connect(_prepare_fresh_character)
 	if args.has("inv") or (args.has("inv-demo") and not args.has("demo-ui")): items.toggle()   # 確認用: --inv-demo はサンプルの持ち物と説明も開く
 	if args.has("tree-demo"):
 		tree_panel.open(tree_panel.tree_tab)
 		print("TREE_DEMO_STATE_JSON=", JSON.stringify(ch))
 		tree_panel.call_deferred("log_demo_layout")
-	# はじめの画面（名前とサーバー）
-	ui.menu = PanelContainer.new()
-	root.add_child(ui.menu)
-	ui.menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER); ui.menu.offset_left = -230; ui.menu.offset_right = 230; ui.menu.offset_top = -130; ui.menu.offset_bottom = 130
-	var mv := VBoxContainer.new(); mv.custom_minimum_size = Vector2(440, 0); ui.menu.add_child(mv)
-	var title := Label.new(); title.text = "浮遊城エテルナ（Godot 試作）"; title.add_theme_font_size_override("font_size", 26); mv.add_child(title)
-	var l1 := Label.new(); l1.text = "名前"; mv.add_child(l1)
-	ui.name_edit = LineEdit.new(); ui.name_edit.text = ch.get("name", "Godot") if not ch.is_empty() else "Godot"; mv.add_child(ui.name_edit)
-	var l2 := Label.new(); l2.text = "サーバー（npm start で立てたゲームのサーバー）"; mv.add_child(l2)
-	ui.url_edit = LineEdit.new(); ui.url_edit.text = args.get("server", "ws://127.0.0.1:8080/ws"); mv.add_child(ui.url_edit)
-	var btn := Button.new(); btn.text = "はじめる"; mv.add_child(btn)
-	btn.pressed.connect(func(): _start(ui.name_edit.text, ui.url_edit.text))
 
 
 func _update_hud() -> void:
@@ -1615,6 +1775,7 @@ func _update_hud() -> void:
 		_apply_hud_demo()
 	hud_ui.set_quests(QuestModel.hud_entries(ch))
 	hud_ui.update()
+	if debug_panel != null: debug_panel.update()
 	if args.has("demo-ui"):
 		hud_ui.help_panel.visible = false
 		hud_ui.banner("")

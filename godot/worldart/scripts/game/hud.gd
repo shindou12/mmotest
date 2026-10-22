@@ -544,7 +544,7 @@ func _build_help() -> void:
 
 
 func _build_death() -> void:
-	# #death: public/style.css 327-328。全画面の暗い赤い楕円、中央 36px、補足 14px。
+	# #death: public/index.html L221 と public/style.css L327-328。文言は同じ。ブラウザ側にもボタンはなく、時間後に新規キャラへ戻る。
 	death_overlay = Control.new()
 	death_overlay.name = "Death"
 	death_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -580,10 +580,12 @@ func _build_death() -> void:
 	labels.death = _label("HP が尽きた…", 36, Color.html("#ff8888"))
 	labels.death.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	labels.death.custom_minimum_size = Vector2(1000.0, 46.0)
+	labels.death.add_theme_constant_override("font_spacing", 11) # CSS letter-spacing: .3em at 36px.
 	center.add_child(labels.death)
 	labels.death_t = _label("", 14, Color.html("#cccccc"))
 	labels.death_t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	labels.death_t.custom_minimum_size = Vector2(1000.0, 20.0)
+	labels.death_t.add_theme_constant_override("font_spacing", 1) # CSS letter-spacing: .1em at 14px.
 	center.add_child(labels.death_t)
 	death_overlay.visible = false
 

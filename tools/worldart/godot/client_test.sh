@@ -3,8 +3,20 @@
 #   sh tools/worldart/godot/client_test.sh
 # 確かめること（大剣・短剣・大斧は武器ごとの回あり）: 1) ログインして草原へ移る 2) 敵に攻撃が当たる 3) 敵を倒して経験値が入る 4) 出口から街へ移る 5) 出口から屋内（マス目）のエリアへ移る 6) 溜め斬り・武器スキル 7) 落とし物を拾い装備する（運しだい）
 cd "$(dirname "$0")/../../.."
+GODOT_COMMAND="${GODOT_BIN:-${G:-godot}}"
+GODOT_WRAPPER_DIR=
+if [ "$GODOT_COMMAND" != godot ]; then
+  GODOT_COMMAND="$(cygpath -u "$GODOT_COMMAND")"
+  GODOT_WRAPPER_DIR="$(mktemp -d /tmp/godot-client-test.XXXXXX)"
+  printf '#!/bin/sh\nexec "%s" "$@"\n' "$GODOT_COMMAND" > "$GODOT_WRAPPER_DIR/godot"
+  chmod +x "$GODOT_WRAPPER_DIR/godot"
+  PATH="$GODOT_WRAPPER_DIR:$PATH"
+  export PATH
+fi
 # Godot の user://logs が既定の AppData に書けない端末では、プロジェクト内の user_data を使う。
-APPDATA="$(cd godot/worldart/.godot/user_data && pwd -W)"
+TEST_APPDATA="${GODOT_TEST_APPDATA:-$PWD/godot/worldart/.godot/user_data/client_test}"
+mkdir -p "$TEST_APPDATA"
+APPDATA="$(cygpath -w "$TEST_APPDATA")"
 export APPDATA
 PORT=$((20000 + $$ % 20000))
 PORT=$PORT node server.js > /tmp/godot_client_test_server.log 2>&1 &
@@ -40,6 +52,8 @@ OUTSMITH=/tmp/godot_client_test_smith.log
 ( cd godot/worldart && timeout -k 5 30 godot --headless --path . -- --auto --town --name=SmithTest --test-ui=smith --server=ws://127.0.0.1:$PORT/ws > $OUTSMITH 2>&1 )
 OUTBOX=/tmp/godot_client_test_box.log
 ( cd godot/worldart && timeout -k 5 30 godot --headless --path . -- --auto --town --name=BoxTest --test-ui=box --server=ws://127.0.0.1:$PORT/ws > $OUTBOX 2>&1 )
+OUTCHAT=/tmp/godot_client_test_chat.log
+( cd godot/worldart && timeout -k 5 30 godot --headless --path . -- --auto --town --name=ChatTest --test-ui=chat --server=ws://127.0.0.1:$PORT/ws > $OUTCHAT 2>&1 )
 kill $SRV
 ok=0
 grep -q "LOG ひだまりの草原" $OUT && echo "OK  草原へ移った" || { echo "NG  草原へ移れない"; ok=1; }
@@ -117,6 +131,9 @@ done
 grep -q "G7_7 NPC ACCEPT OK" $OUTNPC && echo "OK  街で NPC に話してクエストを受ける" || { echo "NG  街で NPC に話してクエストを受ける"; grep -E "G7_7|SCRIPT ERROR" $OUTNPC; ok=1; }
 grep -q "G7_7 SMITH OPEN OK" $OUTSMITH && echo "OK  鍛冶屋を開く" || { echo "NG  鍛冶屋を開く"; grep -E "G7_7|SCRIPT ERROR" $OUTSMITH; ok=1; }
 grep -q "G7_7 BOX OPEN OK" $OUTBOX && echo "OK  共有ボックスを開く" || { echo "NG  共有ボックスを開く"; grep -E "G7_7|SCRIPT ERROR" $OUTBOX; ok=1; }
+grep -q "G7_8 CHAT SEND OK t=chat field=text" $OUTCHAT && echo "OK  チャットを送信: {t:chat, text}" || { echo "NG  チャットを送信"; grep -E "G7_8|SCRIPT ERROR" $OUTCHAT; ok=1; }
+grep -q "G7_8 CHAT RECEIVE OK from=ChatTest text=G7-8 chat roundtrip" $OUTCHAT && echo "OK  サーバー経由でチャットを受信" || { echo "NG  サーバー経由でチャットを受信"; grep -E "G7_8|SCRIPT ERROR" $OUTCHAT; ok=1; }
+grep -q "G7_8 CHAT ROUNDTRIP OK" $OUTCHAT && echo "OK  チャット送受信の往復" || { echo "NG  チャット送受信の往復"; grep -E "G7_8|SCRIPT ERROR" $OUTCHAT; ok=1; }
 # 設定の照合
 G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/settings_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|設定)"
@@ -154,5 +171,9 @@ echo "$G" | grep -E "^(OK|NG|照合)"
 [ -f godot/worldart/data/mobs_golden.json ] || node tools/worldart/godot/golden_mobs.mjs > /dev/null
 G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/mobs_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"
+if [ -n "$GODOT_WRAPPER_DIR" ]; then
+  rm -f "$GODOT_WRAPPER_DIR/godot"
+  rmdir "$GODOT_WRAPPER_DIR"
+fi
 [ $gs -eq 0 ] || { echo "NG  敵の動きの照合（終了コード $gs）"; ok=1; }
 exit $ok
