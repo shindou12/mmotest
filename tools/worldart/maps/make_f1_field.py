@@ -94,8 +94,8 @@ def region(x, z):
 # 地域ごとの木立の種類と数（ゲームの飾りの木は ≈46 本。ここでは当たり判定の木 11 本 + 飾り）
 STYLE = {
     'south': dict(trees=['maple2_s', 'maple2_t', 'maple2_a'], groves=10, count=(2, 4)),
-    'west': dict(trees=['fir3_a', 'maple2_t', 'fir3_b', 'fir3_a', 'maple2_s'], groves=18, count=(3, 6)),
-    'north': dict(trees=['maple2_t', 'fir3_a', 'maple2_s'], groves=11, count=(2, 4)),
+    'west': dict(trees=['fir4_a', 'maple2_t', 'fir4_b', 'fir4_c', 'maple2_s'], groves=18, count=(3, 6)),
+    'north': dict(trees=['maple2_t', 'fir4_c', 'maple2_s'], groves=11, count=(2, 4)),
     'east': dict(trees=['maple2_s', 'maple2_a', 'maple2_t'], groves=9, count=(2, 3)),
     'center': dict(trees=['maple2_s'], groves=0, count=(1, 1)),
 }
@@ -211,7 +211,7 @@ g['paths'] = paths
 g['zones'] = [{
     # 外周の林: 輪郭の 3〜24m 外（中から見て画面の上端より外まで）（画面の外の木の影も暗い所を作る。rulebook 10.2）
     'kind': 'forest', 'world': ring(24.0), 'exclude': ring(3.0), 'noRock': True,
-    'trees': ['maple2_s', 'maple2_t', 'fir3_a', 'maple2_a', 'maple2_t'], 'spacing': 3.3, 'scale': [0.9, 1.08],
+    'trees': ['maple2_s', 'maple2_t', 'fir4_a', 'maple2_a', 'maple2_t'], 'spacing': 3.3, 'scale': [0.9, 1.08],
 }]
 g['groves'] = []
 g['trees'] = trees

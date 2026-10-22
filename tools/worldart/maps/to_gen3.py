@@ -8,7 +8,7 @@ import sys, os, json, copy
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 TPL = json.load(open(os.path.join(ROOT, 'docs/world-art/templates/map-gen3.json')))
 REP = {'maple_a': 'maple2_a', 'maple_b': 'maple2_b', 'maple_c': 'maple2_c', 'maple_big': 'maple2_big',   # 見本②と同じ置き換え（L06）
-       'fir2_a': 'fir3_a', 'fir2_b': 'fir3_b',      # もみ 第 3 世代（L24: 短い小枝の詰まった円錐）
+       'fir2_a': 'fir4_a', 'fir2_b': 'fir4_b',      # もみ 第 4 世代（2026-10-23: 段の枝。第 3 世代 fir3 は L24）
        'rock_c': 'rock_s'}                            # 小石はなめらかな形（rulebook 7.2）
 
 

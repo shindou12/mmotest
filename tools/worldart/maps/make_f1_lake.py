@@ -98,8 +98,8 @@ def region(x, z):
 
 
 STYLE = {
-    'north': dict(trees=['maple2_t', 'fir3_a', 'maple2_a', 'maple2_s', 'fir3_b'], groves=9, count=(3, 5)),
-    'west': dict(trees=['fir3_a', 'fir3_b', 'maple2_t', 'fir3_a'], groves=6, count=(2, 4)),
+    'north': dict(trees=['maple2_t', 'fir4_a', 'maple2_a', 'maple2_s', 'fir4_b'], groves=9, count=(3, 5)),
+    'west': dict(trees=['fir4_a', 'fir4_b', 'maple2_t', 'fir4_c'], groves=6, count=(2, 4)),
     'east': dict(trees=['maple2_s', 'maple2_a', 'maple2_t'], groves=4, count=(2, 3)),
     'south': dict(trees=['maple2_s', 'maple2_t'], groves=2, count=(1, 2)),
 }
@@ -179,7 +179,7 @@ g['ground'] = dict(g['ground'], altTint=[0.98, 0.93, 0.8])
 g['paths'] = paths
 g['zones'] = [{
     'kind': 'forest', 'world': ring(24.0), 'exclude': ring(3.0), 'noRock': True,
-    'trees': ['maple2_s', 'maple2_t', 'fir3_a', 'maple2_a', 'maple2_t'], 'spacing': 3.3, 'scale': [0.9, 1.08],
+    'trees': ['maple2_s', 'maple2_t', 'fir4_a', 'maple2_a', 'maple2_t'], 'spacing': 3.3, 'scale': [0.9, 1.08],
 }]
 g['groves'] = []
 g['trees'] = trees

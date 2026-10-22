@@ -431,7 +431,61 @@ def plate_maple(n=512, seed=115):
     finish(img, n, n, 'plate_maple.png')
 
 
+def needle_spray(d, x, y, ang, L, W, dark, mid, hi, teeth=9):
+    """針葉の小枝 1 本: 根元 (x, y) から ang へ長さ L。縁は先へ向いた針の先の歯（左右で半歯ずらす）の、先のとがった葉片。下に暗い影、上半分に明るい面"""
+    def outline(L_, W_, k):
+        nx, ny = -math.sin(ang), math.cos(ang); ux, uy = math.cos(ang), math.sin(ang)
+        steps = teeth * 2
+        def side(sgn, phase, kk):
+            ps = []
+            for i in range(steps + 1):
+                t = min(1.0, (i + phase) / steps)
+                tip = (i % 2 == 1)
+                hw = W_ * math.sin(math.pi * min(1.0, 0.08 + t * 0.92)) ** 0.5 * (1 - 0.3 * t) * (1.0 if tip else 0.55)
+                tt = t + (0.025 if tip else 0.0)                 # 歯の先は少し先へ（針が前を向く）
+                ps.append((x + ux * L_ * tt + sgn * nx * hw * kk, y + uy * L_ * tt + sgn * ny * hw * kk))
+            return ps
+        return side(1, 0.0, k) + side(-1, 0.5, 1.0)[::-1]
+    d.polygon(outline(L * 1.04, W * 1.1, 1.0), fill=col(dark))
+    d.polygon(outline(L, W, 1.0), fill=col(mid))
+    d.polygon(outline(L * 0.82, W * 0.55, 0.2), fill=col(hi))
+
+
+def fan_fir4(n=512, seed=117):
+    """もみの枝 第 4 世代（見本 art/ref/trees/T01〜T04、RO3 プロンテラ南門のもみ）: 1 本の枝を上から見た扇。根元（下端の中央）から
+    のこぎり歯の縁の短い針葉の小枝が、枝の軸に沿って左右に重なる。外の縁は小枝の先のぎざぎざ、根元ほど暗い。
+    根元 = 下端（v = 0）。小枝を細かく・多くするより、木の側で枝を傾ける（ユーザー、2026-10-23）。
+    同じ形が並ぶと不自然なので（ユーザー、2026-10-23）、横に 4 種類並べた絵にする: 1 = 対称に近い枝、2 = 軸が横へ曲がった左右不ぞろいの枝、
+    3 = 小枝の多い詰まった短い枝、4 = 小枝のまばらな大きく曲がった枝（u 0.25 ごと）"""
+    r = rng(seed); W = n * SS
+    img = canvas(4 * n, n); d = ImageDraw.Draw(img)
+    for v, (pairs, bend, skip, reach) in enumerate([(6, 0.0, 0.0, 1.0), (5, 0.22, 0.18, 1.0), (8, -0.08, 0.05, 0.86), (4, -0.34, 0.22, 1.04)]):
+        bx, by = W * (v + 0.5), W * 0.98
+        def axis(s):                         # 軸の点（s: 0 = 根元、1 = 先）。右の枝は先が横へ曲がる
+            return bx + W * bend * 0.3 * s * s, by - W * 0.8 * reach * s
+        d.line([axis(s / 10) for s in range(11)], fill=col((0.20, 0.22, 0.12)), width=int(W * 0.016))   # 枝の軸（葉の下に）
+        sprays = []
+        for j in range(pairs):               # 軸に沿って左右の小枝。根元ほど長く外へ開き、先ほど短く前を向く
+            s = 0.06 + 0.72 / pairs * j + r.uniform(-0.02, 0.02)
+            x, y = axis(s)
+            for side in (-1, 1):
+                if r.random() < skip: continue
+                a = -math.pi / 2 + bend * 0.6 * s + side * (1.15 - 0.6 * s) + r.normal(0, 0.13)
+                L = W * 0.44 * reach * (1 - 0.6 * s) * r.uniform(0.8, 1.12) * (1 + side * bend * 0.6)
+                sprays.append((s + r.uniform(-0.03, 0.03), x, y, a, L))
+        tx, ty = axis(0.76)
+        sprays.append((0.8, tx, ty, -math.pi / 2 + bend * 0.7, W * r.uniform(0.17, 0.23)))
+        sprays.sort()
+        for depth, x, y, a, L in sprays:
+            dark = lerp((0.13, 0.24, 0.17), (0.20, 0.33, 0.16), depth)
+            mid = lerp((0.27, 0.43, 0.20), (0.44, 0.60, 0.21), depth)
+            hi = mid + (lerp((0.38, 0.55, 0.22), (0.64, 0.78, 0.29), depth) - mid) * 0.45   # 明るい筋は弱く（見本の枝はやわらかい。強いとシダの羽片に見える）
+            needle_spray(d, x, y, a, L, L * r.uniform(0.3, 0.38), dark, mid, hi, teeth=int(r.integers(7, 11)))
+    finish(img, 4 * n, n, 'fan_fir4.png')
+
+
 if __name__ == '__main__':
     spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
     plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); rock_face(); frond_fir3(); lavender(); flagstone(); meander()
+    fan_fir4()
     print('textures2 ->', OUT)

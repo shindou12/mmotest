@@ -72,6 +72,7 @@ M_PLATE = lambda: material('leaf_plate', 'plate_maple.png', alpha=True)
 M_CLUMP = lambda: material('leaf_clump', 'clump_maple.png', alpha=True)
 M_CLOVER = lambda: material('leaf_clover', 'spray_clover.png', alpha=True)
 M_FIR3 = lambda: material('leaf_fir3', 'frond_fir3.png', alpha=True)
+M_FIR4 = lambda: material('leaf_fir4', 'fan_fir4.png', alpha=True)
 M_FIRF = lambda: material('leaf_firfrond', 'frond_fir.png', alpha=True)
 M_GRASS2 = lambda: material('grass_tall', 'grass_tall.png', alpha=True)
 M_ROCK2 = lambda: material('rock_crack', 'rock_crack.png')
@@ -582,15 +583,15 @@ def card2(B, base, fwd, side, L, W, m, cols, nrm):
     B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], [cols[0], cols[0], cols[1], cols[1]], [nrm] * 4, m)
 
 
-def strip2(B, pts, widths, side, m, cols, nrm, v_end=1.0):
-    """折れ線に沿った帯（垂れる葉）。pts[0] が根元。UV v は 0→v_end"""
+def strip2(B, pts, widths, side, m, cols, nrm, v_end=1.0, u=(0.0, 1.0)):
+    """折れ線に沿った帯（垂れる葉）。pts[0] が根元。UV v は 0→v_end、u は u[0]→u[1]（絵の一部・左右反転に使う）"""
     n = len(pts); acc = [0.0]
     for i in range(1, n): acc.append(acc[-1] + (pts[i] - pts[i - 1]).length)
     rows = [(B.add_v(p - side * w / 2), B.add_v(p + side * w / 2)) for p, w in zip(pts, widths)]
     for i in range(n - 1):
         v0, v1 = acc[i] / acc[-1] * v_end, acc[i + 1] / acc[-1] * v_end
         a, b = rows[i], rows[i + 1]
-        B.face([a[0], a[1], b[1], b[0]], [(0, v0), (1, v0), (1, v1), (0, v1)], [cols[i], cols[i], cols[i + 1], cols[i + 1]], [nrm] * 4, m)
+        B.face([a[0], a[1], b[1], b[0]], [(u[0], v0), (u[1], v0), (u[1], v1), (u[0], v1)], [cols[i], cols[i], cols[i + 1], cols[i + 1]], [nrm] * 4, m)
 
 
 def maple(name, seed, width=3.4, height=4.8, base=1.6, clusters=11):
@@ -716,6 +717,74 @@ def fir3(name, seed, height=6.6, width=3.2):
         out = Vector((math.cos(a), math.sin(a), 0)) * 0.18
         pts = [Vector((0, 0, height * 0.88)) + (out + UP) * s * 0.7 for s in (0, 0.5, 1)]
         strip2(B, pts, [0.35, 0.4, 0.25], out.cross(UP).normalized(), M_FIR3(), [crown_color(1.0, 1.0, 0.6, 1.15)] * 3, (out + UP).normalized())
+    return B.build(name)
+
+
+def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15):
+    """もみ 第 4 世代（見本 art/ref/trees/T01〜T04、RO3 プロンテラ南門）: 段（輪生）に分かれた円錐。段ごとに、幹から外へ
+    枝の絵（fan_fir4: 上から見た 1 本の枝、2 種類）を輪に並べ、先を垂らす。2 枚重ね（上の輪は短く、半歩ずらす）で段の上面を閉じる。
+    枝の先がとがって段の縁がぎざぎざになり、段の下に暗い切れ目が残る。上の段ほど小さく明るい。細長い葉の帯（fir3）はシダに見えた。
+    同じ形を繰り返さない（ユーザー、2026-10-23）: 枝ごとに絵の種類・左右反転・長さ・垂れ・向き・抜けを、段ごとに大きさ・高さ・片寄り・ねじれを揺らす。
+    幹は少し傾け、木ごとに段の数と片寄りの向きを変える"""
+    R_ = random.Random(seed); B = Builder()
+    lx, ly = R_.uniform(-1, 1) * lean, R_.uniform(-1, 1) * lean    # 幹の傾き（先で lean m ずれる）
+    def trunk(z): return Vector((lx * (z / height) ** 1.5, ly * (z / height) ** 1.5, z))
+    tube(B, [Vector((0, 0, -0.3)), trunk(0), trunk(height * 0.4), trunk(height * 0.92)], [0.18, 0.15, 0.1, 0.03], M_BARK(), sides=7, ao=(0.3, 0.45))
+    base = height * R_.uniform(0.12, 0.16)                    # 一番下の段の付け根。枝が下向きに出て、裾は地面の近くまで下がる（P02・P04）
+    top = height * 0.9
+    Rs = [(width / 2 * (1 - i / tiers) ** 1.15 + 0.2) * R_.uniform(0.86, 1.12) * R_.choice((1.0, 1.0, 1.0, 0.82, 1.16)) for i in range(tiers)]   # 段の外の半径（下から）。細くとがった先からまっすぐ広がる円錐（幅 ≈ 高さの 0.6、P02・P04・T01）
+    gaps = [(r_ + width * 0.25) * R_.uniform(0.88, 1.12) for r_ in Rs[:-1]]   # 段の間隔は下ほど少し広い（段ごとに揺らす）
+    zs = [base]
+    for g in gaps: zs.append(zs[-1] + (top - base) * g / sum(gaps))
+    phi = R_.uniform(0, 2 * math.pi)                           # 木全体の片寄りの向き（光の来る側へ枝が長い、など）
+    for i in range(tiers):
+        t = i / (tiers - 1)
+        hz = zs[i]; R = Rs[i]
+        tb = t ** 1.1
+        skew = R_.uniform(0.05, 0.22); phi_i = phi + R_.uniform(-0.8, 0.8)
+        twist = R_.uniform(0, 2 * math.pi)
+        tilt, tdir = R_.uniform(0.0, 0.1), R_.uniform(0, 2 * math.pi)   # 段の傾き（段全体が片側へ下がる。輪がそろうと作り物に見える）
+        bright = R_.uniform(0.92, 1.08)                       # 段ごとの明るさの揺れ
+        for layer, (lf, rise, dark) in enumerate([(1.0, 0.0, 0.0), (0.74, 0.14, 0.2), (0.48, 0.3, 0.35)]):   # 外・中・芯の 3 枚重ね
+            Lb = R * lf
+            W = max(Lb * 1.05, 0.6)                           # 上の段も枝の幅を保つ（細いと幹が見えた）
+            n = max(4, int(math.ceil(2 * math.pi * (Lb * 0.55) / (W * 0.45))) + R_.choice((-1, 0, 0, 1)))
+            for k in range(n):
+                if layer == 0 and i < tiers - 2 and R_.random() < 0.09: continue   # ときどき枝が抜けて、下の段が見える
+                a = twist + 2 * math.pi * (k + 0.37 * layer) / n + R_.uniform(-.25, .25)
+                out = Vector((math.cos(a), math.sin(a), 0)); side = out.cross(UP).normalized()
+                # 枝を軸のまわりに傾ける（ユーザー、2026-10-23）: 平らに寝かせると、上から枝の絵がそのまま読めてシダの葉に見える
+                roll = R_.choice((-1, 1)) * R_.uniform(0.2, 0.5)
+                side = (side * math.cos(roll) + UP * math.sin(roll)).normalized()
+                L = Lb * (1 + skew * math.cos(a - phi_i)) * R_.uniform(0.78, 1.15)
+                Wk = W * R_.uniform(0.82, 1.12)
+                # 枝の向き（実物の写真 art/ref/trees/real/P02・P04・P05）: 下の段は幹から下向きに出て先が少し上へ反り、上の段ほど上を向く。
+                # 水平に突き出すと不自然（ユーザー、2026-10-23）。内側の層はさらに下向きにして段の下を埋める
+                pitch = -0.55 + 0.85 * t + R_.uniform(-0.16, 0.16) - 0.25 * (layer == 2) - tilt * math.cos(a - tdir)
+                curl = (0.28 - 0.25 * t) * R_.uniform(0.6, 1.2)          # 枝先の反り上がり（下の段ほど強い）
+                o = trunk(hz + rise * Lb + R_.uniform(-0.08, 0.08))
+                drop = -math.sin(pitch) * L - curl * L + abs(math.sin(roll)) * Wk * 0.5   # 枝先・傾けた縁の下がる量
+                if pitch < 0 and drop > o.z - 0.1:                         # 地面に潜らせない
+                    pitch = -math.asin(max(0.0, min(0.95, (o.z - 0.1 + curl * L - abs(math.sin(roll)) * Wk * 0.5) / L)))
+                L = L / max(0.6, math.cos(pitch))                       # 下向きの枝も水平には段の半径まで届かせる（裾を末広がりに）
+                d_ = out * math.cos(pitch) + UP * math.sin(pitch)
+                pts = [o + d_ * (L * s) + UP * (curl * L * s * s) for s in (0.0, 0.5, 1.0)]
+                c0 = crown_color(min(1.0, 0.1 + 0.5 * tb), 0.0, 0.26 + 0.1 * tb + 0.1 * dark, 0.5 + 0.3 * tb)
+                c1 = crown_color(min(1.0, 0.35 + 0.65 * tb + 0.1 * dark), 1.0, 0.42 + 0.2 * tb + 0.1 * dark, 0.8 + 0.4 * tb)
+                j = R_.uniform(-0.1, 0.1); kb = bright * R_.uniform(0.93, 1.07)   # 枝ごとの黄み・明るさ
+                c1 = (c1[0] * (1 + j) * kb, c1[1] * (1 + j * 0.6) * kb, c1[2] * (1 - j) * kb)
+                cols = [c0, tuple((p_ + q_) / 2 for p_, q_ in zip(c0, c1)), c1]
+                nrm = (out * 0.55 + UP * 0.8).normalized()             # 法線は段の丸みのまま（傾けた枝も段の面として光る、アイデア04）
+                v = R_.choice((0.0, 0.25, 0.5, 0.75)); uu = (v, v + 0.25) if R_.random() < 0.5 else (v + 0.25, v)   # 絵の種類（4）と左右反転
+                strip2(B, pts, [Wk * 0.9, Wk, Wk * 0.9], side, M_FIR4(), cols, nrm, u=uu)
+    for k in range(4):                                        # てっぺん: ほぼ真上へ向いた細い枝で先をとがらせる（P04 の細い頂）
+        a = k * 2 * math.pi / 4 + R_.uniform(0, 1.2)
+        out = Vector((math.cos(a), math.sin(a), 0))
+        o = trunk(top - 0.05)
+        Lt = R_.uniform(0.7, 0.95)
+        pts = [o + (out * R_.uniform(0.12, 0.28) + UP) * s * Lt for s in (0, 0.5, 1)]
+        v = R_.choice((0.0, 0.25, 0.5, 0.75))
+        strip2(B, pts, [0.5, 0.42, 0.28], out.cross(UP).normalized(), M_FIR4(), [crown_color(0.85, 1.0, 0.5, 1.05)] * 3, (out * 0.6 + UP).normalized(), u=(v, v + 0.25))
     return B.build(name)
 
 
@@ -1370,6 +1439,11 @@ ASSETS = {
     'fir2_a': lambda n: fir2(n, 911, height=6.6, width=1.1),
     'fir3_a': lambda n: fir3(n, 931),                              # もみ 第 3 世代（L24）
     'fir3_b': lambda n: fir3(n, 932, height=7.8, width=3.6),
+    'fir4_a': lambda n: fir4(n, 941),                              # もみ 第 4 世代（段の枝の塊、見本 art/ref/trees）
+    'fir4_b': lambda n: fir4(n, 942, height=7.8, width=3.9, tiers=9),
+    'fir4_c': lambda n: fir4(n, 943, height=5.6, width=3.1, tiers=7, lean=0.25),
+    'fir4_d': lambda n: fir4(n, 944, height=7.2, width=2.9, tiers=9, lean=0.1),     # 細く高い
+    'fir4_e': lambda n: fir4(n, 945, height=5.0, width=3.6, tiers=6, lean=0.3),     # 低く横に張った
     'rock_s': lambda n: smooth_rock(n, 947, size=(0.55, 0.45, 0.32), bulge=0.2, sub=3),   # 小石 第 3 世代（rock_c の面のある形をやめる）
     'fir2_b': lambda n: fir2(n, 912, height=7.6, width=1.3),
     'palm2_a': lambda n: palm2(n, 951),
@@ -1455,5 +1529,12 @@ if __name__ == '__main__':
         ob.location.x = x; x += 6.0      # .blend の中では横に並べて見られるように
     bpy.ops.wm.save_as_mainfile(filepath=BLEND)
     import json
-    with open(os.path.join(OUT, 'assets_report.json'), 'w') as f: json.dump(report, f, indent=1)
+    rp = os.path.join(OUT, 'assets_report.json')
+    if only and os.path.exists(rp):          # --only のときは既存の一覧の該当項目だけ差し替える
+        with open(rp) as f: old = json.load(f)
+        merged = [next((r for r in report if r['name'] == o['name']), o) for o in old]
+        merged += [r for r in report if r['name'] not in [o['name'] for o in old]]
+    else:
+        merged = report
+    with open(rp, 'w') as f: json.dump(merged, f, indent=1)
     for r in report: print('ASSET', r)

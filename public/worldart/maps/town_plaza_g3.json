@@ -278,7 +278,7 @@
  ],
  "trees": [
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -4.2,
     -7.0
@@ -287,7 +287,7 @@
    "y": 0.45
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     4.2,
     -14.0
@@ -341,7 +341,7 @@
    ],
    "trees": [
     "maple2_a",
-    "fir3_a"
+    "fir4_a"
    ],
    "count": [
     2,

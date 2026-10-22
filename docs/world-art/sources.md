@@ -10,3 +10,8 @@
 | 葉カードの陰影をまとまりとして見せる定番の方法は？ | [Foliage Normals（Superhive, 販売ページ）](https://superhivemarket.com/products/foliage-normals)、[同 FAQ](https://superhivemarket.com/products/foliage-normals/faq)、[stylized tree shader（BlenderNation 2022）](https://www.blendernation.com/2022/08/11/building-a-fancy-stylized-tree-shader-in-blender-3-2/)、[cremuss（ArtStation）](https://cremuss.artstation.com/projects/Vyz12R)、[Simon Schreibt: Trees](https://simonschreibt.de/tag/trees/)、[Polycount の議論](https://polycount.com/discussion/comment/2490242) | 〔本人〕〔観察〕販売ページは売り手の主張 | 樹冠全体を包む凸包・球から法線を写す（3ds Max の Normal Thief 以来の定番）。裏面で法線を反転させると黒くなる。 | **E07**: 樹冠全体の中心からの法線は大きな明暗が出るが小房のでこぼこが消える。小房 4 : 樹冠 6 の混合を採用。裏面で反転させない処理は E04 で採用済み |
 
 imozuru（https://github.com/MaryCache/imozuru, commit 14635fb）は `~/.claude/skills/imozuru` に入れてある。指示により、行き詰まったときと知見を集めるときに使う。この 2 つの問いは通常の検索で足りたため使っていない。
+
+## もみの見本（2026-10-23、`art/ref/trees/`）
+研究の参考に使う見本で、外部へ公開しない。
+- T01: YouTube のサムネイル（`i.ytimg.com/vi/3NeAoBqD3MM/maxresdefault.jpg`、「Ragnarok Online 3 HD Open-world Gameplay & Latest Trailer」、プロンテラ南門）
+- T02〜T04: 4Gamer の記事の画像（トレーラーのキャプチャ、`www.4gamer.net/games/854/G085427/20250731033/SS/031.jpg`・`032.jpg`・`030.jpg`、ギルドリーグの戦場）

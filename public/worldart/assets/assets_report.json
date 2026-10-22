@@ -1035,5 +1035,80 @@
    "rock_crack"
   ],
   "colors": 1
+ },
+ {
+  "name": "fir4_a",
+  "tris": 730,
+  "size": [
+   3.74,
+   3.79,
+   7.12
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_b",
+  "tris": 822,
+  "size": [
+   4.67,
+   5.47,
+   8.13
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_c",
+  "tris": 598,
+  "size": [
+   3.65,
+   4.08,
+   6.17
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_d",
+  "tris": 798,
+  "size": [
+   3.66,
+   4.63,
+   7.68
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_e",
+  "tris": 578,
+  "size": [
+   4.35,
+   5.15,
+   5.71
+  ],
+  "zmin": -0.34,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
  }
 ]
