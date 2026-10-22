@@ -42,6 +42,11 @@ static func ang_of(x: float, z: float) -> float:
 	return atan2(x, -z)
 
 
+## loop.js move speed: hazardAt(...)?kind === 'sand' ? 0.5 : 1（流砂だけ通常の半速）
+static func hazard_move_multiplier(kind: String) -> float:
+	return 0.5 if kind == "sand" else 1.0
+
+
 ## town-layout.js pushOutBox
 static func push_out_box(b: Dictionary, x: float, z: float, rad: float):
 	var c := cos(float(b["ry"])); var s := sin(float(b["ry"]))

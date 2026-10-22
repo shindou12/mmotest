@@ -626,7 +626,8 @@ func _process(real_dt: float) -> void:
 				var busy: bool = me.swingT < me.swingDur or me.skillT >= 0
 				var slow := 0.45 if (me.guarding or busy) else (0.4 if me.charging and me.chargeT > GameCombat.charge_min() else 1.0)
 				var hz = Hurt.hazard_at(combat.ctx, me.x, me.z)
-				var spd: float = 7.2 * (1 + (float(S["move"]) + combat.ctx.buff_mod("move") + (25.0 if combat.desperate() else 0.0) + combat.title_move()) / 100.0) * slow * (0.5 if hz != null and hz["kind"] == "sand" else 1.0)
+				var hazard_kind := String(hz["kind"]) if hz is Dictionary else ""
+				var spd: float = 7.2 * (1 + (float(S["move"]) + combat.ctx.buff_mod("move") + (25.0 if combat.desperate() else 0.0) + combat.title_move()) / 100.0) * slow * GameRules.hazard_move_multiplier(hazard_kind)
 				var n := mv.normalized()
 				_moveme(n.x * spd * dt, n.y * spd * dt)
 				me.moving = true

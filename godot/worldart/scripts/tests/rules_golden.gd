@@ -26,6 +26,7 @@ var SUITES := {
 	"in_shape": func(a): return R.in_shape(a[0], a[1], a[2], a[3]),
 	"bound_r": func(a): return R.bound_r(R.area(a[0]), a[1]),
 	"ang_diff": func(a): return R.ang_diff(a[0], a[1]),
+	"hazard_move_multiplier": func(a): return R.hazard_move_multiplier(String(a[0])),
 	"xp_to_next": func(a): return R.xp_to_next(int(a[0])),
 	"calc_stats": func(a): return _calc_stats(a[0]),
 	"calc_stats_tree": func(a): return _calc_stats(a[0]),
