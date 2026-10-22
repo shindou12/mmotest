@@ -30,10 +30,12 @@ var bow_tip := 0.0
 var bow_sx := 0.0
 # 盾のガード中に光る板（shield-models.js kite の userData.gauge。GLB へは書き出していない加算の板）。ガードゲージの残りで 青 → 黄 → 赤
 var gauge_mat: StandardMaterial3D = null
-## 光る板の形（shield-models.js kite: 五角形を厚み 0.02 で押し出し、z = 0.1 に置く）
+var gauge_rim_mat: StandardMaterial3D = null
+## 光る板の形（shield-models.js kite: 五角形を厚み 0.02 で押し出し、Godotの盾面に合わせて z = 0.095 に置く）
 const GAUGE_PTS := [Vector2(-0.48, 0.61), Vector2(0.48, 0.61), Vector2(0.48, -0.13), Vector2(0.0, -0.7), Vector2(-0.48, -0.13)]
+const GAUGE_FACE_PTS := [Vector2(-0.42, 0.55), Vector2(0.42, 0.55), Vector2(0.42, -0.1), Vector2(0.0, -0.62), Vector2(-0.42, -0.1)]
 const GAUGE_DEPTH := 0.02
-const GAUGE_Z := 0.1
+const GAUGE_Z := 0.095
 
 
 static func _json(path: String) -> Variant:
@@ -139,37 +141,57 @@ func build(opts: Dictionary) -> void:
 ## 盾のガード中に光る板を足す。三角形 3 つの扇（上下の面）と側面。押し出しは z = ±depth/2（three の ExtrudeGeometry の translate と同じ）
 func _add_gauge_plate() -> void:
 	var h := GAUGE_DEPTH / 2.0
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var caps := SurfaceTool.new()
+	caps.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var sides := SurfaceTool.new()
+	sides.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n := GAUGE_PTS.size()
-	for i in range(1, n - 1):   # 前の面（+z）と後ろの面（-z）。両面描画なので向きは問わない
+	for i in range(1, n - 1):   # 盾の地色が見える面
 		for z in [h, -h]:
-			st.add_vertex(Vector3(GAUGE_PTS[0].x, GAUGE_PTS[0].y, z))
-			st.add_vertex(Vector3(GAUGE_PTS[i].x, GAUGE_PTS[i].y, z))
-			st.add_vertex(Vector3(GAUGE_PTS[i + 1].x, GAUGE_PTS[i + 1].y, z))
-	for i in n:   # 側面
+			caps.add_vertex(Vector3(GAUGE_FACE_PTS[0].x, GAUGE_FACE_PTS[0].y, z))
+			caps.add_vertex(Vector3(GAUGE_FACE_PTS[i].x, GAUGE_FACE_PTS[i].y, z))
+			caps.add_vertex(Vector3(GAUGE_FACE_PTS[i + 1].x, GAUGE_FACE_PTS[i + 1].y, z))
+	for i in n:   # 盾面の外側の縁と側面
+		var oa: Vector2 = GAUGE_PTS[i]
+		var ob: Vector2 = GAUGE_PTS[(i + 1) % n]
+		var ia: Vector2 = GAUGE_FACE_PTS[i]
+		var ib: Vector2 = GAUGE_FACE_PTS[(i + 1) % n]
+		for z in [h, -h]:
+			var p0 := Vector3(oa.x, oa.y, z)
+			var p1 := Vector3(ob.x, ob.y, z)
+			var p2 := Vector3(ib.x, ib.y, z)
+			var p3 := Vector3(ia.x, ia.y, z)
+			for v in [p0, p1, p2, p0, p2, p3]: sides.add_vertex(v)
 		var a: Vector2 = GAUGE_PTS[i]
 		var b: Vector2 = GAUGE_PTS[(i + 1) % n]
 		var p0 := Vector3(a.x, a.y, h)
 		var p1 := Vector3(b.x, b.y, h)
 		var p2 := Vector3(b.x, b.y, -h)
 		var p3 := Vector3(a.x, a.y, -h)
-		for v in [p0, p1, p2, p0, p2, p3]: st.add_vertex(v)
+		for v in [p0, p1, p2, p0, p2, p3]: sides.add_vertex(v)
 	gauge_mat = StandardMaterial3D.new()
 	gauge_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	gauge_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	gauge_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	gauge_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	gauge_mat.cull_mode = BaseMaterial3D.CULL_BACK
 	gauge_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	gauge_mat.render_priority = 2
 	gauge_mat.albedo_color = Color(0.0, 0.0, 0.0, 0.0)
+	gauge_rim_mat = gauge_mat.duplicate() as StandardMaterial3D
 	var mi := MeshInstance3D.new()
 	mi.name = "gaugePlate"
-	mi.mesh = st.commit()
+	mi.mesh = caps.commit()
 	mi.material_override = gauge_mat
 	mi.position = Vector3(0.0, 0.0, GAUGE_Z)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	nodes["shield"].add_child(mi)
+	var side_mi := MeshInstance3D.new()
+	side_mi.name = "gaugeRim"
+	side_mi.mesh = sides.commit()
+	side_mi.material_override = gauge_rim_mat
+	side_mi.position = Vector3(0.0, 0.0, GAUGE_Z)
+	side_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	nodes["shield"].add_child(side_mi)
 
 
 ## player-motion.js の盾の光: ガード中だけ。ガードゲージの残り（gg 0〜1）で 青 → 黄 → 赤、残りわずかで点滅
@@ -177,9 +199,26 @@ func _update_gauge(s: Dictionary) -> void:
 	var gg := float(s.get("gg", 1.0))
 	var guard := bool(s.get("guard", false))
 	var op := 0.0
-	if guard: op = 0.35 + (absf(sin(float(s.get("t", 0.0)) * 12.0)) * 0.3 if gg < 0.3 else 0.0)
+	var blink := absf(sin(float(s.get("t", 0.0)) * 12.0)) * 0.3 if gg < 0.3 else 0.0
+	if guard: op = 0.35 + blink
 	var c := Color("9ad8ff") if gg > 0.6 else (Color("ffd84a") if gg > 0.3 else Color("ff4a3a"))
-	gauge_mat.albedo_color = Color(c.r, c.g, c.b, op)
+	var linear := c.srgb_to_linear()
+	var v := Vector3(linear.r, linear.g, linear.b) / 0.6
+	v = Vector3(0.59719 * v.x + 0.07600 * v.y + 0.02840 * v.z,
+		0.35458 * v.x + 0.90834 * v.y + 0.13383 * v.z,
+		0.04823 * v.x + 0.01566 * v.y + 0.83777 * v.z)
+	var a := v * (v + Vector3(0.0245786, 0.0245786, 0.0245786)) - Vector3(0.000090537, 0.000090537, 0.000090537)
+	var b := v * (0.983729 * v + Vector3(0.4329510, 0.4329510, 0.4329510)) + Vector3(0.238081, 0.238081, 0.238081)
+	var rrt := Vector3(a.x / b.x, a.y / b.y, a.z / b.z)
+	v = Vector3(1.60475 * rrt.x - 0.10208 * rrt.y - 0.00327 * rrt.z,
+		-0.53108 * rrt.x + 1.10813 * rrt.y - 0.07276 * rrt.z,
+		-0.07367 * rrt.x - 0.00605 * rrt.y + 1.07602 * rrt.z)
+	var cap_linear := Vector3(v.x * 1.15, v.y, v.z * 0.625)
+	var cap_color := Color(cap_linear.x, cap_linear.y, cap_linear.z).linear_to_srgb()
+	var rim_linear := Vector3(v.x * 0.9, v.y * 0.95, v.z * 0.675)
+	var rim_color := Color(rim_linear.x, rim_linear.y, rim_linear.z).linear_to_srgb()
+	gauge_mat.albedo_color = Color(cap_color.r, cap_color.g, cap_color.b, op)
+	gauge_rim_mat.albedo_color = Color(rim_color.r, rim_color.g, rim_color.b, op)
 
 
 ## 弦（THREE.Line、色は bowString の引数）と矢（bow_arrow.glb）を弓の形に足す。引き具合は animate が毎フレーム入れる
