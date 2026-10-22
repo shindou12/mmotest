@@ -45,6 +45,11 @@ const GameHud = preload("res://scripts/game/hud.gd")
 const GameTreePanel = preload("res://scripts/game/tree_panel.gd")
 const GameSettingsPanel = preload("res://scripts/game/settings_panel.gd")
 const GameMapPanel = preload("res://scripts/game/map_panel.gd")
+const QuestModel = preload("res://scripts/game/quests.gd")
+const GameNpcPanel = preload("res://scripts/game/npc_panel.gd")
+const GameSmithPanel = preload("res://scripts/game/smith_panel.gd")
+const GameBoxPanel = preload("res://scripts/game/box_panel.gd")
+const GameGatePanel = preload("res://scripts/game/gate_panel.gd")
 
 const SETTINGS_KEY := "eterna_settings_v1"
 const SETTINGS_PATH := "user://eterna_settings_v1.json"
@@ -84,6 +89,15 @@ var hud_ui
 var hud_demo_applied := false
 var tree_panel
 var shot_panel_applied := false
+var npc_panel
+var smith_panel
+var box_panel
+var gate_panel
+var box_items: Array = []
+var box_max := 60
+var box_loaded := false
+var npc_nodes: Array[Dictionary] = []
+var demo_panel_applied := false
 
 # HUD
 var ui := {}
@@ -167,7 +181,9 @@ func _sfx(name: String, opt: Dictionary = {}) -> void:
 
 # ---------------------------------------------------------------- キャラクター（保存は user://。ブラウザ版のセーブとは別）
 func _load_char() -> void:
-	if FileAccess.file_exists(SAVE):
+	if args.has("demo-ui") or args.has("test-ui"):
+		ch = {"name": "NpcTest", "color": "#448a9b", "lv": 1, "xp": 0, "gold": 0}
+	elif FileAccess.file_exists(SAVE):
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(SAVE))
 		ch = parsed if parsed is Dictionary else {}
 	if ch.is_empty():
@@ -186,7 +202,21 @@ func _load_char() -> void:
 		ch["areas"] = {"f1_town": {"done": true, "k": GameMapPanel.CLEAR_KILLS}, "f1_field": {"done": true, "k": GameMapPanel.CLEAR_KILLS}}
 		ch["pin"] = {"area": "f1_field", "x": -21.0, "z": 20.0}
 	if args.has("inv-demo"): items.apply_inventory_demo()
+	if args.has("demo-ui"): _apply_g7_7_demo_character()
 	_calc()
+
+
+func _apply_g7_7_demo_character() -> void:
+	var weapon := {"id": "g77-weapon", "slot": "weapon", "kind": "sword", "rarity": 3, "ilvl": 18, "affixes": [["atkp", 3, 7], ["crit", 2, 3]], "enh": 1, "atk": 25, "bm": 1.2, "name": "紅蓮の細剣", "skill": "retreat", "v": 3}
+	var armor := {"id": "g77-armor", "slot": "armor", "armor": "medium", "atype": "leather", "rarity": 2, "ilvl": 12, "affixes": [["hpp", 2, 6]], "enh": 0, "hp": 14, "def": 3, "base": ["hpp", 4], "bm": 1.05, "name": "革の鎧", "v": 3}
+	ch["name"] = "NpcTest"
+	ch["lv"] = 5
+	ch["gold"] = 1234
+	ch["eq"] = {"weapon": weapon.duplicate(true), "armor": null, "acc": null, "title": null}
+	ch["inv"] = [weapon.duplicate(true), armor]
+	ch["mats"] = {"shard": 23, "gems": {"atkp": 1}}
+	ch["codex"] = {"atkp": 3}
+	ch["titles"] = {}
 
 
 ## 確認用の引数 --wk・--wt・--slots をキャラクターに入れる
@@ -252,7 +282,7 @@ func _recalc() -> void:
 
 
 func _save_char() -> void:
-	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo") or args.has("tree-demo") or args.has("shot"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
+	if args.has("wk") or args.has("wt") or args.has("sv") or args.has("fall") or args.has("inv-demo") or args.has("tree-demo") or args.has("shot") or args.has("test-ui") or args.has("demo-ui"): return   # 確認用のキャラは保存しない（本物のセーブを書き換えない）
 	var f := FileAccess.open(SAVE, FileAccess.WRITE)
 	f.store_string(JSON.stringify(ch))
 
@@ -291,6 +321,9 @@ func _on_msg(m: Dictionary) -> void:
 			unlocked = int(m.get("unlocked", 1))
 			_enter_area(m.area, m.x, m.z)
 			if not args.has("town"): net.send({"t": "wp", "to": args.get("start", "f1_field")})   # 試作は草原から
+			if args.has("test-ui") and not args.has("_ui_test_started"):
+				args["_ui_test_started"] = "1"
+				call_deferred("_run_ui_test")
 		"warped":
 			_sfx("warp") # loop.js update L191: 出口を通ったとき audio.sfx('warp')
 			_enter_area(m.area, m.x, m.z)
@@ -299,12 +332,53 @@ func _on_msg(m: Dictionary) -> void:
 		"snap": _on_snap(m)
 		"tele": _on_tele(m)
 		"die": _on_mob_die(m)
-		"xp": _gain_xp(int(m.n))
+		"xp":
+			_gain_xp(int(m.n))
+			if int(m.get("boss", 0)) > 0:
+				_quest_event({"type": "boss", "floor": int(m.boss)})
+			else:
+				_quest_event({"type": "kill", "name": String(m.get("nm", "")), "area": String(m.get("ar", ""))})
 		"gold":
 			ch["gold"] = int(ch.get("gold", 0)) + int(m.n)
 			_float(Vector3(me.x, 2.6, me.z), "+%d G" % int(m.n), Color(1, 0.85, 0.3))
 			_save_char()
-		"loot": items.on_loot(m)
+		"loot":
+			if String(m.get("src", "")) == "chest":
+				if not ch.get("chests") is Dictionary: ch["chests"] = {}
+				ch["chests"][String(m.get("cid", m.get("ar", "")))] = Time.get_unix_time_from_system() * 1000.0
+				_quest_event({"type": "chest", "area": String(m.get("ar", ""))})
+				_save_char()
+			items.on_loot(m)
+		"box":
+			box_items = m.get("items", []).duplicate(true)
+			box_max = int(m.get("max", 60))
+			box_loaded = true
+			if box_panel != null: box_panel.refresh()
+		"boxPut":
+			if bool(m.get("ok", false)):
+				var inv: Array = ch.get("inv", [])
+				for i in range(inv.size() - 1, -1, -1):
+					if String(inv[i].get("id", "")) == String(m.get("ref", "")):
+						var moved: Dictionary = inv.pop_at(i)
+						_log("「%s」を共有ボックスに入れた" % String(moved.get("name", "装備")), Color.html("#9ae8ff"))
+						break
+				ch["inv"] = inv
+				_save_char()
+				_sfx("equip")
+				if box_panel != null: box_panel.refresh()
+		"boxTake":
+			var taken: Dictionary = m.get("item", {})
+			var inv: Array = ch.get("inv", [])
+			if inv.size() >= 60:
+				_log("インベントリがいっぱいです", Color.html("#ff8888"))
+				net.send({"t": "box", "op": "put", "item": taken})
+			else:
+				inv.push_front(taken)
+				ch["inv"] = inv
+				_log("「%s」を共有ボックスから取り出した" % String(taken.get("name", "装備")), GameItems.rarity_color(int(taken.get("rarity", 0))))
+				_save_char()
+				_sfx("pickup")
+			if box_panel != null: box_panel.refresh()
 		"chat": _log(("%s: " % m.from if m.from != "" else "") + String(m.text), Color.html(m.get("color", "#ffffff")))
 		"leave": _remove_other(int(m.id))
 		"revived": Hurt.revived(combat.ctx, String(m.by))
@@ -325,6 +399,7 @@ func _on_msg(m: Dictionary) -> void:
 
 
 func _enter_area(id: String, x: float, z: float) -> void:
+	var previous_area := area_id
 	area_id = id
 	area = GameRules.area(id)
 	for k in mobs.keys(): _remove_mob(k)
@@ -347,12 +422,23 @@ func _enter_area(id: String, x: float, z: float) -> void:
 	if args.has("at") and id == "f1_field":
 		var p := String(args["at"]).split(","); me.x = float(p[0]); me.z = float(p[1])
 	_banner(area["name"])
+	if previous_area != id:
+		_quest_event({"type": "visit", "area": id})
 
 
 var me_node: Node3D
 func _add_marker_nodes() -> void:
+	npc_nodes.clear()
 	me_node = GameVisuals.player(Color.html(ch["color"]))
 	world.add_child(me_node)
+	for npc in QuestModel.npcs_for(area_id):
+		var person := GameVisuals.npc(Color.html(String(npc.color)))
+		person.position = Vector3(float(npc.x), world.ground_y(float(npc.x), float(npc.z)), float(npc.z))
+		world.add_child(person)
+		var label := GameVisuals.label(String(npc.name), Color.html(String(npc.color)))
+		label.position = person.position + Vector3(0, 2.1, 0)
+		world.add_child(label)
+		npc_nodes.append({"data": npc, "node": person, "label": label})
 	for e in area.get("exits", []):   # 出口の印（光る輪）。行き先の名前
 		var ring := MeshInstance3D.new()
 		ring.mesh = GameVisuals.shape_mesh({"k": "ring", "r0": 2.4, "r1": 3.0}, 1.0)
@@ -525,13 +611,193 @@ func _use_potion() -> void:
 ## 調べる（F）: 近くのレバー・宝箱（4m 以内）。ブラウザ版の画面のボタン（main.js interact）にあたる
 func _interact() -> void:
 	if me.dead or me.crawl: return
-	if area["shape"] == "grid" and area.get("gimmick", "") == "lever" and not door_open:
-		for L in area["pts"].get("L", []):
-			if Vector2(L["x"] - me.x, L["z"] - me.z).length() < 4.0:
-				net.send({"t": "interact", "what": "lever"}); return
-	for c in area.get("chests", []):
-		if Vector2(c["x"] - me.x, c["z"] - me.z).length() < 4.0:
-			net.send({"t": "interact", "what": "chest", "id": c["id"]}); return
+	var target: Variant = _nearest_interact()
+	if not target is Dictionary: return
+	match String(target.kind):
+		"gate":
+			gate_panel.open()
+		"npc":
+			npc_panel.open(target.npc)
+		"smith":
+			smith_panel.open(String(target.npc.name))
+		"box":
+			box_panel.open()
+		"lever":
+			net.send({"t": "interact", "what": "lever"})
+		"chest":
+			if not _chest_open(target.chest):
+				net.send({"t": "interact", "what": "chest", "id": target.chest.id})
+
+
+## progress.js nearestInteract と同じ優先順・距離で対象と案内文を返す。
+func _nearest_interact() -> Variant:
+	if me.get("dead", false): return null
+	var meta: Dictionary = GameMapPanel.MAP_META.get(area_id, {})
+	var gate: Variant = meta.get("gateData", null)
+	if gate is Dictionary and _distance_to(gate) < 6.0:
+		return {"kind": "gate", "label": "転移門を使う（ポーション補充済み）"}
+	for entry in npc_nodes:
+		var npc: Dictionary = entry.data
+		if Vector2(float(npc.x) - float(me.x), float(npc.z) - float(me.z)).length() >= 3.2: continue
+		var kind := "smith" if String(npc.get("role", "")) == "smith" else "npc"
+		return {"kind": kind, "npc": npc, "label": "%s%s" % [String(npc.name), "（鍛冶屋）" if kind == "smith" else "と話す"]}
+	var box: Variant = meta.get("boxData", null)
+	if box is Dictionary and _distance_to(box) < 3.8:
+		return {"kind": "box", "label": "共有ボックスを開く（装備の受け渡し）"}
+	if area.get("shape", "") == "grid":
+		var levers: Array = area.get("pts", {}).get("L", [])
+		if not levers.is_empty() and not door_open and _distance_to(levers[0]) < 3.5:
+			return {"kind": "lever", "label": "レバーを引く"}
+	for chest in area.get("chests", []):
+		if _distance_to(chest) < 3.5:
+			return {"kind": "chest", "chest": chest, "label": "宝箱は空っぽだ（しばらくすると中身が戻る）" if _chest_open(chest) else "宝箱を開ける"}
+	return null
+
+
+func _distance_to(point: Dictionary) -> float:
+	return Vector2(float(point.get("x", 0.0)) - float(me.get("x", 0.0)), float(point.get("z", 0.0)) - float(me.get("z", 0.0))).length()
+
+
+func _chest_open(chest: Dictionary) -> bool:
+	var chests: Dictionary = ch.get("chests", {})
+	var opened := float(chests.get(String(chest.get("id", area_id)), 0.0))
+	var cooldown := 300.0 if bool(chest.get("big", false)) else 600.0
+	return Time.get_unix_time_from_system() * 1000.0 - opened < cooldown * 1000.0
+
+
+func _quest_event(event: Dictionary) -> void:
+	var changed: Array = QuestModel.progress(ch, event)
+	for quest in changed:
+		var state: Dictionary = QuestModel.quest_state(ch, String(quest.id))
+		if bool(state.get("done", false)):
+			hud_ui.toast("クエスト達成：「%s」 依頼人に報告しよう" % String(quest.name), Color.html("#ffd84a"), true)
+			_sfx("clear")
+		else:
+			hud_ui.toast("%s %d / %d" % [String(quest.name), int(state.p), int(quest.n)], Color.html("#bfe6ff"))
+	if not changed.is_empty():
+		_save_char()
+		_refresh_quests()
+
+
+func _refresh_quests() -> void:
+	if hud_ui != null: hud_ui.set_quests(QuestModel.hud_entries(ch))
+	if npc_panel != null and npc_panel.panel.visible: npc_panel.refresh()
+
+
+func _accept_quest(quest_id: String) -> void:
+	var was_active: bool = QuestModel.quest_state(ch, quest_id) != null
+	var changed: Array = QuestModel.accept(ch, quest_id, area_id)
+	var q: Dictionary = QuestModel.index().get(quest_id, {})
+	if q.is_empty(): return
+	if not was_active and QuestModel.quest_state(ch, quest_id) is Dictionary:
+		_sfx("equip")
+		_save_char()
+		_refresh_quests()
+	if not changed.is_empty(): _refresh_quests()
+	if npc_panel != null: npc_panel.refresh()
+
+
+func _claim_quest(quest_id: String) -> void:
+	var quest: Dictionary = QuestModel.index().get(quest_id, {})
+	var state: Variant = QuestModel.quest_state(ch, quest_id)
+	if quest.is_empty() or not state is Dictionary or not bool(state.get("done", false)) or bool(state.get("claimed", false)): return
+	state["claimed"] = true
+	var reward: Dictionary = QuestModel.reward(quest)
+	if reward.has("rarity"):
+		var floor_n := int(area.get("floor", 1))
+		var item := items.make_quest_reward(quest, floor_n, randf())
+		items.spawn_quest_reward(item, float(me.x) + randf_range(-1.0, 1.0), float(me.z) + randf_range(1.0, 2.0))
+	if reward.has("title"):
+		var title_id := String(reward.title)
+		if not ch.get("titles", {}).get(title_id, false):
+			if not ch.get("titles") is Dictionary: ch["titles"] = {}
+			ch["titles"][title_id] = true
+			ch["inv"].push_front(QuestModel.make_title_item(title_id))
+			var title: Dictionary = QuestModel.TITLES.get(title_id, {})
+			hud_ui.banner("称号を獲得", "「%s」" % String(title.get("name", title_id)), GameItems.rarity_color(int(title.get("rarity", 3))), 3.0)
+			hud_ui.toast("称号「%s」：%s" % [String(title.get("name", title_id)), String(title.get("desc", ""))], GameItems.rarity_color(int(title.get("rarity", 3))), true)
+	if reward.has("potion"):
+		ch["potBonus"] = int(ch.get("potBonus", 0)) + int(reward.potion)
+		_calc()
+		me["potions"] = int(S["maxPot"])
+		hud_ui.toast("ポーションの所持数が %d になった" % int(S["maxPot"]), Color.html("#6aff8a"))
+	hud_ui.banner("クエスト完了", String(quest.name), Color.html("#ffd84a"), 2.0)
+	_sfx("levelup")
+	_gain_xp(int(reward.xp))
+	_save_char()
+	_refresh_quests()
+	if npc_panel != null: npc_panel.refresh()
+
+
+func _box_open() -> void:
+	net.send({"t": "box", "op": "open"})
+
+
+func _box_close() -> void:
+	net.send({"t": "box", "op": "close"})
+
+
+func _box_put(item: Dictionary) -> void:
+	if not ch.get("inv", []).has(item): return
+	if not item.has("id") or String(item.id) == "":
+		GameItems.item_seq += 1
+		item["id"] = "box_%d_%d" % [Time.get_ticks_usec(), GameItems.item_seq]
+	_save_char()
+	net.send({"t": "box", "op": "put", "item": item, "ref": item.id})
+
+
+func _box_take(item: Dictionary) -> void:
+	net.send({"t": "box", "op": "take", "uid": item.get("uid", -1)})
+
+
+func _warp_floor(floor_n: int) -> void:
+	if floor_n < 1 or floor_n > unlocked or me.dead or me.crawl: return
+	net.send({"t": "warp", "floor": floor_n})
+	gate_panel.close()
+
+
+func _run_ui_test() -> void:
+	await get_tree().create_timer(0.25).timeout
+	var check := String(args.get("test-ui", ""))
+	match check:
+		"npc":
+			var npc: Dictionary = QuestModel.npcs_for("f1_town")[0]
+			me.x = float(npc.x); me.z = float(npc.z)
+			_interact()
+			var accept_button := _find_button(npc_panel.panel, "受ける")
+			if npc_panel.panel.visible and accept_button != null:
+				accept_button.emit_signal("pressed")
+				if QuestModel.quest_state(ch, "q_slime") is Dictionary:
+					print("G7_7 NPC ACCEPT OK")
+				else:
+					print("G7_7 NPC ACCEPT NG")
+			else:
+				print("G7_7 NPC ACCEPT NG")
+		"smith":
+			var npc: Dictionary = QuestModel.npcs_for("f1_town")[3]
+			me.x = float(npc.x); me.z = float(npc.z)
+			_interact()
+			print("G7_7 SMITH OPEN %s" % ("OK" if smith_panel.panel.visible else "NG"))
+		"box":
+			var box: Dictionary = GameMapPanel.MAP_META["f1_town"].boxData
+			me.x = float(box.x); me.z = float(box.z)
+			await get_tree().create_timer(0.15).timeout
+			_interact()
+			await get_tree().create_timer(0.5).timeout
+			print("G7_7 BOX OPEN %s" % ("OK" if box_panel.panel.visible and box_loaded else "NG"))
+		_:
+			print("G7_7 UI TEST NG unknown=%s" % check)
+	await get_tree().create_timer(0.2).timeout
+	get_tree().quit()
+
+
+func _find_button(root: Node, text: String) -> Button:
+	if root is Button and root.text == text:
+		return root
+	for child in root.get_children():
+		var found := _find_button(child, text)
+		if found != null: return found
+	return null
 
 
 func _gain_xp(n: int) -> void:
@@ -595,7 +861,7 @@ func _process(real_dt: float) -> void:
 			ch = {}; _load_char(); _reset_me(); net.ws.close(); started = false
 			_start(ch["name"], args.get("server", "ws://127.0.0.1:8080/ws"))
 	else:
-		var mv := Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down"))
+		var mv := Vector2.ZERO if _modal_panel_open() else Vector2(Input.get_axis("move_left", "move_right"), Input.get_axis("move_up", "move_down"))
 		if args.has("bot"): mv = _bot(dt)
 		if me.crawl:
 			Hurt.crawl_tick(combat.ctx, dt, mv.x, mv.y)   # 這いずり: ゆっくり動けるだけ
@@ -672,23 +938,29 @@ func _unhandled_input(ev: InputEvent) -> void:
 	if not started: return
 	if ev is InputEventKey and ev.pressed and not ev.echo:
 		if ev.physical_keycode == KEY_M:
+			if _modal_panel_open(): return
 			_toggle_map()
 			get_viewport().set_input_as_handled()
 			return
 		if ev.keycode == KEY_ESCAPE:
-			_toggle_settings()
+			if _modal_panel_open():
+				_close_top_panel()
+			else:
+				_toggle_settings()
 			get_viewport().set_input_as_handled()
 			return
 		if ev.physical_keycode == KEY_K:
+			if _modal_panel_open(): return
 			_toggle_tree()
 			get_viewport().set_input_as_handled()
 			return
 		if ev.physical_keycode == KEY_I:
+			if _modal_panel_open(): return
 			_toggle_inventory()
 			get_viewport().set_input_as_handled()
 			return
-		if _modal_panel_open():
-			return
+		if _modal_panel_open(): return
+	if _modal_panel_open(): return
 	if ev is InputEventMouseButton:
 		if ev.button_index == MOUSE_BUTTON_LEFT:
 			if ev.pressed: combat.press()
@@ -710,7 +982,19 @@ func _modal_panel_open() -> bool:
 	var tree_open: bool = tree_panel != null and tree_panel.is_open()
 	var map_open: bool = hud_ui != null and hud_ui.map_panel != null and hud_ui.map_panel.is_open()
 	var settings_open: bool = hud_ui != null and hud_ui.settings_panel != null and hud_ui.settings_panel.is_open()
-	return inventory_open or tree_open or map_open or settings_open
+	return inventory_open or tree_open or map_open or settings_open or (npc_panel != null and npc_panel.panel.visible) or (smith_panel != null and smith_panel.panel.visible) or (box_panel != null and box_panel.panel.visible) or (gate_panel != null and gate_panel.panel.visible)
+
+
+func _close_top_panel() -> void:
+	if npc_panel != null and npc_panel.panel.visible: npc_panel.close()
+	elif smith_panel != null and smith_panel.panel.visible: smith_panel.close()
+	elif box_panel != null and box_panel.panel.visible: box_panel.close()
+	elif gate_panel != null and gate_panel.panel.visible: gate_panel.close()
+	elif items != null and items.inventory_panel != null and items.inventory_panel.panel.visible: items.toggle()
+	elif tree_panel != null and tree_panel.is_open(): tree_panel.close()
+	elif hud_ui.map_panel != null and hud_ui.map_panel.is_open(): hud_ui.map_panel.close_panel()
+	elif hud_ui.settings_panel != null and hud_ui.settings_panel.is_open(): hud_ui.settings_panel.close_panel()
+	_sync_modal_ui()
 
 
 func _toggle_inventory() -> void:
@@ -805,7 +1089,43 @@ func _map_warp(destination: String) -> void:
 
 
 func _apply_requested_panel() -> void:
-	if shot_panel_applied or not args.has("panel") or area_id != String(args.get("shotarea", "f1_field")): return
+	if area_id != String(args.get("shotarea", "f1_field")): return
+	if args.has("demo-ui") and not demo_panel_applied:
+		demo_panel_applied = true
+		match String(args["demo-ui"]):
+			"dialog":
+				var npc: Dictionary = QuestModel.npcs_for(area_id)[0]
+				me.x = float(npc.x); me.z = float(npc.z)
+				me.a = 0.0
+				npc_panel.open(npc)
+			"quests":
+				var captain_for_quest: Dictionary = QuestModel.npcs_for(area_id)[0]
+				me.x = float(captain_for_quest.x); me.z = float(captain_for_quest.z); me.a = 0.0
+				ch["quests"] = {"q_slime": {"p": 0}}
+				_refresh_quests()
+			"smith":
+				var smith: Dictionary = QuestModel.npcs_for(area_id)[3]
+				me.x = float(smith.x); me.z = float(smith.z)
+				me.a = 0.0
+				smith_panel.open(String(smith.name))
+			"box":
+				var box: Dictionary = GameMapPanel.MAP_META[area_id].boxData
+				me.x = float(box.x); me.z = float(box.z)
+				me.a = 0.0
+				call_deferred("_open_box_demo")
+			"gate":
+				var gate: Dictionary = GameMapPanel.MAP_META[area_id].gateData
+				me.x = float(gate.x); me.z = float(gate.z)
+				me.a = 0.0
+				gate_panel.open()
+			_: pass
+		if hud_ui != null:
+			hud_ui.help_panel.visible = false
+			hud_ui.banner("")
+			for toast in hud_ui.toast_stack.get_children():
+				hud_ui.toast_stack.remove_child(toast)
+				toast.queue_free()
+	if shot_panel_applied or not args.has("panel"): return
 	match String(args["panel"]):
 		"map-area": _open_map("area")
 		"map-floor": _open_map("floor")
@@ -815,6 +1135,15 @@ func _apply_requested_panel() -> void:
 	if hud_ui != null: hud_ui.banner("")
 	if hud_ui != null: hud_ui.help_panel.visible = false
 	shot_panel_applied = true
+
+
+func _open_box_demo() -> void:
+	await get_tree().create_timer(0.15).timeout
+	box_panel.open()
+	await get_tree().create_timer(0.5).timeout
+	if box_loaded and not ch.get("inv", []).is_empty():
+		_box_put(ch["inv"][0])
+		await get_tree().create_timer(0.5).timeout
 
 
 func _tick_waypoint() -> void:
@@ -1253,7 +1582,15 @@ func _setup_hud() -> void:
 	tree_panel = GameTreePanel.new(self)
 	tree_panel.action_sent.connect(_on_tree_action)
 	tree_panel.build_ui(root)
-	if args.has("inv") or args.has("inv-demo"): items.toggle()   # 確認用: --inv-demo はサンプルの持ち物と説明も開く
+	npc_panel = GameNpcPanel.new(self)
+	npc_panel.build_ui(root)
+	smith_panel = GameSmithPanel.new(self)
+	smith_panel.build_ui(root)
+	box_panel = GameBoxPanel.new(self)
+	box_panel.build_ui(root)
+	gate_panel = GameGatePanel.new(self)
+	gate_panel.build_ui(root)
+	if args.has("inv") or (args.has("inv-demo") and not args.has("demo-ui")): items.toggle()   # 確認用: --inv-demo はサンプルの持ち物と説明も開く
 	if args.has("tree-demo"):
 		tree_panel.open(tree_panel.tree_tab)
 		print("TREE_DEMO_STATE_JSON=", JSON.stringify(ch))
@@ -1276,7 +1613,14 @@ func _update_hud() -> void:
 	if args.has("hud-demo") and not hud_demo_applied and started and area_id == String(args.get("shotarea", "f1_field")):
 		hud_demo_applied = true
 		_apply_hud_demo()
+	hud_ui.set_quests(QuestModel.hud_entries(ch))
 	hud_ui.update()
+	if args.has("demo-ui"):
+		hud_ui.help_panel.visible = false
+		hud_ui.banner("")
+		for toast in hud_ui.toast_stack.get_children():
+			hud_ui.toast_stack.remove_child(toast)
+			toast.queue_free()
 
 
 ## --hud-demo の撮影用に HUD の状態だけを一時設定する。セーブはしない。
@@ -1303,8 +1647,10 @@ func _apply_hud_demo() -> void:
 		me["dead"] = true
 		me["deathAt"] = t_now + 12.3
 	hud_ui.help_panel.visible = false
-	# 撮影用のクエスト欄（ブラウザ版の QUESTS の q_slime・q_boarと同じ文）。クエスト自体の移植は G7 の NPC とクエストで
-	hud_ui.set_quests([{"name": "スライム退治", "desc": "ひだまりの草原でグリーンスライムを8体倒す", "p": 3, "n": 8, "done": false}, {"name": "猪狩り", "desc": "イノシシの丘でフレンジーボアを15体倒す", "p": 15, "n": 15, "done": true}])
+	# 比較撮影はクエスト正本の q_slime 状態を使う。通常時の欄も同じ ch.quests から描く。
+	if String(args.get("demo-ui", "")) == "quests":
+		ch["quests"] = {"q_slime": {"p": 0}}
+		_refresh_quests()
 	for toast in hud_ui.toast_stack.get_children():
 		hud_ui.toast_stack.remove_child(toast)
 		toast.queue_free()

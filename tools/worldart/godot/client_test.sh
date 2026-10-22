@@ -3,6 +3,9 @@
 #   sh tools/worldart/godot/client_test.sh
 # 確かめること（大剣・短剣・大斧は武器ごとの回あり）: 1) ログインして草原へ移る 2) 敵に攻撃が当たる 3) 敵を倒して経験値が入る 4) 出口から街へ移る 5) 出口から屋内（マス目）のエリアへ移る 6) 溜め斬り・武器スキル 7) 落とし物を拾い装備する（運しだい）
 cd "$(dirname "$0")/../../.."
+# Godot の user://logs が既定の AppData に書けない端末では、プロジェクト内の user_data を使う。
+APPDATA="$(cd godot/worldart/.godot/user_data && pwd -W)"
+export APPDATA
 PORT=$((20000 + $$ % 20000))
 PORT=$PORT node server.js > /tmp/godot_client_test_server.log 2>&1 &
 SRV=$!
@@ -30,6 +33,13 @@ OUTF=/tmp/godot_client_test_fall.log
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --fall=15 --server=ws://127.0.0.1:$PORT/ws --quit=60 > $OUTF 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_town --server=ws://127.0.0.1:$PORT/ws --quit=40 >> $OUT 2>&1 )
 ( cd godot/worldart && timeout -k 5 100 godot --headless --path . -- --bot --goto=f1_dun --server=ws://127.0.0.1:$PORT/ws --quit=50 >> $OUT 2>&1 )
+# G7-7: F から依頼受注・鍛冶屋・共有ボックスを開く。NPC は実際の「受ける」ボタンを押す。
+OUTNPC=/tmp/godot_client_test_npc.log
+( cd godot/worldart && timeout -k 5 30 godot --headless --path . -- --auto --town --name=NpcTest --test-ui=npc --server=ws://127.0.0.1:$PORT/ws > $OUTNPC 2>&1 )
+OUTSMITH=/tmp/godot_client_test_smith.log
+( cd godot/worldart && timeout -k 5 30 godot --headless --path . -- --auto --town --name=SmithTest --test-ui=smith --server=ws://127.0.0.1:$PORT/ws > $OUTSMITH 2>&1 )
+OUTBOX=/tmp/godot_client_test_box.log
+( cd godot/worldart && timeout -k 5 30 godot --headless --path . -- --auto --town --name=BoxTest --test-ui=box --server=ws://127.0.0.1:$PORT/ws > $OUTBOX 2>&1 )
 kill $SRV
 ok=0
 grep -q "LOG ひだまりの草原" $OUT && echo "OK  草原へ移った" || { echo "NG  草原へ移れない"; ok=1; }
@@ -103,6 +113,20 @@ for pair in "盾槍:$OUTS" "弓:$OUTB"; do
   [ "$name" = "盾槍" ] && { grep -q "^SFX block$" $f && echo "OK  盾槍: SFX block" || { echo "NG  盾槍: SFX block が出ない"; ok=1; }; }
   grep -E "SCRIPT ERROR" $f && ok=1
 done
+# G7-7 の街 UI 確認
+grep -q "G7_7 NPC ACCEPT OK" $OUTNPC && echo "OK  街で NPC に話してクエストを受ける" || { echo "NG  街で NPC に話してクエストを受ける"; grep -E "G7_7|SCRIPT ERROR" $OUTNPC; ok=1; }
+grep -q "G7_7 SMITH OPEN OK" $OUTSMITH && echo "OK  鍛冶屋を開く" || { echo "NG  鍛冶屋を開く"; grep -E "G7_7|SCRIPT ERROR" $OUTSMITH; ok=1; }
+grep -q "G7_7 BOX OPEN OK" $OUTBOX && echo "OK  共有ボックスを開く" || { echo "NG  共有ボックスを開く"; grep -E "G7_7|SCRIPT ERROR" $OUTBOX; ok=1; }
+# 設定の照合
+G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/settings_golden.gd 2>&1); gs=$?
+echo "$G" | grep -E "^(OK|NG|設定)"
+[ $gs -eq 0 ] || { echo "NG  設定の照合（終了コード $gs）"; ok=1; }
+# クエスト進行・報酬・鍛冶屋の式。期待値は元の JavaScript から一時領域に生成する。
+QUESTS_GOLDEN_PATH=$(node tools/worldart/godot/golden_quests.mjs | sed -n 's/^QUESTS_GOLDEN_PATH=//p' | tail -1)
+export QUESTS_GOLDEN_PATH
+G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/quests_golden.gd 2>&1); gs=$?
+echo "$G" | grep -E "^(OK|NG|照合)"
+[ $gs -eq 0 ] || { echo "NG  クエスト・鍛冶屋の照合（終了コード $gs）"; ok=1; }
 # 式の照合（元の JavaScript で作った期待値と GDScript を比べる。JSON は node tools/worldart/godot/golden_rules.mjs で作り直せる）
 G=$(cd godot/worldart && timeout -k 5 100 godot --headless --path . -s res://scripts/tests/rules_golden.gd 2>&1); gs=$?
 echo "$G" | grep -E "^(OK|NG|照合)"

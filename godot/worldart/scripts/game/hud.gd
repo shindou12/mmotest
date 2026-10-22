@@ -225,7 +225,7 @@ var top_buttons := {}
 var map_panel
 var settings_panel
 var quests_signature: String = ""
-var quests_list: Array = []   # [{name, desc, p, n, done}]。TODO: クエストの移植（G7 の NPC とクエスト）で game 側のデータをここへ渡す
+var quests_list: Array = []   # [{name, desc, p, n, done}]。game 側の受注中クエスト。
 
 
 func build(parent: Control, owner) -> void:
@@ -612,10 +612,10 @@ func _build_nav() -> void:
 	floor_label.label_settings.shadow_size = 3
 	floor_label.label_settings.shadow_offset = Vector2(0.0, 1.0)
 	content.add_child(floor_label)
-	# #quests（style.css L273-277・L468-469）: 幅 220px、文字 12px、行の隙間 6px。受注中が無いときは非表示（hud.js P.quests の visible）
+	# #nav #quests（style.css L465-469）が #quests の汎用配置を上書きする。ミニマップ・現在地の下、左端 16px。
 	quests_box = VBoxContainer.new()
 	quests_box.name = "Quests"
-	quests_box.position = Vector2(16.0, 16.0 + 164.0 + 4.0 + 18.0 + 4.0 + 4.0)
+	quests_box.position = Vector2(16.0, floor_label.position.y + floor_label.size.y + 4.0)
 	quests_box.custom_minimum_size = Vector2(220.0, 0.0)
 	quests_box.add_theme_constant_override("separation", 6)
 	quests_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -909,22 +909,12 @@ func _update_charge(me: Dictionary, stats: Dictionary) -> void:
 
 
 func _update_prompt() -> void:
-	var message := ""
 	var me: Dictionary = game.me
-	var map_open: bool = game.hud_ui != null and game.hud_ui.map_panel != null and game.hud_ui.map_panel.is_open()
-	if bool(me.get("dead", false)) or map_open:
+	if bool(me.get("dead", false)) or bool(game._modal_panel_open()):
 		prompt_panel.visible = false
 		return
-	if game.area.get("shape", "") == "grid" and game.area.get("gimmick", "") == "lever" and not game.door_open:
-		for point in game.area.get("pts", {}).get("L", []):
-			if Vector2(float(point.get("x", 0.0)) - float(me.x), float(point.get("z", 0.0)) - float(me.z)).length() < 4.0:
-				message = "レバーを引く"
-				break
-	if message == "":
-		for chest in game.area.get("chests", []):
-			if Vector2(float(chest.get("x", 0.0)) - float(me.x), float(chest.get("z", 0.0)) - float(me.z)).length() < 4.0:
-				message = "宝箱を開ける"
-				break
+	var interaction: Variant = game._nearest_interact()
+	var message := String(interaction.get("label", "")) if interaction is Dictionary else ""
 	prompt_panel.visible = message != ""
 	if message != "":
 		labels.prompt.text = message

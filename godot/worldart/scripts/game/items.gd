@@ -6,9 +6,36 @@ extends RefCounted
 
 const LOOT := {"touch": 1.3, "life": 150.0, "max": 60}
 const InventoryPanel = preload("res://scripts/game/inventory_panel.gd")
+const QuestModel = preload("res://scripts/game/quests.gd")
 # public/shared/data.js の salvageValue(ilvl=20)/4 と salvageMats(enh=0) を Node 22 で出力した表。
 const SALVAGE_BASE := [1, 2, 5, 14, 40, 80, 130, 400]
 const SALVAGE_SHARDS := [1, 1, 2, 4, 8, 12, 16, 30]
+# public/shared/data.js ENH_MAX / ENH_RATE / enhCost / DROP_GRADES / ARMOR_TYPES / ACC_BASE / TIER_PREFIX。
+const ENH_MAX := 10
+const ENH_RATE := [1.0, 1.0, 1.0, 1.0, 1.0, 0.8, 0.65, 0.5, 0.4, 0.3]
+const ENH_SHARDS := [1, 1, 2, 2, 3, 4, 6, 8, 10, 12]
+const CRAFT_MAX_TIER := 5
+const MAX_TIER := 7
+const QUALITY_STEPS := [0.07, 0.24, 0.45, 0.64, 0.82]
+const DROP_GRADES := [
+	{"affixes": 0, "mult": [0.92, 1.18]}, {"affixes": 1, "mult": [0.95, 1.25]},
+	{"affixes": 2, "mult": [1.0, 1.32]}, {"affixes": 3, "mult": [1.05, 1.4]},
+	{"affixes": 3, "mult": [1.7, 1.7], "rarity": 6}, {"affixes": 4, "mult": [2.1, 2.1], "rarity": 7},
+]
+const TIER_PREFIX := ["木の", "青銅の", "鉄の", "鋼の", "銀の", "ミスリルの", "魔鋼の", "アダマンの", "星鉄の", "天鋼の", "神鉄の"]
+const ACC_BASE := ["お守り", "銅の指輪", "銀の首飾り", "翠玉の指輪", "紅玉の護符", "星の耳飾り", "天球の指輪"]
+const ARMOR_TYPES := [
+	{"id": "cloth", "name": "布の服", "cls": "light", "lv": 1, "trait": ["move", 3]}, {"id": "tunic", "name": "革の胴着", "cls": "light", "lv": 1, "trait": ["aspd", 3]},
+	{"id": "hunter", "name": "狩人の外套", "cls": "light", "lv": 4, "trait": ["crit", 3]}, {"id": "robe", "name": "魔導ローブ", "cls": "light", "lv": 6, "trait": ["cdr", 6]},
+	{"id": "ninja", "name": "忍び装束", "cls": "light", "lv": 8, "trait": ["move", 6]}, {"id": "bard", "name": "吟遊詩人の衣", "cls": "light", "lv": 10, "trait": ["aspd", 5]},
+	{"id": "leather", "name": "革の鎧", "cls": "medium", "lv": 1, "trait": ["hpp", 4]}, {"id": "chain", "name": "鎖帷子", "cls": "medium", "lv": 3, "trait": ["def", 2]},
+	{"id": "scale", "name": "鱗鎧", "cls": "medium", "lv": 6, "trait": ["critd", 8]}, {"id": "brigandine", "name": "ブリガンダイン", "cls": "medium", "lv": 8, "trait": ["atkp", 4]},
+	{"id": "ranger", "name": "遊撃兵の胸甲", "cls": "medium", "lv": 10, "trait": ["move", 4]}, {"id": "dragonhide", "name": "竜革の鎧", "cls": "medium", "lv": 12, "trait": ["vamp", 1]},
+	{"id": "breast", "name": "鉄の胸当て", "cls": "heavy", "lv": 1, "trait": ["def", 2]}, {"id": "plate", "name": "板金鎧", "cls": "heavy", "lv": 4, "trait": ["hpp", 6]},
+	{"id": "knight", "name": "騎士の甲冑", "cls": "heavy", "lv": 7, "trait": ["def", 3]}, {"id": "oyoroi", "name": "大鎧", "cls": "heavy", "lv": 9, "trait": ["atkp", 5]},
+	{"id": "paladin", "name": "聖騎士の鎧", "cls": "heavy", "lv": 11, "trait": ["hpp", 8]}, {"id": "fortress", "name": "城塞の重甲冑", "cls": "heavy", "lv": 13, "trait": ["def", 4]},
+]
+static var item_seq: int = 0
 
 var g
 var drops := []   # {it, x, z, t, node, label}
@@ -32,20 +59,28 @@ func on_loot(m: Dictionary) -> void:
 			_harvest(it)
 			_salvage_gold(salvage_value(it))
 			continue
-		var col := rarity_color(int(it.get("rarity", 0)))
-		var n := MeshInstance3D.new()
-		var bm := BoxMesh.new(); bm.size = Vector3(0.45, 0.25, 0.45)
-		n.mesh = bm; n.material_override = GameVisuals.mat(col)
-		var x := float(d["x"]); var z := float(d["z"])
-		n.position = Vector3(x, g.world.ground_y(x, z) + 0.15, z)
-		g.world.add_child(n)
-		var lb := GameVisuals.label(String(it.get("name", "?")), col)
-		lb.position = n.position + Vector3(0, 0.8, 0)
-		g.world.add_child(lb)
-		drops.append({"it": it, "x": x, "z": z, "t": 0.0, "node": n, "label": lb})
-		if Vector2(x - g.me.x, z - g.me.z).length() < 40.0:
-			var stars := _transcend_count(it)
-			g._sfx("drop", {"rarity": int(it.get("rarity", 0)), "slot": String(it.get("slot", "")), "stars": stars}) # loot.js landDrop L31: audio.sfx('drop', {rarity, slot, stars})
+		_spawn_drop(it, float(d["x"]), float(d["z"]))
+
+
+func spawn_quest_reward(it: Dictionary, x: float, z: float) -> void:
+	# progress.js claimQuest は report した位置に通常の装備ドロップを出す。
+	_spawn_drop(it, x, z)
+
+
+func _spawn_drop(it: Dictionary, x: float, z: float) -> void:
+	var col := rarity_color(int(it.get("rarity", 0)))
+	var n := MeshInstance3D.new()
+	var bm := BoxMesh.new(); bm.size = Vector3(0.45, 0.25, 0.45)
+	n.mesh = bm; n.material_override = GameVisuals.mat(col)
+	n.position = Vector3(x, g.world.ground_y(x, z) + 0.15, z)
+	g.world.add_child(n)
+	var lb := GameVisuals.label(String(it.get("name", "?")), col)
+	lb.position = n.position + Vector3(0, 0.8, 0)
+	g.world.add_child(lb)
+	drops.append({"it": it, "x": x, "z": z, "t": 0.0, "node": n, "label": lb})
+	if Vector2(x - g.me.x, z - g.me.z).length() < 40.0:
+		var stars := _transcend_count(it)
+		g._sfx("drop", {"rarity": int(it.get("rarity", 0)), "slot": String(it.get("slot", "")), "stars": stars}) # loot.js landDrop L31: audio.sfx('drop', {rarity, slot, stars})
 
 
 func clear() -> void:
@@ -151,6 +186,272 @@ func describe(it: Dictionary) -> String:
 		var data = GameRules.data()["affixes"].get(String(a[0]))
 		if data != null: s += "\n  %s +%s%s" % [data["name"], data["tiers"][int(a[1]) - 1], data["unit"]]
 	return s
+
+
+## public/shared/data.js enhCost
+static func enhancement_cost(it: Dictionary) -> Dictionary:
+	var enh := int(it.get("enh", 0))
+	return {"gold": roundi((20.0 + float(it.get("ilvl", 1)) * 6.0) * pow(1.55, enh)), "shard": ENH_SHARDS[clampi(enh, 0, ENH_SHARDS.size() - 1)]}
+
+
+## public/shared/data.js affixCost / skillCost / loreCost
+static func affix_cost(it: Dictionary) -> Dictionary:
+	return {"gold": 50 + int(it.get("ilvl", 1)) * 10, "gem": 1}
+
+static func skill_cost(it: Dictionary) -> Dictionary:
+	return {"gold": 40 + int(it.get("ilvl", 1)) * 8}
+
+static func lore_cost(it: Dictionary) -> Dictionary:
+	return {"gold": 300 + int(it.get("ilvl", 1)) * 20, "shard": 10}
+
+
+## public/shared/data.js weightedTier。random_value は 0..1 の試験入力も受け取る。
+static func weighted_tier(maximum: int, high: bool, random_value: float) -> int:
+	if maximum <= 0:
+		return 1
+	var weights: Array[float] = []
+	var total := 0.0
+	for i in maximum:
+		var weight := pow(0.6, float(maximum - 1 - i if high else i))
+		weights.append(weight)
+		total += weight
+	var roll := random_value * total
+	for i in maximum:
+		roll -= weights[i]
+		if roll <= 0.0:
+			return i + 1
+	return 1
+
+
+## public/shared/data.js itemQuality / qualityRarity / gradeItem
+static func item_quality(it: Dictionary) -> float:
+	var ilvl := int(it.get("ilvl", 1))
+	var cap := maxi(3, maxi(1, mini(CRAFT_MAX_TIER, 1 + int(floor(float(ilvl) / 5.0)))))
+	var affix_sum := 0.0
+	var variants: Dictionary = GameRules.data()["skillVariants"]
+	for affix in it.get("affixes", []):
+		var key := String(affix[0])
+		var tier := float(affix[1])
+		affix_sum += 1.25 if variants.has(key) else minf(1.5, tier / float(cap))
+	var bm := clampf((float(it.get("bm", 1.1)) - 0.92) / 0.48, 0.0, 1.0)
+	return 0.7 * affix_sum / 3.0 + 0.3 * bm + float(it.get("enh", 0)) * 0.03
+
+
+static func quality_rarity(quality: float) -> int:
+	var rarity := 0
+	while rarity < QUALITY_STEPS.size() and quality >= float(QUALITY_STEPS[rarity]):
+		rarity += 1
+	return rarity
+
+
+static func grade_item(it: Dictionary) -> void:
+	if String(it.get("slot", "")) == "title" or (it.get("unique") != null and int(it.get("rarity", 0)) >= 6):
+		return
+	var rarity := quality_rarity(item_quality(it))
+	it["rarity"] = maxi(4, rarity) if it.get("unique") != null else rarity
+
+
+func smith_enhance(it: Dictionary, random_roll: float = -1.0) -> Dictionary:
+	if not _owns_item(it) or String(it.get("slot", "")) == "title":
+		return {"ok": false, "msg": "強化できない装備です"}
+	var enh := int(it.get("enh", 0))
+	if enh >= ENH_MAX:
+		return {"ok": false, "msg": "これ以上は強化できません"}
+	var cost := enhancement_cost(it)
+	var error := _smith_pay(cost)
+	if error != "": return {"ok": false, "msg": error}
+	var roll := randf() if random_roll < 0.0 else random_roll
+	var ok := roll < float(ENH_RATE[enh])
+	var up := ""
+	if ok:
+		it["enh"] = enh + 1
+		up = _regrade(it)
+		g._sfx("perfect" if int(it.enh) >= 6 else "levelup")
+	else:
+		g._sfx("block")
+	g._recalc()
+	var message := "+%d に強化した！%s" % [int(it.get("enh", 0)), up] if ok else "強化に失敗した…（+%d のまま）" % int(it.get("enh", 0))
+	return {"ok": ok, "msg": message, "enh": int(it.get("enh", 0))}
+
+
+func smith_affix(it: Dictionary, slot_index: int, key: String, random_roll: float = -1.0) -> Dictionary:
+	var affixes: Array = it.get("affixes", [])
+	if not _owns_item(it) or slot_index < 0 or slot_index >= affixes.size():
+		return {"ok": false, "msg": "特性を選んでください"}
+	var codex: Dictionary = g.ch.get("codex", {})
+	if int(codex.get(key, 0)) <= 0:
+		return {"ok": false, "msg": "まだ特性リストにない特性です（その特性の付いた装備を分解すると追加されます）"}
+	var variants: Dictionary = GameRules.data()["skillVariants"]
+	for i in affixes.size():
+		if i == slot_index: continue
+		if String(affixes[i][0]) == key:
+			return {"ok": false, "msg": "同じ特性はひとつの装備に1つまでです"}
+		if variants.has(key) and variants.has(String(affixes[i][0])):
+			return {"ok": false, "msg": "スキル変化は武器に1つまでです"}
+	if variants.has(key) and String(it.get("slot", "")) != "weapon":
+		return {"ok": false, "msg": "スキル変化は武器に1つまでです"}
+	var cost := affix_cost(it)
+	cost["gemKey"] = key
+	var error := _smith_pay(cost)
+	if error != "": return {"ok": false, "msg": error}
+	var roll := randf() if random_roll < 0.0 else random_roll
+	var tier := weighted_tier(mini(int(codex[key]), CRAFT_MAX_TIER), false, roll)
+	var data: Dictionary = GameRules.data()
+	var value: Variant = tier if variants.has(key) else data["affixes"][key]["tiers"][tier - 1]
+	affixes[slot_index] = [key, tier, value]
+	it["affixes"] = affixes
+	var up := _regrade(it)
+	g._sfx("buff")
+	g._recalc()
+	return {"ok": true, "msg": "%s T%d を付与した%s" % [_affix_name(key), tier, up], "tier": tier}
+
+
+func smith_skill(it: Dictionary, skill_id: String) -> Dictionary:
+	var data: Dictionary = GameRules.data()
+	var pool: Array = data["weaponSkillPool"].get(String(it.get("kind", "")), [])
+	if not _owns_item(it) or String(it.get("slot", "")) != "weapon" or not pool.has(skill_id):
+		return {"ok": false, "msg": "変更できないスキルです"}
+	if String(it.get("skill", "")) == skill_id:
+		return {"ok": false, "msg": "すでにそのスキルです"}
+	var error := _smith_pay(skill_cost(it))
+	if error != "": return {"ok": false, "msg": error}
+	it["skill"] = skill_id
+	g._sfx("skill")
+	g._recalc()
+	var skill: Dictionary = data["skills"]["weapon"].get(skill_id, {})
+	return {"ok": true, "msg": "武器スキルを「%s」に変えた" % String(skill.get("name", skill_id))}
+
+
+func smith_lore(it: Dictionary) -> Dictionary:
+	if not _owns_item(it) or int(it.get("rarity", 0)) < 6 or it.get("fx", []).is_empty() or String(it.get("slot", "")) == "title":
+		return {"ok": false, "msg": "伝説・神器の装備だけが伝承化できます"}
+	var error := _smith_pay(lore_cost(it))
+	if error != "": return {"ok": false, "msg": error}
+	var effects: Array = it.get("fx", []).duplicate()
+	var requirement = "melee" if effects.has("wave") else null
+	item_seq += 1
+	var title := {"id": "lore_%d_%d" % [Time.get_ticks_usec(), item_seq], "slot": "title", "kind": null, "rarity": int(it.rarity), "ilvl": int(it.ilvl),
+		"affixes": [], "enh": 0, "v": 3, "weight": 0, "name": "「%s」の伝承" % String(it.get("name", "装備")),
+		"fx": effects, "lore": it.get("lore", ""), "req": requirement, "from": String(it.get("name", "装備"))}
+	var index := _index_of(it)
+	if index >= 0:
+		g.ch["inv"].remove_at(index)
+	else:
+		var equipped: Dictionary = g.ch.get("eq", {})
+		for slot in equipped.keys():
+			if _same_item(equipped[slot], it): equipped[slot] = null
+		g.ch["eq"] = equipped
+	g.ch["inv"].push_front(title)
+	g._sfx("clear")
+	g._recalc()
+	return {"ok": true, "msg": "%s を手に入れた" % String(title.name), "id": title.id}
+
+
+func make_quest_reward(quest: Dictionary, floor_n: int, upgrade_roll: float) -> Dictionary:
+	var params := QuestModel.reward_item_params_for(quest, g.ch, floor_n, upgrade_roll)
+	return _make_item(int(params.ilvl), int(params.get("grade", 0)), String(quest.reward.get("slot", "")))
+
+
+func _make_item(ilvl: int, grade: int, forced_slot: String) -> Dictionary:
+	var data: Dictionary = GameRules.data()
+	grade = clampi(grade, 0, DROP_GRADES.size() - 1)
+	var drop_grade: Dictionary = DROP_GRADES[grade]
+	var slot: String = forced_slot if forced_slot != "" else String(["weapon", "weapon", "weapon", "armor", "acc"][randi_range(0, 4)])
+	var kinds: Array = data["weapons"].keys()
+	var kind := String(kinds[randi_range(0, kinds.size() - 1)]) if slot == "weapon" else ""
+	var multiplier: Array = drop_grade["mult"]
+	var bm := roundf(randf_range(float(multiplier[0]), float(multiplier[1])) * 1000.0) / 1000.0
+	var growth := pow(float(data["balance"]["playerGrowth"]), ilvl - 1) * bm
+	item_seq += 1
+	var item := {"id": "qitem_%d_%d" % [Time.get_ticks_usec(), item_seq], "slot": slot, "kind": kind if kind != "" else null,
+		"rarity": int(drop_grade.get("rarity", 0)), "ilvl": ilvl, "bm": bm, "affixes": [], "enh": 0, "v": 3}
+	var prefix_index := clampi(int(floor(float(ilvl - 1) / 5.0)), 0, TIER_PREFIX.size() - 1)
+	if slot == "weapon":
+		item["atk"] = roundi(7.0 * growth)
+		item["name"] = TIER_PREFIX[prefix_index] + String(data["weapons"][kind]["name"])
+		var skill_pool: Array = data["weaponSkillPool"][kind]
+		item["skill"] = skill_pool[randi_range(0, skill_pool.size() - 1)]
+	elif slot == "armor":
+		var pool: Array = []
+		for armor_type in ARMOR_TYPES:
+			if int(armor_type.lv) <= maxi(ilvl, 1): pool.append(armor_type)
+		if pool.is_empty(): pool = [ARMOR_TYPES[0], ARMOR_TYPES[1], ARMOR_TYPES[6], ARMOR_TYPES[12]]
+		var armor_type: Dictionary = pool[randi_range(0, pool.size() - 1)]
+		var armor: Dictionary = data["armorClasses"][String(armor_type.cls)]
+		item["armor"] = armor_type.cls
+		item["atype"] = armor_type.id
+		item["base"] = armor_type.trait.duplicate()
+		item["hp"] = roundi(45.0 * growth * float(armor.hp))
+		item["def"] = int(armor.def)
+		item["name"] = armor_type.name
+	else:
+		item["atk"] = roundi(2.5 * growth)
+		item["hp"] = roundi(15.0 * growth)
+		item["name"] = ACC_BASE[mini(ACC_BASE.size() - 1, int(floor(float(ilvl - 1) / 8.0)))]
+	item["weight"] = GameRules.item_weight(item)
+	var keys: Array = data["affixes"].keys()
+	for i in range(keys.size() - 1, 0, -1):
+		var j := randi_range(0, i)
+		var swap = keys[i]; keys[i] = keys[j]; keys[j] = swap
+	for index in int(drop_grade.affixes):
+		var key := String(keys[index])
+		var tier := _roll_tier(ilvl, grade)
+		item.affixes.append([key, tier, data["affixes"][key]["tiers"][tier - 1]])
+	if slot == "weapon" and not item.affixes.is_empty() and randf() < [0.0, 0.0, 0.08, 0.15, 0.3, 0.45][grade]:
+		var variant_keys: Array = data["skillVariants"].keys()
+		var variant := String(variant_keys[randi_range(0, variant_keys.size() - 1)])
+		var variant_tier := _roll_tier(ilvl, grade)
+		item.affixes[item.affixes.size() - 1] = [variant, variant_tier, variant_tier]
+	grade_item(item)
+	return item
+
+
+func _roll_tier(ilvl: int, grade: int) -> int:
+	var maximum := maxi(1, mini(MAX_TIER, 1 + int(floor(float(ilvl) / 5.0)) + (1 if grade >= 4 else 0)))
+	var tier := weighted_tier(mini(maximum, CRAFT_MAX_TIER), true, randf())
+	if maximum >= 6 and tier == CRAFT_MAX_TIER and randf() < 0.25 + float(grade) * 0.05: tier = 6
+	if maximum >= 7 and tier == 6 and randf() < 0.2 + float(grade) * 0.04: tier = 7
+	return tier
+
+
+func _smith_pay(cost: Dictionary) -> String:
+	var materials: Dictionary = g.ch.get("mats", {})
+	var gems: Dictionary = materials.get("gems", {})
+	if int(g.ch.get("gold", 0)) < int(cost.get("gold", 0)): return "ゴールドが足りません"
+	if int(materials.get("shard", 0)) < int(cost.get("shard", 0)): return "強化の欠片が足りません"
+	if cost.has("gemKey") and int(gems.get(String(cost.gemKey), 0)) < int(cost.get("gem", 0)): return "宝石が足りません"
+	g.ch["gold"] = int(g.ch.get("gold", 0)) - int(cost.get("gold", 0))
+	materials["shard"] = int(materials.get("shard", 0)) - int(cost.get("shard", 0))
+	if cost.has("gemKey"):
+		gems[String(cost.gemKey)] = int(gems.get(String(cost.gemKey), 0)) - int(cost.get("gem", 0))
+	materials["gems"] = gems
+	g.ch["mats"] = materials
+	return ""
+
+
+func _regrade(it: Dictionary) -> String:
+	var before := int(it.get("rarity", 0))
+	grade_item(it)
+	var after := int(it.get("rarity", before))
+	if after == before: return ""
+	var rarities: Array = GameRules.data()["rarities"]
+	var label := "「%s」から「%s」に%s" % [String(rarities[before]["name"]), String(rarities[after]["name"]), "上がった" if after > before else "下がった"]
+	if g.hud_ui != null: g.hud_ui.toast("%s：%s" % [String(it.get("name", "装備")), label], rarity_color(after), after > before)
+	return "（%s）" % label
+
+
+func _owns_item(it: Dictionary) -> bool:
+	for candidate in g.ch.get("inv", []):
+		if _same_item(candidate, it): return true
+	for candidate in g.ch.get("eq", {}).values():
+		if _same_item(candidate, it): return true
+	return false
+
+
+func _same_item(candidate: Variant, target: Dictionary) -> bool:
+	if not candidate is Dictionary: return false
+	var id := String(target.get("id", ""))
+	return candidate == target or (id != "" and String(candidate.get("id", "")) == id)
 
 
 func equip(i: int) -> void:

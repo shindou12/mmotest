@@ -84,6 +84,16 @@ static func player(color: Color) -> Node3D:
 	return n
 
 
+## public/js/models/npc-models.js makePlayer(color) と docs/godot/inventory/models.md 2.6。
+## NPC は player.glb の服色だけを変え、武器は付けない。
+static func npc(color: Color) -> Node3D:
+	if not ResourceLoader.exists("res://data/models/player.glb"):
+		return player(color)
+	var model := PlayerModel.new()
+	model.build({"kind": "sword", "no_weapon": true, "color": color})
+	return model.root
+
+
 ## mob-models.js の body / mD / mL / ac の色計算を、glTF の役割名から再現する。
 static func _mob_role_color(role: String, color: Color, accent: Color) -> Color:
 	var c := color.srgb_to_linear()
