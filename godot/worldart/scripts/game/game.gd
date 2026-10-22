@@ -94,6 +94,7 @@ var hud_ui
 var hud_demo_applied := false
 var tree_panel
 var shot_panel_applied := false
+var capture_interaction_sent := false
 var npc_panel
 var smith_panel
 var box_panel
@@ -137,6 +138,7 @@ func _ready() -> void:
 	if not args.has("auto") and not args.has("bot"):
 		_setup_login_preview()
 	_setup_hud()
+	if args.has("visual-shot") and hud != null: hud.visible = false
 	if args.has("auto") or args.has("bot"):
 		_start(args.get("name", ch.get("name", "Godot")), args.get("server", "ws://127.0.0.1:8080/ws"))
 
@@ -444,6 +446,13 @@ func _on_msg(m: Dictionary) -> void:
 		"warped":
 			_sfx("warp") # loop.js update L191: 出口を通ったとき audio.sfx('warp')
 			_enter_area(m.area, m.x, m.z)
+			if args.has("open-door") and area_id == String(args.get("shotarea", "")) and not capture_interaction_sent and not door_open:
+				var levers: Array = area.get("pts", {}).get("L", [])
+				if not levers.is_empty() and Vector2(float(levers[0].x) - me.x, float(levers[0].z) - me.z).length() < 3.5:
+					capture_interaction_sent = true
+					# public/shared/sim/messages.js の st を先に送り、サーバー上の位置を合わせてから interact する。
+					net.send({"t": "st", "x": snappedf(me.x, 0.01), "z": snappedf(me.z, 0.01)})
+					net.send({"t": "interact", "what": "lever"})
 		"roster": unlocked = int(m.get("unlocked", unlocked))
 		"unlock": unlocked = int(m.get("unlocked", unlocked))
 		"snap": _on_snap(m)
@@ -548,7 +557,8 @@ func _enter_area(id: String, x: float, z: float) -> void:
 	for e in area.get("exits", []):
 		portals.append({"to": e["to"], "x": float(e["x"]), "z": float(e["z"]), "r": float(e["r"]), "armed": Vector2(e["x"] - x, e["z"] - z).length() > float(e["r"]) + 1.5})
 	if area["type"] == "town" or area["type"] == "camp": me.potions = S["maxPot"]
-	if args.has("at") and id == "f1_field":
+	var shot_area := String(args.get("shotarea", args.get("start", "f1_field")))
+	if args.has("at") and id == shot_area:
 		var p := String(args["at"]).split(","); me.x = float(p[0]); me.z = float(p[1])
 	_banner(area["name"])
 	if previous_area != id:
@@ -583,6 +593,13 @@ func _add_marker_nodes() -> void:
 # ---------------------------------------------------------------- スナップショット（snapshot.js onSnap）
 func _on_snap(m: Dictionary) -> void:
 	if m.ar != area_id: return
+	if args.has("open-door") and not capture_interaction_sent and not door_open:
+		var levers: Array = area.get("pts", {}).get("L", [])
+		if not levers.is_empty() and Vector2(float(levers[0].x) - me.x, float(levers[0].z) - me.z).length() < 3.5:
+			capture_interaction_sent = true
+			# public/shared/sim/messages.js の st を先に送り、サーバー上の位置を合わせてから interact する。
+			net.send({"t": "st", "x": snappedf(me.x, 0.01), "z": snappedf(me.z, 0.01)})
+			net.send({"t": "interact", "what": "lever"})
 	var next_boss_fighting := String(m.get("bs", "idle")) == "fight"
 	if next_boss_fighting != boss_fighting:
 		boss_fighting = next_boss_fighting
@@ -591,6 +608,7 @@ func _on_snap(m: Dictionary) -> void:
 		_update_boss_music() # ブラウザ版と同じく、戦闘中の部屋への出入りも反映する
 	if bool(int(m.get("door", 0))) != door_open:
 		door_open = bool(int(m.get("door", 0))); world.set_door_open(door_open)
+	world.set_pressure_plates(m.get("pl", []))
 	var seen_p := {}
 	for p in m.p:
 		var id := int(p[0])
@@ -616,26 +634,41 @@ func _on_snap(m: Dictionary) -> void:
 		var mb = mobs.get(id)
 		var kind := int(r[9]); var elite := int(r[11])
 		if mb == null:
-			var md: Dictionary; var sc: float; var nm: String; var rad: float
+			var md: Dictionary; var sc: float; var nm: String; var rad: float; var accent: Variant = null; var player_model = null
 			if kind == 2:
 				md = GameRules.data()["floors"][fl - 1]["boss"]; sc = float(md.get("scale", 1)); nm = String(md["name"]); rad = 0.9 * sc
+				if md.has("accent"): accent = Color.html(String(md["accent"]))
 			else:
-				md = GameRules.mob_def(fl, int(r[1]))
+				# public/js/game/snapshot.js:62-65。番兵の表示用項目は visuals.gd が data.js から補う。
+				md = GameVisuals.mob_display_def(fl, int(r[1]), GameRules.mob_def(fl, int(r[1])))
 				var mds = md.get("scale")
 				sc = float(mds) if mds != null else (0.8 if kind == 1 else (1.9 if elite == 3 else (1.3 if elite > 0 else 1.0)))
-				nm = ("門番" if elite == 2 else ("精鋭 " if elite > 0 else "") + String(md["name"]))
+				# public/js/game/snapshot.js:65、public/shared/areas.js の named.name を表示。
+				nm = ("★ " + GameVisuals.named_mob_name(area_id, String(md["name"])) if elite == 3 else "門番" if elite == 2 else String(md["name"]) if String(md.get("look", "")) == "player" else ("精鋭 " if elite > 0 else "") + String(md["name"]))
 				rad = 0.75 * sc
-			var mob_node: Node3D = GameVisuals.mob(String(md["t"]), Color.html(String(md["color"])), sc, kind == 2)
-			MobAnim.setup(mob_node)
-			mb = {"node": mob_node, "label": GameVisuals.label(nm),
-				"id": id, "x": float(r[2]), "z": float(r[3]), "a": float(r[4]), "rad": rad, "kind": kind, "name": nm, "localT": -9.0, "hp": float(r[5]), "elite": elite, "flash": 0.0}
-			world.add_child(mb.node); world.add_child(mb.label)
+				accent = Color("ff60d0") if elite == 3 else Color("ffb030") if elite > 0 else null
+			var mob_node: Node3D
+			if kind != 2 and String(md.get("look", "")) == "player":
+				var visual: Dictionary = GameVisuals.dark_adventurer(md, sc)
+				mob_node = visual["node"]
+				player_model = visual["player"]
+			else:
+				mob_node = GameVisuals.mob(String(md["t"]), Color.html(String(md["color"])), sc, kind == 2, accent)
+			if player_model == null: MobAnim.setup(mob_node)
+			var label_data := GameVisuals.mob_label(world, sc, elite, String(md["t"]) in ["bat", "wisp"]) if kind != 2 else {}
+			mb = {"node": mob_node, "label": label_data.get("sprite"), "label_view": label_data.get("view"), "label_data": label_data,
+				"player_model": player_model, "look": String(md.get("look", "")), "weapon": String(md.get("weapon", "sword")),
+				"id": id, "x": float(r[2]), "z": float(r[3]), "a": float(r[4]), "rad": rad, "kind": kind, "name": nm, "localT": -9.0, "hp": float(r[5]), "elite": elite, "flash": 0.0,
+				"walkT": 0.0, "atkT": -1.0, "floating": String(md["t"]) in ["bat", "wisp"]}
+			world.add_child(mb.node)
 			mobs[id] = mb
-		mb.tx = float(r[2]); mb.tz = float(r[3]); mb.ta = float(r[4]); mb.mhp = float(r[6]); mb.lv = int(r[7]); mb.st = int(r[8]); mb.enraged = int(r[10]) != 0; mb.stunT = float(r[15])
+		if String(mb.get("look", "")) == "player" and int(r[8]) == 2 and int(mb.get("st", 0)) != 2: mb.atkT = 0.0
+		mb.tx = float(r[2]); mb.tz = float(r[3]); mb.ta = float(r[4]); mb.mhp = float(r[6]); mb.lv = int(r[7]); mb.st = int(r[8]); mb.enraged = int(r[10]) != 0; mb.stunT = float(r[15]); mb.target = int(r[12])
 		mb.guard = r.size() > 16 and int(r[16]) != 0   # 番兵の盾（正面からの攻撃は 3 割）
 		if t_now - mb.localT > 0.4: mb.hp = float(r[5])
 		else: mb.hp = minf(mb.hp, float(r[5]))
-		mb.label.text = "%s Lv%d\n%d / %d" % [mb.name, mb.lv, int(mb.hp), int(mb.mhp)]
+		if mb.label_data is Dictionary and not mb.label_data.is_empty():
+			GameVisuals.update_mob_label(mb.label_data, String(mb.name), int(mb.lv), int(mb.elite), float(mb.hp), float(mb.mhp), int(mb.target) == my_id)
 	for id in mobs.keys():
 		if not seen_m.has(id): _remove_mob(id)
 
@@ -643,7 +676,9 @@ func _on_snap(m: Dictionary) -> void:
 func _remove_mob(id) -> void:
 	var mb = mobs.get(id)
 	if mb == null: return
-	mb.node.queue_free(); mb.label.queue_free()
+	mb.node.queue_free()
+	if mb.get("label") != null: mb.label.queue_free()
+	if mb.get("label_view") != null: mb.label_view.queue_free()
 	mobs.erase(id)
 
 
@@ -660,7 +695,8 @@ func _on_mob_die(m: Dictionary) -> void:
 	var is_boss := bool(m.get("boss", int(mb.get("kind", 0)) == 2))
 	if not is_boss: _sfx("mobdie") # snapshot.js onMobDie L182: audio.sfx('mobdie')
 	mobs.erase(int(m.id))
-	mb.label.queue_free()
+	if mb.get("label") != null: mb.label.queue_free()
+	if mb.get("label_view") != null: mb.label_view.queue_free()
 	if is_boss and boss_fighting:
 		boss_fighting = false
 		_update_boss_music()
@@ -1034,12 +1070,28 @@ func _process(real_dt: float) -> void:
 		preview_t += real_dt * 0.05
 		cam.position = Vector3(sin(preview_t) * 40.0, 16.0, cos(preview_t) * 40.0)
 		cam.look_at(Vector3(0.0, 2.0, 0.0), Vector3.UP)
-	if args.has("shot") and area_id == args.get("shotarea", "f1_field") and (args.has("panel") or mobs.size() > 0 or area["type"] in ["town", "camp"]):
+	if args.has("shot") and area_id == args.get("shotarea", "f1_field") and (args.has("visual-shot") or args.has("panel") or mobs.size() > 0 or area["type"] in ["town", "camp"]):
 		# 撮影（確認用）: そのエリアに入って敵が見えてから <フレーム数> 後に撮って終わる。--shot=<フレーム数>:<出力.png>
 		var sp: PackedStringArray = String(args["shot"]).split(":", true, 1)
 		args["_frames"] = int(args.get("_frames", 0)) + 1
 		if args.has("fxdemo") and int(args["_frames"]) == 60: _fx_demo(String(args["fxdemo"]))   # 確認用（コルーチン。撮り終えたら自分で終了）
 		if int(args["_frames"]) == int(sp[0]):
+			if args.has("visual-shot"):
+				print("CAPTURE_CAMERA ", JSON.stringify({"position": [cam.position.x, cam.position.y, cam.position.z], "fov": cam.fov, "focus": args.get("capture-focus", "")}))
+				var capture_doors: Array[Dictionary] = []
+				for capture_door in world.door_nodes:
+					capture_doors.append({"visible": capture_door.visible, "y": capture_door.position.y})
+				print("CAPTURE_STATE ", JSON.stringify({"area": area_id, "gimmick": area.get("gimmick", ""), "player": [me.x, me.z], "door": door_open, "target": world.door_target_open, "interaction_sent": capture_interaction_sent, "doors": capture_doors, "plates": world.pressure_plate_states}))
+				var capture_mobs: Array[Dictionary] = []
+				var capture_focus := Vector2(me.x, me.z)
+				if args.has("capture-focus"):
+					var capture_focus_parts := String(args["capture-focus"]).split(",")
+					if capture_focus_parts.size() >= 2: capture_focus = Vector2(float(capture_focus_parts[0]), float(capture_focus_parts[1]))
+				for capture_id in mobs:
+					var capture_mob: Dictionary = mobs[capture_id]
+					if int(capture_mob.kind) != 2 and int(capture_mob.elite) == 0 and Vector2(capture_mob.node.position.x - capture_focus.x, capture_mob.node.position.z - capture_focus.y).length() > 20.0: continue
+					capture_mobs.append({"id": capture_mob.id, "name": capture_mob.name, "kind": capture_mob.kind, "elite": capture_mob.elite, "scale": capture_mob.node.scale.x, "look": capture_mob.get("look", ""), "weapon": capture_mob.get("weapon", ""), "player_model": capture_mob.get("player_model") != null, "position": [capture_mob.node.position.x, capture_mob.node.position.y, capture_mob.node.position.z], "label": capture_mob.get("label") != null})
+				print("CAPTURE_MOBS ", JSON.stringify(capture_mobs))
 			get_viewport().get_texture().get_image().save_png(sp[1])
 			print("SHOT ", sp[1])
 			get_tree().quit()
@@ -1722,9 +1774,20 @@ func _sync_nodes(dt: float) -> void:
 		mb.node.position = Vector3(mb.x, y, mb.z); mb.node.rotation.y = mb.a
 		var since_hit := t_now - float(mb.get("localT", -9.0))
 		var hit_flash := maxf(0.0, 1.0 - maxf(0.0, since_hit) * 6.0)
-		MobAnim.animate(mb.node, {"t": t_now + float(mb.id), "st": int(mb.get("st", 0)), "stun": float(mb.get("stunT", 0.0)) > 0.0,
-			"flash": maxf(float(mb.get("flash", 0.0)), hit_flash), "enraged": bool(mb.get("enraged", false))})
-		mb.label.position = Vector3(mb.x, y + 2.4 * mb.node.scale.y + 0.4, mb.z)
+		if mb.get("player_model") != null:
+			var moving := int(mb.get("st", 0)) == 1
+			if moving: mb.walkT += dt
+			if float(mb.get("atkT", -1.0)) >= 0.0: mb.atkT += dt
+			var swing := (fposmod(float(mb.atkT), 0.45) / 0.45) if int(mb.get("st", 0)) >= 2 and float(mb.get("atkT", -1.0)) >= 0.0 else -1.0
+			mb.player_model.animate({"t": t_now, "moving": moving, "walkT": float(mb.walkT), "kind": String(mb.get("weapon", "spear")), "guard": bool(mb.get("guard", false)),
+				"swing": swing, "spin": -1.0, "dodge": 0.0, "down": 0.0, "hurt": 0.4 if float(mb.get("flash", 0.0)) > 0.5 else 0.0, "combo": floori(float(mb.get("atkT", 0.0)) / 0.45) % 2})
+		else:
+			MobAnim.animate(mb.node, {"t": t_now + float(mb.id), "st": int(mb.get("st", 0)), "stun": float(mb.get("stunT", 0.0)) > 0.0,
+				"flash": maxf(float(mb.get("flash", 0.0)), hit_flash), "enraged": bool(mb.get("enraged", false))})
+		if mb.get("label") != null:
+			var label_y := (2.75 + (0.6 if bool(mb.get("floating", false)) else 0.0)) * (1.1 if int(mb.get("elite", 0)) > 0 else 1.0)
+			mb.label.position = Vector3(mb.x, y + label_y, mb.z)
+			mb.label.visible = Vector2(mb.x - me.x, mb.z - me.z).length() < 30.0
 	for id in others:
 		var o = others[id]
 		var f := minf(1.0, dt * 10.0)
@@ -1742,8 +1805,20 @@ func _sync_nodes(dt: float) -> void:
 		fl.node.modulate.a = 1.0 - fl.t
 		if fl.t > 1.0: fl.node.queue_free(); floats.remove_at(i)
 	# カメラ（第 3 世代: 俯角 45°・画角 18°・距離 33m。ホイールで距離）
-	var tgt := Vector3(me.x, gy, me.z)
-	cam.position = tgt + Vector3(0, sin(deg_to_rad(45.0)), cos(deg_to_rad(45.0))) * dist
+	var focus := Vector2(me.x, me.z)
+	if args.has("capture-focus"):
+		var focus_parts := String(args["capture-focus"]).split(",")
+		if focus_parts.size() >= 2: focus = Vector2(float(focus_parts[0]), float(focus_parts[1]))
+	var tgt := Vector3(focus.x, float(args.get("capture-y", world.ground_y(focus.x, focus.y) + 1.2)), focus.y)
+	if args.has("match-browser-camera"):
+		# public/js/game/loop.js:420-431 の zoom=1、grid の 0.9 倍距離、pitch の式を使う。
+		cam.fov = 50.0; cam.near = 0.1; cam.far = 900.0
+		var zoom_t := clampf((1.0 - 0.55) / (1.6 - 0.55), 0.0, 1.0)
+		var capture_pitch := lerpf(0.62, 0.92, zoom_t)
+		var capture_dist := 19.5 * (0.9 if area.get("shape", "") == "grid" else 1.0)
+		cam.position = tgt + Vector3(0, sin(capture_pitch), cos(capture_pitch)) * capture_dist
+	else:
+		cam.position = tgt + Vector3(0, sin(deg_to_rad(45.0)), cos(deg_to_rad(45.0))) * dist
 	if combat.ctx.shake_v > 0.0 and bool(settings.get("shake", true)): cam.position += Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * combat.ctx.shake_v * 0.35   # 画面の揺れ（被弾・ガードブレイクなど）
 	cam.look_at(tgt, Vector3.UP)
 	RenderingServer.global_shader_parameter_set("wa_occ_cam", cam.position)   # 手前の物を点描で抜く（shaders/common.gdshaderinc）
@@ -1841,7 +1916,9 @@ func _float(pos: Vector3, text: String, col: Color) -> void:
 
 
 func _setup_camera() -> void:
-	cam.fov = 18.0; cam.near = 0.3; cam.far = 600.0
+	cam.fov = 50.0 if args.has("match-browser-camera") else 18.0
+	cam.near = 0.1 if args.has("match-browser-camera") else 0.3
+	cam.far = 900.0 if args.has("match-browser-camera") else 600.0
 	add_child(cam)
 	var mp: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/f1_field/map.json")).get("post", {})
 	var pm := ShaderMaterial.new()

@@ -19,6 +19,12 @@ var terrain_mesh: MeshInstance3D
 var sun: DirectionalLight3D
 var env: WorldEnvironment
 var weather_effect: Node3D
+var world_time := 0.0
+var door_target_open := false
+var lever_sticks: Array[Node3D] = []
+var pressure_plates: Array[MeshInstance3D] = []
+var pressure_plate_materials: Array[ShaderMaterial] = []
+var pressure_plate_states: Array = []
 
 const SH_GROUND := preload("res://shaders/ground.gdshader")
 const SH_FOLIAGE := preload("res://shaders/foliage.gdshader")
@@ -26,17 +32,33 @@ const SH_LAMBERT := preload("res://shaders/lambert.gdshader")
 const SH_ROCK := preload("res://shaders/rock.gdshader")
 const WW := preload("res://scripts/water.gd")
 const WX := preload("res://scripts/weather.gd")
+const GRID_BOSS_ACCENT_FALLBACK := {1: "#ffcc33", 2: "#9cff7a", 3: "#ff6a2a"} # public/shared/data.js の FLOORS[].boss.accent。export_gamedata.mjs は省略する。
 
 
 @export var auto_build := true   ## ゲーム（scripts/game/game.gd）は false にして load_area で組み立てる
 
 
 ## 太陽の色×強さと向きをシェーダーの全体の値に（水面 w1 が地面の材質の中で太陽の光を計算する。ビューの光の上書きも拾う）
-func _process(_dt: float) -> void:
-	if sun == null or not is_instance_valid(sun) or not sun.is_inside_tree(): return
-	var c := sun.light_color.srgb_to_linear() * (sun.light_energy * PI)   # three の色 × 強さ
-	RenderingServer.global_shader_parameter_set("wa_sun_col", Vector3(c.r, c.g, c.b))
-	RenderingServer.global_shader_parameter_set("wa_sun_dir", sun.global_transform.basis.z)
+func _process(dt: float) -> void:
+	world_time += dt
+	if sun != null and is_instance_valid(sun) and sun.is_inside_tree():
+		var c := sun.light_color.srgb_to_linear() * (sun.light_energy * PI)   # three の色 × 強さ
+		RenderingServer.global_shader_parameter_set("wa_sun_col", Vector3(c.r, c.g, c.b))
+		RenderingServer.global_shader_parameter_set("wa_sun_dir", sun.global_transform.basis.z)
+	for door in door_nodes:
+		if not is_instance_valid(door): continue
+		var rest_y := float(door.get_meta("grid_rest_y", door.position.y))
+		var target_y := rest_y - 3.4 if door_target_open else rest_y
+		door.position.y += (target_y - door.position.y) * minf(1.0, dt * 3.0)
+		door.visible = door.position.y > rest_y - 3.3
+	for stick in lever_sticks:
+		if is_instance_valid(stick):
+			var target_rotation := -0.6 if door_target_open else 0.6
+			stick.rotation.z += (target_rotation - stick.rotation.z) * minf(1.0, dt * 6.0)
+	for i in pressure_plate_materials.size():
+		var intensity := 1.6 + sin(world_time * 8.0) * 0.4 if i < pressure_plate_states.size() and bool(pressure_plate_states[i]) else 0.0
+		var emission := (Color("40c0ff").srgb_to_linear() * intensity).linear_to_srgb()
+		pressure_plate_materials[i].set_shader_parameter("emission_col", emission)
 
 
 func _ready() -> void:
@@ -177,6 +199,8 @@ func _build_legacy(id: String, ar: Dictionary) -> bool:
 	ToonLook.convert(scene, Color("448a9b"), true)
 	door_nodes.clear()
 	for n in scene.find_children("LegacyDoor", "Node3D", true, false): door_nodes.append(n)
+	lever_sticks.clear(); pressure_plates.clear(); pressure_plate_materials.clear(); pressure_plate_states.clear()
+	if ar["shape"] == "grid": _build_legacy_grid_details(id, ar, scene)
 	if ar["shape"] == "grid":
 		# Grid の buildGrid の床面上端は y=0。扉・レバー・板・宝箱の判定は従来の area データを使う。
 		var body := StaticBody3D.new()
@@ -191,6 +215,121 @@ func _build_legacy(id: String, ar: Dictionary) -> bool:
 		if ground != null: ground.create_trimesh_collision()
 		else: push_error("legacy GLB に LegacyGround がありません: %s" % id)
 	return true
+
+
+## grid.js の扉・レバー・感圧板・罠床を、従来 GLB の上に組み立てる。
+func _build_legacy_grid_details(id: String, ar: Dictionary, legacy_scene: Node) -> void:
+	var points: Dictionary = ar.get("pts", {})
+	var cell := float(ar.get("cell", 4.0))
+	var floor_n := int(ar["floor"])
+	# public/js/env/grid.js は fdef.boss.accent を使う。data/game.json に出ないため JS の階層値を使う。
+	var accent := Color.html(String(GRID_BOSS_ACCENT_FALLBACK.get(floor_n, "#ffcc33")))
+	world_time = 0.0
+	door_target_open = false
+	var doors: Array = points.get("D", [])
+	if not doors.is_empty():
+		for old_door in door_nodes:
+			if is_instance_valid(old_door): old_door.visible = false
+		door_nodes.clear()
+		var door_bar := Color("5a5a64")
+		for d in doors:
+			var gate := Node3D.new()
+			gate.name = "GridDoor"
+			gate.position = Vector3(float(d.x), 0.0, float(d.z))
+			for k in 6:
+				var post := CylinderMesh.new(); post.top_radius = 0.1; post.bottom_radius = 0.1; post.height = 3.2; post.radial_segments = 6
+				var post_node := _grid_detail_mesh(gate, post, "gate_post_%d" % k, door_bar)
+				post_node.position = Vector3(-1.6 + k * 0.64, 1.6, 0.0)
+			for y in [2.9, 0.5]:
+				var bar := BoxMesh.new(); bar.size = Vector3(cell, 0.3, 0.3)
+				var bar_node := _grid_detail_mesh(gate, bar, "gate_bar_%d" % int(y * 10.0), door_bar)
+				bar_node.position = Vector3(0.0, y, 0.0)
+			var seal := _grid_circle_mesh(0.6, 24)
+			var seal_node := _grid_detail_mesh(gate, seal, "gate_seal", (accent.srgb_to_linear() * 1.4).linear_to_srgb(), true, true)
+			seal_node.position = Vector3(0.0, 1.6, 0.2)
+			ToonLook.convert(gate)
+			add_child(gate)
+			gate.set_meta("grid_rest_y", gate.position.y)
+			door_nodes.append(gate)
+	for p in points.get("L", []):
+		var lever := Node3D.new(); lever.name = "GridLever"; lever.position = Vector3(float(p.x), 0.0, float(p.z))
+		var base_found := false
+		for candidate in legacy_scene.find_children("*", "MeshInstance3D", true, false):
+			var existing_base := candidate as MeshInstance3D
+			if existing_base.mesh == null or not existing_base.mesh.get_aabb().size.is_equal_approx(Vector3(1.2, 0.6, 0.8)): continue
+			if existing_base.global_position.distance_to(Vector3(float(p.x), 0.3, float(p.z))) < 0.05:
+				base_found = true
+				break
+		if not base_found:
+			var base := BoxMesh.new(); base.size = Vector3(1.2, 0.6, 0.8)
+			var new_base := _grid_detail_mesh(lever, base, "lever_base", Color("6a6a74")); new_base.position.y = 0.3
+		var stick := Node3D.new(); stick.name = "LeverStick"; stick.position.y = 0.6; lever.add_child(stick); stick.rotation.z = 0.6
+		var shaft := CylinderMesh.new(); shaft.top_radius = 0.07; shaft.bottom_radius = 0.07; shaft.height = 1.3; shaft.radial_segments = 8
+		var shaft_node := _grid_detail_mesh(stick, shaft, "lever_shaft", Color("8a6a4a")); shaft_node.position.y = 0.65
+		var knob := SphereMesh.new(); knob.radius = 0.16; knob.height = 0.32; knob.radial_segments = 10; knob.rings = 8
+		var knob_node := _grid_detail_mesh(stick, knob, "lever_knob", Color("d04a3a")); knob_node.position.y = 1.3
+		ToonLook.convert(lever); add_child(lever); lever_sticks.append(stick)
+		var title := GameVisuals.label("レバー", Color("ffd27a")); title.font_size = 44; title.pixel_size = 3.0 / 512.0; title.outline_modulate = Color(0.0, 0.0, 0.0, 0.85); title.position = Vector3(float(p.x), 2.94, float(p.z)); add_child(title)
+		var prompt := GameVisuals.label("[F] 引く", Color.WHITE); prompt.font_size = 30; prompt.pixel_size = 3.0 / 512.0; prompt.outline_modulate = Color(0.0, 0.0, 0.0, 0.85); prompt.position = Vector3(float(p.x), 2.60, float(p.z)); add_child(prompt)
+	var plate_nodes := legacy_scene.find_children("LegacyPlate_*", "MeshInstance3D", true, false)
+	plate_nodes.sort_custom(func(a: Node, b: Node) -> bool: return String(a.name) < String(b.name))
+	var plate_points: Array = points.get("P", [])
+	for i in plate_points.size():
+		var p: Dictionary = plate_points[i]
+		var plate: MeshInstance3D
+		if i < plate_nodes.size():
+			plate = plate_nodes[i] as MeshInstance3D
+		else:
+			var plate_holder := Node3D.new()
+			plate_holder.name = "PressurePlate_%d" % i
+			var plate_mesh := CylinderMesh.new(); plate_mesh.top_radius = 1.4; plate_mesh.bottom_radius = 1.5; plate_mesh.height = 0.15; plate_mesh.radial_segments = 24
+			plate = _grid_detail_mesh(plate_holder, plate_mesh, "PressurePlate", Color("8a8aa0"), false, false)
+			plate.position = Vector3(float(p.x), 0.08, float(p.z))
+			add_child(plate_holder); ToonLook.convert(plate_holder)
+		var source_material := plate.get_active_material(0) as ShaderMaterial
+		if source_material != null:
+			var unique_material := source_material.duplicate() as ShaderMaterial
+			plate.set_surface_override_material(0, unique_material)
+			pressure_plate_materials.append(unique_material)
+		pressure_plates.append(plate); pressure_plate_states.append(false)
+		for old_label in legacy_scene.find_children("AreaLabel", "MeshInstance3D", true, false):
+			var label_node := old_label as MeshInstance3D
+			if Vector2(label_node.global_position.x - float(p.x), label_node.global_position.z - float(p.z)).length() < 0.05 and absf(label_node.global_position.y - 2.2) < 0.05:
+				label_node.visible = false
+		var caption := GameVisuals.label("感圧板", Color("9ae8ff")); caption.font_size = 44; caption.pixel_size = 3.0 / 512.0; caption.outline_modulate = Color(0.0, 0.0, 0.0, 0.85); caption.position = Vector3(float(p.x), 2.2, float(p.z)); add_child(caption)
+	if not pressure_plates.is_empty(): set_pressure_plates([])
+
+
+func _grid_detail_mesh(parent: Node, mesh: Mesh, name: String, color: Color, glow := false, outline := true) -> MeshInstance3D:
+	var material := StandardMaterial3D.new(); material.albedo_color = color
+	if glow: material.resource_name = "glow"
+	var display_mesh := mesh
+	if mesh is PrimitiveMesh:
+		# CylinderMesh / BoxMesh も ToonLook が扱える ArrayMesh にする。
+		var array_mesh := ArrayMesh.new()
+		array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, (mesh as PrimitiveMesh).get_mesh_arrays())
+		display_mesh = array_mesh
+	var node := MeshInstance3D.new(); node.name = ("ow100_" if outline else "") + name; node.mesh = display_mesh; node.material_override = material; parent.add_child(node)
+	return node
+
+
+func _grid_circle_mesh(radius: float, segments: int) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in segments:
+		var a0 := TAU * i / segments
+		var a1 := TAU * (i + 1) / segments
+		surface.set_normal(Vector3(0.0, 0.0, 1.0))
+		surface.add_vertex(Vector3.ZERO)
+		surface.set_normal(Vector3(0.0, 0.0, 1.0))
+		surface.add_vertex(Vector3(cos(a0) * radius, sin(a0) * radius, 0.0))
+		surface.set_normal(Vector3(0.0, 0.0, 1.0))
+		surface.add_vertex(Vector3(cos(a1) * radius, sin(a1) * radius, 0.0))
+	return surface.commit()
+
+
+func set_pressure_plates(states: Array) -> void:
+	pressure_plate_states = states.duplicate()
 
 
 ## 仮の屋内（マス目）: 床、壁の箱（MultiMesh）、扉（開くと消える）、レバー・感圧板・宝箱・ボス部屋の印
@@ -233,8 +372,7 @@ func _build_grid(ar: Dictionary) -> void:
 
 
 func set_door_open(open: bool) -> void:
-	for d in door_nodes:
-		if is_instance_valid(d): d.visible = not open
+	door_target_open = open
 
 
 ## 仮の地面: 階層の地面の色の平面、輪郭の外の低い壁（灰色の岩の列）、当たり判定のある木・岩・建物を単純な形で

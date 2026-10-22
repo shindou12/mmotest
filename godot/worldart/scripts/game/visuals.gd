@@ -125,6 +125,34 @@ static func _mob_table_accent(t: String, color: Color) -> Color:
 	return Color("ff4030")
 
 
+## public/shared/data.js:350-380 の FLOORS[].elites。export_gamedata.mjs は見た目専用項目を省くため表示時に補う。
+static func mob_display_def(floor_n: int, mob_id: int, source: Dictionary) -> Dictionary:
+	var md := source.duplicate(true)
+	var floors: Array = GameRules.data().get("floors", [])
+	if floor_n < 1 or floor_n > floors.size() or mob_id < 100: return md
+	var elites: Array = floors[floor_n - 1].get("elites", [])
+	if mob_id - 100 >= elites.size(): return md
+	if not md.has("look"): md["look"] = "player"
+	if not md.has("weapon"): md["weapon"] = "spear"
+	match floor_n:
+		1:
+			if not md.has("armor"): md["armor"] = 5
+			if not md.has("accent"): md["accent"] = "#ffb030"
+		2:
+			if not md.has("armor"): md["armor"] = 3
+			if not md.has("accent"): md["accent"] = "#9cff7a"
+		3:
+			if not md.has("armor"): md["armor"] = 6
+			if not md.has("accent"): md["accent"] = "#ff6a2a"
+	return md
+
+
+## public/shared/areas.js:316, 393 の named.name。area の書き出しデータには含まれない。
+static func named_mob_name(area_id: String, fallback: String) -> String:
+	var names := {"f1_lake": "ヌシ・ギガスライム", "f3_canyon": "砂鮫ギルガ"}
+	return String(names.get(area_id, fallback))
+
+
 ## GLB の mob_palette_<本体色>_<アクセント色> から、呼び出し側が省略したアクセントを補う。
 static func _mob_asset_accent(root: Node3D, color: Color) -> Variant:
 	var target := color.to_html(false).to_lower()
@@ -260,6 +288,15 @@ static func mob(t: String, color: Color, sc: float, boss := false, accent: Varia
 						recolored.set_shader_parameter("emission_col", new_emission)
 				mi.set_surface_override_material(s, recolored)
 		_mob_anim_parts(gm, t, boss)
+		if boss:
+			var aura := gm.find_child("MobAnim_aura", true, false) as OmniLight3D
+			if aura != null:
+				# public/js/models.js:292-294 の PointLight(ac, 3, 12)。
+				aura.position = Vector3(0.0, 2.0, 0.0)
+				aura.light_color = accent_color
+				aura.light_energy = 3.0
+				aura.omni_range = 12.0
+				aura.shadow_enabled = false
 		gm.scale = Vector3.ONE * sc
 		return gm
 	var n := Node3D.new()
@@ -287,6 +324,98 @@ static func mob(t: String, color: Color, sc: float, boss := false, accent: Varia
 	return n
 
 
+## snapshot.js の makeDarkAdventurer。プレイヤーの装備を使い、色を暗くして目を光らせる。
+static func dark_adventurer(md: Dictionary, sc: float) -> Dictionary:
+	var color := Color.html(String(md.get("color", "6a4a2a")))
+	var accent := Color.html(String(md.get("accent", "ffb030")))
+	var player := PlayerModel.new()
+	player.build({"kind": String(md.get("weapon", "spear")), "form": 4, "tier": 0, "armor": int(md.get("armor", 0)), "color": color})
+	for mi in player.root.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh == null: continue
+		for surface in mi.mesh.get_surface_count():
+			var source: Material = mi.get_active_material(surface)
+			if source is ShaderMaterial:
+				var material := (source as ShaderMaterial).duplicate() as ShaderMaterial
+				var albedo: Color = material.get_shader_parameter("albedo")
+				material.set_shader_parameter("albedo", (albedo.srgb_to_linear().lerp(color.srgb_to_linear(), 0.35) * 0.85).linear_to_srgb())
+				if material.get_shader_parameter("emission_col") is Color:
+					material.set_shader_parameter("emission_col", accent * 0.12)
+				mi.set_surface_override_material(surface, material)
+			elif source is StandardMaterial3D:
+				var material := (source as StandardMaterial3D).duplicate() as StandardMaterial3D
+				material.albedo_color = (material.albedo_color.srgb_to_linear().lerp(color.srgb_to_linear(), 0.35) * 0.85).linear_to_srgb()
+				if material.emission_enabled: material.emission = accent * 0.12
+				mi.set_surface_override_material(surface, material)
+	player.root.scale = Vector3.ONE * sc
+	return {"node": player.root, "player": player}
+
+
+## labels.js makeMobLabel / drawMobLabel の 256×64 の名札と HP 板。
+static func mob_label(parent: Node, model_scale: float, elite: int, floating: bool) -> Dictionary:
+	var root := Node3D.new()
+	root.name = "MobNameplate"
+	parent.add_child(root)
+	var name_label := Label3D.new()
+	name_label.name = "MobName"
+	name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	name_label.no_depth_test = true
+	name_label.shaded = false
+	name_label.render_priority = 110
+	name_label.font_size = 22
+	name_label.pixel_size = 0.8 / 64.0
+	name_label.width = 256.0
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.outline_size = 4
+	name_label.outline_modulate = Color(0, 0, 0, 0.85)
+	name_label.position.y = 0.15
+	root.add_child(name_label)
+	var hp_back := _mob_label_bar(root, Vector2(2.0, 0.15), Color(0, 0, 0, 0.7), "MobHPBack")
+	hp_back.position.y = -0.175
+	var hp_fill := _mob_label_bar(root, Vector2(1.95, 0.1), Color("e8443a"), "MobHPFill")
+	hp_fill.position.y = -0.175
+	return {"sprite": root, "name": name_label, "fill": hp_fill, "elite": elite, "floating": floating}
+
+
+static func _mob_label_bar(parent: Node, size: Vector2, color: Color, node_name: String) -> MeshInstance3D:
+	var quad := QuadMesh.new()
+	quad.size = size
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	material.no_depth_test = true
+	material.disable_fog = true
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	material.render_priority = 110
+	var bar := MeshInstance3D.new()
+	bar.name = node_name
+	bar.mesh = quad
+	bar.material_override = material
+	parent.add_child(bar)
+	return bar
+
+
+## labels.js の ! / Lv / HP 比率・閾値色を反映する。
+static func update_mob_label(label: Dictionary, name: String, level: int, elite: int, hp: float, max_hp: float, aggro: bool) -> void:
+	var caption: Label3D = label["name"]
+	var fill: MeshInstance3D = label["fill"]
+	var fill_mesh: QuadMesh = fill.mesh as QuadMesh
+	var fill_material: StandardMaterial3D = fill.material_override as StandardMaterial3D
+	var next_text := "%sLv%d %s" % ["! " if aggro else "", level, name]
+	var next_color := Color("ff6a5a") if aggro else Color("ff8ae0") if elite == 3 else Color("ffc04a") if elite > 0 else Color.WHITE
+	var pct := roundi(clampf(hp / maxf(max_hp, 1.0), 0.0, 1.0) * 100.0)
+	var fill_width := 156.0 * pct / 100.0
+	var fill_color := Color("e8443a") if pct > 30 else Color("ff9a3a")
+	if caption.text != next_text or caption.modulate != next_color or not is_equal_approx(fill_mesh.size.x, fill_width * (0.8 / 64.0)) or fill_material.albedo_color != fill_color:
+		caption.text = next_text
+		caption.modulate = next_color
+		fill_mesh.size = Vector2(fill_width * (0.8 / 64.0), 8.0 * (0.8 / 64.0))
+		fill.position.x = (fill_width - 156.0) * (0.8 / 64.0) * 0.5
+		fill_material.albedo_color = fill_color
+
+
 ## 頭の上の名前と HP の札
 static func label(text: String, color := Color.WHITE) -> Label3D:
 	var l := Label3D.new()
@@ -300,9 +429,10 @@ static func label(text: String, color := Color.WHITE) -> Label3D:
 ## 地面に貼る平らな形（予告・斬撃）。circle・ring・cone・line を三角形で作る（原点 = 形の基準点）
 static func shape_mesh(s: Dictionary, fill := 1.0) -> ArrayMesh:
 	if fill < 0.02: return null   # 面のない形を作らない
+	if not String(s.get("k", "")) in ["circle", "ring", "cone", "line"]: return null
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var k := String(s["k"])
+	var k := String(s.get("k", ""))
 	var seg := 40
 	match k:
 		"circle", "ring":
