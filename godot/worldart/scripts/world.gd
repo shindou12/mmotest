@@ -44,6 +44,7 @@ func _ready() -> void:
 ## ゲームのエリアを組み立てる（L27）。data/<id>/map.json があれば第 3 世代の地図、なければ仮の地面（ゲームの輪郭・当たり判定の形だけ）
 func load_area(id: String) -> void:
 	if FileAccess.file_exists("res://data/%s/map.json" % id):
+		ToonLook.set_light(ToonLook.DEFAULT_LIGHT)
 		map_name = id
 		if not is_inside_tree() or not auto_build: build()
 		return
@@ -55,11 +56,75 @@ func load_area(id: String) -> void:
 	_set_globals()
 	_build_light()
 	var ar := GameRules.area(id)
+	if _build_legacy(id, ar): return
 	if ar["shape"] == "grid": _build_grid(ar)
 	else: _build_fallback(ar)
 
 
 var door_nodes: Array = []
+
+
+## buildArea（open.js / grid.js）の GLB。open の当たり高さはブラウザの地面メッシュから取る。
+func _build_legacy(id: String, ar: Dictionary) -> bool:
+	var path := "res://data/legacy/%s.glb" % id
+	if not FileAccess.file_exists(path): return false
+	var index_path := "res://data/legacy/index.json"
+	var index: Dictionary = _json(index_path) if FileAccess.file_exists(index_path) else {}
+	var entry: Dictionary = index.get("areas", {}).get(id, {})
+	var light: Dictionary = entry.get("light", {})
+	if not light.is_empty():
+		# ゲームの後段露出を通した旧エリアの明るさをブラウザ版に合わせる。
+		ToonLook.set_light({
+			"sun_dir": _v3(light.get("sun_dir", [20, 40, 10])),
+			"sun_color": Color.html(String(light.get("sun_color", "#fff1d6"))),
+			"sun_i": float(light.get("sun_i", 2.2)),
+			"sky": Color.html(String(light.get("sky", "#cfe8ff"))),
+			"ground": Color.html(String(light.get("ground", "#3a5a2a"))),
+			"hemi_i": float(light.get("hemi_i", 1.1)),
+			"aces": true, "exposure": 0.75, "outline_scale": 1.0,
+		})
+		if env != null and env.environment != null:
+			var environment: Environment = env.environment
+			environment.background_color = Color.html(String(light.get("sky_bot", "#d8f0ff")))
+			environment.fog_enabled = true
+			environment.fog_mode = Environment.FOG_MODE_DEPTH
+			environment.fog_light_color = Color.html(String(light.get("fog", "#bfe3ff")))
+			environment.fog_light_energy = 1.0
+			environment.fog_depth_begin = float(light.get("fog_near", 40.0))
+			environment.fog_depth_end = float(light.get("fog_far", 140.0))
+			environment.fog_depth_curve = 1.0
+			environment.fog_sky_affect = 1.0
+	var doc := GLTFDocument.new()
+	var state := GLTFState.new()
+	var err := doc.append_from_file(path, state)
+	if err != OK:
+		push_error("legacy GLB を読めません: %s (%s)" % [id, error_string(err)])
+		return false
+	var scene := doc.generate_scene(state)
+	if scene == null:
+		push_error("legacy GLB の scene を作れません: %s" % id)
+		return false
+	scene.name = "LegacyArea"
+	add_child(scene)
+	ToonLook.convert(scene)
+	door_nodes.clear()
+	for n in scene.find_children("LegacyDoor", "Node3D", true, false): door_nodes.append(n)
+	if ar["shape"] == "grid":
+		# Grid の buildGrid の床面上端は y=0。扉・レバー・板・宝箱の判定は従来の area データを使う。
+		var body := StaticBody3D.new()
+		body.name = "LegacyGridFloorCollision"
+		var cs := CollisionShape3D.new()
+		cs.shape = WorldBoundaryShape3D.new()
+		body.add_child(cs)
+		add_child(body)
+	else:
+		# makeHeight と同じ高さの頂点を持つ LegacyGround 自体から歩行・出口表示の高さを取る。
+		var ground := scene.find_child("LegacyGround", true, false) as MeshInstance3D
+		if ground != null: ground.create_trimesh_collision()
+		else: push_error("legacy GLB に LegacyGround がありません: %s" % id)
+	return true
+
+
 ## 仮の屋内（マス目）: 床、壁の箱（MultiMesh）、扉（開くと消える）、レバー・感圧板・宝箱・ボス部屋の印
 func _build_grid(ar: Dictionary) -> void:
 	var CELL := float(ar["cell"]); var W := int(ar["W"]); var H := int(ar["H"])

@@ -17,7 +17,7 @@ const DEFAULT_LIGHT := {
 	"outline_scale": 1.0,   # 輪郭線の太さの倍率（1 = toon.js と同じ。確かめ用に変えられる）
 }
 
-static var _double_shader: Shader
+static var _shader_cache := {}
 static var _materials: Array = []          # 作った ShaderMaterial（光の値を後から入れ直すため）
 static var _mat_cache := {}
 static var _outline_cache := {}
@@ -53,18 +53,39 @@ static func _apply_outline_light(m: ShaderMaterial) -> void:
 	m.set_shader_parameter("exposure", _light["exposure"])
 
 
-static func _toon_material(albedo: Color, emission: Color, unlit: bool, scale: float, double_sided: bool, ow: float) -> ShaderMaterial:
-	var key := "%s|%s|%s|%.3f|%s|%.2f" % [albedo.to_html(false), emission.to_html(false), unlit, scale, double_sided, ow]
+static func _shader_variant(double_sided: bool, vertex_colors: bool, has_texture: bool, transparent: bool, additive: bool) -> Shader:
+	var key := "%s|%s|%s|%s|%s" % [double_sided, vertex_colors, has_texture, transparent, additive]
+	if _shader_cache.has(key): return _shader_cache[key]
+	var code := SHADER.code
+	var mode := "render_mode unshaded, cull_disabled;" if double_sided else "render_mode unshaded, cull_back;"
+	if transparent: mode = mode.replace(";", ", %s, depth_draw_never;" % ("blend_add" if additive else "blend_mix"))
+	code = code.replace("render_mode unshaded, cull_back;", mode)
+	var base := "albedo.rgb"
+	if has_texture:
+		code = code.replace("uniform vec4 albedo : source_color", "uniform sampler2D albedo_tex : source_color;\nuniform vec4 albedo : source_color")
+		code = code.replace("void fragment() {", "void fragment() {\n\tvec4 tex_col = texture(albedo_tex, UV);")
+		base += " * tex_col.rgb"
+	if vertex_colors: base += " * COLOR.rgb"
+	code = code.replace("col = albedo.rgb * color_scale;", "col = %s * color_scale;" % base)
+	code = code.replace("col = albedo.rgb / PI * irr + emission_col.rgb;", "col = %s / PI * irr + emission_col.rgb;" % base)
+	if transparent:
+		var alpha := "albedo.a"
+		if has_texture: alpha += " * tex_col.a"
+		if vertex_colors: alpha += " * COLOR.a"
+		code = code.replace("ALBEDO = col;", "ALBEDO = col;\n\tALPHA = %s;" % alpha)
+	var shader := Shader.new()
+	shader.code = code
+	_shader_cache[key] = shader
+	return shader
+
+
+static func _toon_material(albedo: Color, emission: Color, unlit: bool, scale: float, double_sided: bool, ow: float, vertex_colors := false, tex: Texture2D = null, transparent := false, additive := false) -> ShaderMaterial:
+	var key := "%s|%s|%s|%.3f|%s|%.2f|%s|%s|%s|%s" % [albedo.to_html(true), emission.to_html(false), unlit, scale, double_sided, ow, vertex_colors, tex.get_instance_id() if tex != null else 0, transparent, additive]
 	if _mat_cache.has(key): return _mat_cache[key]
 	var m := ShaderMaterial.new()
-	if double_sided:
-		if _double_shader == null:
-			_double_shader = Shader.new()
-			_double_shader.code = SHADER.code.replace("render_mode unshaded, cull_back;", "render_mode unshaded, cull_disabled;")
-		m.shader = _double_shader
-	else:
-		m.shader = SHADER
+	m.shader = _shader_variant(double_sided, vertex_colors, tex != null, transparent, additive)
 	m.set_shader_parameter("albedo", albedo)
+	if tex != null: m.set_shader_parameter("albedo_tex", tex)
 	m.set_shader_parameter("emission_col", emission)
 	m.set_shader_parameter("color_scale", scale)
 	m.set_shader_parameter("unlit", unlit)
@@ -194,14 +215,21 @@ static func convert(root: Node, player: Color = Color("448a9b")) -> void:
 		var use_hull := false
 		for s in src_mesh.get_surface_count():
 			var src: Material = src_mesh.surface_get_material(s)
+			if src == null: src = mi.get_active_material(s)
 			if not (src is BaseMaterial3D): continue
 			var b: BaseMaterial3D = src
 			var rn := String(b.resource_name)
-			var glow := rn == "glow"
+			var glow := rn == "glow" or rn == "glow_add"
+			var additive := rn == "glow_add"
 			var alb: Color = b.albedo_color
 			if rn.begins_with("player_color"): alb = player_role_color(rn, player)
 			var emi: Color = b.emission if b.emission_enabled and not glow else Color(0, 0, 0)
 			var o := 0.0 if glow else ow
+			var arrays := src_mesh.surface_get_arrays(s)
+			var colors = arrays[Mesh.ARRAY_COLOR]
+			var vertex_colors: bool = colors != null and colors.size() > 0
+			var tex: Texture2D = b.albedo_texture
+			var transparent := b.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA or alb.a < 0.999
 			if o > 0.0: use_hull = true
-			mi.set_surface_override_material(s, _toon_material(alb, emi, glow, gm, b.cull_mode == BaseMaterial3D.CULL_DISABLED, o))
+			mi.set_surface_override_material(s, _toon_material(alb, emi, glow, gm, b.cull_mode == BaseMaterial3D.CULL_DISABLED, o, vertex_colors, tex, transparent, additive))
 		if use_hull: mi.mesh = add_hull(src_mesh)
