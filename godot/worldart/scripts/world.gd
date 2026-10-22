@@ -18,12 +18,14 @@ var placed: Dictionary
 var terrain_mesh: MeshInstance3D
 var sun: DirectionalLight3D
 var env: WorldEnvironment
+var weather_effect: Node3D
 
 const SH_GROUND := preload("res://shaders/ground.gdshader")
 const SH_FOLIAGE := preload("res://shaders/foliage.gdshader")
 const SH_LAMBERT := preload("res://shaders/lambert.gdshader")
 const SH_ROCK := preload("res://shaders/rock.gdshader")
 const WW := preload("res://scripts/water.gd")
+const WX := preload("res://scripts/weather.gd")
 
 
 @export var auto_build := true   ## ゲーム（scripts/game/game.gd）は false にして load_area で組み立てる
@@ -43,10 +45,12 @@ func _ready() -> void:
 
 ## ゲームのエリアを組み立てる（L27）。data/<id>/map.json があれば第 3 世代の地図、なければ仮の地面（ゲームの輪郭・当たり判定の形だけ）
 func load_area(id: String) -> void:
+	_clear_weather()
 	if FileAccess.file_exists("res://data/%s/map.json" % id):
 		ToonLook.set_light(ToonLook.DEFAULT_LIGHT)
 		map_name = id
 		if not is_inside_tree() or not auto_build: build()
+		_install_weather(id, GameRules.area(id), false)
 		return
 	for c in get_children():
 		remove_child(c)
@@ -56,9 +60,28 @@ func load_area(id: String) -> void:
 	_set_globals()
 	_build_light()
 	var ar := GameRules.area(id)
-	if _build_legacy(id, ar): return
+	if _build_legacy(id, ar):
+		_install_weather(id, ar, true)
+		return
 	if ar["shape"] == "grid": _build_grid(ar)
 	else: _build_fallback(ar)
+	_install_weather(id, ar, false)
+
+
+func _clear_weather() -> void:
+	if weather_effect != null and is_instance_valid(weather_effect):
+		if weather_effect.get_parent() == self: remove_child(weather_effect)
+		weather_effect.free()
+	weather_effect = null
+
+
+func _install_weather(id: String, ar: Dictionary, legacy_baked: bool) -> void:
+	var raw: Variant = ar.get("weather", null)
+	if raw == null: return
+	weather_effect = WX.new()
+	weather_effect.name = "Weather"
+	add_child(weather_effect)
+	weather_effect.configure(id, String(raw), env.environment if env != null else null, legacy_baked)
 
 
 var door_nodes: Array = []

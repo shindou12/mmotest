@@ -94,6 +94,13 @@ SUITES.ang_diff = () => {
   return out;
 };
 
+// loop.js movement: hazardAt(...)?kind === 'sand' ? 0.5 : 1
+SUITES.hazard_move_multiplier = () => [
+  { in: ['sand'], out: 0.5 },
+  { in: ['poison'], out: 1 },
+  { in: [''], out: 1 },
+];
+
 // data.js xpToNext
 SUITES.xp_to_next = () => {
   const out = [];
