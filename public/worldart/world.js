@@ -9,6 +9,9 @@
 //     diff=0.15                   画面全体のにじみ（0〜1、既定 0）
 //     diffr=0.012                 にじみの半径（画面の高さに対する割合）
 //     diffm=mix|screen            にじみの混ぜ方（既定 mix）
+//     diffmask=none|depth|edge|veg|soft|lum  にじみをかける範囲（既定 none = 全面）
+//     diffd0 / diffd1             depth の距離範囲（既定: 注視点までの距離の 0.8〜1.6 倍）
+//     diffe=0.08                  edge の輝度勾配しきい値、diffdebug=1 でマスクを表示
 //     grass=0                     草の房を出さない
 //     fnorm=card                  葉の法線を板の向きにする（既定は Blender で入れた外向きの法線）
 //     shadow=0                    影を切る
@@ -35,6 +38,12 @@ const P = Object.assign({ sat: 1.0, contrast: 1.0, lift: [0, 0, 0], gain: [1, 1,
 const diffAmt = THREE.MathUtils.clamp(num('diff', P.diff), 0, 1);
 const diffRadius = Math.max(0, num('diffr', P.diffR));
 const diffMode = (q.get('diffm') || P.diffMode) === 'screen' ? 'screen' : 'mix';
+const diffMaskValue = q.has('diffmask') ? q.get('diffmask') : (P.diffMask || 'none');
+const diffMask = ['depth', 'edge', 'veg', 'soft', 'lum'].includes(diffMaskValue) ? diffMaskValue : 'none';
+const diffDebug = flag('diffdebug', false);
+const diffDepth0 = q.has('diffd0') && Number.isFinite(num('diffd0', NaN)) ? Math.max(0, num('diffd0', 0)) : null;
+const diffDepth1 = q.has('diffd1') && Number.isFinite(num('diffd1', NaN)) ? Math.max(0, num('diffd1', 0)) : null;
+const diffEdge = Math.max(0.0001, num('diffe', 0.08));
 
 // ---------------------------------------------------------------- レンダラー
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -634,8 +643,10 @@ const terrain = await load(`${BASE}maps/${MAP}/terrain.glb`);
 terrain.scene.traverse((o) => {
   if (!o.isMesh) return;
   if (o.name.startsWith('water') || o.material.name === 'water') {
+    o.userData.diffMaskGround = false;
     o.material = waterMaterial(); o.receiveShadow = num('wshadow', WRULE ? 0 : 1) > 0;   // w1 は水面に影を受けない（透ける水面に VSM の影が縦の筋になった。見本でも水面に木の影はほぼ落ちない） o.renderOrder = 2;
   } else {
+    o.userData.diffMaskGround = true;
     o.material = groundMaterial(); o.receiveShadow = true;
   }
 });
@@ -658,6 +669,7 @@ await Promise.all(assetNames.map(async (name) => {
     if (loadName === 'clover_bb' && o.geometry.attributes.color) o.geometry.setAttribute('aCenter', o.geometry.attributes.color);
     const mat = fixMaterial(o, name, loadName);
     const im = new THREE.InstancedMesh(o.geometry, mat, items.length);
+    im.userData.diffMaskIgnore = shadowOnly;
     items.forEach(([x, y, z, r, s], i) => {
       dummy.position.set(x, y, z); dummy.rotation.set(0, r, 0); dummy.scale.setScalar(s); dummy.updateMatrix();
       im.setMatrixAt(i, dummy.matrix.clone().multiply(o.matrixWorld));
@@ -712,11 +724,71 @@ const grade = new ShaderPass({
     }`,
 });
 // 画面全体のにじみ。半分の解像度に縮小し、横・縦のガウスぼかしを別々にかける
+const DIFF_MASK_CODE = { depth: 1, edge: 2, veg: 3, soft: 4, lum: 5 };
+const DIFF_VEGETATION = /leaf|frond|grass|clover|foliage|vegetation|bush|shrub|plant/i;
+const DIFF_WHITE_TEXTURE = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, THREE.RGBAFormat);
+DIFF_WHITE_TEXTURE.needsUpdate = true;
+const DIFF_MASK_CAMERA = { value: new THREE.Vector3() };
+
+function diffMaskMaterial(source, include) {
+  const map = source?.map || null;
+  if (map) map.updateMatrix();
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uMap: { value: map || DIFF_WHITE_TEXTURE }, uHasMap: { value: map ? 1 : 0 },
+      uAlphaTest: { value: source?.alphaTest || 0 }, uKind: { value: include ? 1 : 0 },
+      uMapTransform: { value: map ? map.matrix : new THREE.Matrix3() }, uCamera: DIFF_MASK_CAMERA,
+    },
+    vertexShader: `#include <common>
+      uniform mat3 uMapTransform;
+      varying vec2 vMaskUv;
+      varying vec3 vWorldPos;
+      void main() {
+        vMaskUv = (uMapTransform * vec3(uv, 1.0)).xy;
+        vec4 localPosition = vec4(position, 1.0);
+        #ifdef USE_INSTANCING
+          localPosition = instanceMatrix * localPosition;
+        #endif
+        vec4 worldPosition = modelMatrix * localPosition;
+        vWorldPos = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }`,
+    fragmentShader: `uniform sampler2D uMap;
+      uniform float uHasMap, uAlphaTest, uKind;
+      uniform vec3 uCamera;
+      varying vec2 vMaskUv;
+      varying vec3 vWorldPos;
+      void main() {
+        if (uHasMap > 0.5 && uAlphaTest > 0.0 && texture2D(uMap, vMaskUv).a < uAlphaTest) discard;
+        gl_FragColor = vec4(uKind, length(vWorldPos - uCamera), 0.0, 1.0);
+      }`,
+    side: source?.side ?? THREE.FrontSide,
+    depthTest: true, depthWrite: true, transparent: false, toneMapped: false,
+  });
+}
+
 class DiffusionPass extends Pass {
-  constructor(amt, radius, mode) {
+  constructor(amt, radius, mode, maskType = 'none', debug = false) {
     super();
     this.amt = amt;
     this.radius = radius;
+    this.maskType = maskType;
+    this.debug = debug;
+    this.masked = maskType !== 'none' || debug;
+    this.needsObjectMask = ['depth', 'veg', 'soft'].includes(maskType);
+    this.maskTarget = this.needsObjectMask
+      ? new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false })
+      : null;
+    this.maskObjects = null;
+    this.maskMaterials = [];
+    if (this.maskTarget) {
+      this.maskBackgroundMaterial = new THREE.ShaderMaterial({
+        vertexShader: VS,
+        fragmentShader: 'void main(){ gl_FragColor = vec4(0.0, 600.0, 0.0, 1.0); }',
+        depthTest: false, depthWrite: false, toneMapped: false,
+      });
+      this.maskBackgroundQuad = new FullScreenQuad(this.maskBackgroundMaterial);
+    }
     this.halfA = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, type: THREE.HalfFloatType, depthBuffer: false });
     this.halfB = this.halfA.clone();
     this.blurMaterial = new THREE.ShaderMaterial({
@@ -735,29 +807,142 @@ class DiffusionPass extends Pass {
         }`,
       depthTest: false, depthWrite: false,
     });
-    this.compositeMaterial = new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, tBlur: { value: null }, uAmt: { value: amt }, uScreen: { value: mode === 'screen' ? 1 : 0 } },
-      vertexShader: VS,
-      fragmentShader: `uniform sampler2D tDiffuse, tBlur; uniform float uAmt, uScreen; varying vec2 vUv;
+    const uniforms = { tDiffuse: { value: null }, tBlur: { value: null }, uAmt: { value: amt }, uScreen: { value: mode === 'screen' ? 1 : 0 } };
+    const legacyFragment = `uniform sampler2D tDiffuse, tBlur; uniform float uAmt, uScreen; varying vec2 vUv;
         void main() {
           vec3 c = texture2D(tDiffuse, vUv).rgb;
           vec3 blur = texture2D(tBlur, vUv).rgb;
           vec3 result = mix(c, blur, uAmt);
           if (uScreen > 0.5) result = vec3(1.0) - (vec3(1.0) - c) * (vec3(1.0) - blur * uAmt);
           gl_FragColor = vec4(result, 1.0);
-        }`,
+        }`;
+    const maskedFragment = `uniform sampler2D tDiffuse, tBlur, tMask;
+      uniform float uAmt, uScreen, uMaskMode, uDebug, uD0, uD1, uEdge;
+      uniform vec2 uTexel, uMaskTexel;
+      varying vec2 vUv;
+      float luminance(vec2 p) {
+        return dot(texture2D(tDiffuse, p).rgb, vec3(0.2126, 0.7152, 0.0722));
+      }
+      float rawMask(vec2 p) {
+        if (uMaskMode > 0.5 && uMaskMode < 1.5) return smoothstep(uD0, uD1, texture2D(tMask, p).g);
+        if (uMaskMode > 1.5 && uMaskMode < 2.5) {
+          vec2 dx = vec2(uTexel.x, 0.0), dy = vec2(0.0, uTexel.y);
+          float gx = abs(luminance(p + dx) - luminance(p - dx)) * 0.5;
+          float gy = abs(luminance(p + dy) - luminance(p - dy)) * 0.5;
+          return 1.0 - smoothstep(uEdge, uEdge * 2.0, length(vec2(gx, gy)));
+        }
+        if (uMaskMode > 2.5 && uMaskMode < 3.5) return texture2D(tMask, p).r;
+        if (uMaskMode > 3.5 && uMaskMode < 4.5) {
+          vec2 scene = texture2D(tMask, p).rg;
+          return smoothstep(uD0, uD1, scene.g) * scene.r;
+        }
+        if (uMaskMode > 4.5) {
+          float l = luminance(p);
+          return smoothstep(0.14, 0.32, l) * (1.0 - smoothstep(0.68, 0.9, l));
+        }
+        return 1.0;
+      }
+      float softenedMask(vec2 p) {
+        vec2 t = uMaskTexel;
+        return rawMask(p) * 0.5
+          + (rawMask(p + vec2(t.x, 0.0)) + rawMask(p - vec2(t.x, 0.0))
+          + rawMask(p + vec2(0.0, t.y)) + rawMask(p - vec2(0.0, t.y))) * 0.125;
+      }
+      void main() {
+        float mask = softenedMask(vUv);
+        if (uDebug > 0.5) {
+          gl_FragColor = vec4(vec3(mask), 1.0);
+          return;
+        }
+        vec3 c = texture2D(tDiffuse, vUv).rgb;
+        vec3 blur = texture2D(tBlur, vUv).rgb;
+        float amt = uAmt * mask;
+        vec3 result = mix(c, blur, amt);
+        if (uScreen > 0.5) result = vec3(1.0) - (vec3(1.0) - c) * (vec3(1.0) - blur * amt);
+        gl_FragColor = vec4(result, 1.0);
+      }`;
+    if (this.masked) Object.assign(uniforms, {
+      tMask: { value: this.maskTarget ? this.maskTarget.texture : DIFF_WHITE_TEXTURE },
+      uMaskMode: { value: DIFF_MASK_CODE[maskType] || 0 }, uDebug: { value: debug ? 1 : 0 },
+      uTexel: { value: new THREE.Vector2(1, 1) }, uMaskTexel: { value: new THREE.Vector2(1, 1) },
+      uD0: { value: 0 }, uD1: { value: 1 }, uEdge: { value: diffEdge },
+    });
+    this.compositeMaterial = new THREE.ShaderMaterial({
+      uniforms,
+      vertexShader: VS,
+      fragmentShader: this.masked ? maskedFragment : legacyFragment,
       depthTest: false, depthWrite: false,
     });
     this.quad = new FullScreenQuad(this.blurMaterial);
+  }
+
+  collectMaskObjects() {
+    this.maskObjects = [];
+    scene.traverse((object) => {
+      if (!object.isMesh) return;
+      if (object.userData.diffMaskIgnore) {
+        this.maskObjects.push({ object, ignore: true });
+        return;
+      }
+      const sources = Array.isArray(object.material) ? object.material : [object.material];
+      const materials = sources.map((source) => {
+        const include = object.userData.diffMaskGround || DIFF_VEGETATION.test(source?.name || '');
+        const material = diffMaskMaterial(source, include);
+        this.maskMaterials.push(material);
+        return material;
+      });
+      this.maskObjects.push({ object, material: Array.isArray(object.material) ? materials : materials[0] });
+    });
+  }
+
+  renderMask(renderer) {
+    if (!this.maskObjects) this.collectMaskObjects();
+    DIFF_MASK_CAMERA.value.copy(camera.position);
+    const target = renderer.getRenderTarget();
+    const background = scene.background;
+    const autoClear = renderer.autoClear;
+    const clearColor = renderer.getClearColor(new THREE.Color()).clone();
+    const clearAlpha = renderer.getClearAlpha();
+    const restore = [];
+    try {
+      scene.background = null;
+      renderer.autoClear = false;
+      renderer.setRenderTarget(this.maskTarget);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear(true, true, true);
+      this.maskBackgroundQuad.render(renderer);
+      renderer.clearDepth();
+      for (const entry of this.maskObjects) {
+        if (entry.ignore) {
+          restore.push([entry.object, 'visible', entry.object.visible]);
+          entry.object.visible = false;
+        } else {
+          restore.push([entry.object, 'material', entry.object.material]);
+          entry.object.material = entry.material;
+        }
+      }
+      renderer.render(scene, camera);
+    } finally {
+      for (let i = restore.length - 1; i >= 0; i--) {
+        const [object, property, value] = restore[i];
+        object[property] = value;
+      }
+      scene.background = background;
+      renderer.autoClear = autoClear;
+      renderer.setClearColor(clearColor, clearAlpha);
+      renderer.setRenderTarget(target);
+    }
   }
 
   setSize(width, height) {
     const w = Math.max(1, Math.round(width * 0.5));
     const h = Math.max(1, Math.round(height * 0.5));
     this.halfA.setSize(w, h); this.halfB.setSize(w, h);
+    if (this.maskTarget) this.maskTarget.setSize(width, height);
   }
 
   render(renderer, writeBuffer, readBuffer) {
+    if (this.maskTarget) this.renderMask(renderer);
     this.quad.material = this.blurMaterial;
     const uniforms = this.blurMaterial.uniforms;
     uniforms.uTexel.value.set(1 / this.halfA.width, 1 / this.halfA.height);
@@ -772,6 +957,14 @@ class DiffusionPass extends Pass {
     this.quad.material = this.compositeMaterial;
     this.compositeMaterial.uniforms.tDiffuse.value = readBuffer.texture;
     this.compositeMaterial.uniforms.tBlur.value = this.halfB.texture;
+    if (this.masked) {
+      this.compositeMaterial.uniforms.uTexel.value.set(1 / readBuffer.width, 1 / readBuffer.height);
+      const maskWidth = this.maskTarget ? this.maskTarget.width : readBuffer.width;
+      const maskHeight = this.maskTarget ? this.maskTarget.height : readBuffer.height;
+      this.compositeMaterial.uniforms.uMaskTexel.value.set(1 / maskWidth, 1 / maskHeight);
+      this.compositeMaterial.uniforms.uD0.value = diffDepth0 ?? camState.dist * 0.8;
+      this.compositeMaterial.uniforms.uD1.value = Math.max(this.compositeMaterial.uniforms.uD0.value + 0.001, diffDepth1 ?? camState.dist * 1.6);
+    }
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     if (this.clear) renderer.clear();
     this.quad.render(renderer);
@@ -780,9 +973,12 @@ class DiffusionPass extends Pass {
   dispose() {
     this.halfA.dispose(); this.halfB.dispose();
     this.blurMaterial.dispose(); this.compositeMaterial.dispose(); this.quad.dispose();
+    this.maskTarget?.dispose();
+    this.maskBackgroundMaterial?.dispose(); this.maskBackgroundQuad?.dispose();
+    for (const material of this.maskMaterials) material.dispose();
   }
 }
-const diffusion = diffAmt > 0 ? new DiffusionPass(diffAmt, diffRadius, diffMode) : null;
+const diffusion = diffAmt > 0 || diffDebug ? new DiffusionPass(diffAmt, diffRadius, diffMode, diffMask, diffDebug) : null;
 // 奥と手前のぼかし（画面の縦位置で強さを決める。中央の帯はぼかさない）
 const dof = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) }, uAmt: { value: P.dof },
@@ -803,7 +999,7 @@ const dof = new ShaderPass({
       gl_FragColor = c;
     }`,
 });
-if (flag('post')) { composer.addPass(grade); if (diffAmt > 0) composer.addPass(diffusion); if (flag('dof')) composer.addPass(dof); }
+if (flag('post')) { composer.addPass(grade); if (diffAmt > 0 || diffDebug) composer.addPass(diffusion); if (flag('dof') && !diffDebug) composer.addPass(dof); }
 
 // ビューの照明の上書き（見本のカットシーンなど、カメラ演出が違う見本に合わせる）
 const LIGHT0 = { sun: sun.intensity, hemi: hemi.intensity, exposure: renderer.toneMappingExposure, sat: grade.uniforms.uSat.value };
