@@ -520,99 +520,6 @@ def plate_maple(n=512, seed=115):
     finish(img, n, n, 'plate_maple.png')
 
 
-def plate_palm5(n=512, seed=124):
-    """大きな掌状の葉 4 枚を重ねた房。葉脈や粒模様を足さず、柄元から先へ色をなめらかに変える"""
-    r = rng(seed)
-    W = n * SS
-    rgb = np.zeros((W, W, 3), dtype=np.uint8)
-    rgb[:] = (90, 120, 42)
-    alpha = np.zeros((W, W), dtype=np.uint8)
-    # 奥から手前へ描く。後ろの葉を暗くし、重なりの上下を分ける
-    leaves = [
-        (0.31, 0.65, -24, 0.195, 5, 0.78),
-        (0.69, 0.65,  22, 0.195, 7, 0.83),
-        (0.42, 0.80, -14, 0.200, 5, 0.92),
-        (0.60, 0.80,  15, 0.200, 7, 1.00),
-    ]
-    for rx, ry, angle, length, count, shade in leaves:
-        angle += r.uniform(-2.0, 2.0)
-        length *= r.uniform(0.97, 1.03)
-        root = np.array((rx * W, ry * W), dtype=float)
-        L = length * W
-        theta = math.radians(angle)
-        hub = root + np.array((math.sin(theta), -math.cos(theta))) * L * 0.25
-        if count == 5:
-            offsets = [-63, -32, 0, 32, 63]
-            lengths = [0.72, 0.88, 1.00, 0.88, 0.72]
-        else:
-            offsets = [-68, -45, -22, 0, 22, 45, 68]
-            lengths = [0.68, 0.82, 0.93, 1.00, 0.93, 0.82, 0.68]
-
-        mask = Image.new('L', (W, W), 0)
-        draw = ImageDraw.Draw(mask)
-        for offset, reach in zip(offsets, lengths):
-            a = theta + math.radians(offset)
-            forward = np.array((math.sin(a), -math.cos(a)))
-            across = np.array((math.cos(a), math.sin(a)))
-            tip_len = L * reach
-            half_width = L * 0.12
-            left, right = [], []
-            for step in range(13):
-                t = step / 12
-                width = half_width * math.sin(math.pi * t) ** 0.82
-                center = hub + forward * tip_len * t
-                left.append(tuple(center + across * width))
-                right.append(tuple(center - across * width))
-            draw.polygon(left + right[::-1], fill=255)
-
-        # 短い柄と葉の中心だけをつなぎ、細い葉脈は描かない
-        stem_w = max(1, round(L * 0.035))
-        draw.line([tuple(root), tuple(hub)], fill=255, width=stem_w)
-        web_r = L * 0.055
-        draw.ellipse((hub[0] - web_r, hub[1] - web_r, hub[0] + web_r, hub[1] + web_r), fill=255)
-
-        box = mask.getbbox()
-        if not box:
-            continue
-        x0, y0, x1, y1 = box
-        pad = 2
-        x0, y0 = max(0, x0 - pad), max(0, y0 - pad)
-        x1, y1 = min(W, x1 + pad), min(W, y1 + pad)
-        mask_arr = np.asarray(mask.crop((x0, y0, x1, y1))) > 0
-        yy, xx = np.mgrid[y0:y1, x0:x1]
-        distance = np.sqrt((xx + 0.5 - root[0]) ** 2 + (yy + 0.5 - root[1]) ** 2) / L
-        t = np.clip((distance - 0.05) / 0.88, 0, 1)
-        t = t * t * (3 - 2 * t)
-        base = np.array((0.25, 0.31, 0.13))
-        tip = np.array((0.66, 0.80, 0.30))
-        color = np.clip((base + (tip - base) * t[..., None]) * shade * 255, 0, 255).astype(np.uint8)
-        rgb_crop = rgb[y0:y1, x0:x1]
-        alpha_crop = alpha[y0:y1, x0:x1]
-        rgb_crop[mask_arr] = color[mask_arr]
-        alpha_crop[mask_arr] = 255
-
-    # 透明な縁にも葉の色を延ばし、切り抜きのまわりに黒い縁が出ないようにする
-    active = alpha > 0
-    for _ in range(8):
-        source_active = active.copy()
-        source_rgb = rgb.copy()
-        outside = ~source_active
-        assigned = np.zeros_like(active)
-        for dy in (-1, 0, 1):
-            for dx in (-1, 0, 1):
-                if dx == 0 and dy == 0:
-                    continue
-                neighbor = np.roll(source_active, (dy, dx), axis=(0, 1))
-                take = outside & neighbor & ~assigned
-                neighbor_rgb = np.roll(source_rgb, (dy, dx), axis=(0, 1))
-                rgb[take] = neighbor_rgb[take]
-                assigned |= take
-        active |= assigned
-
-    img = Image.fromarray(np.dstack((rgb, alpha)), 'RGBA')
-    finish(img, n, n, 'plate_palm5.png')
-
-
 def needle_spray(d, x, y, ang, L, W, dark, mid, hi, teeth=9):
     """針葉の小枝 1 本: 根元 (x, y) から ang へ長さ L。縁は先へ向いた針の先の歯（左右で半歯ずらす）の、先のとがった葉片。下に暗い影、上半分に明るい面"""
     def outline(L_, W_, k):
@@ -668,6 +575,6 @@ def fan_fir4(n=512, seed=117):
 
 if __name__ == '__main__':
     spray_maple(); clump_maple(); spray_clover(); bush_bb(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
-    plate_maple(); plate_palm5(); canvas_beige(); canvas_blue(); canvas_hide(); rock_face(); frond_fir3(); lavender(); flagstone(); meander()
+    plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); rock_face(); frond_fir3(); lavender(); flagstone(); meander()
     fan_fir4()
     print('textures2 ->', OUT)
