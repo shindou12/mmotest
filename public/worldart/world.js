@@ -135,8 +135,22 @@ const GROUND = spec.ground || {};
 const altTex = GROUND.alt === 'cobble' ? T.cobble : GROUND.alt === 'flagstone' ? T.flag : T.sand;
 const rockTex = GROUND.rock === 'face' ? T.face : GROUND.rock === 'crack' ? T.crack : T.rock;   // 急な面の岩肌（crack: 第 2 世代 1.6m、face: 角ばった板と真っすぐな割れ目 L15、4.5m）
 const rockScale = GROUND.rock === 'face' ? 4.5 : GROUND.rock === 'crack' ? 1.6 : 4.5;
+const GROUND_BAKE = THREE.MathUtils.clamp(num('bake', 0), 0, 1);
+let skyvisTex = null;
+if (GROUND_BAKE > 0) {
+  try {
+    skyvisTex = await new Promise((resolve) => texLoader.load(`${BASE}maps/${MAP}/skyvis.png`, resolve, undefined, () => resolve(null)));
+    if (skyvisTex) {
+      skyvisTex.colorSpace = THREE.NoColorSpace;
+      skyvisTex.minFilter = THREE.LinearFilter;
+      skyvisTex.magFilter = THREE.LinearFilter;
+    }
+  } catch {}
+}
+const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
 function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}`;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
@@ -201,6 +215,17 @@ function groundMaterial() {
         }
         diffuseColor.rgb *= col;
 `);
+    if (GROUND_BAKE_ON) {
+      sh.uniforms.tSkyvis = { value: skyvisTex };
+      sh.uniforms.uSkyvisOrigin = { value: new THREE.Vector2(placed.terrain.x0, placed.terrain.z0) };
+      sh.uniforms.uSkyvisSize = { value: placed.terrain.size };
+      sh.uniforms.uBake = { value: GROUND_BAKE };
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform sampler2D tSkyvis; uniform vec2 uSkyvisOrigin; uniform float uSkyvisSize, uBake;')
+        .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+          float skyVisibility = texture2D(tSkyvis, (vW.xz - uSkyvisOrigin) / uSkyvisSize).r;
+          reflectedLight.indirectDiffuse *= mix(1.0, skyVisibility, uBake);`);
+    }
     addDesat(sh);
   };
   return m;
