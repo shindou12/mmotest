@@ -815,8 +815,10 @@ def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15, upper_density=1.
                 Wk = W * R_.uniform(0.82, 1.12)
                 # 枝の向き（実物の写真 art/ref/trees/real/P02・P04・P05）: 下の段は幹から下向きに出て先が少し上へ反り、上の段ほど上を向く。
                 # 水平に突き出すと不自然（ユーザー、2026-10-23）。内側の層はさらに下向きにして段の下を埋める
-                pitch = -0.55 + 0.85 * t + R_.uniform(-0.16, 0.16) - 0.25 * (layer == 2) - tilt * math.cos(a - tdir)
-                curl = (0.28 - 0.25 * t) * R_.uniform(0.6, 1.2)          # 枝先の反り上がり（下の段ほど強い）
+                # 枝は全部の段で幹から下向きに出て、先がさらに垂れる（ユーザー、2026-10-23: 枝が幹に垂直・上向きに見えた。
+                # 前は上の段ほど上向き（最上段 +17°）で、枝先を反り上げていた）。下の段 -36°、上の段 -20°
+                pitch = -0.62 + 0.28 * t + R_.uniform(-0.12, 0.12) - 0.2 * (layer == 2) - tilt * math.cos(a - tdir)
+                curl = -(0.16 + 0.12 * t) * R_.uniform(0.7, 1.3)         # 枝先の垂れ（負 = 下へ。上の段の短い枝も垂れて見えるように）
                 o = trunk(hz + rise * Lb + R_.uniform(-0.08, 0.08))
                 drop = -math.sin(pitch) * L - curl * L + abs(math.sin(roll)) * Wk * 0.5   # 枝先・傾けた縁の下がる量
                 if pitch < 0 and drop > o.z - 0.1:                         # 地面に潜らせない
@@ -846,7 +848,7 @@ def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15, upper_density=1.
     rings = []
     for i in range(tiers):
         z = zs[i] - Rs[i] * 0.25
-        r = Rs[i] * 0.26 * (1 - 0.3 * i / tiers)
+        r = Rs[i] * 0.26 * (1 - 0.65 * i / tiers)   # 上の段ほど細く（枝が垂れると付け根の上に芯が黒い点で見えた）
         rings.append((trunk(z), r, tuple(0.45 * x for x in crown_color(0.08 + 0.3 * i / tiers, 0.0, 0.2, 0.42))))   # 影として読ませる（明るいと緑の柱に見えた）
     rings.append((trunk(top + 0.35), 0.02, crown_color(0.5, 0.0, 0.3, 0.6)))
     idx = []
