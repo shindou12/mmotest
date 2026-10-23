@@ -77,7 +77,14 @@ func _spawn_drop(it: Dictionary, x: float, z: float) -> void:
 	var lb := GameVisuals.label(String(it.get("name", "?")), col)
 	lb.position = n.position + Vector3(0, 0.8, 0)
 	g.world.add_child(lb)
-	drops.append({"it": it, "x": x, "z": z, "t": 0.0, "node": n, "label": lb})
+	var beam: Node3D
+	var transcend_stars := _transcend_count(it)
+	var rarity := int(it.get("rarity", 0))
+	if transcend_stars > 0:
+		beam = g.combat.ctx._fx().beam(x, z, 0xff7ab0, 12.0 + transcend_stars * 4.0, 0.45 + transcend_stars * 0.1) # loot.js landDrop / fx.js FX.beam
+	elif rarity >= 4:
+		beam = g.combat.ctx._fx().beam(x, z, col, 14.0 if rarity == 4 else 22.0, 0.45 if rarity == 4 else 0.7) # loot.js landDrop / fx.js FX.beam
+	drops.append({"it": it, "x": x, "z": z, "t": 0.0, "node": n, "label": lb, "beam": beam})
 	if Vector2(x - g.me.x, z - g.me.z).length() < 40.0:
 		var stars := _transcend_count(it)
 		g._sfx("drop", {"rarity": int(it.get("rarity", 0)), "slot": String(it.get("slot", "")), "stars": stars}) # loot.js landDrop L31: audio.sfx('drop', {rarity, slot, stars})
@@ -86,6 +93,7 @@ func _spawn_drop(it: Dictionary, x: float, z: float) -> void:
 func clear() -> void:
 	for d in drops:
 		d.node.queue_free(); d.label.queue_free()
+		if d.get("beam") != null: g.combat.ctx._fx().remove_item(d.beam)
 	drops.clear()
 
 
@@ -95,7 +103,9 @@ func update(dt: float) -> void:
 		d.t += dt
 		d.node.rotation.y = d.t * 1.5
 		if d.t > LOOT.life:
-			d.node.queue_free(); d.label.queue_free(); drops.remove_at(i); continue
+			d.node.queue_free(); d.label.queue_free()
+			if d.get("beam") != null: g.combat.ctx._fx().remove_item(d.beam)
+			drops.remove_at(i); continue
 		if not g.me.dead and not g.me.crawl and Vector2(d.x - g.me.x, d.z - g.me.z).length() <= LOOT.touch:
 			pickup(i)
 
@@ -113,7 +123,9 @@ func pickup(i: int) -> void:
 	g._log("%s「%s」を入手" % [GameRules.data()["rarities"][r]["name"], d.it.get("name", "?")], rarity_color(r))
 	g._sfx("pickup") # loot.js pickupDrop L61: audio.sfx('pickup')
 	if g.args.has("bot"): print("PICKUP %s %s" % [d.it.get("slot"), d.it.get("name")])
-	d.node.queue_free(); d.label.queue_free(); drops.remove_at(i)
+	d.node.queue_free(); d.label.queue_free()
+	if d.get("beam") != null: g.combat.ctx._fx().remove_item(d.beam)
+	drops.remove_at(i)
 	refresh()
 
 
@@ -267,6 +279,7 @@ func smith_enhance(it: Dictionary, random_roll: float = -1.0) -> Dictionary:
 		it["enh"] = enh + 1
 		up = _regrade(it)
 		g._sfx("perfect" if int(it.enh) >= 6 else "levelup")
+		if g is Node3D: g.combat.ctx._fx().beam(g.me.x, g.me.z, 0xffa236 if int(it.enh) >= 6 else 0xffd84a, 10.0, 0.6, 0.8) # items.js smithEnhance / fx.js FX.beam
 	else:
 		g._sfx("block")
 	g._recalc()
@@ -343,6 +356,7 @@ func smith_lore(it: Dictionary) -> Dictionary:
 		g.ch["eq"] = equipped
 	g.ch["inv"].push_front(title)
 	g._sfx("clear")
+	if g is Node3D: g.combat.ctx._fx().beam(g.me.x, g.me.z, 0xffa236, 16.0, 1.0, 1.4) # items.js smithLore / fx.js FX.beam
 	g._recalc()
 	return {"ok": true, "msg": "%s を手に入れた" % String(title.name), "id": title.id}
 
@@ -352,13 +366,17 @@ func make_quest_reward(quest: Dictionary, floor_n: int, upgrade_roll: float) -> 
 	return _make_item(int(params.ilvl), int(params.get("grade", 0)), String(quest.reward.get("slot", "")))
 
 
-func _make_item(ilvl: int, grade: int, forced_slot: String) -> Dictionary:
+## public/shared/data.js makeItem。debug-panel は kind / unique_def を指定して同じ基礎計算を使う。
+func _make_item(ilvl: int, grade: int, forced_slot: String, forced_kind := "", unique_def: Dictionary = {}) -> Dictionary:
 	var data: Dictionary = GameRules.data()
 	grade = clampi(grade, 0, DROP_GRADES.size() - 1)
 	var drop_grade: Dictionary = DROP_GRADES[grade]
+	if not unique_def.is_empty():
+		forced_slot = String(unique_def.get("slot", forced_slot))
+		forced_kind = String(unique_def.get("kind", forced_kind))
 	var slot: String = forced_slot if forced_slot != "" else String(["weapon", "weapon", "weapon", "armor", "acc"][randi_range(0, 4)])
 	var kinds: Array = data["weapons"].keys()
-	var kind := String(kinds[randi_range(0, kinds.size() - 1)]) if slot == "weapon" else ""
+	var kind := forced_kind if slot == "weapon" and forced_kind != "" else String(kinds[randi_range(0, kinds.size() - 1)]) if slot == "weapon" else ""
 	var multiplier: Array = drop_grade["mult"]
 	var bm := roundf(randf_range(float(multiplier[0]), float(multiplier[1])) * 1000.0) / 1000.0
 	var growth := pow(float(data["balance"]["playerGrowth"]), ilvl - 1) * bm
@@ -374,7 +392,8 @@ func _make_item(ilvl: int, grade: int, forced_slot: String) -> Dictionary:
 	elif slot == "armor":
 		var pool: Array = []
 		for armor_type in ARMOR_TYPES:
-			if int(armor_type.lv) <= maxi(ilvl, 1): pool.append(armor_type)
+			var wanted_armor := String(unique_def.get("armor", ""))
+			if int(armor_type.lv) <= maxi(ilvl, 1) and (wanted_armor == "" or String(armor_type.cls) == wanted_armor): pool.append(armor_type)
 		if pool.is_empty(): pool = [ARMOR_TYPES[0], ARMOR_TYPES[1], ARMOR_TYPES[6], ARMOR_TYPES[12]]
 		var armor_type: Dictionary = pool[randi_range(0, pool.size() - 1)]
 		var armor: Dictionary = data["armorClasses"][String(armor_type.cls)]
@@ -383,11 +402,16 @@ func _make_item(ilvl: int, grade: int, forced_slot: String) -> Dictionary:
 		item["base"] = armor_type.trait.duplicate()
 		item["hp"] = roundi(45.0 * growth * float(armor.hp))
 		item["def"] = int(armor.def)
-		item["name"] = armor_type.name
+		item["name"] = String(unique_def["name"]) if not unique_def.is_empty() else armor_type.name
 	else:
 		item["atk"] = roundi(2.5 * growth)
 		item["hp"] = roundi(15.0 * growth)
-		item["name"] = ACC_BASE[mini(ACC_BASE.size() - 1, int(floor(float(ilvl - 1) / 8.0)))]
+		item["name"] = String(unique_def["name"]) if not unique_def.is_empty() else ACC_BASE[mini(ACC_BASE.size() - 1, int(floor(float(ilvl - 1) / 8.0)))]
+	if slot == "weapon" and not unique_def.is_empty(): item["name"] = String(unique_def["name"])
+	if not unique_def.is_empty():
+		item["unique"] = String(unique_def["key"])
+		item["fx"] = unique_def.get("fx", []).duplicate()
+		item["lore"] = String(unique_def.get("lore", ""))
 	item["weight"] = GameRules.item_weight(item)
 	var keys: Array = data["affixes"].keys()
 	for i in range(keys.size() - 1, 0, -1):

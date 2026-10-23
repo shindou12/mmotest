@@ -108,6 +108,10 @@ var box_max := 60
 var box_loaded := false
 var npc_nodes: Array[Dictionary] = []
 var demo_panel_applied := false
+var bloom_setup_key := ""
+var debug_enemy_level := 50
+var debug_boss_level := 0
+var pin_beam: Node3D
 
 # HUD
 var ui := {}
@@ -188,6 +192,10 @@ func _set_setting(key: String, value: Variant) -> void:
 
 ## 効果音は実ゲームの文脈からだけ再生する。照合用の文脈は _op を記録するため機器に触れない。
 func _sfx(name: String, opt: Dictionary = {}) -> void:
+	if name == "hit" and args.has("debug") and debug_panel != null and debug_panel.sound_samples_loaded:
+		debug_panel.play_selected_sound(bool(opt.get("crit", false)))
+		if args.has("bot"): print("SFX ", name)
+		return
 	if audio == null or not audio.sfx(name, opt): return
 	if args.has("bot"): print("SFX ", name)
 
@@ -213,6 +221,7 @@ func _load_char() -> void:
 	if ch.is_empty():
 		ch = _new_character("Godot", "#3aa0ff", String(GameRules.data().get("defaultWeapon", "sword")))
 	_normalize_character()
+	if args.has("debug"): _prepare_debug_character()
 	_apply_test_args()
 	if args.has("map-demo"):
 		ch["waypoints"] = {"f1_town": true, "f1_field": true}
@@ -266,6 +275,21 @@ func _normalize_character() -> void:
 	ch["lv"] = clampi(int(ch.get("lv", 1)), 1, GameRules.data()["levels"].size())
 	ch["xp"] = maxi(0, int(ch.get("xp", 0)))
 	ch["gold"] = maxi(0, int(ch.get("gold", 0)))
+
+
+## public/js/game/debug.js prepareDebugChar。
+func _prepare_debug_character() -> void:
+	var prof_max := int(GameWTree.prof_max())
+	ch["lv"] = int(GameRules.data()["levels"].size())
+	ch["xp"] = 0
+	ch["prof"] = {}
+	for kind in GameRules.data()["weapons"].keys():
+		ch["prof"][String(kind)] = {"lv": prof_max, "xp": 0}
+	ch["profBest"] = prof_max
+	ch["waypoints"] = {}
+	for id in GameRules.data()["areas"].keys(): ch["waypoints"][String(id)] = true
+	ch["gold"] = maxi(int(ch.get("gold", 0)), 999999)
+	ch["mats"]["shard"] = maxi(int(ch["mats"].get("shard", 0)), 9999)
 
 
 func _setup_login_preview() -> void:
@@ -523,12 +547,16 @@ func _on_msg(m: Dictionary) -> void:
 			if int(m.id) != my_id:
 				_log("%s が倒れた" % m.name, Color(1, 0.6, 0.5))
 				var po = others.get(int(m.id))
-				if po != null: po.rv = maxf(float(po.get("rv", -1.0)), 0.01)
+				if po != null:
+					po.rv = maxf(float(po.get("rv", -1.0)), 0.01)
+					combat.ctx._fx().beam(float(po.x), float(po.z), 0xff6a5a, 10.0, 0.6, 1.2) # net-client.js pdown / fx.js FX.beam
 		"prev":   # 仲間が起き上がった
 			var po2 = others.get(int(m.id))
 			if po2 != null:
 				po2.rv = -1.0
 				_log("%s が起き上がった" % po2.get("name", ""), Color(0.6, 1, 0.8))
+				combat.ctx._fx().beam(float(po2.x), float(po2.z), 0x9affc8, 10.0, 0.9, 1.0) # net-client.js prev / fx.js FX.beam
+				combat.ctx._fx().ring_wave(float(po2.x), float(po2.z), 0x9affc8, 4.0, 0.5)
 		"door":
 			if m.get("open", false): door_open = true; world.set_door_open(true)
 
@@ -553,16 +581,54 @@ func _enter_area(id: String, x: float, z: float) -> void:
 	combat.ctx.shape = String(area["shape"])   # hurt.gd のハザードの判定（屋内は無効）
 	combat.ctx.hazards = area.get("hazards", [])
 	me.x = x; me.z = z; me.a = PI; me.transit = false
+	if not args.has("skip-entry-beam"):
+		combat.ctx._fx().beam(me.x, me.z, 0x6ad0ff, 12.0, 1.2, 1.2) # area.js enterArea / fx.js FX.beam
+	_refresh_pin_beam()
+	_apply_bloom()
+	var shot_area := String(args.get("shotarea", args.get("start", "f1_field")))
+	if args.has("teledemo") and id == shot_area:
+		args.erase("teledemo")
+		var shapes := [
+			{"k": "circle", "x": x - 3.5, "z": z - 4.0, "r": 3.0},
+			{"k": "cone", "x": x + 3.5, "z": z - 4.0, "a": PI, "len": 6.0, "arc": PI / 2.5},
+		]
+		_on_tele({"sh": shapes, "c": "#ff3030", "d": 2000, "dmg": 0, "src": 0, "kd": false}) # fx.js makeTelegraph。--panel では start を 1 秒戻し、進行 0.5 を静止撮影
+		if args.has("panel") and not teles.is_empty(): teles.back().start = t_now - 1.0
 	portals.clear()
 	for e in area.get("exits", []):
 		portals.append({"to": e["to"], "x": float(e["x"]), "z": float(e["z"]), "r": float(e["r"]), "armed": Vector2(e["x"] - x, e["z"] - z).length() > float(e["r"]) + 1.5})
 	if area["type"] == "town" or area["type"] == "camp": me.potions = S["maxPot"]
-	var shot_area := String(args.get("shotarea", args.get("start", "f1_field")))
 	if args.has("at") and id == shot_area:
 		var p := String(args["at"]).split(","); me.x = float(p[0]); me.z = float(p[1])
 	_banner(area["name"])
 	if previous_area != id:
 		_quest_event({"type": "visit", "area": id})
+
+
+## fx-styles.js の bloom と render.js の UnrealBloomPass (strength / radius / threshold) を WorldEnvironment glow へ渡す。
+func _apply_bloom() -> void:
+	if world == null or combat == null: return
+	var world_env := world.get_node_or_null("Env") as WorldEnvironment
+	if world_env == null or world_env.environment == null: return
+	var fx: GameFx = combat.ctx._fx()
+	var style := String(args.get("fxstyle", settings.get("fx", "blend")))
+	if fx.style_name != style: fx.set_style(style)
+	var enabled := String(args.get("bloom", "on")) != "off" and String(settings.get("quality", "high")) != "low"
+	var key := "%d:%s:%s" % [world_env.environment.get_instance_id(), style, enabled]
+	if key == bloom_setup_key: return
+	bloom_setup_key = key
+	var env := world_env.environment
+	env.glow_enabled = enabled
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
+	env.glow_hdr_threshold = fx.bloom_threshold()
+	env.glow_bloom = 0.0 # 低い輝度まで広げず、閾値を超えた光だけをにじませる
+	env.glow_normalized = true
+	env.glow_intensity = fx.bloom()
+	for level in range(7): env.set_glow_level(level, 0.0)
+	# UnrealBloomPass radius 0.45 を Godot の隣接する blur level 3/4 の混合率へ移す。
+	var radius := fx.bloom_radius()
+	env.set_glow_level(3, 1.0 - radius)
+	env.set_glow_level(4, radius)
 
 
 var me_node: Node3D
@@ -664,6 +730,9 @@ func _on_snap(m: Dictionary) -> void:
 			mobs[id] = mb
 		if String(mb.get("look", "")) == "player" and int(r[8]) == 2 and int(mb.get("st", 0)) != 2: mb.atkT = 0.0
 		mb.tx = float(r[2]); mb.tz = float(r[3]); mb.ta = float(r[4]); mb.mhp = float(r[6]); mb.lv = int(r[7]); mb.st = int(r[8]); mb.enraged = int(r[10]) != 0; mb.stunT = float(r[15]); mb.target = int(r[12])
+		if args.has("debug"):
+			if kind == 2 and debug_boss_level > 0: mb.lv = debug_boss_level
+			elif kind != 2: mb.lv = debug_enemy_level # debug.js setEnemyLv。表示値のみで、敵の HP と攻撃値はサーバー管理
 		mb.guard = r.size() > 16 and int(r[16]) != 0   # 番兵の盾（正面からの攻撃は 3 割）
 		if t_now - mb.localT > 0.4: mb.hp = float(r[5])
 		else: mb.hp = minf(mb.hp, float(r[5]))
@@ -753,14 +822,32 @@ func _boss_cell_open(c: int, r: int, rows: Array, width: int, height: int) -> bo
 func _on_tele(m: Dictionary) -> void:
 	var col := Color.html(String(m.get("c", "#ff3030")))
 	var meshes := []
+	var materials := []
+	var height_at := Callable(world, "ground_y")
 	for s in m.sh:
-		var y: float = world.ground_y(float(s["x"]), float(s["z"])) + 0.05
-		var out := MeshInstance3D.new(); out.mesh = GameVisuals.shape_mesh(s, 1.0); out.material_override = GameVisuals.mat(col, true, 0.22)
-		out.position = Vector3(s["x"], y, s["z"]); world.add_child(out)
-		var fill := MeshInstance3D.new(); fill.material_override = GameVisuals.mat(col, true, 0.45)
-		fill.position = Vector3(s["x"], y + 0.01, s["z"]); world.add_child(fill)
-		meshes.append(out); meshes.append(fill)
-	teles.append({"meshes": meshes, "sh": m.sh, "start": t_now, "dur": float(m.d) / 1000.0, "dmg": float(m.dmg), "src": int(m.get("src", 0)), "kd": bool(m.get("kd", false)), "color": col})
+		var fill := MeshInstance3D.new()
+		fill.mesh = GameVisuals.telegraph_mesh(s, height_at)
+		var fill_mat := ShaderMaterial.new()
+		fill_mat.shader = preload("res://shaders/telegraph.gdshader")
+		fill_mat.set_shader_parameter("uColor", col)
+		fill_mat.set_shader_parameter("uProg", 0.0)
+		fill_mat.set_shader_parameter("uPulse", 0.0)
+		fill_mat.render_priority = 110 # post.gdshader の仕上げの板より後に出す
+		fill.material_override = fill_mat
+		fill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(fill)
+		var edge_mat := StandardMaterial3D.new()
+		edge_mat.albedo_color = Color(col.r, col.g, col.b, 0.95)
+		edge_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		edge_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		edge_mat.no_depth_test = true
+		edge_mat.render_priority = 111
+		var edge := MeshInstance3D.new()
+		edge.mesh = GameVisuals.telegraph_outline(s, height_at, edge_mat)
+		edge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(edge)
+		meshes.append(fill); meshes.append(edge); materials.append(fill_mat)
+	teles.append({"meshes": meshes, "materials": materials, "sh": m.sh, "start": t_now, "dur": float(m.d) / 1000.0, "dmg": float(m.dmg), "src": int(m.get("src", 0)), "kd": bool(m.get("kd", false)), "color": col})
 	for s in m.sh:
 		if Vector2(float(s["x"]) - me.x, float(s["z"]) - me.z).length() < 25.0:
 			_sfx("telegraph") # hurt.js onTele L15: 近くの攻撃予告で audio.sfx('telegraph')
@@ -771,8 +858,10 @@ func _update_teles() -> void:
 	for i in range(teles.size() - 1, -1, -1):
 		var te = teles[i]
 		var k := clampf((t_now - te.start) / maxf(te.dur, 0.01), 0, 1)
-		for j in te.sh.size():
-			te.meshes[j * 2 + 1].mesh = GameVisuals.shape_mesh(te.sh[j], k)
+		var pulse := maxf(0.0, sin(k * 30.0)) * k # hurt.js updateTeles → makeTelegraph.setProgress
+		for material in te.materials:
+			material.set_shader_parameter("uProg", k)
+			material.set_shader_parameter("uPulse", pulse)
 		if k >= 1.0:
 			Hurt.resolve_tele(combat.ctx, te)
 			for g in te.meshes: g.queue_free()
@@ -935,6 +1024,7 @@ func _claim_quest(quest_id: String) -> void:
 			var title: Dictionary = QuestModel.TITLES.get(title_id, {})
 			hud_ui.banner("称号を獲得", "「%s」" % String(title.get("name", title_id)), GameItems.rarity_color(int(title.get("rarity", 3))), 3.0)
 			hud_ui.toast("称号「%s」：%s" % [String(title.get("name", title_id)), String(title.get("desc", ""))], GameItems.rarity_color(int(title.get("rarity", 3))), true)
+			combat.ctx._fx().beam(me.x, me.z, 0xffd84a, 14.0, 0.9, 1.2) # progress.js grantTitle / fx.js FX.beam
 	if reward.has("potion"):
 		ch["potBonus"] = int(ch.get("potBonus", 0)) + int(reward.potion)
 		_calc()
@@ -1044,6 +1134,7 @@ func _gain_xp(n: int) -> void:
 	if leveled:
 		_calc(); me.hp = S["mhp"]
 		_sfx("levelup") # actions.js gainXp L441: audio.sfx('levelup')
+		combat.ctx._fx().beam(me.x, me.z, 0xffd84a, 16.0, 1.0, 1.5) # actions.js gainXp / fx.js FX.beam
 		_banner("LEVEL UP  Lv %d" % int(ch["lv"]))
 	_save_char()
 
@@ -1055,6 +1146,7 @@ func _moveme(dx: float, dz: float) -> void:
 
 # ---------------------------------------------------------------- 毎フレーム（loop.js update）
 func _process(real_dt: float) -> void:
+	_apply_bloom()
 	var dt := real_dt
 	if args.has("panel"):
 		dt = 0.0
@@ -1091,13 +1183,13 @@ func _process(real_dt: float) -> void:
 					var capture_mob: Dictionary = mobs[capture_id]
 					if int(capture_mob.kind) != 2 and int(capture_mob.elite) == 0 and Vector2(capture_mob.node.position.x - capture_focus.x, capture_mob.node.position.z - capture_focus.y).length() > 20.0: continue
 					capture_mobs.append({"id": capture_mob.id, "name": capture_mob.name, "kind": capture_mob.kind, "elite": capture_mob.elite, "scale": capture_mob.node.scale.x, "look": capture_mob.get("look", ""), "weapon": capture_mob.get("weapon", ""), "player_model": capture_mob.get("player_model") != null, "position": [capture_mob.node.position.x, capture_mob.node.position.y, capture_mob.node.position.z], "label": capture_mob.get("label") != null})
-				print("CAPTURE_MOBS ", JSON.stringify(capture_mobs))
 			get_viewport().get_texture().get_image().save_png(sp[1])
 			print("SHOT ", sp[1])
 			get_tree().quit()
 	if not started or area.is_empty(): return
 	_apply_requested_panel()
 	_tick_waypoint()
+	_tick_pin()
 	if args.has("fall") and not args.has("_fell") and t_now > float(args["fall"]) and not me.dead and not me.crawl:
 		# 確認用: その秒に倒れる（這いずり → 一人なら力尽きる → 始め直す、の流れを確かめる）。--fall=<秒>
 		args["_fell"] = "1"; me.hp = 0.0; Hurt.fall(combat.ctx)
@@ -1169,7 +1261,9 @@ func _process(real_dt: float) -> void:
 				for p in portals:
 					var d := Vector2(p.x - me.x, p.z - me.z).length()
 					if d < p.r and p.armed:
-						me.transit = true; net.send({"t": "move", "to": p.to}); break
+						me.transit = true
+						combat.ctx._fx().beam(me.x, me.z, 0x6ad8ff, 12.0, 1.2, 0.8) # area.js waypointWarp / fx.js FX.beam
+						net.send({"t": "move", "to": p.to}); break
 					if d > p.r + 1.5: p.armed = true
 			# 溜め・通常攻撃の予約・技の時間・飛ぶ斬撃（loop.js）
 			combat.tick_actions(dt, safe)
@@ -1343,6 +1437,7 @@ func _map_pin(world_pos: Vector2) -> void:
 		var area_name := String(area.get("name", area_id))
 		hud_ui.toast("📍 ピンを立てた（%s）" % area_name, Color.html("#ffd84a"))
 	_save_char()
+	_refresh_pin_beam()
 	_sfx("ui")
 	hud_ui.map_panel.refresh_now()
 
@@ -1354,6 +1449,7 @@ func _map_warp(destination: String) -> void:
 	var waypoint_ok := bool(meta.get("gate", false)) or bool(ch.get("waypoints", {}).get(destination, false))
 	if not waypoint_ok or int(target.get("floor", 1)) > unlocked or destination == area_id or bool(me.get("dead", false)) or bool(me.get("crawl", false)):
 		return
+	combat.ctx._fx().beam(me.x, me.z, 0x6ad8ff, 12.0, 1.2, 0.8) # area.js waypointWarp / fx.js FX.beam
 	net.send({"t": "wp", "to": destination})
 	if hud_ui != null and hud_ui.map_panel != null: hud_ui.map_panel.close_panel()
 	_sync_modal_ui()
@@ -1426,9 +1522,32 @@ func _tick_waypoint() -> void:
 	ch["waypoints"][area_id] = true
 	_save_char()
 	_sfx("levelup")
+	combat.ctx._fx().beam(float(waypoint.x), float(waypoint.z), 0x6ad8ff, 10.0, 1.4, 1.2) # area.js waypointTick / fx.js FX.beam
+	combat.ctx._fx().ring_wave(float(waypoint.x), float(waypoint.z), 0x6ad8ff, 5.0, 0.6)
 	if hud_ui != null:
 		hud_ui.toast("◇ ワープポイントを解放した（%s）" % String(area.get("name", area_id)), Color.html("#9ae8ff"))
 		if hud_ui.map_panel != null: hud_ui.map_panel.refresh_now()
+
+
+## area.js refreshPin / pinTick。現在エリアの地図ピンだけに、破棄できる無期限の柱を置く。
+func _refresh_pin_beam() -> void:
+	var fx: GameFx = combat.ctx._fx()
+	if pin_beam != null:
+		fx.remove_item(pin_beam)
+		pin_beam = null
+	var pin: Variant = ch.get("pin", null)
+	if pin is Dictionary and String(pin.get("area", "")) == area_id:
+		pin_beam = fx.beam(float(pin["x"]), float(pin["z"]), 0xffd84a, 30.0, 0.35)
+
+
+func _tick_pin() -> void:
+	var pin: Variant = ch.get("pin", null)
+	if not pin is Dictionary or String(pin.get("area", "")) != area_id: return
+	if Vector2(float(me.x) - float(pin["x"]), float(me.z) - float(pin["z"])).length() > 3.5: return
+	ch["pin"] = null
+	_save_char()
+	_refresh_pin_beam()
+	if hud_ui != null: hud_ui.toast("📍 目的地に着いた", Color.html("#ffd84a"))
 
 
 func _sync_modal_ui() -> void:
@@ -1871,7 +1990,7 @@ func _fx_demo(spec: String) -> void:
 		if kind in ["slash", "all"]: fx.slash(x, z, 0.0, 3.0, 110.0, 0xffd84a, 1.0, false)
 		if kind in ["ring", "all"]: fx.ring_wave(x, z + 5.0, 0x6ab0ff, 4.0, 0.45)
 		if kind in ["lightning", "all"]: fx.lightning(x + 5.0, z + 4.0, 0xbfd8ff)
-		if kind in ["beam", "all"]: fx.beam(x - 5.0, z + 4.0, 0xffd84a, 8.0, 0.8, 1.2)
+		if kind in ["beam", "all"]: fx.beam(x - 5.0, z + 4.0, 0x6ad0ff, 12.0, 1.2, 1.2) # area.js enterArea / fx.js FX.beam
 		if kind in ["burst", "all"]:
 			fx.burst(x, 1.2, z + 4.0, 18, {"color": 0xffd84a, "speed": 9, "size": 0.5, "life": 0.4})
 			fx.burst(x - 3.0, 0.8, z + 4.0, 25, {"color": 0xff6a20, "speed": 4, "size": 0.6, "life": 0.7, "gravity": 3})

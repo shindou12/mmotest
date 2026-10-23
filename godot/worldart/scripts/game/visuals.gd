@@ -454,3 +454,129 @@ static func shape_mesh(s: Dictionary, fill := 1.0) -> ArrayMesh:
 			var f := Vector3(sin(a), 0, cos(a)); var sd := Vector3(cos(a), 0, -sin(a)) * w
 			for v in [-sd, sd, sd + f * L, -sd, sd + f * L, -sd + f * L]: st.add_vertex(v)
 	return st.commit()
+
+
+## fx.js makeTelegraph / teleGeometry。各頂点に地形の高さと進行方向の UV.x を入れる。
+static func telegraph_mesh(s: Dictionary, height_at: Callable) -> ArrayMesh:
+	var k := String(s.get("k", ""))
+	if not k in ["circle", "ring", "cone", "line"]: return null
+	var positions := PackedVector3Array()
+	var uvs := PackedVector2Array()
+	var indices := PackedInt32Array()
+	if k == "line":
+		var length := float(s["len"])
+		var width := float(s["w"])
+		var angle := float(s["a"])
+		var ls := maxi(2, ceili(length / 0.8))
+		var ws := maxi(2, ceili(width / 0.8))
+		for i in range(ls + 1):
+			for j in range(ws + 1):
+				var lx := -width / 2.0 + width * float(j) / ws
+				var lz := length * float(i) / ls
+				_telegraph_vertex(s, lx, lz, angle, float(i) / ls, height_at, positions, uvs)
+		for i in ls:
+			for j in ws:
+				var a := i * (ws + 1) + j
+				var b := a + ws + 1
+				indices.append_array([a, b, a + 1, a + 1, b, b + 1])
+	else:
+		var r0 := 0.0
+		var r1 := 0.0
+		var a0 := 0.0
+		var a1 := TAU
+		var angle := 0.0
+		if k == "circle":
+			r1 = float(s["r"])
+		elif k == "ring":
+			r0 = maxf(0.01, float(s["r0"]))
+			r1 = float(s["r1"])
+		elif k == "cone":
+			r1 = float(s["len"])
+			a0 = -float(s["arc"]) / 2.0
+			a1 = float(s["arc"]) / 2.0
+			angle = float(s["a"])
+		var rs := maxi(4, ceili((r1 - r0) / 0.8))
+		var arc_steps := maxi(12, ceili(absf(a1 - a0) * maxf(r1, 1.0) / 0.9))
+		for i in range(rs + 1):
+			var radius := r0 + (r1 - r0) * float(i) / rs
+			for j in range(arc_steps + 1):
+				var t := a0 + (a1 - a0) * float(j) / arc_steps
+				var progress := radius / maxf(r1, 0.01) if k != "ring" else (radius - r0) / maxf(r1 - r0, 0.01)
+				_telegraph_vertex(s, sin(t) * radius, cos(t) * radius, angle, progress, height_at, positions, uvs)
+		for i in rs:
+			for j in arc_steps:
+				var a := i * (arc_steps + 1) + j
+				var b := a + arc_steps + 1
+				indices.append_array([a, b, a + 1, a + 1, b, b + 1])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = positions
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+static func _telegraph_vertex(s: Dictionary, lx: float, lz: float, angle: float, progress: float, height_at: Callable, positions: PackedVector3Array, uvs: PackedVector2Array) -> void:
+	var c := cos(angle)
+	var sn := sin(angle)
+	var x := float(s["x"]) + lx * c + lz * sn
+	var z := float(s["z"]) - lx * sn + lz * c
+	positions.append(Vector3(x, float(height_at.call(x, z)) + 0.14, z))
+	uvs.append(Vector2(progress, 0.0))
+
+
+## fx.js makeTelegraph / teleOutline。境界線も地形の高さに沿わせる。
+static func telegraph_outline(s: Dictionary, height_at: Callable, material: Material) -> ImmediateMesh:
+	var mesh := ImmediateMesh.new()
+	mesh.surface_begin(Mesh.PRIMITIVE_LINES, material)
+	var k := String(s.get("k", ""))
+	match k:
+		"circle":
+			_telegraph_arc(mesh, s, float(s["r"]), 0.0, TAU, 0.0, height_at)
+		"ring":
+			_telegraph_arc(mesh, s, float(s["r1"]), 0.0, TAU, 0.0, height_at)
+			if float(s["r0"]) > 0.3: _telegraph_arc(mesh, s, float(s["r0"]), 0.0, TAU, 0.0, height_at)
+		"cone":
+			var half_arc := float(s["arc"]) / 2.0
+			var length := float(s["len"])
+			var angle := float(s["a"])
+			_telegraph_arc(mesh, s, length, -half_arc, half_arc, angle, height_at)
+			_telegraph_straight(mesh, s, 0.0, 0.0, sin(-half_arc) * length, cos(-half_arc) * length, angle, height_at)
+			_telegraph_straight(mesh, s, 0.0, 0.0, sin(half_arc) * length, cos(half_arc) * length, angle, height_at)
+		"line":
+			var half_width := float(s["w"]) / 2.0
+			var length := float(s["len"])
+			var angle := float(s["a"])
+			_telegraph_straight(mesh, s, -half_width, 0.0, -half_width, length, angle, height_at)
+			_telegraph_straight(mesh, s, half_width, 0.0, half_width, length, angle, height_at)
+			_telegraph_straight(mesh, s, -half_width, 0.0, half_width, 0.0, angle, height_at)
+			_telegraph_straight(mesh, s, -half_width, length, half_width, length, angle, height_at)
+	mesh.surface_end()
+	return mesh
+
+
+static func _telegraph_arc(mesh: ImmediateMesh, s: Dictionary, radius: float, from_angle: float, to_angle: float, rotation: float, height_at: Callable) -> void:
+	var count := maxi(16, ceili(absf(to_angle - from_angle) * radius / 0.6))
+	for i in count:
+		var t0 := from_angle + (to_angle - from_angle) * float(i) / count
+		var t1 := from_angle + (to_angle - from_angle) * float(i + 1) / count
+		_telegraph_line(mesh, s, sin(t0) * radius, cos(t0) * radius, sin(t1) * radius, cos(t1) * radius, rotation, height_at)
+
+
+static func _telegraph_straight(mesh: ImmediateMesh, s: Dictionary, x0: float, z0: float, x1: float, z1: float, rotation: float, height_at: Callable) -> void:
+	var count := maxi(2, ceili(Vector2(x1 - x0, z1 - z0).length() / 0.6))
+	for i in count:
+		var k0 := float(i) / count
+		var k1 := float(i + 1) / count
+		_telegraph_line(mesh, s, lerpf(x0, x1, k0), lerpf(z0, z1, k0), lerpf(x0, x1, k1), lerpf(z0, z1, k1), rotation, height_at)
+
+
+static func _telegraph_line(mesh: ImmediateMesh, s: Dictionary, x0: float, z0: float, x1: float, z1: float, rotation: float, height_at: Callable) -> void:
+	var c := cos(rotation)
+	var sn := sin(rotation)
+	for point: Vector2 in [Vector2(x0, z0), Vector2(x1, z1)]:
+		var x := float(s["x"]) + point.x * c + point.y * sn
+		var z := float(s["z"]) - point.x * sn + point.y * c
+		mesh.surface_add_vertex(Vector3(x, float(height_at.call(x, z)) + 0.16, z))
