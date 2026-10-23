@@ -120,15 +120,14 @@ const tex = (name, srgb = true) => {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 };
-const T = { flag: tex('ground_flagstone'), noise: tex('noise_soft', false), crack: tex('rock_crack'), face: tex('rock_face'), mass: tex('rock_mass'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
+const T = { flag: tex('ground_flagstone'), noise: tex('noise_soft', false), crack: tex('rock_crack'), face: tex('rock_face'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
 
 // ---------------------------------------------------------------- 地面の材質
 // 頂点色 R=土の道 G=砂/石畳 B=岩肌。境目は草の絵の明るさで崩してぎざぎざにする
 const GROUND = spec.ground || {};
 const altTex = GROUND.alt === 'cobble' ? T.cobble : GROUND.alt === 'flagstone' ? T.flag : T.sand;
-const rockMode = q.get('rock') || GROUND.rock;
-const rockTex = rockMode === 'mass' ? T.mass : rockMode === 'face' ? T.face : rockMode === 'crack' ? T.crack : T.rock;   // mass: 量感のある岩塊 4m
-const rockScale = rockMode === 'mass' ? 4.0 : rockMode === 'face' ? 4.5 : rockMode === 'crack' ? 1.6 : 4.5;
+const rockTex = GROUND.rock === 'face' ? T.face : GROUND.rock === 'crack' ? T.crack : T.rock;   // 急な面の岩肌（crack: 第 2 世代 1.6m、face: 角ばった板と真っすぐな割れ目 L15、4.5m）
+const rockScale = GROUND.rock === 'face' ? 4.5 : GROUND.rock === 'crack' ? 1.6 : 4.5;
 function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
   m.onBeforeCompile = (sh) => {

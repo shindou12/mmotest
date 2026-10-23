@@ -363,39 +363,6 @@ def rock_face(n=1024, seed=114):
     Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'rock_face.png'))
 
 
-def rock_mass(n=1024, seed=116):
-    """崖の丸い岩塊。周期ノイズの重ね合わせを滑らかな明暗にし、閉じた割れ目は描かない"""
-    r = rng(seed)
-    yy, xx = np.mgrid[0:n, 0:n] / n
-    warp_x = periodic_noise(n, 4.5, seed + 1) - 0.5
-    warp_y = periodic_noise(n, 3.8, seed + 2) - 0.5
-    height = np.zeros((n, n), dtype=float)
-    for _ in range(7):
-        cx, cy = r.random(2); rx, ry = r.uniform(0.12, 0.23, 2); amp = r.uniform(0.78, 1.2)
-        dx = np.abs(xx - cx + warp_x * 0.035); dy = np.abs(yy - cy + warp_y * 0.035)
-        dx = np.minimum(dx, 1.0 - dx); dy = np.minimum(dy, 1.0 - dy)
-        d = (dx / rx) ** 2 + (dy / ry) ** 2
-        bump = amp * np.exp(-1.45 * d)
-        height = np.maximum(height, bump) + np.log1p(np.exp(-12.0 * np.abs(height - bump))) / 12.0
-    height = 0.88 * (height - height.min()) / (height.max() - height.min() + 1e-8) + 0.12 * periodic_noise(n, 3.5, seed + 3)
-    gx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * n * 0.5
-    gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * n * 0.5
-    top = 0.5 + 0.5 * np.cos(2 * np.pi * yy)  # 周期の境目も明るさをそろえる
-    upper_face = 0.5 + 0.5 * np.tanh(0.48 * gy - 0.08 * gx)
-    light = np.clip(0.36 + 0.12 * top + 0.40 * upper_face + 0.18 * height, 0.12, 0.98)
-    cool = np.array((0.24, 0.31, 0.40))[None, None, :]
-    warm = np.array((0.75, 0.71, 0.64))[None, None, :]
-    base = cool + (warm - cool) * light[..., None]
-    moss_noise = periodic_noise(n, 7.0, seed + 4)
-    upper = np.clip(0.58 * top + 0.42 * upper_face, 0, 1)
-    moss = np.clip((moss_noise - 0.55) * 3.2, 0, 1) * np.clip((upper - 0.48) * 2.4, 0, 1) * 0.30
-    moss_color = np.array((0.40, 0.45, 0.29))[None, None, :]
-    base = base * (1 - moss[..., None]) + moss_color * moss[..., None]
-    grain = periodic_noise(n, 26.0, seed + 5)
-    base *= (0.97 + 0.06 * grain[..., None])
-    Image.fromarray((np.clip(base, 0, 1) * 255).astype(np.uint8), 'RGB').save(os.path.join(OUT, 'rock_mass.png'))
-
-
 def crate2_tex(n=512, seed=117):
     """木箱・荷車・樽用。暖色の板に、曲がった浅い継ぎ目と細い木目を入れる"""
     yy, xx = np.mgrid[0:n, 0:n] / n
