@@ -523,8 +523,7 @@ func _build_terrain() -> void:
 			xf = n.transform
 		else:
 			water = n
-	if water != null and not WW.is_w1(spec): _build_water(water)   # w1 は地面の材質の中（scripts/water.gd）
-	var has_water := water != null
+	if water != null: _build_water(water)
 	sc.free()
 	var m := ShaderMaterial.new()
 	m.shader = SH_GROUND
@@ -533,7 +532,6 @@ func _build_terrain() -> void:
 	var rk: String = {"face": "rock_face", "crack": "rock_crack"}.get(G.get("rock", ""), "rock")
 	for k in [["t_grass", "ground_grass"], ["t_dirt", "ground_dirt"], ["t_alt", alt], ["t_rock", rk], ["t_noise", "noise_soft"]]:
 		m.set_shader_parameter(k[0], _tex(k[1]))
-	if has_water and WW.is_w1(spec): WW.configure(m, self)
 	terrain_mesh = MeshInstance3D.new()
 	terrain_mesh.name = "Terrain"
 	terrain_mesh.mesh = mesh
