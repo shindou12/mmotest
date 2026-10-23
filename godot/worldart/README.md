@@ -59,3 +59,13 @@ sh tools/worldart/godot/run.sh -- --map=mihon2 --view=B01 --vwarm=12 --diff=0.3 
 | `--srad` | 0 以上 / 地図の `shadowRadius`、なければ 2 | three.js の VSM 半径を Godot の影ぼかし半径へ変換 |
 
 影半径の対応は `Godot blur = clamp(1.5 + (srad - map_default_srad) × 0.25, 0, 7)`。`map_default_srad` は地図の `shadowRadius`、なければ `2`。地図ごとの既定値では Godot の現在のぼかし `1.5` を保ち、そこからの VSM 半径の差を反映する。調整値の正本は `scripts/tuning.gd` にあり、実行中は `set_tuning_value(name, value)` で変更して反映できる。色・にじみがすべて 0 の間は `shaders/post_default.gdshader` を使い、既定画素を保つ。
+
+## 調整ラボ（2026-10-24）
+研究の地図 8 枚（mihon2・f1_field・f1_lake・orc_meadow_g3・south_coast_g3・town_plaza_g3・forest_path_g3・palm_clearing_g3）を開き、見た目の値を動かして比べる。
+- 起動: `Godot_v4.3-stable_win64.exe --path godot/worldart scenes/main.tscn -- --tune`（`--map=<地図> --view=<ビュー>` も可）
+- Tab 調整パネル、1 を押している間 見本の写真（mihon2 の B01〜B04）、2 を押している間 すべて既定（研究の切り替えも切）、M 地図とビュー
+- パネル: 光（太陽の強さ・高さ・向き、空の光）、色（露出・彩度・コントラスト・葉の回り込み・葉の彩度）、仕上げ（上下のぼかし・周辺減光・上の暗がり）、研究の切り替え（vwarm・vcool・vdesat・vlift、diff・diffr・diffmask・にじみの距離（0 = 自動）・diffe、bake、srad）
+- 保存は `user://presets/<名前>.json`。「既定との差をコピー」は `vwarm=11&diff=0.3&diffmask=veg` の形（three.js の URL の引数と同じ。研究の切り替え以外の名前は three.js では効かないものがある）
+- 撮影でも同じ値: `--set=vwarm=11&diff=0.3` か `--vwarm=11 --diff=0.3`、`--hold=ref|default`
+- 重さ: 1920×1080 で既定 約 250 FPS、にじみの veg・soft マスクで 約 50 FPS（マスク用の描画が増えるため）
+- three.js との差: `python -I -X utf8 tools/worldart/godot/port_check.py <地図...> [--skip-three]`（Windows の GPU で動く。PLAYWRIGHT_MODULE と Node 22 を PATH に）。2026-10-24 は 23 ビュー中 19 が合格。外れ 4（f1_field F04・OV、f1_lake OV、south_coast_g3 cam）は明暗比のずれで、three.js の VSM の影と Godot の影の方式の違い・植生の揺れの時刻が見当
