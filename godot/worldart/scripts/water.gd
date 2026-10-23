@@ -34,6 +34,7 @@ static func configure(water: ShaderMaterial, world) -> void:
 	water.set_shader_parameter("u_wsky", _lin(spec.get("sky", {}).get("color", "#cfe0ee")))
 	water.set_shader_parameter("u_wshadow", float(W.get("wshadow", 0.0 if w1 else 1.0)))
 	if w1:
+		water.set_shader_parameter("t_sand", world._tex("ground_sand"))
 		water.set_shader_parameter("t_noise", world._tex("noise_soft"))
 		water.set_shader_parameter("u_wwd", Vector4(float(W.get("deepAt", 2.6)), float(W.get("causticAt", 1.6)), float(W.get("bandAt", 0.28)), float(W.get("glint", 0.0))))
 		water.set_shader_parameter("u_wrefl", float(W.get("refl", 1.0)))
