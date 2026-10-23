@@ -770,7 +770,7 @@ def fir3(name, seed, height=6.6, width=3.2):
     return B.build(name)
 
 
-def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15):
+def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15, upper_density=1.6):
     """もみ 第 4 世代（見本 art/ref/trees/T01〜T04、RO3 プロンテラ南門）: 段（輪生）に分かれた円錐。段ごとに、幹から外へ
     枝の絵（fan_fir4: 上から見た 1 本の枝、2 種類）を輪に並べ、先を垂らす。2 枚重ね（上の輪は短く、半歩ずらす）で段の上面を閉じる。
     枝の先がとがって段の縁がぎざぎざになり、段の下に暗い切れ目が残る。上の段ほど小さく明るい。細長い葉の帯（fir3）はシダに見えた。
@@ -779,7 +779,7 @@ def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15):
     R_ = random.Random(seed); B = Builder()
     lx, ly = R_.uniform(-1, 1) * lean, R_.uniform(-1, 1) * lean    # 幹の傾き（先で lean m ずれる）
     def trunk(z): return Vector((lx * (z / height) ** 1.5, ly * (z / height) ** 1.5, z))
-    tube(B, [Vector((0, 0, -0.3)), trunk(0), trunk(height * 0.4), trunk(height * 0.92)], [0.18, 0.15, 0.1, 0.03], M_BARK(), sides=7, ao=(0.3, 0.45))
+    tube(B, [Vector((0, 0, -0.3)), trunk(0), trunk(height * 0.4), trunk(height * 0.6)], [0.18, 0.15, 0.1, 0.02], M_BARK(), sides=7, ao=(0.3, 0.45))
     base = height * R_.uniform(0.12, 0.16)                    # 一番下の段の付け根。枝が下向きに出て、裾は地面の近くまで下がる（P02・P04）
     top = height * 0.9
     Rs = [(width / 2 * (1 - i / tiers) ** 1.15 + 0.2) * R_.uniform(0.86, 1.12) * R_.choice((1.0, 1.0, 1.0, 0.82, 1.16)) for i in range(tiers)]   # 段の外の半径（下から）。細くとがった先からまっすぐ広がる円錐（幅 ≈ 高さの 0.6、P02・P04・T01）
@@ -791,14 +791,19 @@ def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15):
         t = i / (tiers - 1)
         hz = zs[i]; R = Rs[i]
         tb = t ** 1.1
+        upper = hz >= height * 0.45
+        # 上半分は芯の層を幹へ寄せて太くし、内側の枝を増やして幹を隠す
+        core_lf, core_rise = (0.62, 0.08) if upper else (0.48, 0.3)
         skew = R_.uniform(0.05, 0.22); phi_i = phi + R_.uniform(-0.8, 0.8)
         twist = R_.uniform(0, 2 * math.pi)
         tilt, tdir = R_.uniform(0.0, 0.1), R_.uniform(0, 2 * math.pi)   # 段の傾き（段全体が片側へ下がる。輪がそろうと作り物に見える）
         bright = R_.uniform(0.92, 1.08)                       # 段ごとの明るさの揺れ
-        for layer, (lf, rise, dark) in enumerate([(1.0, 0.0, 0.0), (0.74, 0.14, 0.2), (0.48, 0.3, 0.35)]):   # 外・中・芯の 3 枚重ね
+        for layer, (lf, rise, dark) in enumerate([(1.0, 0.0, 0.0), (0.74, 0.14, 0.2), (core_lf, core_rise, 0.35)]):   # 外・中・芯の 3 枚重ね
             Lb = R * lf
             W = max(Lb * 1.05, 0.6)                           # 上の段も枝の幅を保つ（細いと幹が見えた）
-            n = max(4, int(math.ceil(2 * math.pi * (Lb * 0.55) / (W * 0.45))) + R_.choice((-1, 0, 0, 1)))
+            fill = upper_density if upper and layer > 0 else 1.0
+            base_n = math.ceil(2 * math.pi * (Lb * 0.55) / (W * 0.45))
+            n = max(4, int(math.ceil(base_n * fill)) + R_.choice((-1, 0, 0, 1)))
             for k in range(n):
                 if layer == 0 and i < tiers - 2 and R_.random() < 0.09: continue   # ときどき枝が抜けて、下の段が見える
                 a = twist + 2 * math.pi * (k + 0.37 * layer) / n + R_.uniform(-.25, .25)
@@ -835,6 +840,27 @@ def fir4(name, seed, height=6.6, width=3.4, tiers=8, lean=0.15):
         pts = [o + (out * R_.uniform(0.12, 0.28) + UP) * s * Lt for s in (0, 0.5, 1)]
         v = R_.choice((0.0, 0.25, 0.5, 0.75))
         strip2(B, pts, [0.5, 0.42, 0.28], out.cross(UP).normalized(), M_FIR4(), [crown_color(0.85, 1.0, 0.5, 1.05)] * 3, (out * 0.6 + UP).normalized(), u=(v, v + 0.25))
+    # 樹冠の芯（定番の「中身の塊」）: 枝のカードの奥に、段の半径の 0.4 倍の暗い円錐を置く。段の間から幹と向こうの景色が
+    # 透けて、上の段が薄く見えた（Luna 1・2 回目、art/shots/fir4/luna1・luna2）。縦のカードで埋めると外へとげが突き出た
+    m_core = M_FIR4(); sides = 9                                # 絵は枝の絵の、葉で埋まった軸の近くの 1 点だけを使う（不透明）
+    rings = []
+    for i in range(tiers):
+        z = zs[i] - Rs[i] * 0.25
+        r = Rs[i] * 0.26 * (1 - 0.3 * i / tiers)
+        rings.append((trunk(z), r, tuple(0.45 * x for x in crown_color(0.08 + 0.3 * i / tiers, 0.0, 0.2, 0.42))))   # 影として読ませる（明るいと緑の柱に見えた）
+    rings.append((trunk(top + 0.35), 0.02, crown_color(0.5, 0.0, 0.3, 0.6)))
+    idx = []
+    for c, r, _ in rings:
+        idx.append([B.add_v(c + Vector((math.cos(2 * math.pi * k / sides), math.sin(2 * math.pi * k / sides), 0)) * r) for k in range(sides)])
+    for i in range(len(rings) - 1):
+        ca = rings[i][2]; cb = rings[i + 1][2]
+        for k in range(sides):
+            k2 = (k + 1) % sides
+            q = [idx[i][k], idx[i][k2], idx[i + 1][k2], idx[i + 1][k]]
+            na = Vector((math.cos(2 * math.pi * k / sides), math.sin(2 * math.pi * k / sides), -0.3)).normalized()   # 少し下向き（日が当たりにくい）
+            nb = Vector((math.cos(2 * math.pi * k2 / sides), math.sin(2 * math.pi * k2 / sides), -0.3)).normalized()
+            uvc = [(0.125, 0.3), (0.126, 0.3), (0.126, 0.301), (0.125, 0.301)]
+            B.face(q, uvc, [ca, ca, cb, cb], [na, nb, nb, na], m_core)
     return B.build(name)
 
 
