@@ -37,3 +37,25 @@ sh tools/worldart/godot/run.sh --import                          # 画面のな�
 sh tools/worldart/godot/run.sh -- --shot=F01,F02 --out=/abs/dir  # 固定ビューを撮る
 ```
 別の地図を見るときは `scenes/main.tscn` の World の `map_name` を変える。
+
+## 仕上げ調整（調整ラボ 3）
+`scenes/main.tscn` の起動引数の `--` より後に指定する。撮影時も同じ値が使われる。
+
+```sh
+sh tools/worldart/godot/run.sh -- --map=mihon2 --view=B01 --vwarm=12 --diff=0.3 --diffmask=veg --bake=0.5 --srad=6
+```
+
+| 引数 | 範囲・初期値 | 内容 |
+|---|---|---|
+| `--vwarm` / `--vcool` | 0〜30 度 / 0 | 中〜明部の緑を黄へ、暗部の緑を青へ色相移動 |
+| `--vdesat` / `--vlift` | 0〜1 / 0 | 明部の彩度を下げる / 明部を持ち上げる |
+| `--diff` | 0〜1 / 0 | にじみの強さ。grade の後、上下のぼかしの前に合成 |
+| `--diffr` | 画面高に対する比率 / 0.012 | 半解像度の横・縦ガウスぼかしの半径 |
+| `--diffmask` | `none`, `depth`, `edge`, `lum`, `veg`, `soft` / `none` | にじみを混ぜる範囲。`veg` と `soft` は植生と地面のマスクを使う |
+| `--diffd0` / `--diffd1` | 距離 / 注視点距離の 0.8 倍 / 1.6 倍 | `depth` と `soft` の距離範囲 |
+| `--diffe` | 0 以上 / 0.08 | `edge` の輝度差のしきい値 |
+| `--diffdebug` | 0 または 1 / 0 | にじみマスクを白黒で表示 |
+| `--bake` | 0〜1 / 0 | `skyvis.png` がある地図だけ、地面の空光を可視率で弱める |
+| `--srad` | 0 以上 / 地図の `shadowRadius`、なければ 2 | three.js の VSM 半径を Godot の影ぼかし半径へ変換 |
+
+影半径の対応は `Godot blur = clamp(1.5 + (srad - map_default_srad) × 0.25, 0, 7)`。`map_default_srad` は地図の `shadowRadius`、なければ `2`。地図ごとの既定値では Godot の現在のぼかし `1.5` を保ち、そこからの VSM 半径の差を反映する。調整値の正本は `scripts/tuning.gd` にあり、実行中は `set_tuning_value(name, value)` で変更して反映できる。色・にじみがすべて 0 の間は `shaders/post_default.gdshader` を使い、既定画素を保つ。

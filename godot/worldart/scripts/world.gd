@@ -16,6 +16,8 @@ extends Node3D
 var spec: Dictionary
 var placed: Dictionary
 var terrain_mesh: MeshInstance3D
+var ground_material: ShaderMaterial
+var skyvis_available := false
 var sun: DirectionalLight3D
 var env: WorldEnvironment
 var weather_effect: Node3D
@@ -511,6 +513,19 @@ func _build_light() -> void:
 	add_child(env)
 
 
+## world.js の VSM 半径の差を Godot の既定 blur 1.5 から 0.25 倍で反映する。
+func set_shadow_radius(radius: float) -> void:
+	if sun != null and is_instance_valid(sun):
+		var default_radius := float(spec.get("shadowRadius", 2.0))
+		sun.shadow_blur = clampf(1.5 + (radius - default_radius) * 0.25, 0.0, 7.0)
+
+
+## skyvis がある地図だけ、空の間接光を焼いた可視率で弱める。
+func set_bake(amount: float) -> void:
+	if ground_material != null and is_instance_valid(ground_material):
+		ground_material.set_shader_parameter("bake", clampf(amount, 0.0, 1.0) if skyvis_available else 0.0)
+
+
 # ---------------------------------------------------------------- 地形
 func _build_terrain() -> void:
 	var sc: Node = load("res://data/%s/terrain.glb" % map_name).instantiate()
@@ -527,13 +542,24 @@ func _build_terrain() -> void:
 	sc.free()
 	var m := ShaderMaterial.new()
 	m.shader = SH_GROUND
+	ground_material = m
+	skyvis_available = false
 	var G: Dictionary = spec.get("ground", {})
 	var alt: String = {"cobble": "ground_cobble", "flagstone": "ground_flagstone"}.get(G.get("alt", ""), "ground_sand")
 	var rk: String = {"face": "rock_face", "crack": "rock_crack"}.get(G.get("rock", ""), "rock")
 	for k in [["t_grass", "ground_grass"], ["t_dirt", "ground_dirt"], ["t_alt", alt], ["t_rock", rk], ["t_noise", "noise_soft"]]:
 		m.set_shader_parameter(k[0], _tex(k[1]))
+	var skyvis_path := "res://data/%s/skyvis.png" % map_name
+	if FileAccess.file_exists(skyvis_path) and placed.has("terrain"):
+		var tm: Dictionary = placed["terrain"]
+		m.set_shader_parameter("t_skyvis", load(skyvis_path))
+		m.set_shader_parameter("skyvis_origin", Vector2(float(tm["x0"]), float(tm["z0"])))
+		m.set_shader_parameter("skyvis_size", float(tm["size"]))
+		m.set_shader_parameter("skyvis_on", true)
+		skyvis_available = true
 	terrain_mesh = MeshInstance3D.new()
 	terrain_mesh.name = "Terrain"
+	terrain_mesh.set_meta("wa_diff_ground", true)
 	terrain_mesh.mesh = mesh
 	terrain_mesh.transform = xf
 	terrain_mesh.material_override = m
@@ -546,6 +572,7 @@ func _build_terrain() -> void:
 func _build_water(src: MeshInstance3D) -> void:
 	var mi := MeshInstance3D.new()
 	mi.name = "Water"
+	mi.set_meta("wa_diff_ignore_vegetation", true)
 	mi.mesh = src.mesh
 	mi.transform = src.global_transform if src.is_inside_tree() else src.transform
 	mi.material_override = WW.make(self)
@@ -582,6 +609,9 @@ func _material_for(src: Material) -> Material:
 	var tex: Texture2D = src.albedo_texture if src is BaseMaterial3D else null
 	var m := ShaderMaterial.new()
 	var leafy := name.contains("leaf") or name.contains("frond") or name.contains("grass")
+	var mask_vegetation := leafy or name.contains("clover") or name.contains("bush")
+	m.set_meta("wa_source_name", name)
+	m.set_meta("wa_diff_vegetation", mask_vegetation)
 	if name == "rock_crack":
 		m.shader = SH_ROCK
 		m.set_shader_parameter("t_crack", _tex("rock_crack"))
