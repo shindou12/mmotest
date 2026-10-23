@@ -119,7 +119,7 @@ vec3 after_diffusion(vec2 uv) {
 	vec3 c = graded(uv);
 	if (enabled && diff_amt > 0.0) {
 		float amount = diff_amt * softened_mask(uv);
-		c = mix(c, to_srgb(texture(t_blur, uv).rgb), amount);
+		c = mix(c, texture(t_blur, uv).rgb, amount);
 	}
 	return c;
 }

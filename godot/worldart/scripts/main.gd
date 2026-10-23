@@ -79,6 +79,8 @@ func _create_post_chain() -> void:
 	cam.near = 0.3
 	cam.far = 600.0
 	cam.current = true
+	# World3D を共有する補助カメラと、全画面ポスト板を別レイヤーに分ける。
+	cam.cull_mask = 0xFFFF ^ 4
 	add_child(cam)
 	pm.shader = default_post_shader
 	pm.render_priority = 100
@@ -87,6 +89,7 @@ func _create_post_chain() -> void:
 	post.name = "Post"
 	post.mesh = quad
 	post.material_override = pm
+	post.layers = 2
 	post.extra_cull_margin = 16384
 	post.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	cam.add_child(post)
@@ -102,6 +105,7 @@ func _create_post_chain() -> void:
 	source_cam.name = "DiffusionSourceCamera"
 	source_cam.near = cam.near
 	source_cam.far = cam.far
+	source_cam.cull_mask = 0xFFFF ^ 2
 	source_cam.current = true
 	source_viewport.add_child(source_cam)
 	source_pm = ShaderMaterial.new()
@@ -114,6 +118,7 @@ func _create_post_chain() -> void:
 	source_post.name = "DiffusionGrade"
 	source_post.mesh = source_quad
 	source_post.material_override = source_pm
+	source_post.layers = 4
 	source_post.extra_cull_margin = 16384
 	source_post.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	source_cam.add_child(source_post)
