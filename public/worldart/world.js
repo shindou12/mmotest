@@ -135,6 +135,8 @@ const GROUND = spec.ground || {};
 const GROUND_SOFT = THREE.MathUtils.clamp(num('gsoft', 0), 0, 1);
 const GROUND_DRY = THREE.MathUtils.clamp(num('gdry', 0), 0, 1);
 const GROUND_EDGE_ON = GROUND_SOFT > 0 || GROUND_DRY > 0;
+const GROUND_WIDE = Math.max(0, num('gwide', 0));
+const GROUND_WIDE_ON = GROUND_WIDE > 0;
 // B01 の道際（x=560〜604、y=380〜459）の平均色。sRGB で #989B49
 const GROUND_EDGE_UNIFORMS = { uGSoft: { value: GROUND_SOFT }, uGDry: { value: GROUND_DRY }, uDryGrass: { value: new THREE.Color(0x989b49) } };
 function groundEdgeBlend(source, noise) {
@@ -146,7 +148,29 @@ function groundEdgeBlend(source, noise) {
         float dryOut = mix(edgeLo, edgeHi, 0.78);
         float dryBand = smoothstep(edgeLo, dryIn, edgeValue) * (1.0 - smoothstep(dryIn, dryOut, edgeValue));`;
 }
-const groundWeightCode = GROUND_EDGE_ON ? groundEdgeBlend('vSplat.r', 'n') : 'float wd = smoothstep(0.4, 0.6, vSplat.r + n * 0.9);';
+// gwide: 頂点色を写した絵の R（土）と G（砂/石畳）を円周 12 点で平均し、元の重みは max で残して道の芯を守る。
+const wideGroundWeightCode = `vec2 splatUv = (wp - uST.xy) / uST.z;
+        float wideAverage = 0.0;
+        float wideAltAverage = 0.0;
+        for (int i = 0; i < 12; i++) {
+          float a = 6.2831853 * float(i) / 12.0;
+          vec2 offset = vec2(cos(a), sin(a)) * (uGWide / uST.z);
+          vec2 weights = texture2D(tSplat, splatUv + offset).rg;
+          wideAverage += weights.r;
+          wideAltAverage += weights.g;
+        }
+        wideAverage /= 12.0;
+        wideAltAverage /= 12.0;
+        float wideWeight = max(wideAverage, vSplat.r);
+        float wideAltWeight = max(wideAltAverage, vSplat.g);
+        float wideNoise = texture2D(tNoise, wp / 2.6).r - 0.5;
+        float wideEdgeNoise = wideNoise * 0.12 + n * 0.35;`;
+const groundWeightCode = GROUND_WIDE_ON
+  ? wideGroundWeightCode + (GROUND_EDGE_ON ? groundEdgeBlend('wideWeight', 'wideEdgeNoise / 0.9') : 'float wd = smoothstep(0.32, 0.68, wideWeight + wideEdgeNoise);')
+  : GROUND_EDGE_ON ? groundEdgeBlend('vSplat.r', 'n') : 'float wd = smoothstep(0.4, 0.6, vSplat.r + n * 0.9);';
+const altWeightCode = GROUND_WIDE_ON
+  ? 'float wa = smoothstep(0.32, 0.68, wideAltWeight + wideEdgeNoise);'
+  : 'float wa = smoothstep(0.4, 0.6, vSplat.g + n * 0.9);';
 const tuftDirtBlendCode = GROUND_EDGE_ON
   ? `${groundEdgeBlend('sp.r', 'n')}
         vec3 gcol = mix(gr, texture2D(tDirtB, wp / 6.0).rgb * uDirtTintB, wd);`
@@ -169,7 +193,7 @@ if (GROUND_BAKE > 0) {
 const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
 function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
-  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_EDGE_ON ? ':edge-v1' : ''}`;
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}`;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
@@ -182,12 +206,13 @@ function groundMaterial() {
       uWater: { value: new THREE.Vector2(spec.terrain.water?.level ?? 0, !spec.terrain.water ? 0 : num('wrule', spec.terrain.water.rule === 'w1' ? 1 : 0) > 0 ? 2 : 1) },
     });
     if (GROUND_EDGE_ON) Object.assign(sh.uniforms, GROUND_EDGE_UNIFORMS);
+    if (GROUND_WIDE_ON) Object.assign(sh.uniforms, { tSplat: GB.tSplat, uST: GB.uST, uGWide: { value: GROUND_WIDE } });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale, uRockPix, uRockSoft; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
+        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
@@ -212,7 +237,7 @@ function groundMaterial() {
         rock = mix(rock, rockLo, uRockSoft);
         float n = dot(g1, vec3(0.33)) - 0.33;
         ${groundWeightCode}
-        float wa = smoothstep(0.4, 0.6, vSplat.g + n * 0.9);
+        ${altWeightCode}
         // 岩肌: rockPix のとき画素ごとの傾き（補間した法線）× 頂点色 A（草の垂れ）で決める。頂点ごとの岩の重みは崖の面が 1〜2 マスしかなく、
         // 三角の対角線で草と岩の境が歯の列になった（F23、L18）
         float rk = vSplat.b;
@@ -664,7 +689,7 @@ terrain.scene.traverse((o) => {
   }
 });
 scene.add(terrain.scene);
-if (GBLEND && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // アイデア01: 地面の頂点色を絵に
+if ((GBLEND || GROUND_WIDE_ON) && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // アイデア01 と gwide: 地面の頂点色を絵に
 
 const SKIP = new Set(flag('grass') ? [] : ['grass_a']);
 const assetNames = Object.keys(placed.assets).filter((a) => !SKIP.has(a));
