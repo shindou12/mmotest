@@ -132,6 +132,25 @@ const T = { flag: tex('ground_flagstone'), noise: tex('noise_soft', false), crac
 // ---------------------------------------------------------------- 地面の材質
 // 頂点色 R=土の道 G=砂/石畳 B=岩肌。境目は草の絵の明るさで崩してぎざぎざにする
 const GROUND = spec.ground || {};
+const GROUND_SOFT = THREE.MathUtils.clamp(num('gsoft', 0), 0, 1);
+const GROUND_DRY = THREE.MathUtils.clamp(num('gdry', 0), 0, 1);
+const GROUND_EDGE_ON = GROUND_SOFT > 0 || GROUND_DRY > 0;
+// B01 の道際（x=560〜604、y=380〜459）の平均色。sRGB で #989B49
+const GROUND_EDGE_UNIFORMS = { uGSoft: { value: GROUND_SOFT }, uGDry: { value: GROUND_DRY }, uDryGrass: { value: new THREE.Color(0x989b49) } };
+function groundEdgeBlend(source, noise) {
+  return `float edgeLo = mix(0.4, 0.1, uGSoft);
+        float edgeHi = mix(0.6, 0.9, uGSoft);
+        float edgeValue = ${source} + ${noise} * 0.9;
+        float wd = smoothstep(edgeLo, edgeHi, edgeValue);
+        float dryIn = mix(edgeLo, edgeHi, 0.38);
+        float dryOut = mix(edgeLo, edgeHi, 0.78);
+        float dryBand = smoothstep(edgeLo, dryIn, edgeValue) * (1.0 - smoothstep(dryIn, dryOut, edgeValue));`;
+}
+const groundWeightCode = GROUND_EDGE_ON ? groundEdgeBlend('vSplat.r', 'n') : 'float wd = smoothstep(0.4, 0.6, vSplat.r + n * 0.9);';
+const tuftDirtBlendCode = GROUND_EDGE_ON
+  ? `${groundEdgeBlend('sp.r', 'n')}
+        vec3 gcol = mix(gr, texture2D(tDirtB, wp / 6.0).rgb * uDirtTintB, wd);`
+  : 'vec3 gcol = mix(gr, texture2D(tDirtB, wp / 6.0).rgb * uDirtTintB, smoothstep(0.4, 0.6, sp.r + n * 0.9));';
 const altTex = GROUND.alt === 'cobble' ? T.cobble : GROUND.alt === 'flagstone' ? T.flag : T.sand;
 const rockTex = GROUND.rock === 'face' ? T.face : GROUND.rock === 'crack' ? T.crack : T.rock;   // 急な面の岩肌（crack: 第 2 世代 1.6m、face: 角ばった板と真っすぐな割れ目 L15、4.5m）
 const rockScale = GROUND.rock === 'face' ? 4.5 : GROUND.rock === 'crack' ? 1.6 : 4.5;
@@ -150,7 +169,7 @@ if (GROUND_BAKE > 0) {
 const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
 function groundMaterial() {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
-  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}`;
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_EDGE_ON ? ':edge-v1' : ''}`;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
@@ -162,12 +181,14 @@ function groundMaterial() {
       // y: 0 = 水なし、1 = 第 2 世代（水際の砂を暗く）、2 = 水の規則 w1（水際の砂を明るく光らせる。見本 W01・W04）
       uWater: { value: new THREE.Vector2(spec.terrain.water?.level ?? 0, !spec.terrain.water ? 0 : num('wrule', spec.terrain.water.rule === 'w1' ? 1 : 0) > 0 ? 2 : 1) },
     });
+    if (GROUND_EDGE_ON) Object.assign(sh.uniforms, GROUND_EDGE_UNIFORMS);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise; uniform vec3 uGrassTint, uDirtTint; uniform float uAltScale, uRockScale, uRockPix, uRockSoft; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
+        ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
       .replace('#include <map_fragment>', `
@@ -190,7 +211,7 @@ function groundMaterial() {
         vec3 rockLo = texture2D(tRock, vW.zy / uRockScale, 4.0).rgb * an.x + texture2D(tRock, vW.xy / uRockScale, 4.0).rgb * an.z + texture2D(tRock, vW.xz / uRockScale, 4.0).rgb * an.y;
         rock = mix(rock, rockLo, uRockSoft);
         float n = dot(g1, vec3(0.33)) - 0.33;
-        float wd = smoothstep(0.4, 0.6, vSplat.r + n * 0.9);
+        ${groundWeightCode}
         float wa = smoothstep(0.4, 0.6, vSplat.g + n * 0.9);
         // 岩肌: rockPix のとき画素ごとの傾き（補間した法線）× 頂点色 A（草の垂れ）で決める。頂点ごとの岩の重みは崖の面が 1〜2 マスしかなく、
         // 三角の対角線で草と岩の境が歯の列になった（F23、L18）
@@ -202,6 +223,7 @@ function groundMaterial() {
         }
         float wr = smoothstep(0.35, 0.65, rk + n * 0.6);
         vec3 col = mix(grass, dirt, wd);
+        ${GROUND_EDGE_ON ? 'col = mix(col, uDryGrass, dryBand * uGDry);' : ''}
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);
         if (uWater.y > 1.5) {
@@ -354,13 +376,14 @@ function addGroundBlend(sh) {
     uGrassTintB: { value: new THREE.Color(...(GROUND.grassTint || [1, 1, 1])) }, uDirtTintB: { value: new THREE.Color(...(GROUND.dirtTint || [1, 1, 1])) },
     uAltTintB: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) }, uAltScaleB: { value: GROUND.altScale || 6.0 },
     uLushTintB: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmtB: { value: num('lush', GROUND.lushAmt ?? 0) }, uLushBiasB: { value: num('lushBias', GROUND.lushBias ?? 0) } });
+  if (GROUND_EDGE_ON) Object.assign(sh.uniforms, GROUND_EDGE_UNIFORMS);
   sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vGBroot; varying float vGBh;')
     .replace('#include <project_vertex>', `#include <project_vertex>
       vec4 gbRoot = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
       vGBroot = gbRoot.xz; vGBh = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y - gbRoot.y;`);
   sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
       uniform sampler2D tSplat, tGrassB, tNoiseB, tDirtB, tAltB; uniform vec3 uST, uGrassTintB, uDirtTintB, uAltTintB, uLushTintB;
-      uniform float uGBAmt, uGBH, uAltScaleB, uLushAmtB, uLushBiasB; varying vec2 vGBroot; varying float vGBh;`)
+      uniform float uGBAmt, uGBH, uAltScaleB, uLushAmtB, uLushBiasB; ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''} varying vec2 vGBroot; varying float vGBh;`)
     .replace('#include <color_fragment>', `#include <color_fragment>
       {   // 根元の地面の地色（地面の材質と同じ式。岩は除く）
         vec2 wp = vGBroot; vec4 sp = texture2D(tSplat, (wp - uST.xy) / uST.z);
@@ -370,7 +393,8 @@ function addGroundBlend(sh) {
         vec3 nz = texture2D(tNoiseB, wp / 28.0).rgb;
         gr *= mix(vec3(1.0), uLushTintB, smoothstep(0.42 - uLushBiasB, 0.6 - uLushBiasB, nz.r * 0.55 + nz.g * 0.3 + nz.b * 0.15) * uLushAmtB);
         float n = dot(g1, vec3(0.33)) - 0.33;
-        vec3 gcol = mix(gr, texture2D(tDirtB, wp / 6.0).rgb * uDirtTintB, smoothstep(0.4, 0.6, sp.r + n * 0.9));
+        ${tuftDirtBlendCode}
+        ${GROUND_EDGE_ON ? 'gcol = mix(gcol, uDryGrass, dryBand * uGDry);' : ''}
         gcol = mix(gcol, texture2D(tAltB, wp / uAltScaleB).rgb * uAltTintB, smoothstep(0.4, 0.6, sp.g + n * 0.9));
         float kb = uGBAmt * (1.0 - smoothstep(0.0, uGBH, vGBh));
         diffuseColor.rgb = mix(diffuseColor.rgb, gcol, kb);
@@ -452,7 +476,7 @@ function fixMaterial(mesh, assetName = '', modelName = assetName) {
   const gbOn = GBLEND && GB_ASSETS.test(assetName);
   // three はシェーダーを onBeforeCompile の文字列で使い回すので、分岐ごとにキーを分ける（分けないとアイデア01が別の材質のシェーダーに埋もれる）
   const aoOn = m.vertexColors && !isGrassMat && (isLeaf || AO_ALL);
-  m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}:${aoOn}:prelit-${prelitOn}:clover-bb-${isCloverBB}`;
+  m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}:${aoOn}:prelit-${prelitOn}:clover-bb-${isCloverBB}${gbOn && GROUND_EDGE_ON ? ':ground-edge-v1' : ''}`;
   if (isCloverBB) {
     m.onBeforeCompile = addCloverBillboard;
     return m;
