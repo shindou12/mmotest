@@ -1,4 +1,5 @@
 extends Node3D
+const TUNING_PARAMS = preload("res://scripts/tuning_params.gd")
 ## 地図を見る（L26、goal-worldart-port で全地図・全ビューに）。world.js の歩く・ビュー・仕上げと同じ。
 ## 操作: WASD・矢印 注目点を動かす、Q / E 向き、マウスのホイール 距離、M 地図とビューを選ぶ画面（scripts/viewer_menu.gd があれば）。
 ## カメラは地図の camera か views（見本の基準カメラ。ビューごとの光の上書き light: sun・hemi・exposure・sat・vignette・topDark）か、
@@ -49,10 +50,15 @@ var args := {}
 var view_name := ""
 var light0 := {}   # 地図の光の基準（ビューの上書きはこれに掛ける）
 var menu: Node = null
+var tuning_panel: Node = null
+var hold_kind := ""
+var _param_values: Dictionary = TUNING_PARAMS.defaults()
+var srad_map_default := 2.0
 
 
 func _ready() -> void:
 	args = _args()
+	hold_kind = String(args.get("hold", ""))
 	_create_post_chain()
 	get_viewport().size_changed.connect(_resize_post_chain)
 	cam.near = 0.3
@@ -69,6 +75,10 @@ func _ready() -> void:
 		menu = load("res://scripts/viewer_menu.gd").new()
 		add_child(menu)
 	await load_map(String(args.get("map", world.map_name)), String(args.get("view", "")))
+	_apply_command_values()
+	tuning_panel = load("res://scripts/tuning_panel.gd").new()
+	tuning_panel.panel_open = args.has("tune")
+	add_child(tuning_panel)
 	if args.has("shot"):
 		_shoot(String(args["shot"]).split(","), String(args.get("out", "user://shots")))
 
@@ -207,7 +217,11 @@ func _args() -> Dictionary:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--"):
 			var kv := a.substr(2).split("=", true, 1)
-			d[kv[0]] = kv[1] if kv.size() > 1 else "1"
+			var value := kv[1] if kv.size() > 1 else "1"
+			if kv[0] == "set" and d.has("set"):
+				d["set"] = "%s&%s" % [d["set"], value]
+			else:
+				d[kv[0]] = value
 	return d
 
 
@@ -235,7 +249,8 @@ func load_map(name: String, view := "") -> void:
 	world.map_name = name   # world.gd の map_name の設定で組み立て直す
 	var spec: Dictionary = world.spec
 	var P: Dictionary = spec.get("post", {})
-	tuning.set_map_default("srad", float(spec.get("shadowRadius", 2.0)))
+	srad_map_default = float(spec.get("shadowRadius", 2.0))
+	tuning.set_map_default("srad", srad_map_default)
 	_set_post_parameter("tone", 1 if String(spec.get("tone", "aces")) == "aces" else 0)
 	_set_post_parameter("exposure", float(P.get("exposure", 1.0)))
 	_set_post_parameter("sat", float(P.get("sat", 1.0)))
@@ -268,6 +283,7 @@ func load_map(name: String, view := "") -> void:
 		tuning_args_applied = true
 	if menu != null and menu.has_method("refresh"): menu.refresh()
 	apply_tuning()
+	if tuning_panel != null and tuning_panel.has_method("refresh"): tuning_panel.refresh()
 
 
 func _v3(a) -> Vector3:
@@ -292,7 +308,11 @@ func set_tuning_value(name: String, value: Variant) -> bool:
 
 
 func apply_tuning() -> void:
-	var values: Dictionary = tuning.values()
+	var values: Dictionary = tuning.values().duplicate()
+	if hold_kind == "default":   # 押している間だけ既定（研究の切り替えも全部切。影の縁は地図の既定）
+		for k in ["vwarm", "vcool", "vdesat", "vlift", "diff", "bake"]: values[k] = 0.0
+		values["diffdebug"] = false
+		values["srad"] = srad_map_default   # 地図の shadowRadius（無ければ 2）
 	var effect_enabled: bool = String(args.get("post", "1")) != "0"
 	var use_tuning_shader: bool = effect_enabled and (
 		float(values["vwarm"]) != 0.0 or float(values["vcool"]) != 0.0
@@ -348,16 +368,31 @@ func set_view(v: String) -> void:
 	if spec.has("views"): target.y = world.ground_y(target.x, target.z)   # 区画のある地図: 注目点を地面に置く（world.js と同じ）
 	_apply_light(C.get("light", {}))
 	_place()
+	if tuning_panel != null and tuning_panel.has_method("refresh"):
+		tuning_panel.refresh()
 
 
 ## world.js applyLight: 地図の光に掛ける（sun・hemi・exposure・sat）と、仕上げの周辺減光・上の暗がり
 func _apply_light(L: Dictionary) -> void:
-	world.sun.light_energy = float(light0["sun"]) * float(L.get("sun", 1.0))
-	RenderingServer.global_shader_parameter_set("wa_hemi_int", float(light0["hemi"]) * float(L.get("hemi", 1.0)))
-	_set_post_parameter("exposure", float(light0["exposure"]) * float(L.get("exposure", 1.0)))
-	_set_post_parameter("sat", float(light0["sat"]) * float(L.get("sat", 1.0)))
-	_set_post_parameter("vignette", float(L.get("vignette", 0.0)))
-	_set_post_parameter("top_dark", float(L.get("topDark", 0.0)))
+	var use_default := hold_kind == "default"
+	world.sun.light_energy = float(light0["sun"]) * _param_ratio("sun", use_default) * float(L.get("sun", 1.0))
+	RenderingServer.global_shader_parameter_set("wa_hemi_int", float(light0["hemi"]) * _param_ratio("hemi", use_default) * float(L.get("hemi", 1.0)))
+	_set_post_parameter("exposure", float(light0["exposure"]) * _param_ratio("exposure", use_default) * float(L.get("exposure", 1.0)))
+	_set_post_parameter("sat", float(light0["sat"]) * _param_ratio("sat", use_default) * float(L.get("sat", 1.0)))
+	_set_post_parameter("contrast", float(world.spec.get("post", {}).get("contrast", 1.0)) * _param_ratio("contrast", use_default))
+	_set_post_parameter("vignette", clampf(float(L.get("vignette", 0.0)) + float(_param("vignette", use_default)), 0.0, 1.0))
+	_set_post_parameter("top_dark", clampf(float(L.get("topDark", 0.0)) + float(_param("topDark", use_default)), 0.0, 1.0))
+	_set_post_parameter("dof_amt", float(world.spec.get("post", {}).get("dof", 1.0)) * _param_ratio("dof", use_default))
+	_set_post_parameter("dof_top", clampf(float(world.spec.get("post", {}).get("dofTop", 0.30)) + float(_param("dofTop", use_default)) - float(TUNING_PARAMS.find("dofTop").default), 0.0, 1.0))
+	_set_post_parameter("dof_bot", clampf(float(world.spec.get("post", {}).get("dofBot", 0.80)) + float(_param("dofBot", use_default)) - float(TUNING_PARAMS.find("dofBot").default), 0.0, 1.0))
+	var F: Dictionary = world.spec.get("foliage", {})
+	RenderingServer.global_shader_parameter_set("wa_wrap", float(F.get("wrap", 0.0)) * _param_ratio("wrap", use_default))
+	RenderingServer.global_shader_parameter_set("wa_leaf_sat", float(F.get("sat", world.spec.get("albedoSat", 1.0))) * _param_ratio("lsat", use_default))
+	var S: Dictionary = world.spec.get("sun", {})
+	var az := deg_to_rad(float(S.get("azimuth", 0.0)) + float(_param("sunAz", use_default)) - float(TUNING_PARAMS.find("sunAz").default))
+	var el := deg_to_rad(float(S.get("elevation", 0.0)) + float(_param("sunEl", use_default)) - float(TUNING_PARAMS.find("sunEl").default))
+	var to_sun := Vector3(sin(az) * cos(el), sin(el), cos(az) * cos(el))
+	world.sun.basis = Basis.looking_at(-to_sun, Vector3.UP if abs(to_sun.y) < 0.99 else Vector3.FORWARD)
 
 
 func _place() -> void:
@@ -487,9 +522,98 @@ func _process(dt: float) -> void:
 
 
 func _unhandled_input(ev: InputEvent) -> void:
+	if ev is InputEventKey:
+		if ev.keycode == KEY_TAB and ev.pressed and not ev.echo:
+			if tuning_panel != null:
+				tuning_panel.toggle_panel()
+			get_viewport().set_input_as_handled()
+		elif ev.keycode == KEY_1:
+			if ev.pressed and not ev.echo:
+				set_hold("ref")
+			elif not ev.pressed and hold_kind == "ref":
+				set_hold("")
+			get_viewport().set_input_as_handled()
+		elif ev.keycode == KEY_2:
+			if ev.pressed and not ev.echo:
+				set_hold("default")
+			elif not ev.pressed and hold_kind == "default":
+				set_hold("")
+			get_viewport().set_input_as_handled()
 	if ev is InputEventMouseButton and ev.pressed:
 		if ev.button_index == MOUSE_BUTTON_WHEEL_UP: dist = max(3.0, dist * 0.9); _place()
 		elif ev.button_index == MOUSE_BUTTON_WHEEL_DOWN: dist = min(80.0, dist / 0.9); _place()
+
+
+## 調整パネルから参照する値。まだ描画へつないでいない研究値も保持する。
+func get_param(key: String):
+	if tuning.values().has(key): return tuning.get_value(key)   # 研究の切り替え（tuning.gd が正）
+	return _param_values.get(key, null)
+
+
+## 調整パネルから値を受け取り、現在の地図とビューへ反映する。
+func set_param(key: String, value) -> void:
+	var item: Dictionary = TUNING_PARAMS.find(key)
+	if item.is_empty():
+		return
+	match item.kind:
+		"slider":
+			_param_values[key] = clampf(float(value), float(item.min), float(item.max))
+		"toggle":
+			_param_values[key] = bool(value) if value is bool else String(value).to_lower() in ["1", "true", "on"]
+		"choice":
+			if item.choices.has(value):
+				_param_values[key] = value
+	if tuning.values().has(key):   # 研究の切り替えは tuning.gd へ（色の移り・にじみ・ベイク・影の縁）
+		tuning.set_value(key, _param_values[key])
+		apply_tuning()
+	elif world != null and not world.spec.is_empty():
+		_apply_light(_current_view_light())
+	if tuning_panel != null and tuning_panel.has_method("refresh_values"):
+		tuning_panel.refresh_values()
+	print("TUNE_SET ", key, "=", _param_values[key])
+
+
+func _param(key: String, use_default := false):
+	var item: Dictionary = TUNING_PARAMS.find(key)
+	return item.default if use_default else _param_values.get(key, item.default)
+
+
+func _param_ratio(key: String, use_default := false) -> float:
+	var item: Dictionary = TUNING_PARAMS.find(key)
+	return float(_param(key, use_default)) / float(item.default)
+
+
+func _current_view_light() -> Dictionary:
+	var view_key: String = view_name.split("@")[0]
+	var views_d: Dictionary = world.spec.get("views", {})
+	return views_d.get(view_key, {}).get("light", {})
+
+
+func _apply_command_values() -> void:
+	if not args.has("set"):
+		return
+	for pair in String(args["set"]).split("&"):
+		var parts := pair.split("=", true, 1)
+		if parts.size() != 2:
+			continue
+		var item: Dictionary = TUNING_PARAMS.find(parts[0])
+		if item.is_empty():
+			continue
+		var value = parts[1]
+		if item.kind == "slider":
+			value = float(value)
+		elif item.kind == "toggle":
+			value = value.to_lower() in ["1", "true", "on"]
+		set_param(parts[0], value)
+
+
+func set_hold(kind: String) -> void:
+	hold_kind = kind if kind in ["ref", "default"] else ""
+	if world != null and not world.spec.is_empty():
+		_apply_light(_current_view_light())
+		apply_tuning()
+	if tuning_panel != null and tuning_panel.has_method("set_hold_state"):
+		tuning_panel.set_hold_state(hold_kind)
 
 
 ## ビューを撮って PNG に書き、終わる（tools/worldart/godot/run.sh・port_check.py）

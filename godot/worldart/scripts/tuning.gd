@@ -37,6 +37,9 @@ func has_override(name: String) -> bool:
 func set_value(name: String, raw: Variant) -> bool:
 	if not _values.has(name):
 		return false
+	if name in ["diffd0", "diffd1"] and float(raw) <= 0.0:   # 0 = 自動（カメラの距離の 0.8 倍・1.6 倍。次の set_reference_distance で入る）
+		_overrides.erase(name)
+		return true
 	_values[name] = _normalize(name, raw, _values[name])
 	_overrides[name] = true
 	return true
