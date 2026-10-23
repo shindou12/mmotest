@@ -720,9 +720,22 @@ composer.addPass(outPass);
 const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
 const grade = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uSat: { value: num('sat', P.sat) }, uCon: { value: num('contrast', P.contrast) },
-    uLift: { value: new THREE.Vector3(...P.lift) }, uGain: { value: new THREE.Vector3(...P.gain) }, uVig: { value: 0 }, uTopDark: { value: 0 } },
+    uLift: { value: new THREE.Vector3(...P.lift) }, uGain: { value: new THREE.Vector3(...P.gain) }, uVig: { value: 0 }, uTopDark: { value: 0 },
+    uVWarm: { value: THREE.MathUtils.clamp(num('vwarm', 0), 0, 30) }, uVDesat: { value: THREE.MathUtils.clamp(num('vdesat', 0), 0, 1) },
+    uVLift: { value: THREE.MathUtils.clamp(num('vlift', 0), 0, 1) }, uVCool: { value: THREE.MathUtils.clamp(num('vcool', 0), 0, 30) } },
   vertexShader: VS,
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat, uCon, uVig, uTopDark; uniform vec3 uLift, uGain; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat, uCon, uVig, uTopDark, uVWarm, uVDesat, uVLift, uVCool; uniform vec3 uLift, uGain; varying vec2 vUv;
+    vec3 rgbToHsv(vec3 c) {
+      vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+      vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+      vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+      float d = q.x - min(q.w, q.y);
+      return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + 1e-10)), d / (q.x + 1e-10), q.x);
+    }
+    vec3 hsvToRgb(vec3 c) {
+      vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+      return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+    }
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -730,6 +743,17 @@ const grade = new ShaderPass({
       c.rgb = (c.rgb - 0.5) * uCon + 0.5;
       c.rgb += uLift * (1.0 - l);
       c.rgb *= mix(vec3(1.0), uGain, smoothstep(0.2, 0.8, l));
+      if (uVWarm != 0.0 || uVDesat != 0.0 || uVLift != 0.0 || uVCool != 0.0) {
+        float warm = smoothstep(0.22, 0.50, l);
+        float light = smoothstep(0.55, 0.82, l);
+        vec3 hsv = rgbToHsv(c.rgb);
+        float hue = hsv.x * 360.0;
+        float greenYellow = smoothstep(34.0, 46.0, hue) * (1.0 - smoothstep(100.0, 112.0, hue)) * smoothstep(0.18, 0.36, hsv.y);
+        hsv.x = fract(hsv.x + (uVCool * (1.0 - warm) - uVWarm * warm) * greenYellow / 360.0);
+        hsv.y *= 1.0 - uVDesat * light;
+        hsv.z = 1.0 - (1.0 - hsv.z) * exp(-1.2 * uVLift * light);
+        c.rgb = hsvToRgb(hsv);
+      }
       c.rgb *= 1.0 - uVig * smoothstep(0.3, 0.85, length((vUv - 0.5) * vec2(1.25, 1.0)));
       c.rgb *= 1.0 - uTopDark * smoothstep(0.62, 1.0, vUv.y);
       gl_FragColor = vec4(clamp(c.rgb, 0.0, 1.0), 1.0);
