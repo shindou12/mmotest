@@ -885,6 +885,33 @@ def clover_bush(name, seed, radius=0.8):
     return B.build(name)
 
 
+def clover_bb(name):
+    """クローバーの茂み: 光を描き込んだ絵を、カメラ向けに回す 5 枚の板へ貼る。中心は COLOR_0 に記録する。"""
+    B = Builder()
+    cards = [
+        (Vector((0.00, -0.04, 0.125)), 1.58, 0.95, 0.00),
+        (Vector((-0.35, -0.02, 0.10)), 1.36, 0.78, -0.12),
+        (Vector((0.35, -0.02, 0.10)), 1.36, 0.79, 0.12),
+        (Vector((0.00, 0.04, 0.09)), 1.99, 0.86, math.pi / 2),
+        (Vector((0.00, 0.00, 0.09)), 1.66, 0.84, math.pi / 2),
+    ]
+    for center, width, height, angle in cards:
+        right = Vector((math.cos(angle), math.sin(angle), 0))
+        up = UP
+        ps = [center - right * width / 2 - up * height / 2,
+              center + right * width / 2 - up * height / 2,
+              center + right * width / 2 + up * height / 2,
+              center - right * width / 2 + up * height / 2]
+        idx = [B.add_v(p) for p in ps]
+        # glTF は (x, z, -y) に軸を変える。中心を 0〜1 に符号化し、実行時に aCenter として読む。
+        center_gltf = (center.x, center.z, -center.y)
+        encoded = (0.5 + center_gltf[0] / 2.2, center_gltf[1] / 1.2, 0.5 + center_gltf[2] / 2.2)
+        cols = [encoded] * 4
+        normal = right.cross(up).normalized()
+        B.face(idx, [(0, 0), (1, 0), (1, 1), (0, 1)], cols, [normal] * 4, M_CLOVER_BB())
+    return B.build(name)
+
+
 def grass_tall_tuft(name, seed):
     """背の高い草の房: 根元の 1 点から外へ 15〜35° 倒した 5 枚（grass_tall）。法線は真上"""
     R_ = random.Random(seed); B = Builder()
@@ -1588,6 +1615,7 @@ ASSETS = {
     'palm2_b': lambda n: palm2(n, 952, height=3.8, frond=1.3, lean=0.9),
     'clover_a': lambda n: clover_bush(n, 921),
     'clover_b': lambda n: clover_bush(n, 922, radius=1.1),
+    'clover_bb': lambda n: clover_bb(n),
     'grass_tall_a': lambda n: grass_tall_tuft(n, 931),
     'cliff_rock_a': lambda n: smooth_rock(n, 941),
     'cliff_rock_b': lambda n: smooth_rock(n, 942, size=(3.4, 2.2, 3.0), bulge=0.26),

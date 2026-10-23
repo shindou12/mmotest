@@ -6,6 +6,9 @@
 //     sat contrast                仕上げの彩度・コントラスト
 //     post=0                      仕上げ（色調・ぼかし）をすべて切る
 //     dof=0                       奥と手前のぼかしだけ切る
+//     diff=0.15                   画面全体のにじみ（0〜1、既定 0）
+//     diffr=0.012                 にじみの半径（画面の高さに対する割合）
+//     diffm=mix|screen            にじみの混ぜ方（既定 mix）
 //     grass=0                     草の房を出さない
 //     fnorm=card                  葉の法線を板の向きにする（既定は Blender で入れた外向きの法線）
 //     shadow=0                    影を切る
@@ -16,6 +19,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 const q = new URLSearchParams(location.search);
 const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
@@ -27,7 +31,10 @@ const OCC = { cam: { value: new THREE.Vector3() }, tgt: { value: new THREE.Vecto
 
 const spec = await (await fetch(`${BASE}maps/${MAP}.json`)).json();
 const placed = await (await fetch(`${BASE}maps/${MAP}/placements.json`)).json();
-const P = Object.assign({ sat: 1.0, contrast: 1.0, lift: [0, 0, 0], gain: [1, 1, 1], dof: 1.0, exposure: 1.0 }, spec.post || {});
+const P = Object.assign({ sat: 1.0, contrast: 1.0, lift: [0, 0, 0], gain: [1, 1, 1], dof: 1.0, exposure: 1.0, diff: 0, diffR: 0.012, diffMode: 'mix' }, spec.post || {});
+const diffAmt = THREE.MathUtils.clamp(num('diff', P.diff), 0, 1);
+const diffRadius = Math.max(0, num('diffr', P.diffR));
+const diffMode = (q.get('diffm') || P.diffMode) === 'screen' ? 'screen' : 'mix';
 
 // ---------------------------------------------------------------- レンダラー
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -227,6 +234,7 @@ const LEAF = { lift: { value: num('llift', spec.foliage?.lift ?? 0.0) }, wrap: {
   receive: flag('leafShadow', spec.foliage?.receiveShadow ?? true) };
 const ALBEDO_SAT = { value: num('asat', spec.albedoSat ?? 1.0) };
 const LEAF_SAT = { value: num('lsat', spec.foliage?.sat ?? spec.albedoSat ?? 1.0) };   // 葉だけの地色の彩度（日陰の葉の彩度を抑える）
+const PRELIT = Math.max(0.0, Math.min(1.0, num('prelit', 0.0)));
 const desatChunk = '\n{ float l_ = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)); diffuseColor.rgb = mix(vec3(l_), diffuseColor.rgb, uAlbedoSat); }\n';
 function addDesat(sh, u = ALBEDO_SAT) {
   sh.uniforms.uAlbedoSat = u;
@@ -257,6 +265,36 @@ function addLushToGrass(sh) {
       vec3 nzg = texture2D(tNoiseG, vGW / 28.0).rgb;
       float lushg = smoothstep(0.42 - uLushBiasG, 0.6 - uLushBiasG, nzg.r * 0.55 + nzg.g * 0.3 + nzg.b * 0.15);
       diffuseColor.rgb *= uGrassTintG * mix(vec3(1.0), uLushTintG, lushg * uLushAmtG);`);
+}
+// L27 仮説 E: 現在の葉の明暗と、幹からの高さ・球状法線で描いた明暗を混ぜる。
+function addPrelitLeaves(sh, height, amount) {
+  Object.assign(sh.uniforms, { uPrelitAmount: { value: amount }, uPrelitHeight: { value: height } });
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vPrelitHeight; varying float vPrelitNormalY;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPrelitHeight = position.y; vPrelitNormalY = normal.y;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uPrelitAmount, uPrelitHeight; varying float vPrelitHeight, vPrelitNormalY;')
+    .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+      float ph = clamp(vPrelitHeight / max(uPrelitHeight, 0.001), 0.0, 1.0);
+      float pn = clamp(vPrelitNormalY, 0.0, 1.0);
+      float paintedLight = smoothstep(0.04, 0.94, ph * 0.68 + pn * 0.32);
+      vec3 paintedTint = mix(vec3(0.55, 0.78, 0.84), vec3(1.34, 1.25, 0.72), paintedLight);
+      vec3 litLeaf = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + reflectedLight.indirectSpecular + totalEmissiveRadiance;
+      vec3 paintedLeaf = diffuseColor.rgb * paintedTint;
+      totalEmissiveRadiance += (paintedLeaf - litLeaf) * uPrelitAmount;`);
+}
+// clover_bb: 頂点色に格納した板中心のまわりで回し、各板をカメラ正面へ向ける。
+function addCloverBillboard(sh) {
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aCenter;')
+    .replace('#include <project_vertex>', `
+      vec3 bbCenter = vec3((aCenter.r - 0.5) * 2.2, aCenter.g * 1.2, (aCenter.b - 0.5) * 2.2);
+      mat4 bbModel = modelMatrix * instanceMatrix;
+      vec3 bbCenterWorld = (bbModel * vec4(bbCenter, 1.0)).xyz;
+      vec3 bbOffsetWorld = (bbModel * vec4(position - bbCenter, 0.0)).xyz;
+      vec3 bbUpWorld = normalize((bbModel * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+      float bbVertical = dot(bbOffsetWorld, bbUpWorld);
+      float bbWidth = length(bbOffsetWorld - bbUpWorld * bbVertical) * (uv.x < 0.5 ? -1.0 : 1.0);
+      vec3 bbCenterView = (viewMatrix * vec4(bbCenterWorld, 1.0)).xyz;
+      vec4 mvPosition = vec4(bbCenterView + vec3(bbWidth, bbVertical, 0.0), 1.0);
+      gl_Position = projectionMatrix * mvPosition;`);
 }
 // アイデア01（L22）: 地面と草の色の融合。草・低木の根元はその場所の地面の色（地面の材質と同じ式で求めた地色）を受け取り、
 // 先へ向かって本来の色に戻す。gblend=1（URL）か spec.foliage.groundBlend で入れる。地面の頂点色（土・砂/石畳・岩）は読み込み後に
@@ -364,25 +402,36 @@ function swapMap(tex) {
   c.anisotropy = tex.anisotropy; c.name = tex.name; c.needsUpdate = true; return c;
 }
 const MSAA = num('msaa', spec.post?.msaa ?? 0);   // 0 = なし（前の撮影と同じ）、4 = 第 3 世代の規則
-function fixMaterial(mesh, assetName = '') {
+function fixMaterial(mesh, assetName = '', modelName = assetName) {
   const src = mesh.material;
   const isLeaf = /leaf|frond|grass/.test(src.name);
-  const m = new THREE.MeshLambertMaterial({
+  const isGrassMat = /grass/.test(src.name);
+  const isCloverBB = modelName === 'clover_bb';
+  const prelitOn = PRELIT > 0 && isLeaf && !isGrassMat && !isCloverBB;
+  const m = isCloverBB ? new THREE.MeshBasicMaterial({
+    map: src.map || null, vertexColors: false,
+    alphaTest: MSAA ? 0.25 : 0.5, side: THREE.DoubleSide,
+    alphaToCoverage: MSAA > 0,
+  }) : new THREE.MeshLambertMaterial({
     map: src.map || null, vertexColors: !!mesh.geometry.attributes.color,
     alphaTest: isLeaf ? (MSAA ? 0.25 : 0.5) : 0, side: isLeaf ? THREE.DoubleSide : THREE.FrontSide,
     alphaToCoverage: isLeaf && MSAA > 0,   // 切り抜きの縁を MSAA の標本で半透明に（見本の葉の縁はなめらか）
   });
   m.name = src.name;
+  if (isCloverBB) m.userData.cloverBillboard = true;
   if (isLeaf && LTEX.size && m.map) m.map = swapMap(m.map);
   if (isLeaf && LDIL && m.map) m.map = dilateMap(m.map);
   if (isLeaf && FNORM_CARD) mesh.geometry.computeVertexNormals();   // 比較用: 板の向きの法線
-  const isGrassMat = /grass/.test(src.name);
   const isRock2 = src.name === 'rock_crack';
   if (isRock2) { m.map = null; m.vertexColors = true; }
   const gbOn = GBLEND && GB_ASSETS.test(assetName);
   // three はシェーダーを onBeforeCompile の文字列で使い回すので、分岐ごとにキーを分ける（分けないとアイデア01が別の材質のシェーダーに埋もれる）
   const aoOn = m.vertexColors && !isGrassMat && (isLeaf || AO_ALL);
-  m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}:${aoOn}`;
+  m.customProgramCacheKey = () => `fix:${isLeaf}:${isGrassMat}:${isRock2}:${gbOn}:${aoOn}:prelit-${prelitOn}:clover-bb-${isCloverBB}`;
+  if (isCloverBB) {
+    m.onBeforeCompile = addCloverBillboard;
+    return m;
+  }
   m.onBeforeCompile = (sh) => {
     addDesat(sh, isLeaf && !isGrassMat ? LEAF_SAT : ALBEDO_SAT);
     if (aoOn) {
@@ -413,6 +462,10 @@ function fixMaterial(mesh, assetName = '') {
           'float dotNL = saturate( dot( geometryNormal, directLight.direction ) );',
           'float dotNL = saturate( (dot( geometryNormal, directLight.direction ) + uWrap) / (1.0 + uWrap) );\n' +
           '\tdotNL += uTrans * pow( saturate( dot( geometryViewDir, -directLight.direction ) ), 2.0 );'));
+    }
+    if (prelitOn) {
+      mesh.geometry.computeBoundingBox();
+      addPrelitLeaves(sh, Math.max(0.1, mesh.geometry.boundingBox.max.y), PRELIT);
     }
   };
   return m;
@@ -577,7 +630,8 @@ await Promise.all(assetNames.map(async (name) => {
   g.scene.updateMatrixWorld(true);
   g.scene.traverse((o) => {
     if (!o.isMesh) return;
-    const mat = fixMaterial(o, name);
+    if (loadName === 'clover_bb' && o.geometry.attributes.color) o.geometry.setAttribute('aCenter', o.geometry.attributes.color);
+    const mat = fixMaterial(o, name, loadName);
     const im = new THREE.InstancedMesh(o.geometry, mat, items.length);
     items.forEach(([x, y, z, r, s], i) => {
       dummy.position.set(x, y, z); dummy.rotation.set(0, r, 0); dummy.scale.setScalar(s); dummy.updateMatrix();
@@ -586,7 +640,13 @@ await Promise.all(assetNames.map(async (name) => {
     const isGrass = name.startsWith('grass');
     im.castShadow = !isGrass; im.receiveShadow = !/leaf|frond/.test(mat.name) || LEAF.receive;
     if (/leaf|frond|grass/.test(mat.name)) {
-      im.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.5 });
+      const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: mat.alphaTest || 0.5 });
+      if (mat.userData.cloverBillboard) {
+        depth.side = THREE.DoubleSide;
+        depth.customProgramCacheKey = () => 'clover-bb-depth';
+        depth.onBeforeCompile = addCloverBillboard;
+      }
+      im.customDepthMaterial = depth;
     }
     if (shadowOnly) { mat.colorWrite = false; mat.depthWrite = false; im.receiveShadow = false; im.castShadow = flag('casters'); }
     im.frustumCulled = false;
@@ -626,6 +686,78 @@ const grade = new ShaderPass({
       gl_FragColor = vec4(clamp(c.rgb, 0.0, 1.0), 1.0);
     }`,
 });
+// 画面全体のにじみ。半分の解像度に縮小し、横・縦のガウスぼかしを別々にかける
+class DiffusionPass extends Pass {
+  constructor(amt, radius, mode) {
+    super();
+    this.amt = amt;
+    this.radius = radius;
+    this.halfA = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat, type: THREE.HalfFloatType, depthBuffer: false });
+    this.halfB = this.halfA.clone();
+    this.blurMaterial = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) }, uAxis: { value: new THREE.Vector2(1, 0) }, uSigma: { value: 0 } },
+      vertexShader: VS,
+      fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uTexel, uAxis; uniform float uSigma; varying vec2 vUv;
+        void main() {
+          vec3 sum = vec3(0.0); float total = 0.0;
+          float spread = max(uSigma * 0.5, 0.001);
+          for (int i = -4; i <= 4; i++) {
+            float x = float(i); float w = exp(-0.125 * x * x);
+            sum += texture2D(tDiffuse, vUv + uAxis * uTexel * (x * spread)).rgb * w;
+            total += w;
+          }
+          gl_FragColor = vec4(sum / total, 1.0);
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    this.compositeMaterial = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, tBlur: { value: null }, uAmt: { value: amt }, uScreen: { value: mode === 'screen' ? 1 : 0 } },
+      vertexShader: VS,
+      fragmentShader: `uniform sampler2D tDiffuse, tBlur; uniform float uAmt, uScreen; varying vec2 vUv;
+        void main() {
+          vec3 c = texture2D(tDiffuse, vUv).rgb;
+          vec3 blur = texture2D(tBlur, vUv).rgb;
+          vec3 result = mix(c, blur, uAmt);
+          if (uScreen > 0.5) result = vec3(1.0) - (vec3(1.0) - c) * (vec3(1.0) - blur * uAmt);
+          gl_FragColor = vec4(result, 1.0);
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    this.quad = new FullScreenQuad(this.blurMaterial);
+  }
+
+  setSize(width, height) {
+    const w = Math.max(1, Math.round(width * 0.5));
+    const h = Math.max(1, Math.round(height * 0.5));
+    this.halfA.setSize(w, h); this.halfB.setSize(w, h);
+  }
+
+  render(renderer, writeBuffer, readBuffer) {
+    this.quad.material = this.blurMaterial;
+    const uniforms = this.blurMaterial.uniforms;
+    uniforms.uTexel.value.set(1 / this.halfA.width, 1 / this.halfA.height);
+    uniforms.uSigma.value = this.radius * this.halfA.height * 0.5;
+    uniforms.tDiffuse.value = readBuffer.texture;
+    uniforms.uAxis.value.set(1, 0);
+    renderer.setRenderTarget(this.halfA); renderer.clear(); this.quad.render(renderer);
+    uniforms.tDiffuse.value = this.halfA.texture;
+    uniforms.uAxis.value.set(0, 1);
+    renderer.setRenderTarget(this.halfB); renderer.clear(); this.quad.render(renderer);
+
+    this.quad.material = this.compositeMaterial;
+    this.compositeMaterial.uniforms.tDiffuse.value = readBuffer.texture;
+    this.compositeMaterial.uniforms.tBlur.value = this.halfB.texture;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    if (this.clear) renderer.clear();
+    this.quad.render(renderer);
+  }
+
+  dispose() {
+    this.halfA.dispose(); this.halfB.dispose();
+    this.blurMaterial.dispose(); this.compositeMaterial.dispose(); this.quad.dispose();
+  }
+}
+const diffusion = diffAmt > 0 ? new DiffusionPass(diffAmt, diffRadius, diffMode) : null;
 // 奥と手前のぼかし（画面の縦位置で強さを決める。中央の帯はぼかさない）
 const dof = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) }, uAmt: { value: P.dof },
@@ -646,7 +778,7 @@ const dof = new ShaderPass({
       gl_FragColor = c;
     }`,
 });
-if (flag('post')) { composer.addPass(grade); if (flag('dof')) composer.addPass(dof); }
+if (flag('post')) { composer.addPass(grade); if (diffAmt > 0) composer.addPass(diffusion); if (flag('dof')) composer.addPass(dof); }
 
 // ビューの照明の上書き（見本のカットシーンなど、カメラ演出が違う見本に合わせる）
 const LIGHT0 = { sun: sun.intensity, hemi: hemi.intensity, exposure: renderer.toneMappingExposure, sat: grade.uniforms.uSat.value };

@@ -116,6 +116,62 @@ def spray_clover(n=512, seed=102):
     finish(img, n, n, 'spray_clover.png')
 
 
+def bush_bb(w=512, h=320):
+    """カメラ向けの葉の房。外周だけに大きな葉形を残し、面の明暗は高さと内側への距離で塗る。"""
+    W, H = w * SS, h * SS
+    xx = np.linspace(0.0, 1.0, W, dtype=np.float32)[None, :]
+    yy = np.linspace(0.0, 1.0, H, dtype=np.float32)[:, None]
+    px = (xx - 0.5) / 0.48
+    py = (yy - 0.55) / 0.39
+    radius = np.sqrt(px * px + py * py)
+    angle = np.arctan2(py, px)
+    rim = 1.0 + 0.11 * np.sin(angle * 7.0 + 0.35) + 0.04 * np.sin(angle * 11.0 - 0.8) + 0.025 * np.cos(angle * 4.0 + 0.6)
+    inside = rim - radius
+    edge = 2.0 / H / 0.39
+    alpha = np.clip((inside + edge) / (2.0 * edge), 0.0, 1.0)
+    alpha = alpha * alpha * (3.0 - 2.0 * alpha)
+
+    top = np.clip((0.94 - yy) / 0.80, 0.0, 1.0)
+    inner = np.clip(1.0 - radius / rim, 0.0, 1.0)
+    light = np.clip(top * 0.72 + (1.0 - inner) * 0.28, 0.0, 1.0)
+    light = light * light * (3.0 - 2.0 * light)
+    low = np.array((0.17, 0.35, 0.32), dtype=np.float32)
+    middle = np.array((0.37, 0.59, 0.32), dtype=np.float32)
+    high = np.array((0.70, 0.82, 0.34), dtype=np.float32)
+    t = np.clip(light / 0.62, 0.0, 1.0)
+    t = t * t * (3.0 - 2.0 * t)
+    rgb = low + (middle - low) * t[..., None]
+    t = np.clip((light - 0.45) / 0.55, 0.0, 1.0)
+    t = t * t * (3.0 - 2.0 * t)
+    rgb += (high - rgb) * t[..., None]
+    # ごく低い周波数の面の丸み。外縁は暗くせず、暗い色は内側へだけ寄せる。
+    inner_lower = inner * (1.0 - top) * 0.08
+    rgb *= np.stack((1.0 - inner_lower * 0.25, 1.0 - inner_lower * 0.06, 1.0 + inner_lower * 0.10), axis=-1)
+    rgba = np.dstack((np.clip(rgb, 0.0, 1.0), alpha))
+    img = Image.fromarray(np.uint8(np.clip(rgba * 255.0, 0.0, 255.0)), 'RGBA')
+    img = img.resize((w, h), Image.Resampling.LANCZOS)
+
+    # 透明画素にも輪郭の色を外へ広げ、ミップマップで切り抜きの縁が暗くならないようにする。
+    data = np.asarray(img).copy()
+    colors = data[:, :, :3].astype(np.float32)
+    filled = data[:, :, 3] > 0
+    for _ in range(12):
+        padded_colors = np.pad(colors, ((1, 1), (1, 1), (0, 0)), mode='edge')
+        padded_filled = np.pad(filled, ((1, 1), (1, 1)), mode='constant')
+        sums = np.zeros_like(colors); counts = np.zeros(filled.shape, dtype=np.float32)
+        for dy in range(3):
+            for dx in range(3):
+                mask = padded_filled[dy:dy + h, dx:dx + w]
+                sums += padded_colors[dy:dy + h, dx:dx + w] * mask[:, :, None]
+                counts += mask
+        add = (~filled) & (counts > 0)
+        if not np.any(add): break
+        colors[add] = sums[add] / counts[add, None]
+        filled[add] = True
+    data[:, :, :3] = np.uint8(np.clip(colors, 0, 255))
+    Image.fromarray(data, 'RGBA').save(os.path.join(OUT, 'bush_bb.png'))
+
+
 def frond_fir(w=512, h=1024, seed=103):
     """細長いシダの葉: 中軸の左右に細い羽片が 30 対、羽片のふちに小さな切れ込み。根元=下端"""
     r = rng(seed); W, H = w * SS, h * SS
@@ -518,7 +574,7 @@ def fan_fir4(n=512, seed=117):
 
 
 if __name__ == '__main__':
-    spray_maple(); clump_maple(); spray_clover(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
+    spray_maple(); clump_maple(); spray_clover(); bush_bb(); frond_fir(); frond_palm(); grass_tall(); rock_crack(); noise_soft()
     plate_maple(); canvas_beige(); canvas_blue(); canvas_hide(); rock_face(); frond_fir3(); lavender(); flagstone(); meander()
     fan_fir4()
     print('textures2 ->', OUT)
