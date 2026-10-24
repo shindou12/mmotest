@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2D素材の見え方比較｜夜の校舎</title>
+    <link rel="stylesheet" href="./compare.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <p>2D IMAGE → 3D FEEL</p>
+        <h1>見本｜現在｜試作</h1>
+        <p class="note">中央は壁面に枠を重ねた状態。右は壁を抜き、奥の絵を別レイヤーにした試作です。</p>
+      </header>
+      <section class="compare">
+        <figure>
+          <figcaption><strong>見本</strong><span>使う2D素材</span></figcaption>
+          <div class="sample-assets">
+            <img src="./assets/window-frame.png" alt="透過した窓枠画像">
+            <img src="./assets/door-frame.png" alt="透過したドア枠画像">
+          </div>
+        </figure>
+        <figure>
+          <figcaption><strong>現在</strong><span>壁に画像を重ねる</span></figcaption>
+          <iframe title="壁に枠を重ねた廊下" src="./?preview=1&bump=0&cutout=0"></iframe>
+        </figure>
+        <figure>
+          <figcaption><strong>試作</strong><span>壁を抜いて奥にも絵を置く</span></figcaption>
+          <iframe title="壁を抜いて奥の画像を分けた廊下" src="./?preview=1&bump=0&cutout=1"></iframe>
+        </figure>
+      </section>
+      <footer>窓は枠・開口・校庭、ドアは枠・板・教室を別々の画像レイヤーにしています。椅子は廊下に向きを固定しています。</footer>
+    </main>
+  </body>
+</html>

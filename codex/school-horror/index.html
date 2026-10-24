@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>夜の校舎</title>
+    <link rel="stylesheet" href="./style.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js",
+          "three/addons/": "/node_modules/three/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="./main.js"></script>
+  </head>
+  <body>
+    <main id="root">
+      <canvas id="world" aria-label="夜の校舎の廊下"></canvas>
+      <div id="vignette" aria-hidden="true"></div>
+      <section id="entry" aria-label="開始画面">
+        <div class="entry-card">
+          <p class="eyebrow">AFTER HOURS</p>
+          <h1>夜の校舎</h1>
+          <p class="instruction">2D画像だけで組んだ廊下</p>
+          <p class="keys">クリック開始　·　WASD移動　·　マウスで見回す</p>
+          <p class="keys">F 懐中電灯　·　B 壁の凹凸比較　·　Esc 解除</p>
+        </div>
+      </section>
+      <output id="toast" aria-live="polite"></output>
+    </main>
+  </body>
+</html>
