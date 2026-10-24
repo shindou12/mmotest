@@ -34,3 +34,7 @@
   https://openaccess.thecvf.com/content_CVPR_2020/html/Tucker_Single-View_View_Synthesis_With_Multiplane_Images_CVPR_2020_paper.html
 
 既知の方式を用途ごとに組み合わせる。すべてを一枚のカラー画像から正確に復元できる一つの処理として扱わない。
+
+## 追加調査
+
+開発者自身の制作記事、画像面の組立、True Impostors、深度付きスプライト、室内の家具レイヤーを調べ直した記録: [RESEARCH-2026-10-24.md](./RESEARCH-2026-10-24.md)。前回の椅子の診断に、投影補正と深度補間の不足を追記。今回は実装変更なし。

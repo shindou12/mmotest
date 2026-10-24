@@ -1,0 +1,63 @@
+{
+  "checked_on": "2026-10-24",
+  "repositories": [
+    {
+      "name": "Ctrlmonster/three-octahedral-impostor",
+      "url": "https://github.com/Ctrlmonster/three-octahedral-impostor",
+      "pushed_at": "2025-03-29T00:22:29Z",
+      "archived": false,
+      "license_detected_by_github": "MIT",
+      "default_branch": "main"
+    },
+    {
+      "name": "agargaro/octahedral-impostor",
+      "url": "https://github.com/agargaro/octahedral-impostor",
+      "pushed_at": "2025-11-03T20:58:34Z",
+      "archived": false,
+      "license_detected_by_github": "MIT",
+      "default_branch": "main"
+    },
+    {
+      "name": "knowercoder/BasicInteriorMap",
+      "url": "https://github.com/knowercoder/BasicInteriorMap",
+      "pushed_at": "2024-03-14T17:55:15Z",
+      "archived": false,
+      "license_detected_by_github": "MIT",
+      "default_branch": "main"
+    },
+    {
+      "name": "ictusbrucks/ImpostorBaker",
+      "url": "https://github.com/ictusbrucks/ImpostorBaker",
+      "pushed_at": "2020-11-10T14:27:43Z",
+      "archived": false,
+      "license_detected_by_github": null,
+      "default_branch": "master"
+    },
+    {
+      "name": "vt-vl-lab/3d-photo-inpainting",
+      "url": "https://github.com/vt-vl-lab/3d-photo-inpainting",
+      "pushed_at": "2024-08-30T23:48:56Z",
+      "archived": false,
+      "license_detected_by_github": "NOASSERTION",
+      "default_branch": "master"
+    },
+    {
+      "name": "richardmonette/three-impostor",
+      "url": "https://github.com/richardmonette/three-impostor",
+      "pushed_at": "2026-10-20T00:48:53Z",
+      "archived": false,
+      "license_detected_by_github": "MIT",
+      "default_branch": "main"
+    }
+  ],
+  "package": {
+    "peerDependencies": {
+      "three": ">=0.186.0"
+    },
+    "license": "MIT",
+    "version": "0.2.0",
+    "name": "three-impostor"
+  },
+  "local_three_version": "0.160.0",
+  "installed": false
+}
