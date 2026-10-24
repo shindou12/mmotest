@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>見本｜現在｜試作 — 画像の部品と奥行き</title>
+  <link rel="stylesheet" href="./compare.css">
+</head>
+<body>
+<main id="root">
+  <header>
+    <p>AFTER HOURS / IMAGE BASED SCENE</p>
+    <h1>見本｜現在｜試作</h1>
+    <nav><a href="./current-v3.html?preview=1">試作を歩く ↗</a><a href="./current-v2.html?preview=1">前の版を歩く ↗</a></nav>
+    <p class="note">見本は使用する2D素材。中央と右は同じ視点・光で撮った実画面です。</p>
+  </header>
+  <section>
+    <h2>椅子</h2>
+    <div class="compare">
+      <figure><figcaption><strong>見本</strong><span>部品の画像</span></figcaption><a class="frame" href="./assets/chair-parts-v3.png"><img src="./assets/chair-parts-v3.png" alt="座面・背・支持材の透過画像"></a></figure>
+      <figure><figcaption><strong>現在</strong><span>方向画像の切替</span></figcaption><a class="frame" href="./current-v2.html?preview=1&still=1&shot=chair-front"><img src="./shots/v3/current-chair-front.jpg" alt="前の椅子の実画面"></a></figure>
+      <figure><figcaption><strong>試作</strong><span>部品を固定</span></figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=chair-front"><img src="./shots/v3/chair-front.jpg" alt="固定した画像面で組んだ椅子の実画面"></a></figure>
+    </div>
+  </section>
+  <section>
+    <h2>教室</h2>
+    <div class="compare">
+      <figure><figcaption><strong>見本</strong><span>壁と家具の画像</span></figcaption><div class="frame materials"><a href="./assets/classroom-wall-v3.png"><img src="./assets/classroom-wall-v3.png" alt="家具を含まない教室の壁画像"></a><a href="./assets/classroom-desk-v3.png"><img src="./assets/classroom-desk-v3.png" alt="透過した机と椅子の画像"></a></div></figure>
+      <figure><figcaption><strong>現在</strong><span>一枚写真の再投影</span></figcaption><a class="frame" href="./current-v2.html?preview=1&still=1&shot=door"><img src="./shots/v3/current-door.jpg" alt="前の教室の実画面"></a></figure>
+      <figure><figcaption><strong>試作</strong><span>家具を別の奥行きへ</span></figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=door"><img src="./shots/v3/door-near.jpg" alt="壁と家具を別々に描いた教室の実画面"></a></figure>
+    </div>
+  </section>
+  <section>
+    <h2>横・背面・歩いて振り返る</h2>
+    <div class="view-grid">
+      <figure><figcaption>横</figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=chair-side"><img src="./shots/v3/chair-side.jpg" alt="椅子の横側"></a></figure>
+      <figure><figcaption>背面</figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=chair-back"><img src="./shots/v3/chair-back.jpg" alt="椅子の背面"></a></figure>
+      <figure><figcaption>歩行後</figcaption><a class="frame" href="./shots/v3/walk-turn.jpg"><img src="./shots/v3/walk-turn.jpg" alt="入口から椅子の横を歩いて通り振り返った画面"></a></figure>
+    </div>
+  </section>
+  <section>
+    <h2>同じ懐中電灯・影の有無</h2>
+    <div class="details">
+      <figure><figcaption>影なし</figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=chair-side&torchShadow=0"><img src="./shots/v3/torch-shadow-off.jpg" alt="同じ懐中電灯で照らし、影だけを切った状態"></a></figure>
+      <figure><figcaption>影あり</figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=chair-side"><img src="./shots/v3/torch-shadow-on.jpg" alt="同じ懐中電灯で椅子と壁の影が連動した状態"></a></figure>
+    </div>
+  </section>
+  <section>
+    <h2>家具の距離だけを変える</h2>
+    <div class="details">
+      <figure><figcaption>近い層</figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=door"><img src="./shots/v3/door-near.jpg" alt="家具の奥行き1.25m"></a></figure>
+      <figure><figcaption>遠い層</figcaption><a class="frame" href="./current-v3.html?preview=1&still=1&shot=door&layerDepth=2.1"><img src="./shots/v3/door-far.jpg" alt="家具の奥行き2.1m"></a></figure>
+    </div>
+  </section>
+  <footer>画像を押すと拡大・起動。WASDで移動、ドラッグで見回し、Fで懐中電灯。室内の家具は平面のままで、入室には対応していません。</footer>
+</main>
+</body>
+</html>

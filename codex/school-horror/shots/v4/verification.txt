@@ -1,0 +1,15 @@
+stage.js: exit 0
+layered-room.js: exit 0
+stage-v3.js: exit 0
+layered-room-v3.js: exit 0
+git diff --check: exit 0
+v3 snapshot (撮影位置と初期点灯指定以外): True
+layered-room-v3.jsと変更前の一致: True
+current-room.jpg / compat-room.jpg: 最大RGB差0、差8超0画素
+current-warm-end.jpg / warm-end.jpg: 最大RGB差0、差8超0画素
+実操作: 教室前でA/D横移動、ドラッグで見回し、F点消灯。
+最初のドラッグで姿勢が傾く不具合を修正後、再操作して撮影。
+ブラウザーerror/warn: [] (browser-log.json)
+比較ページの画像13個: naturalWidth/naturalHeightすべて0超。
+比較画像と入口・椅子・最奥・入切の実画面を実際に開いて判断。
+481x902の通常のビューポート。撮影用サイズ変更なし。

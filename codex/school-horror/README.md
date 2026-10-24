@@ -10,10 +10,10 @@
 
 - 試作を歩く: http://127.0.0.1:8172/codex/school-horror/?preview=1
 - 見本｜現在｜試作: http://127.0.0.1:8172/codex/school-horror/compare.html
-- 前の版: http://127.0.0.1:8172/codex/school-horror/current-v2.html?preview=1
+- 前の版: http://127.0.0.1:8172/codex/school-horror/current-v3.html?preview=1
 - 操作: WASD移動、マウスまたはドラッグで見回し、F懐中電灯、Esc解除、B壁の微細な凹凸。
 
-## 今回の試作（v3）
+## 前回の試作（v3）
 
 ### 椅子
 
@@ -52,3 +52,16 @@ https://joostdevblog.blogspot.com/2018/09/interior-mapping-real-rooms-without.ht
 - 室内の家具は平面のままです。部屋へ入る、机の裏へ回る操作には対応しません。室内の光は簡略化しており、廊下の懐中電灯を室内で物理的に照らし直す方式ではありません。
 - 椅子は廊下と同じ光を受けて影・床反射へ入ります。教室は入口から見える範囲に用途を限定しています。
 - 新規インストール、APIキー、従量課金APIは使用していません。新しい画像は組み込み生成です。生成プロンプトは `PROMPTS-V3.md`、見直しは `ITERATIONS.md`、調査資料は `RESEARCH-2026-10-24.md` に記録しました。
+## v4の追加
+
+HD-2Dの開発者取材を参考に、消灯した教室の環境光を廊下と共有。画像の机と床も懐中電灯を受け、ドアと机の不透明部分が光を遮る。参考と制約は [RESEARCH-2026-10-25.md](./RESEARCH-2026-10-25.md)、経過は [ITERATIONS.md](./ITERATIONS.md)。
+
+- 比較: `compare.html`。前回の比較は `compare-v3.html`。
+- 比較元: `current-v3.html`。
+- 診断: `?preview=1&still=1&shot=room-light&torch=1`。
+- `roomLight=0`: 室内への懐中電灯だけを切る。
+- `roomShadow=0`: 室内のドア・家具による遮光だけを切る。開口の遮光は残る。
+- `roomAmbient=0`: 消灯室の環境光を以前の一定の明暗へ戻す。
+- `torch=1`: 起動時から懐中電灯を点ける。Fで切替可能。
+
+画像は既存の素材を使用。追加の画像生成、インストール、APIキーや従量課金の利用はなし。椅子はv3の画像部品のままで、近接時の支持材の交差面は残る。
