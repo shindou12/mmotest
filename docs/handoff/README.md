@@ -5,6 +5,6 @@
 | 作業 | 目標 | 最新の引継ぎ | ブランチ |
 |---|---|---|---|
 | 大剣ブランチ全体を Godot へ | `docs/godot/goal.md` | `2026-10-22-g5-g7.md` | （引継ぎ文書を見る） |
-| ワールドマップのアートスタイルの研究（大剣とは別の作業） | `docs/world-art/rulebook.md`、記録は `docs/world-art/rules/ab-L27.md` | `2026-10-22-art-style.md`（L27・L28 の進み具合は `ab-L27.md`） | `claude/art-style-L27` |
+| ワールドマップのアートスタイルの研究（大剣とは別の作業） | `docs/world-art/rulebook.md`、記録は `docs/world-art/rules/ab-L27.md` | `2026-10-24-art-style.md`（Codex が主担当で続ける） | `claude/art-style-L27` |
 
 古い引継ぎ文書は記録として残す（日付の新しいものが優先）。
