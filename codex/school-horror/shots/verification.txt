@@ -1,0 +1,6 @@
+node --check stage.js : exit 0
+node --check interior.js : exit 0
+node --check floor-reflection.js : exit 0
+Browser: WASD forward, drag look, F flashlight visibly operated.
+Browser console error/warn entries: []
+Interior comparison: depth=0 / depth=1.2 screenshots opened and visually compared.
