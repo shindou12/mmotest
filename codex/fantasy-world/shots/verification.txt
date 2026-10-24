@@ -1,0 +1,9 @@
+node --check codex/fantasy-world/stage.js: exit 0
+node --check codex/fantasy-world/ui.js: exit 0
+ブラウザーerror/warn: [] (browser-log.json)
+実操作: Wで前進、Dで横移動、ドラッグで見回しと振り返り、Fで手元の灯り。
+UIの整理後にも前進とドラッグを再操作。
+比較ページの画像9個: naturalWidth/naturalHeightはすべて0超。
+元画像4点と入口・家・窓・街路・城門・振り返り・比較ページを実際に開いて判断。
+撮影: 481x902の通常のビューポート。撮影のためのサイズ変更なし。
+描画パラメータの比較: pixel-check.txt。

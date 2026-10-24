@@ -1,0 +1,7 @@
+@import url("../school-horror/style.css");
+:root, body { background: #20253d; }
+#vignette { background: radial-gradient(ellipse, transparent 50%, rgba(17, 19, 38, .24)); }
+.entry-card { background: rgba(24, 27, 44, .78); border-color: #8f846c; }
+.eyebrow { color: #e5c48c; }
+#nav { position: absolute; left: 20px; bottom: 18px; z-index: 3; font-size: 11px; }
+#nav a { color: #f4e0b7; text-decoration: none; text-shadow: 0 1px 5px #000; }
