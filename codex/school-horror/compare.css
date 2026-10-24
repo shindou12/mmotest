@@ -1,20 +1,26 @@
 :root { color-scheme: dark; font-family: "Yu Gothic UI", "Meiryo", sans-serif; color: #e1e5df; background: #0c1013; }
 * { box-sizing: border-box; }
 body { margin: 0; }
-main { width: min(1800px, 100%); margin: auto; padding: 28px; }
-header { margin-bottom: 22px; }
-header p:first-child { color: #9caab3; font-size: 10px; letter-spacing: .22em; }
-h1 { margin: 8px 0; font-size: 28px; font-weight: 500; letter-spacing: .12em; }
-.note, footer { color: #9da5a6; font-size: 12px; }
-.compare { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+main { width: min(1280px, 100%); margin: auto; padding: 24px; }
+header { margin-bottom: 24px; }
+header p:first-child { color: #9caab3; font-size: 10px; letter-spacing: .2em; }
+h1 { margin: 8px 0 18px; font-size: clamp(23px, 4vw, 32px); font-weight: 500; letter-spacing: .12em; }
+nav { display: flex; gap: 24px; font-size: 14px; }
+a { color: #d4d8b6; text-decoration: none; }
+nav a { border-bottom: 1px solid #5d6758; padding-bottom: 5px; }
+.note, footer { color: #9da5a6; font-size: 11px; line-height: 1.8; }
+section { margin: 28px 0; }
+h2 { font-size: 16px; font-weight: 500; }
+.compare, .view-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 figure { min-width: 0; margin: 0; border: 1px solid #30383c; background: #11171b; }
-figcaption { padding: 11px 13px; display: flex; gap: 10px; align-items: baseline; }
+figcaption { min-height: 52px; padding: 9px 12px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 figcaption strong { font-weight: 500; }
 figcaption span { color: #9da5a6; font-size: 10px; }
-img { display: block; width: 100%; height: auto; }
-a { display: block; }
-footer { margin-top: 16px; }
-.details { margin-top: 36px; }
-h2 { font-size: 17px; font-weight: 500; }
-.details > div { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 900px) { main { padding: 16px; } .compare, .details > div { grid-template-columns: 1fr; } }
+.frame { display: flex; align-items: center; justify-content: center; aspect-ratio: 481 / 902; width: 100%; overflow: hidden; background: #0e1418; }
+.frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.materials { flex-direction: column; }
+.materials a { width: 100%; height: 50%; display: flex; align-items: center; }
+.materials img { max-height: 100%; }
+.details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 840px; margin: auto; }
+footer { margin: 26px 0; }
+@media (max-width: 700px) { main { padding: 14px; } .compare, .view-grid, .details { gap: 7px; } figcaption { padding: 7px; font-size: 12px; } figcaption span { font-size: 9px; } }

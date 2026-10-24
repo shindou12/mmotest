@@ -1,0 +1,6 @@
+stage.js : node --check exit 0
+image-chair.js : node --check exit 0
+layered-room.js : node --check exit 0
+stage-v2.js : node --check exit 0
+Browser actual controls: W forward, drag turn, F flashlight operated.
+Browser error/warn: [] (browser-log.json)

@@ -6,6 +6,8 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { makeInterior } from "./interior.js";
 import { makeFloorReflection } from "./floor-reflection.js";
+import { makeImageChair } from "./image-chair.js";
+import { makeLayeredRoom } from "./layered-room.js";
 
 const query = new URLSearchParams(location.search);
 const W = 3.4, H = 3.05, BAY = 4.6, L = BAY * 6;
@@ -114,14 +116,14 @@ function reveal(parent, width, height, bottom) {
 const interiors = [], bumped = [], lamps = [];
 let chair, chairMaps, ready = false;
 const loader = new THREE.TextureLoader();
-const names = ["wall-source", "floor-wood", "door-frame", "door-leaf", "window-frame", "night-yard", "classroom-depth", "chair-eight-v2", "ceiling-v2", "fluorescent-v2"];
+const names = ["wall-source", "floor-wood", "door-frame", "door-leaf", "window-frame", "night-yard", "classroom-depth", "chair-eight-v2", "ceiling-v2", "fluorescent-v2", "chair-parts-v3", "classroom-wall-v3", "classroom-desk-v3"];
 try {
   const textures = await Promise.all(names.map(name => loader.loadAsync(`./assets/${name}.png`)));
   for (const texture of textures) {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   }
-  const [wall, wood, frame, leaf, windowFrame, yard, room, chairs, ceiling, fixture] = textures;
+  const [wall, wood, frame, leaf, windowFrame, yard, room, chairs, ceiling, fixture, chairParts, classroomWall, classroomDesk] = textures;
   const floorMap = tiled(wood, W / 2.4, L / 2.4);
   const floorMaterial = standard(floorMap, { roughness: 0.7, bumpMap: floorMap, bumpScale: 0.012 });
   const floor = plane(W, L, floorMaterial);
@@ -132,6 +134,7 @@ try {
   const frameMaterial = cutout(frame, { roughness: 0.7, metalness: 0.16 });
   const leafMaterial = cutout(leaf, { roughness: 0.74, metalness: 0.08 });
   const windowMaterial = cutout(windowFrame, { roughness: 0.62, metalness: 0.22 });
+  const furnitureMap = cropAlpha(classroomDesk);
   function door(parent, open = 0, warmth = false) {
     reveal(parent, 1.01, 2.30, 0.04);
     const jamb = plane(1.15, 2.43, frameMaterial, parent);
@@ -140,8 +143,14 @@ try {
     hinge.position.set(-0.49, 0.04, 0.03); hinge.rotation.y = -open; parent.add(hinge);
     const slab = plane(0.99, 2.33, leafMaterial, hinge);
     slab.position.set(0.495, 1.165, 0); slab.castShadow = true;
-    const interior = makeInterior(1.01, 2.30, room, { depth: query.get("depth") === "0" ? 0 : 1.2,
-      brightness: warmth ? 3.5 : 3.2, tint: warmth ? 0xffc276 : 0x9caebb });
+    const interior = query.get("room") === "photo"
+      ? makeInterior(1.01, 2.30, room, { depth: query.get("depth") === "0" ? 0 : 1.2,
+        brightness: warmth ? 3.5 : 3.2, tint: warmth ? 0xffc276 : 0x9caebb })
+      : makeLayeredRoom(1.01, 2.30, { wall, floor: wood, ceiling, back: classroomWall, furniture: furnitureMap }, {
+        furniture: query.get("furniture") !== "0",
+        frontRowDepth: query.get("layerDepth") === "2.1" ? 2.1 : 1.25,
+        brightness: warmth ? 1.1 : 0.75, tint: warmth ? 0xffd4a1 : 0xbacde3,
+      });
     interior.position.set(0, 1.19, -0.175); parent.add(interior); interiors.push(interior);
   }
   for (let i = 0; i < 6; i++) {
@@ -193,8 +202,13 @@ try {
     const map = chairs.clone(); map.repeat.set(0.25, 0.5);
     map.offset.set(i % 4 / 4, 0.5 - Math.floor(i / 4) * 0.5); map.needsUpdate = true; return map;
   });
-  chair = plane(1.18, 1.18, standard(chairMaps[0], { alphaTest: 0.18, side: THREE.DoubleSide, roughness: 0.85 }));
-  chair.position.set(-0.94, 0.39, -4.5); contact(-0.94, -4.5, 1.35, 1.3, 0.95);
+  if (query.get("chair") === "atlas") {
+    chair = plane(1.18, 1.18, standard(chairMaps[0], { alphaTest: 0.18, side: THREE.DoubleSide, roughness: 0.85 }));
+    chair.position.set(-0.94, 0.39, -4.5);
+  } else {
+    scene.add(makeImageChair(chairParts, { roundNormals: query.get("chairNormals") !== "0" }));
+  }
+  contact(-0.94, -4.5, 1.1, 0.9, 0.65);
   const paperMap = canvasTexture((ctx, w, h) => {
     ctx.fillStyle = "#bcb9a6"; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = "#565a52";
@@ -214,7 +228,9 @@ const shots = {
   window: [[0.65, 1.63, -4.4], [-1.7, 1.7, -6.9]],
   door: [[-0.55, 1.63, -10], [1.7, 1.25, -11.5]],
   "chair-front": [[0.45, 1.63, -2.7], [-0.94, 0.5, -4.5]],
+  "chair-side": [[1.05, 1.15, -4.5], [-0.94, 0.24, -4.5]],
   "chair-back": [[0.45, 1.63, -6.5], [-0.94, 0.5, -4.5]],
+  "door-other": [[-0.55, 1.63, -13], [1.7, 1.25, -11.5]],
   end: [[0, 1.63, -23.8], [0, 1.4, -L]],
 };
 if (shots[query.get("shot")]) {
@@ -224,6 +240,12 @@ let active = query.has("preview"), dragging = false, lastX = 0, lastY = 0;
 entry.hidden = active;
 const keys = new Set();
 const flashlight = new THREE.SpotLight(0xffe9be, 0, 14, 0.35, 0.65, 2);
+flashlight.castShadow = query.get("torchShadow") !== "0";
+flashlight.shadow.mapSize.set(1024, 1024);
+flashlight.shadow.camera.near = 0.05;
+flashlight.shadow.camera.far = flashlight.distance;
+flashlight.shadow.bias = -0.0002;
+flashlight.shadow.normalBias = 0.005;
 scene.add(camera); camera.add(flashlight, flashlight.target);
 flashlight.position.set(0.16, -0.16, 0); flashlight.target.position.set(0, -0.12, -8);
 entry.addEventListener("click", () => { if (!ready) return; active = true; entry.hidden = true; controls.lock(); });

@@ -1,0 +1,3 @@
+furniture depth: size=(481, 902), changed pixels (>8/255)=10705
+support normals: size=(481, 902), changed pixels (>8/255)=7718
+torch shadow: size=(481, 902), changed pixels (>8/255)=9973
