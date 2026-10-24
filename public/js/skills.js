@@ -7,7 +7,7 @@ import { WEAPON_DEFS } from './weapons/index.js';
 //
 // 各スキルの run(c) は main.js が渡す戦闘コンテキスト c を使う:
 //   c.me, c.aim(), c.col(), c.later(sec, fn), c.arc(range, deg, mult, o), c.line(len, w, mult, o),
-//   c.circle(x, z, r, mult, o), c.proj(o), c.dash(a, dist, dur, iframe), c.buff(id, label, sec, mods, color),
+//   c.circle(x, z, r, mult, o)（o.reach: o.a の向きへ縦に引き伸ばす）, c.proj(o), c.dash(a, dist, dur, iframe), c.buff(id, label, sec, mods, color),
 //   c.heal(frac), c.text(str, cls), c.shake(v), c.sfx(name, opt), c.fx, c.nearest(range)
 //   c.arrow(o) 矢を放つ（弓。射程の端まで飛ぶ）, c.point() マウスの地面座標
 // o.type: 'normal' | 'heavy' | 'wskill' | 'tskill'（ツリーの強化倍率とスタン値の基準を決める）

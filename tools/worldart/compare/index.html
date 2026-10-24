@@ -1,0 +1,385 @@
+<meta charset="utf-8">
+<title>見本② 版くらべ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 地図を画面いっぱいに出し、左に操作の板、右に版の説明の板を重ねる。夜の野営地の板のような、暗く温かい一色の見た目（意図して暗い一色） */
+:root {
+  --ground: #1d2318;
+  --panel: rgba(24, 28, 20, 0.86);
+  --line: rgba(236, 224, 188, 0.16);
+  --ink: #f0e9d4;
+  --ink-soft: #bdb59c;
+  --accent: #dcb15e;
+  --accent-ink: #261d0c;
+  --ok: #8fc27a;
+  --warn: #e0a34f;
+  --bad: #d9715b;
+  --idle: #8e9686;
+  --display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--ground); color: var(--ink); font-family: var(--body); overflow: hidden; font-size: 13px; }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: var(--ground); }
+.panel {
+  position: fixed; z-index: 5; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  backdrop-filter: blur(6px); display: flex; flex-direction: column; gap: 10px; padding: 12px 14px;
+  max-height: calc(100% - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
+}
+.ctl { top: calc(env(safe-area-inset-top, 0px) + 12px); left: max(16px, env(safe-area-inset-left, 0px)); width: min(340px, calc(100vw - 32px)); }
+.ctl { max-height: calc(100% - 170px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }   /* 下のスティックの帯にかからない（中はスクロール） */
+.about { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+.about summary { cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink-soft); }
+.about[open] summary { margin-bottom: 8px; }
+.about .tabs { margin-bottom: 8px; }
+h1 { margin: 0; font-family: var(--display); font-size: 17px; letter-spacing: 0.04em; text-wrap: balance; }
+h2 { margin: 0; font-family: var(--display); font-size: 15px; text-wrap: balance; }
+h3 { margin: 4px 0 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink-soft); }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button, .tabs button, .minbtn {
+  font: 500 12.5px/1.2 var(--body); color: var(--ink); background: transparent; border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 10px; cursor: pointer; text-align: left;
+}
+.chips button[aria-pressed="true"], .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ver { display: grid; gap: 6px; }
+.ver button { border-radius: 8px; padding: 7px 10px; display: grid; gap: 2px; }
+.ver button small { color: inherit; opacity: 0.75; font-size: 11px; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.help { margin: 0; font-size: 12px; line-height: 1.65; color: var(--ink-soft); }
+kbd { font: 600 11px/1 var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; color: var(--ink); }
+.pose { font: 12px/1.4 var(--mono); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.tabs { display: flex; gap: 6px; }
+.sect { display: flex; flex-direction: column; gap: 6px; }
+.sect p, .sect li { margin: 0; line-height: 1.6; }
+.sect ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
+.note { border-left: 3px solid var(--warn); padding-left: 8px; color: var(--ink); }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+td { border-top: 1px solid var(--line); padding: 5px 4px; vertical-align: top; line-height: 1.5; }
+td:first-child { font-family: var(--mono); color: var(--ink-soft); white-space: nowrap; }
+.st { display: inline-block; font-size: 11px; border-radius: 999px; padding: 1px 7px; border: 1px solid currentColor; white-space: nowrap; }
+.st.done { color: var(--ok); } .st.part { color: var(--warn); } .st.new { color: var(--idle); } .st.no { color: var(--bad); }
+.star { color: var(--accent); }
+.minbtn { align-self: flex-start; font-size: 12px; color: var(--ink-soft); border: none; padding: 0; text-decoration: underline; }
+.panel.min > :not(.head) { display: none; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.loading {
+  position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; background: var(--ground);
+  color: var(--ink-soft); font-size: 14px; letter-spacing: 0.06em; text-align: center; padding-inline: max(16px, env(safe-area-inset-left, 0px));
+}
+.loading.err { color: var(--bad); }
+.stick {
+  position: fixed; z-index: 6; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: 120px; height: 120px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
+}
+.stick .knob {
+  position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+  background: var(--accent); opacity: 0.85; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); pointer-events: none;
+}
+.stick.on { cursor: grabbing; }
+.turn {
+  position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  display: flex; gap: 8px;
+}
+.turn button {
+  width: 52px; height: 52px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+  font-size: 20px; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;
+}
+.turn button:active { background: var(--accent); color: var(--accent-ink); }
+@media (max-width: 760px) {
+  .stick { width: 104px; height: 104px; }
+  .ctl { max-height: calc(100% - 260px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+}
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Zen+Maru+Gothic:wght@700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+
+<iframe id="stage" title="3D の地図" src="about:blank"></iframe>
+<div class="loading" id="loading">読み込み中</div>
+
+<aside class="panel ctl" id="ctl" aria-label="操作">
+  <div class="head"><h1>見本② 版くらべ</h1><button class="minbtn" id="ctl-min">たたむ</button></div>
+  <div class="group">
+    <h3>地図</h3>
+    <div class="chips" id="maps" role="group" aria-label="地図"></div>
+  </div>
+  <div class="group">
+    <h3>版</h3>
+    <div class="ver chips" id="vers" role="group" aria-label="版"></div>
+  </div>
+  <div class="group" id="areas-grp">
+    <h3>エリア</h3>
+    <div class="chips" id="areas" role="group" aria-label="エリア"></div>
+  </div>
+  <div class="group">
+    <h3>カメラ</h3>
+    <div class="chips" id="cams" role="group" aria-label="カメラ"></div>
+  </div>
+  <div class="group" id="ideas-grp" hidden>
+    <h3>アイデアの入／切（L22・L23）</h3>
+    <div class="chips" id="ideatg" role="group" aria-label="アイデアの入／切"></div>
+  </div>
+  <p class="help">歩く: 左下のスティックを押したまま倒す（<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> と矢印キーも可）。向き: 右下の ⟲ ⟳ か <kbd>Q</kbd><kbd>E</kbd>。ズーム: 地図を 2 本指でつまむ、PC はホイール。赤い柱が人物の代わりです。版を替えても、いる場所・向き・カメラはそのままです。</p>
+  <div class="pose" id="pose">—</div>
+  <details class="about" id="about">
+    <summary>版の説明とアイデア表</summary>
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-ver" aria-selected="true">この版</button>
+      <button role="tab" id="tab-ideas" aria-selected="false">アイデア表</button>
+    </div>
+    <div id="pane-ver" class="sect"></div>
+    <div id="pane-ideas" class="sect" hidden></div>
+  </details>
+</aside>
+
+
+<div class="stick" id="stick" role="application" aria-label="移動のスティック（押したまま倒した向きへ歩く）"><div class="knob" id="knob"></div></div>
+<div class="turn" aria-label="向きを回す">
+  <button id="turn-l" data-k="q" aria-label="左へ回る">⟲</button><button id="turn-r" data-k="e" aria-label="右へ回る">⟳</button>
+</div>
+
+<script>
+const VERSIONS = {
+  L20: {
+    name: 'L20 基準', sub: 'L21 より前（git 8b3708e）', module: 'world_L20.js', data: 'L20/', extra: '',
+    restore: 'コミット 8b3708e の world.js と見本②の地図データをそのまま使っています（アセット・テクスチャは L20〜L21 で同一）。推測で作った部分はありません。',
+    changes: ['カメラ 俯角 52°・縦の画角 25°・距離 22m', '階調の圧縮 ACES、空の光 #c4ccc8（灰緑）1.65、太陽 4.4', '仕上げの描画先に MSAA なし（縁がぎざぎざ）', '崖は地形の岩肌 + 苔の斑（L15〜L18）、小さく詰まった広葉樹（L11）'],
+    ideas: '03・04・05（葉だけ）・06・07・08・09・11・14・16 は導入済み。10・17 は未導入。',
+    status: '12 ビューの撮影と評価表あり（art/shots/mihon2/L20、goal-mihon2.md）。',
+    issues: ['日陰が日なたより暖色（青の寄り 0.73〜0.80、見本 1.05〜1.35）', '葉・草の縁がぎざぎざ（MSAA なし）', '材質のシェーダーの取り違え（草の房と葉が同じシェーダーを使い回す。L22 で発見）'],
+  },
+  L21: {
+    name: 'L21 最新（撮影時）', sub: 'git d342f95 のまま', module: 'world_L21.js', data: 'L21/', extra: '',
+    restore: 'コミット d342f95 の world.js と地図データをそのまま使っています。L21 の 12 ビューを撮ったときと同じ状態です。',
+    changes: ['カメラ 45°・18°・33m（全 23 枚の測定: 人物 = 画面の 0.115）', 'MSAA 4 + 葉の alpha to coverage（アイデア10）', '輝度だけの階調圧縮 tone lum + 青い空の光 #a9bfdc 2.6、太陽 4.0（アイデア17）'],
+    ideas: '10・17 を導入。01 は未導入。',
+    status: '12 ビューの撮影と rulecheck の数値あり（日陰の青の寄り 1.13〜1.19 で見本の範囲）。',
+    issues: ['日陰が明るすぎ（明暗比 2.0〜2.1、見本 2.4〜2.8）、彩度が低い（0.45〜0.49、見本 0.51〜0.55）', 'B04（神殿前）の画角が狭い（共通のカメラの 18° を引き継いだ）', '材質のシェーダーの取り違え（草の房の色が違って見える）'],
+  },
+  L21f: {
+    name: 'L21 修正', sub: 'シェーダーの取り違えだけ直す', module: 'world_L21f.js', data: 'L21/', extra: '',
+    restore: 'コミット 60877e3 の world.js を、アイデア01 を切った状態で使います。地形・配置・カメラ・光は L21 と同じデータです。',
+    changes: ['材質ごとにシェーダーのキーを分けた（three はシェーダーを onBeforeCompile の文字列で使い回すため、草の房と葉が取り違えられていた）', 'アイデア01 の仕組みはコードにあるが、この版では切ってある'],
+    ideas: 'L21 と同じ。01 の比較の基準。',
+    status: 'B01・B03・近く・歩行者の目線で目視（草の房が緑寄りに変わる）。12 ビューの撮影はまだ。',
+    issues: ['L21 の残課題（日陰が明るい・彩度が低い・B04 の画角）はそのまま'],
+  },
+  L21g: {
+    name: 'L21 修正 + 01', sub: '地面と草の色の融合だけ足す', module: 'world_L21f.js', data: 'L21/', extra: 'gblend=1',
+    restore: '「L21 修正」と同じコード・地形・配置・カメラ・光に、gblend=1 の切り替えだけを足しています。',
+    changes: ['草・茂み・羊歯・ラベンダー・花の根元が、その場所の地面の地色（地面と同じ式: 草の絵・土・敷石の塗り分けと色むら）を受け取る', '根元の割合 0.85、高さ 0.32m で本来の色へ戻る（先は本来の色のまま）', '地面の頂点色（土・敷石・岩の塗り分け）を読み込み時に絵に写して引く'],
+    ideas: 'アイデア01 を導入（検証中）。',
+    status: 'B01 の近くと歩行者の目線で目視: 草地の房の根元は地面の緑に、道の際の房は根元が土色になり、地面とつながって見える。数値の比較と、林・崖・別の地図での確認はまだ。',
+    issues: ['背の低い房は全体が地面の色に寄り、先の黄色が弱くなる（高さ 0.32m の決め方が要検討）', 'ゲームのカメラ（33m）では差が小さい。「近く」「足元」のカメラで見比べる'],
+  },
+  L22: {
+    name: 'L22', sub: '退行の修正 + アイデアの入／切', module: 'world_L22.js', data: 'L22/', extra: '', ideas01: true,
+    restore: 'コミット 71c581d の world.js と地図データです。下の「アイデアの入／切」は URL の引数を 1 つだけ変えて、同じ場所で読み直します（地形・配置・カメラ・光は同じ）。',
+    changes: ['B04（神殿前）の画角を 25° に戻した（L21 の退行）', '階調は線形（露出を掛けて切るだけ）+ 露出 1.25。L21 の tone "lum" は three の OutputPass で効いていなかった（F25）。効かせると明暗比 1.9〜2.0 で見本から遠ざかったので不採用', '空の光 2.6 → 2.1、仕上げの彩度 0.86 → 1.0', 'シェーダーの取り違えの修正（F24）込み'],
+    ideas: '01 は既定で切（入れると草の房の根元が地面の色に）。02・04・05 は既定で入。入／切の比較の結果は「アイデア表」と docs/world-art/rules/ab-L22.md。',
+    status: '12 ビューの撮影（L22）と rulecheck: 輝度 0.51/0.54/0.52/0.48（見本 0.51/0.51/0.49/0.48）、彩度 0.56/0.58/0.52/0.30（見本 0.53/0.55/0.51/0.30）、B04 は構図・数値とも見本にほぼ一致。アイデア 01・02・04・05 は見本②の B01〜B03・近景と south_coast で入／切を比較済み。',
+    issues: ['B01〜B03 の明暗比が浅い（2.2、見本 2.4〜2.8）、いちばん暗い所が明るい（p0.5 ≈50、見本 32〜38）。05 は原因でない', '01 を入れると、道際の茂み（クローバー）の下部が土色の輪になる（草の房だけに絞るべき）', '02（葉の透け）はこのカメラと太陽の向きでは効かない（画素の変化 0）', '石像の出来は評価の対象外'],
+  },
+  L23: {
+    name: 'L23 最新', sub: '色相と明暗比の修正 + 01 は草の房だけ', module: 'world_L23.js', data: 'L23/', extra: '', ideas01: true,
+    ideaArgs: { '01': ['', 'gblend=0'], '02': ['trans=0.3', ''], '04': ['', 'fnorm=card'], '05': ['', 'wrap=0'], c: ['', 'llift=0.14&hemi=2.1&ltint=1,1,1&gtint=1.8,1.6,0.62&sat=1.0'] },
+    ideaDefault: { '01': true, '02': false, '04': true, '05': true, c: true },
+    restore: 'コミット 07988ba の world.js と地図データです。下の入／切は URL の引数だけを変えて同じ場所で読み直します。「色と明暗（L23）」を切ると、葉の持ち上げ・空の光・地色の色味・彩度を L22 の値に戻します（B03 だけの空の光の上書き 1.1→1.0 は戻りません）。',
+    changes: ['葉の持ち上げ 0.14 → 0（明暗比を浅くしていた一番の要因）', '空の光 2.1 → 1.6', '葉の色味 [1.18, 1.0, 0.76]（新設）と草の地色 [2.15, 1.6, 0.5] で緑すぎた色相を直す。太陽を暖色にする案は色相が動かず不採用', '仕上げの彩度 1.0 → 0.92', 'アイデア01 を草の房だけにして既定で入（茂みの土色の輪が出ない）', '葉の透け 0（効果がないため）'],
+    ideas: '01 採用（草の房だけ）、02 却下、04 採用、05 採用（0.5、値の感度は小さい）。結果は「アイデア表」と docs/world-art/rules/ab-L23.md。',
+    status: '12 ビューの撮影（L23）: 明暗比 2.59/2.38/2.52/2.40（見本 2.61/2.36/2.84/2.35）、彩度 0.55/0.57/0.51/0.30（見本 0.53/0.55/0.51/0.30）、緑の日なたの色相 74/70/72°（見本 68/71/72°）、最も暗い所 42/45/39（見本 37/38/32）。',
+    issues: ['林と崖（B03）の明暗比 2.52（見本 2.84）、森の奥の影が浅い', '道と野営地（B01）の緑がまだ 6° 緑寄り', '草の日陰の青みが見本②より少し強い', 'この光と色はまだ見本②だけで決めたもの（ほかの地図では未確認）'],
+  },
+};
+// 第 2 世代の地図に第 3 世代の規則を当てた比較（L24、tools/worldart/maps/to_gen3.py）。MAPINFO の数値は rulecheck（docs/world-art/rules/gen3-maps-L24.md）
+const MAPS = { mihon2: { name: '見本②（南パヨン）', def: 'L23' } };
+const MAPINFO = {"orc_meadow": {"g2": "明暗比 2.59・日陰の青の寄り 0.76（暖色、見本 R01 1.31）・緑の色相 61°（見本 67°）", "g3": "明暗比 2.58・青の寄り 1.25（見本 1.24〜1.31）・緑の色相 77°（見本 67〜68°）・暗部 41（見本 23〜25）", "g2issues": ["日陰が暖色（ACES）", "崖が岩の柱の列"], "g3issues": ["緑が強い（太陽の方位 135° の地図では、見本②で決めた地色が緑に出る）", "暗部が浮く"]}, "forest_path": {"g2": "明暗比 2.51・青の寄り 0.80・緑の色相 65°（見本 B03 72°）", "g3": "明暗比 2.54・青の寄り 1.23（見本 1.07〜1.11）・緑の色相 74°（見本 67〜72°）", "g2issues": ["日陰が暖色", "もみが羊歯に見える（細長いシダの葉）", "崖が岩の柱の列"], "g3issues": ["暗部が浮き明部が届かない（p0.5 38・p99.5 206、見本 25〜32・217〜249）"]}, "palm_clearing": {"g2": "明暗比 2.56・青の寄り 0.86・緑の色相 60°（見本 B02 71°）", "g3": "明暗比 2.58・青の寄り 1.25・緑の色相 71°（見本 69〜71°）", "g2issues": ["日陰が暖色", "緑が黄に寄る"], "g3issues": ["暗部が浮く（p0.5 37、見本 B02 38・C05 15）"]}, "south_coast": {"g2": "明暗比 2.97・青の寄り 0.94・緑の色相 71°（見本 C01 72°）", "g3": "明暗比 2.98・青の寄り 1.20（見本 1.06）・緑の色相 71°（見本 72°）", "g2issues": ["日陰が暖色", "崖が岩の柱の列"], "g3issues": ["水際の崖の面が暗い岩の帯になった（見本 C01 の浜の崖とは未比較）"]}, "town_plaza": {"g2": "明暗比 2.64・青の寄り 0.81・緑の色相 59°（見本 C02 78°）", "g3": "明暗比 2.65・青の寄り 1.49（見本 1.06〜1.11）・緑の色相 70°（見本 75〜78°）・石は日陰で青灰（見本どおり）", "g2issues": ["日陰が暖色", "暗部が沈みすぎ（p0.5 6）"], "g3issues": ["草の日陰が青すぎる（石畳の照り返しがない。地面からの光を暖色にする必要）", "家・小物は第 2 世代の形のまま"]}};   // 数値は docs/world-art/rules/gen3-maps-L24.md
+for (const [m, nm] of [['orc_meadow', 'オーク村の草地'], ['south_coast', '南の海辺'], ['town_plaza', '町の通り'], ['forest_path', '崖下の小道'], ['palm_clearing', '林の空き地']]) {
+  const I = MAPINFO[m] || {};
+  MAPS[m] = { name: nm, def: `${m}__g3` };
+  VERSIONS[`${m}__g2`] = { map: m, name: '第 2 世代', sub: 'もとの設定（今のコードで描く）', module: 'world_now.js', data: `M/${m}/`, extra: '',
+    restore: '第 2 世代の設定の地図（public/worldart/maps/' + m + '.json）を、今のコードで描いています（シェーダーの取り違えの修正などは入っています）。',
+    changes: ['カメラ 俯角 52°・画角 25°・距離 22m、階調 ACES、灰緑の空の光 1.8、葉の持ち上げ 0.12', '第 2 世代の広葉樹（丸い房）、崖は岩の柱を並べる'],
+    ideas: '04・05 は導入済み。01・10・17 はなし。', status: I.g2 || '—', issues: I.g2issues || [] };
+  VERSIONS[`${m}__g3`] = { map: m, name: '第 3 世代の規則', sub: 'to_gen3.py で変換', module: 'world_now.js', data: `M/${m}/`, mapName: `${m}_g3`, extra: '',
+    restore: '同じ地図の構図（道・区域・小物・木の位置・太陽の向き）のまま、規則集（rulebook.md、L23 の光と色）の設定だけを当てています（' + m + '_g3.json）。',
+    changes: ['カメラ 45°・18°・33m、階調は線形 + 露出 1.25、MSAA 4', '青い空の光 1.6、葉の持ち上げ 0、葉と草の色味、仕上げの彩度 0.92、やわらかい影', 'アセットを Blender で一から作り直し: 広葉樹 maple2、もみ fir3（短い小枝の詰まった円錐、新規）、小石 rock_s（なめらか、新規）', '崖は地形の岩肌 + 起伏（置いた岩の列をやめる）', 'アイデア01（草の房の根元に地面の色）'],
+    ideas: '01・04・05・10・17 を導入。02 は使わない。', status: I.g3 || '—', issues: I.g3issues || [] };
+}
+const AREAS = { B01: '道と野営地', B02: '草原とヤシ', B03: '林と崖', B04: '神殿前の広場' };
+MAPS.mihon2.areas = AREAS;
+// ゲームの第 1 層「ひだまりの草原」を第 3 世代で作り直した地図（L25、tools/worldart/maps/make_f1_field.py）。エリアの代わりに固定ビュー F01〜F07
+MAPS.f1_field = { name: 'ひだまりの草原（ゲーム 第1層）', def: 'f1_field__g3',
+  areas: { F01: '街からの入口', F02: '中心の広場', F03: '西の林（古井戸へ）', F04: '北の大岩', F05: '東の柵（イノシシの丘へ）', F06: '宝箱', F07: '迷宮区への出口' } };
+VERSIONS.f1_field__g3 = { map: 'f1_field', name: '第 3 世代で作り直し', sub: 'L25・ゲームの形のまま', module: 'world_now.js', data: 'M/f1_field/', mapName: 'f1_field', extra: '',
+  restore: 'ゲームの f1_field（public/shared/areas.js）の輪郭・出口 4 つ・当たり判定の木 11 本と岩 1 つ・宝箱 2 つ・出現位置をそのまま使い、見た目だけを規則集（rulebook.md）で作り直した地図です。ゲームの今の絵との並べた比較は <a href="M/f1_field/compare_game.webp" target="_blank">こちらの画像</a>。',
+  changes: ['外周: 輪郭のすぐ外を 3m の段の岩肌（上に草が垂れる）にし、その上を林で埋めた。出口は段を切った谷で、道が林の奥へ続く', '道はゲームと同じ曲がり方。中心の土の広場に道しるべ・切り株・倒木', '西（古井戸の洞窟へ）は暗い林、北は当たり判定の大岩に岩の組、東（イノシシの丘へ）は柵と切り株、南（街へ）は花の多い草地', 'Blender で新しく作ったアセット: 宝箱 chest_s、道しるべ signpost、出口の門 waygate、倒木 log_fallen、大岩 outcrop_a/b', '光・階調・仕上げ・地面の色は規則集のまま（L23）'],
+  ideas: '01・04・05・10・17 を導入。02 は使わない。',
+  status: '7 ビューの撮影（L25c）: 明暗比 2.36 / 1.59 / 2.50 / 2.92 / 2.57 / 2.54 / 2.42（F01〜F07、草地の見本 2.4〜3.9）、暗い所 12 / 2 / 11 / 20 / 16 / 20 / 13%（目標 13〜17%）。草の日陰/日なた 0.48〜0.58、青の寄り 1.12〜1.21。',
+  issues: ['中心の広場（F02）は開けたまま（ワープポイントのある集まる場所）: 明暗比 1.59・暗い所 2%', '東の柵が道ばたの木の幹を突き抜ける所がある', '道しるべの板が細く、枯れ枝に見える', 'ゲームの実際の歩く高さ（ゲームの heightAt）とは別の地形（見た目の段・起伏）。ゲームへの組み込みは未'] };
+const CAMS = { game: 'ゲーム', near: '近く', low: '足元' };
+const CAM_SET = { near: [11, 36], low: [7, 28] };
+const IDEAS = [
+  ['01', 1, '地面と草の色の融合', 'done', '採用・検証済み（L23）', '草の房だけに絞って採用。茂みの土色の輪が出ない。L23 で既定で入'],
+  ['02', 1, '葉の透過光', 'no', '却下（検証済み）', '見本②で画素の変化 0（このカメラと太陽の向きでは効かない）。south_coast でも小'],
+  ['03', 0, '地面の材質の境', 'part', '一部導入', '傾き・ノイズ・三方向・画素ごとの岩。高さで混ぜる方式は未'],
+  ['04', 1, '樹冠の球状の法線', 'done', '導入・検証済み', '切ると草の房に暗い面、樹冠が平たくなる。入で樹冠が塊として読める'],
+  ['05', 1, 'Wrapped Diffuse', 'done', '採用・検証済み（L23）', '0.25〜0.75 で結果がほぼ同じ（感度小）。0.5 のまま'],
+  ['06', 0, '草の法線を上向きに', 'done', '導入済み', '草の房の法線は真上'],
+  ['07', 0, '樹冠の内部の暗部', 'done', '導入済み', '頂点 AO + 葉が影を受ける'],
+  ['08', 0, '頂点色の色階調', 'done', '導入済み', '上は黄、下は青緑。L23 で葉の色味 foliage.tint を新設'],
+  ['09', 0, 'アルファ抜きの葉カード', 'done', '導入済み', 'もみの小羽片の絵は要修正'],
+  ['10', 0, 'Alpha to Coverage', 'done', '導入・検証済み', 'L21。拡大で縁がなめらか'],
+  ['11', 0, '葉・枝の階層', 'part', '一部導入', '段の房、詰まった小さな木'],
+  ['12', 0, '岩の法線', 'new', '初見', '—'],
+  ['13', 0, '接地の AO', 'part', '検討済み', '頂点 AO のみ'],
+  ['14', 0, 'やわらかい影・木漏れ日', 'done', '導入済み', 'VSM、葉の切り抜きを影に'],
+  ['15', 0, '細部の情報量の制御', 'part', '検討済み', '上下のぼけ。見本の細部量の順位は測定済み'],
+  ['16', 0, 'ミップマップ・フィルタ', 'done', '標準のまま', '異方性 8、LOD なし'],
+  ['17', 0, '色管理・階調の圧縮', 'done', '導入・検証済み（訂正）', 'ACES をやめ線形 + 露出 1.25。L21 の lum は効いていなかった（F25）'],
+  ['18', 0, '弱いブルーム', 'no', '却下（一般の場面）', '見本は発光物の小さな光の輪だけ'],
+];
+
+const $ = (id) => document.getElementById(id);
+const state = { map: 'mihon2', ver: 'L23', area: 'B01', cam: 'game', pose: null, gameCam: null, idea: {} };
+const IDEA_ARG = { '01': ['gblend=1', ''], '02': ['', 'trans=0'], '04': ['', 'fnorm=card'], '05': ['', 'wrap=0'] };   // [入のときの引数, 切のときの引数]
+const IDEA_NAME = { '01': '01 地面と草の色', '02': '02 葉の透け', '04': '04 球状の法線', '05': '05 回り込む光', c: '色と明暗（L23）' };
+const IDEA_DEFAULT = { '01': false, '02': true, '04': true, '05': true };   // L22 の既定
+const ideaArgs = (v) => v.ideaArgs || IDEA_ARG;
+const resetIdeas = (k) => { state.idea = { ...(VERSIONS[k].ideaDefault || IDEA_DEFAULT) }; };
+function extraFor(k) {
+  const v = VERSIONS[k]; if (!v.ideas01) return v.extra;
+  return Object.entries(state.idea).map(([n, on]) => ideaArgs(v)[n][on ? 0 : 1]).filter(Boolean).join('&');
+}
+let api = null, frameWin = null;
+
+function chips(el, items, key, onPick, render) {
+  el.innerHTML = '';
+  for (const [k, v] of Object.entries(items)) {
+    const b = document.createElement('button'); b.id = `${key}-${k}`; b.dataset.k = k;
+    b.innerHTML = render ? render(k, v) : v; b.setAttribute('aria-pressed', String(state[key] === k));
+    b.addEventListener('click', () => { onPick(k); focusStage(); }); el.appendChild(b);
+  }
+}
+const mark = (key) => document.querySelectorAll(`[id^="${key}-"]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === state[key])));
+function focusStage() { try { $('stage').focus(); frameWin?.focus(); } catch (e) {} }
+
+function renderInfo() {
+  const v = VERSIONS[state.ver];
+  const li = (a) => a.map((x) => `<li>${x}</li>`).join('');
+  $('pane-ver').innerHTML = `
+    <p class="note">${v.restore}</p>
+    <h3>変更点</h3><ul>${li(v.changes)}</ul>
+    <h3>アイデア</h3><p>${v.ideas}</p>
+    <h3>確認状況</h3><p>${v.status}</p>
+    <h3>既知の問題</h3><ul>${li(v.issues)}</ul>
+    ${state.ver === 'L21g' || state.ver === 'L21f' ? '<p class="help">01 の見比べ方: エリア「道と野営地」、カメラ「足元」で、道の際の草の房の根元を「L21 修正」と「L21 修正 + 01」で切り替えて見ます。</p>' : ''}`;
+  const cls = { done: 'done', part: 'part', new: 'new', no: 'no' };
+  $('pane-ideas').innerHTML = `<p class="help"><span class="star">★</span> は優先して検証する項目（01・02・04・05）。入／切の比較は L22 の版で切り替えて見られます。状態は docs/world-art/rules/ideas.md と同じです。</p>
+    <table><tbody>${IDEAS.map(([n, pr, t, c, st, note]) => `<tr><td>${n}${pr ? ' <span class="star">★</span>' : ''}</td><td><b>${t}</b><br><span class="st ${cls[c]}">${st}</span> ${note}</td></tr>`).join('')}</tbody></table>`;
+}
+
+const loadingEl = $('loading');
+window.__cmpProgress = (t, err) => {
+  if (t) { loadingEl.hidden = false; loadingEl.textContent = t; loadingEl.classList.toggle('err', !!err); }
+  else loadingEl.hidden = true;
+};
+
+function applyCam() {
+  if (!api) return;
+  if (state.cam === 'game' && state.gameCam) api.setCam(state.gameCam.dist, state.gameCam.pitch, state.gameCam.fov);
+  else if (CAM_SET[state.cam]) api.setCam(CAM_SET[state.cam][0], CAM_SET[state.cam][1]);
+  else if (state.cam === 'free' && state.free) api.setCam(state.free.dist, state.free.pitch);
+}
+// ピンチ・ホイールでズームしたら、その距離を覚えて版を替えても保つ（カメラの選択は外れる）
+window.__cmpZoomed = (dist, pitch) => { state.cam = 'free'; state.free = { dist, pitch }; mark('cam'); };
+window.__cmpOnReady = (a, w) => {
+  api = a; frameWin = w;
+  api.setView(MAPS[state.map].areas ? state.area : 'cam');   // この版のそのエリアのカメラと光（エリアのない地図は地図のカメラ）
+  const p0 = api.pose(); state.gameCam = { dist: p0.dist, pitch: p0.pitch, fov: p0.fov };
+  if (state.pose) { api.moveTo(state.pose.x, state.pose.z); api.setYaw(state.pose.yaw); }
+  applyCam(); focusStage();
+};
+function loadVersion(k) {
+  const v = VERSIONS[k];
+  try { if (api) state.pose = api.pose(); } catch (e) {}
+  api = null; frameWin = null;
+  window.__cmpConfig = { module: v.module, data: v.data, extra: extraFor(k), map: v.mapName || v.map || 'mihon2' };
+  window.__cmpProgress(`${v.name} を読み込み中`);
+  const old = $('stage'); const f = document.createElement('iframe');
+  f.id = 'stage'; f.title = '3D の地図'; f.tabIndex = 0; f.src = 'view.html';
+  old.replaceWith(f);                          // 前の版の WebGL を手放してから次を作る
+}
+function pickVer(k) { if (k === state.ver && api) return; state.ver = k; resetIdeas(k); mark('ver'); renderInfo(); renderIdeas(); loadVersion(k); }
+function renderIdeas() {
+  const on = !!VERSIONS[state.ver].ideas01; $('ideas-grp').hidden = !on; const el = $('ideatg'); el.innerHTML = '';
+  for (const n of Object.keys(state.idea)) {
+    const b = document.createElement('button'); b.id = `idea-${n}`; b.setAttribute('aria-pressed', String(state.idea[n]));
+    b.textContent = `${IDEA_NAME[n]}：${state.idea[n] ? '入' : '切'}`;
+    b.addEventListener('click', () => { state.idea[n] = !state.idea[n]; renderIdeas(); loadVersion(state.ver); focusStage(); });
+    el.appendChild(b);
+  }
+}
+function pickArea(k) { state.area = k; mark('area'); state.pose = null; if (!api) return; api.setView(k); const p = api.pose(); state.gameCam = { dist: p.dist, pitch: p.pitch, fov: p.fov }; applyCam(); }
+function pickCam(k) { state.cam = k; mark('cam'); applyCam(); }
+
+function renderVers() {
+  chips($('vers'), Object.fromEntries(Object.entries(VERSIONS).filter(([, v]) => (v.map || 'mihon2') === state.map)), 'ver', pickVer, (k, v) => `${v.name}<small>${v.sub}</small>`);
+  const A = MAPS[state.map].areas; $('areas-grp').hidden = !A;
+  if (A) { if (!A[state.area]) state.area = Object.keys(A)[0]; chips($('areas'), A, 'area', pickArea); }
+}
+function pickMap(m) {
+  if (m === state.map) return;
+  state.map = m; mark('map'); state.pose = null; state.cam = 'game'; state.free = null; mark('cam');
+  api = null; frameWin = null;                 // 別の地図: 位置は持ち越さない
+  state.ver = null; renderVers(); pickVer(MAPS[m].def);
+}
+chips($('maps'), Object.fromEntries(Object.entries(MAPS).map(([k, v]) => [k, v.name])), 'map', pickMap);
+renderVers();
+chips($('cams'), CAMS, 'cam', pickCam);
+renderInfo(); renderIdeas();
+for (const [b, p] of [['tab-ver', 'pane-ver'], ['tab-ideas', 'pane-ideas']]) {
+  $(b).addEventListener('click', () => {
+    for (const [b2, p2] of [['tab-ver', 'pane-ver'], ['tab-ideas', 'pane-ideas']]) { $(b2).setAttribute('aria-selected', String(b2 === b)); $(p2).hidden = p2 !== p; }
+  });
+}
+for (const id of ['ctl']) {
+  $(`${id}-min`).addEventListener('click', () => { const el = $(id); el.classList.toggle('min'); $(`${id}-min`).textContent = el.classList.contains('min') ? 'ひらく' : 'たたむ'; });
+}
+// 親のページでキーを押しても歩けるように、地図の中へ渡す
+const send = (type, key) => { try { frameWin?.dispatchEvent(new KeyboardEvent(type, { key })); } catch (e) {} };
+addEventListener('keydown', (e) => { if (/^(w|a|s|d|q|e|arrow)/i.test(e.key)) send('keydown', e.key); });
+addEventListener('keyup', (e) => { if (/^(w|a|s|d|q|e|arrow)/i.test(e.key)) send('keyup', e.key); });
+// 仮想スティック: 中心からのずれを半径で割って -1〜1。中心の 12% は遊び。地図の中の window.__stick に渡す
+const stick = $('stick'), knob = $('knob'); const R = innerWidth <= 760 ? 40 : 48; let stickId = null;
+function setStick(x, y) {
+  knob.style.transform = `translate(${x * R}px, ${y * R}px)`;
+  const m = Math.hypot(x, y), v = m < 0.12 ? { x: 0, y: 0 } : { x, y };
+  try { if (frameWin) frameWin.__stick = v; } catch (e) {}
+}
+function stickAt(e) {
+  const r = stick.getBoundingClientRect();
+  let x = (e.clientX - (r.left + r.width / 2)) / R, y = (e.clientY - (r.top + r.height / 2)) / R;
+  const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+  setStick(x, y);
+}
+stick.addEventListener('pointerdown', (e) => { e.preventDefault(); stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stick.classList.add('on'); stickAt(e); });
+stick.addEventListener('pointermove', (e) => { if (e.pointerId === stickId) stickAt(e); });
+for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(t, (e) => { if (e.pointerId !== stickId) return; stickId = null; stick.classList.remove('on'); setStick(0, 0); });
+document.querySelectorAll('.turn button').forEach((b) => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); send('keydown', k); });
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(t, () => send('keyup', k));
+});
+setInterval(() => {
+  if (!api) return;
+  try { state.pose = api.pose(); $('pose').textContent = `x ${state.pose.x.toFixed(1)}  z ${state.pose.z.toFixed(1)}  向き ${Math.round(state.pose.yaw)}°  距離 ${state.pose.dist.toFixed(0)}m`; } catch (e) {}
+}, 250);
+if (innerWidth < 600) { $('ctl').classList.add('min'); $('ctl-min').textContent = 'ひらく'; }   // スマホは地図を広く（板は「ひらく」で出す）
+resetIdeas(state.ver); renderIdeas();
+loadVersion(state.ver);
+</script>

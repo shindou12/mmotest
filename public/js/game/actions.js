@@ -5,7 +5,7 @@ import { BALANCE } from '../../shared/balance.js';
 import { MAX_LEVEL, RARITIES, WEAPONS, xpToNext } from '../../shared/data.js';
 import { collide } from '../../shared/areas.js';
 import { HEAVY, TREE_SKILLS } from '../skills.js';
-import { angDiff, now, degToRad } from './util.js';
+import { angDiff, now, degToRad, clamp } from './util.js';
 import { fxCall, fxReduce, fxSome } from './weapon-fx.js';
 import { link, rules, screen, state, stats, view } from './ports.js';
 
@@ -60,9 +60,12 @@ export function buildCombat() {
         if (along > -0.6 && along < len + 0.6 && side < w / 2 + 0.6) rules.reviveHit(p, o);
       }
     },
+    // o.reach: 円を o.a の向きへ reach だけ引き伸ばす（横幅は r のまま、縦にだけ長い当たり）
     circle(x, z, r, mult, o = {}) {
-      for (const mb of [...state.mobs.values()]) if (mb !== o.skip && Math.hypot(mb.x - x, mb.z - z) < r + mb.rad) rules.dealDamage(mb, mult, o);
-      for (const p of rules.downedAllies()) if (Math.hypot(p.x - x, p.z - z) < r + 0.6) rules.reviveHit(p, o);
+      const reach = o.reach || 0, a = o.a ?? state.me.a, fx_ = Math.sin(a), fz = Math.cos(a);
+      const dist = (px, pz) => { const dx = px - x, dz = pz - z, t = clamp(dx * fx_ + dz * fz, 0, reach); return Math.hypot(dx - fx_ * t, dz - fz * t); };
+      for (const mb of [...state.mobs.values()]) if (mb !== o.skip && dist(mb.x, mb.z) < r + mb.rad) rules.dealDamage(mb, mult, o);
+      for (const p of rules.downedAllies()) if (dist(p.x, p.z) < r + 0.6) rules.reviveHit(p, o);
     },
     proj(o) {
       const color = o.color ?? RARITIES[stats.S.wr].color;
@@ -122,7 +125,7 @@ export function canAct() { return stats.S && !state.me.dead && !state.me.crawl &
 
 // 攻撃を始めるとき、盾槍のガードボーナスをこの攻撃に乗せる
 export function startAttack() {
-  state.me.motion = '';state.me.motionT = 0;
+  state.me.motion = '';state.me.motionT = 0;state.me.heavySwing = false;
   state.me.atkBonus = state.me.nextAtkBonus; state.me.atkBonusT = now() + 0.7; state.me.nextAtkBonus = 1;
 }
 
@@ -168,7 +171,7 @@ export function doHeavy(lv) {
   fxCall('beforeHeavy'); // 報復者 など
   rules.wtHeavy(lv);
   state.me.a = rules.aimAngle();
-  state.me.swingT = 0; state.me.swingDur = 0.5; state.me.combo = 2; state.me.sw++;
+  state.me.swingT = 0; state.me.swingDur = 0.5; state.me.combo = 2; state.me.sw++; state.me.heavySwing = true; // 強攻撃の振り（大剣は溜めの振りかぶりから振り下ろす）
   view.audio.sfx('heavy');
   view.fx.flash(state.me.x, 1.5, state.me.z, RARITIES[stats.S.wr].color, lv === 2 ? 30 : 15, 0.3);
   const counter = state.me.counterFire;

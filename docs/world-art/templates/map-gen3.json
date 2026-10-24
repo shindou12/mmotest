@@ -1,0 +1,255 @@
+{
+ "name": "NEW_MAP",
+ "note": "第 3 世代の規則の地図の雛形（docs/world-art/rulebook.md、L23 の光と色）。public/worldart/maps/<名>.json に複製し、name・地形・道・区域を書き換える。光・階調・仕上げ・地面の色は規則なのでそのまま使う。",
+ "seed": 1,
+ "aspect": 1.7778,
+ "camera": {
+  "target": [
+   0,
+   0,
+   0
+  ],
+  "yaw": 0,
+  "pitch": 45,
+  "dist": 33,
+  "fov": 18
+ },
+ "sun": {
+  "azimuth": 70,
+  "elevation": 40,
+  "color": "#fff0d4",
+  "intensity": 4.0
+ },
+ "sky": {
+  "color": "#cfe0ee",
+  "light": "#a9bfdc",
+  "ground": "#6f7468",
+  "intensity": 1.6
+ },
+ "tone": "linear",
+ "albedoSat": 0.9,
+ "shadowMap": "vsm",
+ "shadowRadius": 6,
+ "foliage": {
+  "wrap": 0.5,
+  "trans": 0.0,
+  "receiveShadow": true,
+  "sat": 0.95,
+  "lift": 0.0,
+  "tint": [
+   1.18,
+   1.0,
+   0.76
+  ],
+  "groundBlend": true
+ },
+ "post": {
+  "msaa": 4,
+  "exposure": 1.25,
+  "sat": 0.92,
+  "contrast": 1.0,
+  "lift": [
+   0,
+   0,
+   0
+  ],
+  "gain": [
+   1,
+   1,
+   1
+  ],
+  "dof": 1.0
+ },
+ "ground": {
+  "grassTint": [
+   2.15,
+   1.6,
+   0.5
+  ],
+  "lushBias": 0.12,
+  "dirtTint": [
+   0.92,
+   1.0,
+   0.42
+  ],
+  "rockTint": [
+   0.92,
+   0.94,
+   0.78
+  ],
+  "rock": "face",
+  "rockPix": true,
+  "lushTint": [
+   0.55,
+   0.92,
+   0.95
+  ],
+  "lushAmt": 1.3,
+  "tuftTint": [
+   1.12,
+   1.05,
+   0.8
+  ]
+ },
+ "terrain": {
+  "size": 110,
+  "cell": 0.5,
+  "ground": "grass",
+  "hills": {
+   "amp": 0.3,
+   "scale": 16
+  },
+  "cliffs": [
+   {
+    "screen": [
+     [
+      -0.3,
+      0.12
+     ],
+     [
+      0.3,
+      0.06
+     ],
+     [
+      0.55,
+      -0.2
+     ]
+    ],
+    "low": "near",
+    "drop": 2.5,
+    "width": 1.6,
+    "jag": 0.8,
+    "raise": true,
+    "radius": 14,
+    "relief": 0.4
+   }
+  ]
+ },
+ "paths": [
+  {
+   "screen": [
+    [
+     0.45,
+     1.2
+    ],
+    [
+     0.5,
+     0.7
+    ],
+    [
+     0.62,
+     0.4
+    ],
+    [
+     0.7,
+     -0.1
+    ]
+   ],
+   "width": 2.5,
+   "mat": "dirt",
+   "soft": 0.7
+  }
+ ],
+ "zones": [
+  {
+   "kind": "forest",
+   "screen": [
+    [
+     0.8,
+     -0.3
+    ],
+    [
+     1.5,
+     -0.3
+    ],
+    [
+     1.5,
+     1.5
+    ],
+    [
+     0.85,
+     1.5
+    ]
+   ],
+   "trees": [
+    "maple2_s",
+    "maple2_t",
+    "fir2_a"
+   ],
+   "spacing": 3.2,
+   "scale": [
+    0.9,
+    1.05
+   ]
+  }
+ ],
+ "groves": [
+  {
+   "space": "screen",
+   "centers": [
+    [
+     0.1,
+     0.25
+    ],
+    [
+     0.15,
+     0.9
+    ]
+   ],
+   "trees": [
+    "maple2_s",
+    "maple2_t",
+    "palm2_b"
+   ],
+   "count": [
+    2,
+    4
+   ],
+   "radius": 2.3,
+   "scale": [
+    0.9,
+    1.05
+   ]
+  }
+ ],
+ "trees": [],
+ "props": [],
+ "scatter": {
+  "grass": {
+   "asset": "grass_a",
+   "spacing": 0.36,
+   "edge_boost": 0.5,
+   "scale": [
+    0.5,
+    0.85
+   ]
+  },
+  "tall": {
+   "asset": "grass_tall_a",
+   "spacing": 0.6,
+   "edge": 0.6,
+   "prob": 0.9,
+   "scale": [
+    0.8,
+    1.3
+   ]
+  },
+  "bush": {
+   "asset": "clover_a",
+   "edge": [
+    1.0,
+    3.5
+   ],
+   "prob": 0.35,
+   "scale": [
+    0.8,
+    1.2
+   ]
+  },
+  "flowers": {
+   "asset": "flowers_a",
+   "spacing": 1.3,
+   "prob": 0.5
+  }
+ }
+}

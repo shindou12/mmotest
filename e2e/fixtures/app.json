@@ -46,28 +46,28 @@
   "errors": []
  },
  "dom/town": {
-  "hash": "1119a752ba9a2e1058240031",
-  "size": 11926
+  "hash": "4cb480c64724f963322c984f",
+  "size": 12171
  },
  "dom/inventory": {
-  "hash": "96600d23be44e1f689513a12",
-  "size": 13547
+  "hash": "0fa2cbaad1662302ffb98836",
+  "size": 13792
  },
  "dom/tree": {
-  "hash": "4fe642ac4f20feb87c945d19",
-  "size": 24800
+  "hash": "616de8cf2ec35fea2e56bad2",
+  "size": 25045
  },
  "dom/map": {
-  "hash": "f40ccf85f499c6a2f05cff51",
-  "size": 24819
+  "hash": "9bc18fdf884c10a8f1ee0e0e",
+  "size": 25064
  },
  "dom/settings": {
-  "hash": "fd71486566fe826235efb718",
-  "size": 24847
+  "hash": "0cef51a095265a96402dd4b0",
+  "size": 25092
  },
  "dom/closed": {
-  "hash": "03b2b4c8adf2d8a5d64db8c0",
-  "size": 24854
+  "hash": "7a4353194a50fe83a2550bf6",
+  "size": 25099
  },
  "run": {
   "area": "f1_field",
@@ -108,8 +108,8 @@
   "lv": 1
  },
  "dom/after-run": {
-  "hash": "5772ba5c850075b6859da760",
-  "size": 24937
+  "hash": "a6c10b46b633b2f162b4e768",
+  "size": 25182
  },
  "errors": []
 }

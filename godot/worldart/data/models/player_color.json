@@ -1,0 +1,41 @@
+{
+ "base": "#448a9b",
+ "roles": {
+  "cloth": {
+   "name": "player_color",
+   "a": "player",
+   "b": 2373963,
+   "t": 0.32
+  },
+  "clothD": {
+   "name": "player_color_clothD",
+   "a": "player",
+   "b": 1581870,
+   "t": 0.7
+  },
+  "coat": {
+   "name": "player_color_coat",
+   "a": "player",
+   "b": 1055270,
+   "t": 0.62
+  },
+  "hair": {
+   "name": "player_color_hair",
+   "a": 1516333,
+   "b": "player",
+   "t": 0.12
+  },
+  "armor_cloth": {
+   "name": "player_color_armor_cloth",
+   "a": "player",
+   "b": 2763322,
+   "t": 0.35
+  },
+  "armor_dark": {
+   "name": "player_color_armor_dark",
+   "a": "player",
+   "b": 1052696,
+   "t": 0.7
+  }
+ }
+}

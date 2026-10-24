@@ -1,0 +1,56 @@
+{
+ "1": {
+  "name": "フード",
+  "hide": {
+   "baseGear": false,
+   "shoulders": false,
+   "hair": true,
+   "cape": false
+  }
+ },
+ "2": {
+  "name": "忍びの襟巻き",
+  "hide": {
+   "baseGear": false,
+   "shoulders": false,
+   "hair": false,
+   "cape": false
+  }
+ },
+ "3": {
+  "name": "革の肩当てとマント",
+  "hide": {
+   "baseGear": false,
+   "shoulders": true,
+   "hair": false,
+   "cape": true
+  }
+ },
+ "4": {
+  "name": "鎖頭巾",
+  "hide": {
+   "baseGear": true,
+   "shoulders": false,
+   "hair": true,
+   "cape": false
+  }
+ },
+ "5": {
+  "name": "騎士の兜と大肩当て",
+  "hide": {
+   "baseGear": true,
+   "shoulders": true,
+   "hair": true,
+   "cape": false
+  }
+ },
+ "6": {
+  "name": "角兜と重マント",
+  "hide": {
+   "baseGear": true,
+   "shoulders": true,
+   "hair": true,
+   "cape": true
+  }
+ }
+}

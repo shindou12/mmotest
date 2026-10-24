@@ -1,0 +1,139 @@
+<title>見本くらべ L27</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 画面いっぱいに 2 枚を並べ、上に版と見本の切り替え、下に点数とメモ。画像が主役なので暗い無彩色に固定 */
+:root {
+  --bg: #121412; --panel: #1c1f1c; --line: #2e332e; --fg: #e4e7e1; --dim: #8d958a; --accent: #c9e27a;
+  --ui: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--ui); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 24px; display: grid; gap: 12px; }
+.bar { display: flex; gap: 8px; align-items: center; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: inherit; font-size: 13px; color: var(--dim); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer; }
+button[aria-pressed="true"] { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select, input[type="text"] { font: inherit; font-size: 14px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-width: 0; max-width: 100%; }
+.bar select { flex: 1 1 auto; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+@media (max-width: 900px), (orientation: portrait) { .pair { grid-template-columns: 1fr; gap: 10px; } }
+.pair figure { margin: 0; min-width: 0; }
+.pair img { display: block; width: 100%; height: auto; aspect-ratio: 1400 / 794; background: var(--panel); border-radius: 4px;
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: none; cursor: pointer;
+  outline: 2px solid transparent; outline-offset: -2px; transition: outline-color .08s; }
+.pair img.on { outline-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .pair img { transition: none; } }
+.score { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.score button { padding: 8px 0; font-variant-numeric: tabular-nums; }
+.memo { display: flex; gap: 8px; }
+.memo input { flex: 1 1 auto; }
+#out { width: 100%; min-height: 8em; font: 13px/1.5 ui-monospace, Consolas, monospace; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; box-sizing: border-box; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500&display=swap">
+
+<div class="wrap">
+  <div class="bar">
+    <select id="vers" aria-label="版"></select>
+    <div class="group" id="views"></div>
+  </div>
+  <div class="pair">
+    <figure><img id="ref" alt="見本" draggable="false" tabindex="0"></figure>
+    <figure><img id="cur" alt="現在" draggable="false" tabindex="0"></figure>
+  </div>
+  <div class="score" id="score" role="group" aria-label="点数"></div>
+  <div class="memo">
+    <input type="text" id="note" placeholder="メモ" aria-label="メモ">
+    <button id="copy">コピー</button>
+  </div>
+  <textarea id="out" readonly hidden aria-label="評価の一覧"></textarea>
+</div>
+
+<script>
+// [版, 名前, 比べる現在の撮影]（後の版は点描抜きを切って撮ったので、同じ条件の現在と比べる）
+const VERSIONS = [
+  ['srad24', '影の縁 ぼかし大', 'base9'],
+  ['srad12', '影の縁 ぼかし中', 'base9'],
+  ['k3', '影の縁 大 + 境を広げる', 'base9'],
+  ...['S', 'M', 'L'].flatMap((c) => ['s', 'm', 'l'].map((b) => [`xc${c}_b${b}`,
+    `色 ${{ S: '小', M: '中', L: '大' }[c]} × ベイク ${{ s: '小', m: '中', l: '大' }[b]}`, 'base8'])),
+  ['vsoft', '色 中だけ', 'base6'],
+  ['bake5', 'ベイク 中だけ', 'base3'],
+];
+const VIEWS = ['B01', 'B03'];
+const baseOf = (k) => (VERSIONS.find((x) => x[0] === k) || VERSIONS[0])[2];
+const nameOf = (k) => (VERSIONS.find((x) => x[0] === k) || VERSIONS[0])[1];
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+let ver = store.get('ver', VERSIONS[0][0]), view = store.get('view', VIEWS[0]);
+if (!VERSIONS.some(([k]) => k === ver)) ver = VERSIONS[0][0];
+let evals = {}; try { evals = JSON.parse(store.get('evals', '{}')) || {}; } catch (e) { evals = {}; }
+const key = () => `${ver}|${view}`;
+const saveEvals = () => store.set('evals', JSON.stringify(evals));
+
+const $ = (id) => document.getElementById(id);
+const src = (k, v) => `img/${k}_${v}.webp`;
+for (const [k] of VERSIONS) for (const v of VIEWS) new Image().src = src(k, v);   // 押したときにちらつかないよう先に読む
+for (const v of VIEWS) for (const b of ['ref', 'base', 'base2', 'base3', 'base4', 'base5', 'base6', 'base8', 'base9']) new Image().src = src(b, v);
+
+const held = { ref: false, cur: false };
+function show() {
+  $('ref').src = src(held.ref ? ver : 'ref', view);
+  $('cur').src = src(held.cur ? ver : baseOf(ver), view);
+  $('ref').classList.toggle('on', held.ref);
+  $('cur').classList.toggle('on', held.cur);
+}
+function render() {
+  const sel = $('vers');
+  if (!sel.options.length) {
+    for (const [k, l] of VERSIONS) sel.add(new Option(l, k));
+    sel.onchange = () => { ver = sel.value; store.set('ver', ver); render(); };
+  }
+  sel.value = ver;
+  const vb = $('views'); vb.innerHTML = '';
+  for (const v of VIEWS) {
+    const b = document.createElement('button'); b.textContent = v; b.setAttribute('aria-pressed', String(v === view));
+    b.onclick = () => { view = v; store.set('view', v); render(); }; vb.appendChild(b);
+  }
+  const e = evals[key()] || {};
+  const sc = $('score'); sc.innerHTML = '';
+  for (let n = 1; n <= 10; n++) {
+    const b = document.createElement('button'); b.textContent = n; b.setAttribute('aria-pressed', String(e.s === n));
+    b.onclick = () => { const cur = evals[key()] || {}; cur.s = cur.s === n ? undefined : n; evals[key()] = cur; saveEvals(); render(); };
+    sc.appendChild(b);
+  }
+  $('note').value = e.m || '';
+  show();
+}
+$('note').addEventListener('input', () => { const cur = evals[key()] || {}; cur.m = $('note').value; evals[key()] = cur; saveEvals(); });
+
+function report() {
+  const lines = ['L27 見本くらべの評価（10 段階）'];
+  for (const [k, l] of VERSIONS) for (const v of VIEWS) {
+    const e = evals[`${k}|${v}`]; if (!e || (!e.s && !e.m)) continue;
+    lines.push(`${l} ${v}: ${e.s ?? '-'}${e.m ? ' ' + e.m : ''}`);
+  }
+  return lines.join('\n');
+}
+$('copy').addEventListener('click', () => {
+  const text = report(); const out = $('out'); out.value = text;
+  const fallback = () => { out.hidden = false; out.focus(); out.select(); $('copy').textContent = '選択しました'; };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(() => { out.hidden = true; $('copy').textContent = 'コピーしました'; setTimeout(() => { $('copy').textContent = 'コピー'; }, 1500); }, fallback);
+  else fallback();
+});
+
+for (const id of ['ref', 'cur']) {
+  const el = $(id);
+  const down = (ev) => { ev.preventDefault(); held[id] = true; show(); };
+  const up = () => { if (held[id]) { held[id] = false; show(); } };
+  el.addEventListener('pointerdown', (ev) => { el.setPointerCapture?.(ev.pointerId); down(ev); });
+  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, up);
+  el.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  el.addEventListener('keydown', (ev) => { if ((ev.key === ' ' || ev.key === 'Enter') && !held[id]) down(ev); });
+  el.addEventListener('keyup', (ev) => { if (ev.key === ' ' || ev.key === 'Enter') up(); });
+  window.addEventListener('blur', up);
+}
+render();
+</script>

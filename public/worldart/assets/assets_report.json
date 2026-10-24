@@ -1,0 +1,1157 @@
+[
+ {
+  "name": "tree_broad_a",
+  "tris": 714,
+  "size": [
+   5.56,
+   5.96,
+   6.16
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_broad"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "tree_broad_b",
+  "tris": 690,
+  "size": [
+   6.06,
+   7.28,
+   6.89
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_broad"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "pine_a",
+  "tris": 932,
+  "size": [
+   5.22,
+   5.31,
+   6.84
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_frond"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "pine_b",
+  "tris": 932,
+  "size": [
+   6.12,
+   6.2,
+   8.24
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_frond"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "bush_a",
+  "tris": 84,
+  "size": [
+   2.66,
+   2.82,
+   2.38
+  ],
+  "zmin": -0.65,
+  "mats": [
+   "leaf_broad"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm_a",
+  "tris": 186,
+  "size": [
+   3.2,
+   2.9,
+   5.61
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm_b",
+  "tris": 186,
+  "size": [
+   3.11,
+   3.41,
+   6.41
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "tree_broad_y",
+  "tris": 636,
+  "size": [
+   6.2,
+   6.19,
+   6.83
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_broad"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "grass_a",
+  "tris": 10,
+  "size": [
+   0.72,
+   0.71,
+   0.41
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "grass"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "flowers_a",
+  "tris": 4,
+  "size": [
+   0.86,
+   0.86,
+   0.28
+  ],
+  "zmin": -0.06,
+  "mats": [
+   "leaf_flower"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "rock_a",
+  "tris": 56,
+  "size": [
+   1.23,
+   1.18,
+   0.65
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "rock"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "rock_b",
+  "tris": 44,
+  "size": [
+   2.55,
+   1.85,
+   1.21
+  ],
+  "zmin": -0.17,
+  "mats": [
+   "rock"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "rock_c",
+  "tris": 64,
+  "size": [
+   0.49,
+   0.42,
+   0.24
+  ],
+  "zmin": -0.04,
+  "mats": [
+   "rock"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fence_spike",
+  "tris": 406,
+  "size": [
+   2.63,
+   3.22,
+   1.9
+  ],
+  "zmin": 0.05,
+  "mats": [
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "crate",
+  "tris": 108,
+  "size": [
+   0.8,
+   0.8,
+   0.8
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple_a",
+  "tris": 378,
+  "size": [
+   4.93,
+   4.25,
+   5.29
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple_b",
+  "tris": 376,
+  "size": [
+   4.89,
+   4.63,
+   5.88
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple_c",
+  "tris": 376,
+  "size": [
+   4.15,
+   4.39,
+   4.71
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir2_a",
+  "tris": 910,
+  "size": [
+   3.22,
+   3.23,
+   7.14
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_firfrond"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir3_a",
+  "tris": 1332,
+  "size": [
+   3.96,
+   3.97,
+   6.81
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir3"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir3_b",
+  "tris": 1464,
+  "size": [
+   4.37,
+   4.37,
+   7.87
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir3"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "rock_s",
+  "tris": 320,
+  "size": [
+   0.57,
+   0.52,
+   0.21
+  ],
+  "zmin": -0.02,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir2_b",
+  "tris": 910,
+  "size": [
+   3.64,
+   3.64,
+   8.04
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_firfrond"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm2_a",
+  "tris": 246,
+  "size": [
+   2.44,
+   2.34,
+   3.59
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm2"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm2_b",
+  "tris": 246,
+  "size": [
+   2.6,
+   2.69,
+   4.23
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm2"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "clover_a",
+  "tris": 64,
+  "size": [
+   2.05,
+   1.99,
+   0.95
+  ],
+  "zmin": -0.35,
+  "mats": [
+   "leaf_clover"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "clover_b",
+  "tris": 64,
+  "size": [
+   2.55,
+   2.51,
+   1.03
+  ],
+  "zmin": -0.32,
+  "mats": [
+   "leaf_clover"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "grass_tall_a",
+  "tris": 10,
+  "size": [
+   0.66,
+   0.71,
+   0.56
+  ],
+  "zmin": -0.0,
+  "mats": [
+   "grass_tall"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cliff_rock_a",
+  "tris": 1280,
+  "size": [
+   2.82,
+   2.08,
+   1.5
+  ],
+  "zmin": -0.17,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cliff_rock_b",
+  "tris": 1280,
+  "size": [
+   3.84,
+   2.56,
+   1.95
+  ],
+  "zmin": -0.23,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "boulder_a",
+  "tris": 320,
+  "size": [
+   1.38,
+   1.14,
+   0.58
+  ],
+  "zmin": -0.07,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cliff_col_a",
+  "tris": 1280,
+  "size": [
+   1.53,
+   1.16,
+   3.51
+  ],
+  "zmin": -0.34,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cliff_col_b",
+  "tris": 1280,
+  "size": [
+   1.2,
+   0.97,
+   3.22
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "teepee",
+  "tris": 95,
+  "size": [
+   3.89,
+   3.89,
+   3.88
+  ],
+  "zmin": -0.02,
+  "mats": [
+   "canvas_beige",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "teepee2",
+  "tris": 513,
+  "size": [
+   7.93,
+   7.93,
+   3.33
+  ],
+  "zmin": -0.03,
+  "mats": [
+   "canvas_hide",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "slab_a",
+  "tris": 76,
+  "size": [
+   1.71,
+   1.22,
+   0.66
+  ],
+  "zmin": -0.09,
+  "mats": [
+   "rock"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "slab_b",
+  "tris": 76,
+  "size": [
+   1.37,
+   1.17,
+   0.6
+  ],
+  "zmin": -0.08,
+  "mats": [
+   "rock"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "tarp_tent",
+  "tris": 196,
+  "size": [
+   4.26,
+   3.56,
+   1.76
+  ],
+  "zmin": -0.06,
+  "mats": [
+   "crate",
+   "canvas_blue",
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "barrel",
+  "tris": 156,
+  "size": [
+   0.76,
+   0.76,
+   0.9
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cart_frame",
+  "tris": 204,
+  "size": [
+   1.92,
+   1.37,
+   0.96
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "stump",
+  "tris": 70,
+  "size": [
+   1.33,
+   1.26,
+   0.65
+  ],
+  "zmin": -0.08,
+  "mats": [
+   "bark",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "lavender",
+  "tris": 12,
+  "size": [
+   0.77,
+   0.76,
+   0.74
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "leaf_lavender"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "stone_steps",
+  "tris": 168,
+  "size": [
+   2.82,
+   4.05,
+   2.29
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "flagstone",
+   "stone"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "statue",
+  "tris": 11932,
+  "size": [
+   1.86,
+   1.98,
+   3.42
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "stone",
+   "stone_meander",
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "statue2",
+  "tris": 20620,
+  "size": [
+   2.03,
+   1.75,
+   3.76
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "stone",
+   "stone_meander",
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "stone_lantern",
+  "tris": 68,
+  "size": [
+   0.84,
+   0.84,
+   2.02
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "stone"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "curb",
+  "tris": 12,
+  "size": [
+   0.3,
+   3.0,
+   0.35
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "stone"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "rail_fence",
+  "tris": 48,
+  "size": [
+   0.12,
+   3.0,
+   1.1
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "temple_wall",
+  "tris": 72,
+  "size": [
+   0.72,
+   6.0,
+   3.95
+  ],
+  "zmin": -0.1,
+  "mats": [
+   "stone",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple_big",
+  "tris": 378,
+  "size": [
+   5.3,
+   5.88,
+   7.9
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_clump"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_a",
+  "tris": 486,
+  "size": [
+   4.18,
+   3.98,
+   6.37
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_b",
+  "tris": 488,
+  "size": [
+   4.36,
+   4.45,
+   7.45
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_c",
+  "tris": 398,
+  "size": [
+   3.59,
+   3.48,
+   5.54
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_big",
+  "tris": 582,
+  "size": [
+   5.22,
+   5.13,
+   8.67
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_s",
+  "tris": 716,
+  "size": [
+   3.25,
+   3.61,
+   5.01
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "maple2_t",
+  "tris": 708,
+  "size": [
+   3.63,
+   3.82,
+   5.64
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_plate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "palm2_low",
+  "tris": 246,
+  "size": [
+   1.79,
+   1.78,
+   0.87
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_palm2"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "house_a",
+  "tris": 74,
+  "size": [
+   7.9,
+   6.1,
+   8.5
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "stone",
+   "plaster",
+   "roof",
+   "window",
+   "crate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "house_b",
+  "tris": 74,
+  "size": [
+   9.9,
+   6.6,
+   9.7
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "stone",
+   "plaster",
+   "roof",
+   "window",
+   "crate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "lamp",
+  "tris": 52,
+  "size": [
+   0.8,
+   0.8,
+   4.15
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "banner_pole",
+  "tris": 32,
+  "size": [
+   0.14,
+   1.02,
+   4.4
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "wood",
+   "banner"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "bench",
+  "tris": 72,
+  "size": [
+   2.0,
+   0.56,
+   0.95
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate",
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "planter",
+  "tris": 42,
+  "size": [
+   2.4,
+   2.4,
+   0.8
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "stone",
+   "soil"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "chest_s",
+  "tris": 112,
+  "size": [
+   0.9,
+   0.65,
+   0.61
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate",
+   "wood",
+   "stone",
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "waystone",
+  "tris": 84,
+  "size": [
+   2.9,
+   2.51,
+   2.95
+  ],
+  "zmin": -0.2,
+  "mats": [
+   "flagstone",
+   "stone",
+   "paint"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "signpost",
+  "tris": 64,
+  "size": [
+   1.59,
+   1.93,
+   2.77
+  ],
+  "zmin": -0.25,
+  "mats": [
+   "wood",
+   "crate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "waygate",
+  "tris": 300,
+  "size": [
+   5.73,
+   0.77,
+   3.89
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "stone",
+   "wood",
+   "crate"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "log_fallen",
+  "tris": 156,
+  "size": [
+   3.43,
+   0.7,
+   0.99
+  ],
+  "zmin": -0.07,
+  "mats": [
+   "bark",
+   "wood"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "outcrop_a",
+  "tris": 1280,
+  "size": [
+   6.36,
+   5.58,
+   2.46
+  ],
+  "zmin": -0.29,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "outcrop_b",
+  "tris": 1280,
+  "size": [
+   2.97,
+   2.62,
+   1.47
+  ],
+  "zmin": -0.18,
+  "mats": [
+   "rock_crack"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_a",
+  "tris": 1058,
+  "size": [
+   3.74,
+   3.79,
+   7.06
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_b",
+  "tris": 1180,
+  "size": [
+   4.67,
+   5.47,
+   8.15
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_c",
+  "tris": 896,
+  "size": [
+   3.65,
+   4.08,
+   6.21
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_d",
+  "tris": 1148,
+  "size": [
+   3.66,
+   4.63,
+   7.64
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "fir4_e",
+  "tris": 838,
+  "size": [
+   4.35,
+   5.15,
+   5.68
+  ],
+  "zmin": -0.3,
+  "mats": [
+   "bark",
+   "leaf_fir4"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "crate2",
+  "tris": 584,
+  "size": [
+   0.8,
+   0.8,
+   0.8
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate2"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "barrel2",
+  "tris": 304,
+  "size": [
+   0.76,
+   0.76,
+   0.9
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "wood2"
+  ],
+  "colors": 1
+ },
+ {
+  "name": "cart_frame2",
+  "tris": 6422,
+  "size": [
+   1.92,
+   1.37,
+   0.96
+  ],
+  "zmin": 0.0,
+  "mats": [
+   "crate2",
+   "wood2"
+  ],
+  "colors": 1
+ }
+]
