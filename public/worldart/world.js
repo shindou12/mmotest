@@ -10,6 +10,9 @@
 //     diffr=0.012                 にじみの半径（画面の高さに対する割合）
 //     diffm=mix|screen            にじみの混ぜ方（既定 mix）
 //     grass=0                     草の房を出さない
+//     gshell=12                   草のシェル層数（0 で切）
+//     gsh=0.18                    草の高さ（m）
+//     gsd=0.045                   草 1 本の間隔（m）
 //     fnorm=card                  葉の法線を板の向きにする（既定は Blender で入れた外向きの法線）
 //     shadow=0                    影を切る
 //     walk=1                      WASD / 矢印キーで注目点を動かし、カメラが付いていく
@@ -24,6 +27,9 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 const q = new URLSearchParams(location.search);
 const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
 const flag = (k, d = true) => (q.has(k) ? q.get(k) !== '0' : d);
+const GSHELL = Math.max(0, Math.floor(num('gshell', 0)));
+const GSH = Math.max(0, num('gsh', 0.18));
+const GSD = Math.max(0.001, num('gsd', 0.045));
 const MAP = q.get('map') || 'orc_meadow';
 const BASE = './';
 // 手前を抜く範囲（カメラ・注目点・半径）。placeCamera が更新する
@@ -191,9 +197,9 @@ if (GROUND_BAKE > 0) {
   } catch {}
 }
 const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
-function groundMaterial() {
+function groundMaterial(shell = null) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
-  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}`;
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}${shell ? ':shell-v1' : ''}`;
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
@@ -205,14 +211,21 @@ function groundMaterial() {
       // y: 0 = 水なし、1 = 第 2 世代（水際の砂を暗く）、2 = 水の規則 w1（水際の砂を明るく光らせる。見本 W01・W04）
       uWater: { value: new THREE.Vector2(spec.terrain.water?.level ?? 0, !spec.terrain.water ? 0 : num('wrule', spec.terrain.water.rule === 'w1' ? 1 : 0) > 0 ? 2 : 1) },
     });
+    if (shell) Object.assign(sh.uniforms, { uShellH: shell.h, uShellHeight: { value: GSH }, uShellSpacing: { value: GSD } });
     if (GROUND_EDGE_ON) Object.assign(sh.uniforms, GROUND_EDGE_UNIFORMS);
     if (GROUND_WIDE_ON) Object.assign(sh.uniforms, { tSplat: GB.tSplat, uST: GB.uST, uGWide: { value: GROUND_WIDE } });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vSplat = color;
+vW = (modelMatrix * vec4(position,1.0)).xyz;
+vWN = normalize(mat3(modelMatrix) * normal);
+${shell ? 'transformed += normal * uShellHeight * uShellH;' : ''}`)
+      .replace('#include <beginnormal_vertex>', shell ? '#include <beginnormal_vertex>\nobjectNormal = vec3(0.0, 1.0, 0.0);' : '#include <beginnormal_vertex>');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
+        ${shell ? 'uniform float uShellH, uShellHeight, uShellSpacing;' : ''}
         ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
 `)
@@ -251,6 +264,19 @@ function groundMaterial() {
         ${GROUND_EDGE_ON ? 'col = mix(col, uDryGrass, dryBand * uGDry);' : ''}
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);
+        ${shell ? `
+          float gw = (1.0 - wd) * (1.0 - wa) * (1.0 - wr);
+          vec2 cell = floor(wp / uShellSpacing);
+          vec2 local = fract(wp / uShellSpacing);
+          float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
+          float seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
+          vec2 center = vec2(0.18 + seed * 0.64, 0.18 + seed2 * 0.64);
+          float radius = 0.46 * (1.0 - 0.78 * uShellH);
+          float heightVar = mix(0.5, 1.0, texture2D(tNoise, wp / 2.0).r);
+          if (distance(local, center) > radius || gw * heightVar < uShellH) discard;
+          col *= mix(0.72, 1.0, uShellH);
+          col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, uShellH));
+        ` : ''}
         if (uWater.y > 1.5) {
           float hw = vW.y - uWater.x;
           float wet = smoothstep(0.16, 0.0, hw) * smoothstep(-0.12, 0.02, hw);   // 水の上の水際（≈0.5m の帯）だけ明るく
@@ -680,14 +706,25 @@ const gltf = new GLTFLoader();
 const load = (url) => new Promise((res, rej) => gltf.load(url, res, undefined, rej));
 
 const terrain = await load(`${BASE}maps/${MAP}/terrain.glb`);
+const terrainMeshes = [];
 terrain.scene.traverse((o) => {
   if (!o.isMesh) return;
   if (o.name.startsWith('water') || o.material.name === 'water') {
     o.material = waterMaterial(); o.receiveShadow = num('wshadow', WRULE ? 0 : 1) > 0;   // w1 は水面に影を受けない（透ける水面に VSM の影が縦の筋になった。見本でも水面に木の影はほぼ落ちない） o.renderOrder = 2;
   } else {
-    o.material = groundMaterial(); o.receiveShadow = true;
+    terrainMeshes.push(o);
   }
 });
+for (const o of terrainMeshes) {
+  o.material = groundMaterial(); o.receiveShadow = true;
+  if (GSHELL > 0) for (let i = 1; i <= GSHELL; i++) {
+    const layer = new THREE.Mesh(o.geometry, groundMaterial({ h: { value: i / GSHELL } }));
+    layer.name = `${o.name}_gshell_${i}`;
+    layer.position.copy(o.position); layer.quaternion.copy(o.quaternion); layer.scale.copy(o.scale);
+    layer.castShadow = false; layer.receiveShadow = true; layer.renderOrder = i;
+    o.parent.add(layer);
+  }
+}
 scene.add(terrain.scene);
 if ((GBLEND || GROUND_WIDE_ON) && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // アイデア01 と gwide: 地面の頂点色を絵に
 
