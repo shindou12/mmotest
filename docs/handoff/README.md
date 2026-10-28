@@ -5,6 +5,7 @@
 | 作業 | 目標 | 最新の引継ぎ | ブランチ |
 |---|---|---|---|
 | 大剣ブランチ全体を Godot へ | `docs/godot/goal.md` | `2026-10-22-g5-g7.md` | （引継ぎ文書を見る） |
-| ワールドマップのアートスタイルの研究（大剣とは別の作業） | `docs/world-art/rulebook.md`、記録は `docs/world-art/rules/ab-L27.md` | `2026-10-24-art-style.md`（Codex が主担当で続ける） | `claude/art-style-L27` |
+| ワールドマップのアートスタイルの研究（大剣とは別の作業） | `docs/world-art/rulebook.md`、記録は `docs/world-art/rules/ab-L27.md` | `2026-10-24-art-style.md`（Codex が主担当で続ける） | `claude/art-style-L29`（L29 の見直しと草のシェル。`docs/world-art/rules/review-L29.md`） |
+| 工程管理サイト Maestro（専用リポジトリ `shindou12/maestro` で作る） | `docs/handoff/2026-10-28-maestro.md` の 1・2 | `2026-10-28-maestro.md` | `shindou12/maestro`（種は mmotest の `claude/art-style-L29` の `maestro/`） |
 
 古い引継ぎ文書は記録として残す（日付の新しいものが優先）。
