@@ -1,0 +1,3 @@
+[build]
+  command = "node maestro/site/build.mjs"
+  publish = "maestro/dist"

@@ -1,4 +1,5 @@
 node_modules/
+maestro/dist/
 world-save.json
 
 world-save-coop-hard.json
