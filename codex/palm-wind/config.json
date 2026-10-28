@@ -1,0 +1,11 @@
+{
+  "period": 8,
+  "secondaryFrequency": 2,
+  "primaryWeight": 0.75,
+  "secondaryWeight": 0.25,
+  "secondaryPhase": 0.71,
+  "phaseDirection": [2.4, 3.1],
+  "bendRadians": 0.26,
+  "direction": [0.8, 0, 0.6],
+  "newLeafStiffness": 0.55
+}

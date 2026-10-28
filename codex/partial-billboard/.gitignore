@@ -1,0 +1,4 @@
+server.pid
+server*.log
+__pycache__/
+*.blend1

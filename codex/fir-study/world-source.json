@@ -1,0 +1,18 @@
+{
+  "source": "codex\\palm-coast\\world.generated.js",
+  "sha256": "bd6da9f049e615e178a39582bad1c176bf2f6cde243aa20de49e081e6c68b996",
+  "target": {
+    "asset": "fir4_c",
+    "index": 1
+  },
+  "hooks": [
+    "const assetNames = Object.keys(placed.assets)",
+    "await fetch('./layout.json')",
+    "const modelURL = coastPalm ?",
+    "if (coastPalm && im.customDepthMaterial) im.customDepthMaterial.side = THREE.DoubleSide;",
+    "window.__moveTo(-1.8, 3.7);",
+    "TY = state.view === 'near' ? 1.7 : 0;",
+    "camState.pitch = state.view === 'near' ? 40 : 85;",
+    "camState.dist = state.view === 'near' ? 19 : 29;"
+  ]
+}

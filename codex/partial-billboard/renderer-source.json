@@ -1,0 +1,11 @@
+{
+ "source": "public/worldart/world.js",
+ "sha256": "eaa8c8460a75a311dea6e457fc12d0c331bf7bed4906eaa957b73a92e6d92625",
+ "hooks": [
+  "const q = new URLSearchParams(location.search);",
+  "const BASE = './';",
+  "const g = await load(`${BASE}${q.get('adir') || 'assets'}/${loadName}.glb`);",
+  "    im.frustumCulled = false;"
+ ],
+ "renderCalls": 2
+}

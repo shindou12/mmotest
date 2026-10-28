@@ -1,0 +1,14 @@
+{
+  "source": "public/worldart/world.js",
+  "sha256": "5815b8f2b7a9f1c684f79b4cb524d61002e1c6e4fe5273a67ab692f5096f7afd",
+  "map": "south_coast_g3",
+  "model": "codex/palm-billboard/assets/palm2_a_liked_frond_v4.glb",
+  "layout": "codex/palm-coast/layout.json",
+  "hooks": [
+    "const BASE = './';",
+    "const assetSwap = new Map(",
+    "  const g = await load(`${BASE}${q.get('adir') || 'assets'}/${loadName}.glb`);",
+    "dummy.scale.setScalar(s);",
+    "    im.frustumCulled = false;"
+  ]
+}

@@ -1,0 +1,11 @@
+:root{font-family:"Yu Gothic UI",Meiryo,sans-serif;color:#e2e6d9;background:#141a16;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0}main{max-width:1440px;margin:auto;padding:24px;--preview-aspect:1.76295}
+header{display:flex;gap:24px;align-items:baseline}h1{font-size:23px;font-weight:500;margin:0}#status{font-size:12px;color:#aab49f}
+nav{display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin:22px 0;padding:12px 0;position:sticky;top:0;z-index:10;background:#141a16}label{display:flex;align-items:center;gap:8px;font-size:13px}
+select,button{background:#253125;border:1px solid #52604c;color:inherit;padding:7px 12px;border-radius:4px;font:inherit}
+button{cursor:pointer}button[aria-pressed=true]{border-color:#d9d798;background:#44513c}input{width:130px;accent-color:#c8d29e}output{min-width:40px;font-variant-numeric:tabular-nums}
+.presets{display:flex;gap:6px}.comparison,.native{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}
+figure{margin:0;min-width:0;background:#20291f;border:1px solid #394435}figcaption{padding:12px 16px;display:flex;justify-content:space-between;gap:10px;font-size:17px}figcaption span{color:#aab49f;font-size:13px}
+iframe,.comparison img{display:block;width:100%;aspect-ratio:var(--preview-aspect);border:0;background:#111810}.comparison img{object-fit:contain}.native img{display:block;width:100%}
+footer,details{margin-top:22px;font-size:12px;color:#b6bfaa;line-height:1.8}a{color:#dce0b2}summary{cursor:pointer;margin-bottom:14px}
+@media(max-width:850px){main{padding:12px}.comparison,.native{gap:16px}figcaption{padding:10px;font-size:15px}figcaption span{font-size:12px}header{display:block}h1{font-size:20px}nav{gap:12px;position:static}input{width:90px}}

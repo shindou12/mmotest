@@ -1,0 +1,24 @@
+{
+  "model": "palm2_a_liked_frond_v4",
+  "source": "codex\\palm-billboard\\assets\\palms-round.blend",
+  "trunkTipBefore": [
+    0.77972513,
+    3.20000005,
+    0.02070397
+  ],
+  "trunkTipAfter": [
+    0.45983794,
+    3.20000005,
+    0.01221003
+  ],
+  "rootSpreadBefore": 0.04,
+  "rootSpreadAfter": 0.018,
+  "rootLayerScale": 0.35,
+  "fronds": 15,
+  "rowPivotError": 2.7314279645418166e-07,
+  "topFrondDownwardRotations": {
+    "12": 22,
+    "13": 27,
+    "14": 24
+  }
+}

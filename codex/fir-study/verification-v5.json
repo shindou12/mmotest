@@ -1,0 +1,11 @@
+{
+  "sourceHashesMatch": {
+    "public/worldart/world.js": true,
+    "codex\\palm-coast\\world.generated.js": true,
+    "tools/worldart/blender/build_assets.py": true
+  },
+  "unitErrors": [],
+  "worldErrors": [],
+  "activeModelSHA256": "fb0fae4e5398b5d4bd35acdffc04e7c63968264a2e401fdbac96b86e334a0d1c",
+  "hierarchyParentsValid": true
+}

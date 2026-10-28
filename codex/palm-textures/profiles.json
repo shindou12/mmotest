@@ -1,0 +1,7 @@
+{
+  "1": {"leaf": "frond-ro-v1.png", "bark": "bark-ro-v1.png", "label": "前案"},
+  "reference": {"leaf": "frond-reference-v1.png", "bark": "bark-reference-v1.png", "label": "幅広い葉・落ち着いた色"},
+  "soft": {"leaf": "frond-soft-v2.png", "bark": "bark-reference-v1.png", "label": "丸い葉の側面・明るく柔らかい塗り"},
+  "flow": {"leaf": "frond-flow-v3.png", "bark": "bark-reference-v1.png", "label": "側片が葉先へ流れる葉"},
+  "round": {"leaf": "frond-round-v1.png", "bark": "bark-reference-v1.png", "label": "丸く幅広い葉"}
+}

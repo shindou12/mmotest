@@ -1,0 +1,123 @@
+{
+  "id": "fir-soft",
+  "title": "柔らかいもみの木",
+  "activeVersion": "v5",
+  "status": "試作・公式地図は未変更",
+  "authoring": "Blender 4.2.23",
+  "generator": "build.py",
+  "settings": "settings-v5.json",
+  "versions": [
+    {
+      "version": "v1",
+      "status": "比較用の旧試作",
+      "model": "assets/fir_soft_v1.glb",
+      "blend": "assets/fir_soft_v1.blend",
+      "settings": "settings-v1.json",
+      "report": "assets/fir_soft_v1.json",
+      "triangles": 1780,
+      "sprays": 73
+    },
+    {
+      "version": "v2",
+      "status": "比較用の旧試作",
+      "model": "assets/fir_soft_v2.glb",
+      "blend": "assets/fir_soft_v2.blend",
+      "settings": "settings-v2.json",
+      "report": "assets/fir_soft_v2.json",
+      "triangles": 3932,
+      "sprays": 129
+    },
+    {
+      "version": "v3",
+      "status": "比較用の旧試作",
+      "model": "assets/fir_soft_v3.glb",
+      "blend": "assets/fir_soft_v3.blend",
+      "settings": "settings-v3.json",
+      "report": "assets/fir_soft_v3.json",
+      "triangles": 3932,
+      "sprays": 129
+    },
+    {
+      "version": "v4",
+      "status": "比較の基準・前回版",
+      "model": "assets/fir_soft_v4.glb",
+      "blend": "assets/fir_soft_v4.blend",
+      "settings": "settings-v4.json",
+      "report": "assets/fir_soft_v4.json",
+      "triangles": 4380,
+      "sprays": 145
+    },
+    {
+      "version": "v5",
+      "status": "比較の既定・採用判断待ち",
+      "model": "assets/fir_soft_v5.glb",
+      "blend": "assets/fir_soft_v5.blend",
+      "settings": "settings-v5.json",
+      "report": "assets/fir_soft_v5.json",
+      "triangles": 10896,
+      "sprays": 265,
+      "mainBranches": 34,
+      "secondaryBranches": 136
+    }
+  ],
+  "activeFiles": [
+    {
+      "path": "assets/branch-fan-v5.png",
+      "sha256": "1022bc071e7df23edc62497713f4919cfb0122413c4809315ff7d2f532c1f290",
+      "bytes": 1920816
+    },
+    {
+      "path": "assets/fir_soft_v5.glb",
+      "sha256": "fb0fae4e5398b5d4bd35acdffc04e7c63968264a2e401fdbac96b86e334a0d1c",
+      "bytes": 2821864
+    },
+    {
+      "path": "assets/fir_soft_v5.blend",
+      "sha256": "eaf4a70686983d63ef562ec52e8856d632711ff006dddbcd812261698f6524fc",
+      "bytes": 3772968
+    },
+    {
+      "path": "settings-v5.json",
+      "sha256": "b2d1a5cca6e643ee8a90bcbe49f361396019e5c38864fe352c4bea22b9215e1d",
+      "bytes": 836
+    },
+    {
+      "path": "build.py",
+      "sha256": "2935965c5d939aa6945282298d84778016e71b5c519f2bbb260acd194ed69501",
+      "bytes": 9870
+    },
+    {
+      "path": "hierarchy.py",
+      "sha256": "2a44eba3979f5f1b7cca10edfb88b0b597735de598808cbbd65dfe345f211470",
+      "bytes": 5039
+    }
+  ],
+  "texture": {
+    "path": "assets/branch-fan-v5.png",
+    "mode": "RGBA",
+    "size": [
+      1536,
+      1024
+    ],
+    "alphaExtrema": [
+      0,
+      254
+    ],
+    "generation": "組み込みimagegen。指示はPROMPTS.md",
+    "processing": "元PNGを変更せずコピー"
+  },
+  "placement": {
+    "map": "south_coast_g3",
+    "replaceAsset": "fir4_c",
+    "index": 1,
+    "palms": 3,
+    "layout": "../palm-coast/layout.json"
+  },
+  "references": "PLAN-v5.md",
+  "iterations": "ITERATIONS.md",
+  "verification": {
+    "unit": "shots/v5/browser-log.json",
+    "world": "shots/world-v5/browser-log.json"
+  },
+  "hierarchy": "hierarchy.py"
+}

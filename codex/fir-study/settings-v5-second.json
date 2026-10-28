@@ -1,0 +1,71 @@
+{
+  "hierarchy": true,
+  "height": 5.6,
+  "trunkTop": 5.12,
+  "segments": 6,
+  "seed": 2628,
+  "forks": 3,
+  "tuftWidth": 0.93,
+  "aoRoot": 0.7,
+  "aoTip": 0.92,
+  "tint": [
+    0.85,
+    0.92,
+    0.9
+  ],
+  "materialVertexColor": true,
+  "alternateSpray": true,
+  "curvedNormals": true,
+  "branchLevels": [
+    [
+      1.1,
+      1.88,
+      6
+    ],
+    [
+      1.86,
+      1.71,
+      6
+    ],
+    [
+      2.6,
+      1.48,
+      6
+    ],
+    [
+      3.29,
+      1.2,
+      6
+    ],
+    [
+      3.91,
+      1.0,
+      6
+    ],
+    [
+      4.39,
+      0.77,
+      5
+    ],
+    [
+      4.75,
+      0.58,
+      5
+    ],
+    [
+      5.03,
+      0.38,
+      4
+    ]
+  ],
+  "textures": {
+    "dense": "branch-fan-v5.png",
+    "droop": "branch-fan-v5.png",
+    "tip": "branch-fan-v5.png"
+  },
+  "tuftUV": [
+    0.03,
+    1.0
+  ],
+  "rootTufts": true
+}

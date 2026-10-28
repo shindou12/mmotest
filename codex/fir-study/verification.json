@@ -1,0 +1,15 @@
+{
+  "sourceHashesMatch": {
+    "public/worldart/world.js": true,
+    "codex\\palm-coast\\world.generated.js": true,
+    "tools/worldart/blender/build_assets.py": true
+  },
+  "unitErrors": [],
+  "worldErrors": [],
+  "activeModelSHA256": "a1b53f588c7c7db6d657cf2ea5cf25cf9cae0dd262ae5c3f2a53b2fe047825aa",
+  "textureRGBA": "RGBA",
+  "textureAlphaExtrema": [
+    0,
+    255
+  ]
+}

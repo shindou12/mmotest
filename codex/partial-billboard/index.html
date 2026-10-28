@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>葉カードの部分追従</title><link rel="stylesheet" href="./style.css?v=large1"><script type="module" src="./ui.js"></script>
+</head><body>
+<main id="root">
+  <header><h1>葉カードの部分追従</h1><p id="status" role="status">読み込み中</p></header>
+  <nav aria-label="比較条件">
+    <label>視点 <select id="view" data-action="view"><option value="B01">標準</option><option value="near">近景</option><option value="side">横から</option><option value="oblique">斜め</option></select></label>
+    <label>方位 <input id="yaw" data-action="yaw" type="range" min="-180" max="180" step="1" value="0"><output id="yaw-value">0°</output></label>
+    <label>試作の追従 <input id="follow" data-action="follow" type="range" min="0" max="1" step="0.05" value="0.5"><output id="follow-value">0.50</output></label>
+    <div class="presets"><button data-action="preset" data-value="0">固定</button><button data-action="preset" data-value="0.5">半分</button><button data-action="preset" data-value="1">完全追従</button></div>
+  </nav>
+  <section class="comparison" aria-label="見本、現在、試作">
+    <figure><figcaption>見本</figcaption><a href="/art/ref/B01.webp"><img src="/art/ref/B01.webp" alt="RO3の参考画面B01"></a></figure>
+    <figure><figcaption>現在 <span>固定</span></figcaption><iframe id="current" src="./frame.html?map=mihon2&amp;v=B01&amp;occR=0&amp;follow=0" title="現在の固定された葉"></iframe></figure>
+    <figure><figcaption>試作 <span id="trial-label">追従 0.50</span></figcaption><iframe id="trial" src="./frame.html?map=mihon2&amp;v=B01&amp;occR=0&amp;follow=0.5" title="部分追従する葉"></iframe></figure>
+  </section>
+  <footer>画面をドラッグすると両方の方位が変わります。<a href="./README.md">制作と確認の記録</a></footer>
+  <details><summary>Blenderでの形状確認（Three.jsの実画面ではありません）</summary>
+    <div class="native"><figure><figcaption>固定</figcaption><img src="./shots/v2/blender-20-follow-0.png" alt="Blenderで固定した葉"></figure><figure><figcaption>部分追従</figcaption><img src="./shots/v2/blender-20-follow-50.png" alt="Blenderで半分追従した葉"></figure><figure><figcaption>完全追従</figcaption><img src="./shots/v2/blender-20-follow-100.png" alt="Blenderで完全追従した葉"></figure></div>
+  </details>
+</main></body></html>

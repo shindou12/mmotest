@@ -1,0 +1,22 @@
+{
+  "height": 5.6,
+  "width": 3.7,
+  "tiers": 9,
+  "outerCount": 9,
+  "innerCount": 5,
+  "segments": 7,
+  "fold": 0.17,
+  "droop": 0.40,
+  "irregularity": 0.16,
+  "widthRatio": 0.62,
+  "aoRoot": 0.84,
+  "aoTip": 1.0,
+  "tierCurve": 1.35,
+  "innerRise": -0.68,
+  "innerDroop": 0.24,
+  "minInnerLength": 0.56,
+  "tipRoot": 4.75,
+  "tipLength": 0.84,
+  "tipWidth": 0.52,
+  "seed": 2626
+}

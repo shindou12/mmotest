@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>砂浜ワールド・ヤシの比較</title>
+<style>
+  :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#151a13;color:#edf0df}
+  *{box-sizing:border-box}body{margin:0}main{max-width:1640px;margin:auto;padding:16px}
+  header{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:20px;flex-wrap:wrap;background:#151a13ee;padding:10px 0}
+  h1{font-size:18px;margin:0}nav{display:flex;gap:6px}button,a{font:inherit;color:inherit}
+  button{background:#252d20;border:1px solid #536044;border-radius:5px;padding:7px 18px;cursor:pointer}
+  button[aria-pressed=true]{background:#64734c;border-color:#a5b28e}header a{margin-left:auto;font-size:13px}
+  figure{margin:14px 0 24px}figcaption{padding:8px 12px;background:#252d20;font-size:14px}
+  .reference{height:300px;background:#879363}img{display:block;width:100%;height:100%;object-fit:contain}
+  iframe{display:block;border:0;width:100%;aspect-ratio:16/9;background:#bed3d7}
+  @media(max-width:700px){main{padding:8px}header{gap:10px}header a{margin-left:0}.reference{height:230px}iframe{aspect-ratio:4/3}}
+</style></head><body><main id="root">
+<header><h1>砂浜ワールドのヤシ</h1><nav aria-label="見る方向">
+  <button data-view="wide" aria-pressed="true">全景</button><button data-view="near" aria-pressed="false">木の近く</button><button data-view="top" aria-pressed="false">上から</button>
+</nav><a href="../fir-study/coast.html">もみの比較</a><a href="../palm-model-study/">単体の比較</a></header>
+<figure><figcaption>見本</figcaption><div class="reference"><img src="../palm-study/reference/favorite-palm.png" alt="気に入ったヤシの見本"></div></figure>
+<figure><figcaption>現在・9本</figcaption><iframe data-current src="./frame.html?map=south_coast_g3&amp;palms=full&amp;occR=0" title="ヤシ9本の砂浜"></iframe></figure>
+<figure><figcaption>試作・3本</figcaption><iframe data-trial src="./frame.html?map=south_coast_g3&amp;palms=trial&amp;occR=0" title="ヤシ3本の砂浜"></iframe></figure>
+</main><script type="module" src="./ui.js"></script></body></html>

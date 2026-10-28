@@ -1,0 +1,23 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>同じヤシで固定と追従を比較</title><link rel="stylesheet" href="../partial-billboard/style.css?v=large1"><script type="module" src="../partial-billboard/ui.js?v=tree2"></script>
+<style>.refcrop{display:block;position:relative;overflow:hidden;aspect-ratio:var(--preview-aspect)}.comparison .refcrop img{position:absolute;width:600%;height:auto;aspect-ratio:auto;left:50%;top:50%;transform:translate(-43%,-82%);max-width:none}</style>
+</head><body><main id="root" data-current-follow="0" data-default-follow="0.7">
+<header><h1>同じヤシで固定と追従を比較</h1><p id="status" role="status">読み込み中</p></header>
+<nav aria-label="比較条件">
+<label>視点 <select id="view" data-action="view"><option value="B01">標準</option><option value="near">近景</option><option value="side">横から</option><option value="oblique">斜め</option><option value="top">上から</option></select></label>
+<label>方位 <input id="yaw" data-action="yaw" type="range" min="-180" max="180" step="1" value="0"><output id="yaw-value">0°</output></label>
+<label>試作の追従 <input id="follow" data-action="follow" type="range" min="0" max="1" step="0.05" value="0.7"><output id="follow-value">0.70</output></label>
+<div class="presets"><button data-action="preset" data-value="0">固定</button><button data-action="preset" data-value="0.5">半分</button><button data-action="preset" data-value="1">設計上限</button></div>
+</nav>
+<section class="comparison" aria-label="見本、現在、試作">
+<figure><figcaption>見本 <span>B03・ヤシ部分を拡大</span></figcaption><a class="refcrop" href="/art/ref/B03.webp"><img src="/art/ref/B03.webp" alt="見本B03の下側にあるヤシ。クリックで全画面資料"></a></figure>
+<figure><figcaption>現在 <span>専用ヤシ・固定</span></figcaption><iframe id="current" src="./frame.html?follow=0" title="同じ専用ヤシの固定版"></iframe></figure>
+<figure><figcaption>試作 <span id="trial-label">追従 0.70</span></figcaption><iframe id="trial" src="./frame.html?follow=0.7" title="葉の芯と先端を固定したヤシ"></iframe></figure>
+</section>
+<footer>ドラッグで方位を変更。葉の芯・付け根・先端を固定し、葉面だけを少しひねります。<a href="./README.md">制作記録</a> · <a href="../billboard-tree/">前の広葉樹</a> · <a href="./index.html">既存ヤシとの比較</a></footer>
+<details open><summary>Blenderでの形状比較</summary><div class="native">
+<figure><figcaption>現在</figcaption><img src="./shots/v3/current-40-0.png" alt="Blenderで撮影した既存ヤシ"></figure>
+<figure><figcaption>試作・固定</figcaption><img src="./shots/v3/fixed-40-0.png" alt="同じ専用ヤシの追従なし"></figure>
+<figure><figcaption>試作・追従0.7</figcaption><img src="./shots/v3/follow-40-0.png" alt="専用ヤシの葉面追従"></figure>
+</div></details>
+</main></body></html>

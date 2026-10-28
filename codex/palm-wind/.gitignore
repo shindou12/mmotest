@@ -1,0 +1,11 @@
+__pycache__/
+shots/v1/weak/
+shots/v1/medium/
+shots/v2-painted/weak/
+shots/v2-painted/medium/
+shots/v3-reference/weak/
+shots/v3-reference/medium/
+shots/v4-soft/weak/
+shots/v4-soft/medium/
+shots/v5-flow/weak/
+shots/v5-flow/medium/

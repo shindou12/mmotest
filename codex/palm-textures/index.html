@@ -1,0 +1,28 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>葉先へ流れる側片</title><link rel="stylesheet" href="../partial-billboard/style.css?v=large1"><script type="module" src="./ui.js"></script>
+<style>.refcrop{display:block;position:relative;overflow:hidden;aspect-ratio:var(--preview-aspect)}.comparison .refcrop img{position:absolute;width:600%;height:auto;aspect-ratio:auto;left:50%;top:50%;transform:translate(-43%,-82%);max-width:none}</style>
+</head><body><main id="root">
+<header><h1>葉先へ流れる側片</h1><p id="status" role="status">読み込み中</p></header>
+<nav aria-label="比較条件"><label>視点 <select id="view" data-action="view"><option value="B01">標準</option><option value="near">近景</option><option value="side">横から</option><option value="oblique">斜め</option><option value="top">上から</option></select></label>
+<label>方位 <input id="yaw" data-action="yaw" type="range" min="-180" max="180" value="0"><output id="yaw-value">0°</output></label></nav>
+<section class="comparison" aria-label="見本、現在、材質の試作">
+<figure><figcaption>見本 <span>ユーザー提供</span></figcaption><a href="./reference/user-palm.png"><img src="./reference/user-palm.png" alt="ユーザー提供の幅広い葉のヤシ"></a></figure>
+<figure><figcaption>現在 <span>直前の案</span></figcaption><iframe id="current" src="../palm-billboard/frame.html?follow=0&amp;paint=soft" title="側片が根元へ戻っていた前案"></iframe></figure>
+<figure><figcaption>試作 <span>側片が葉先へ流れる葉</span></figcaption><iframe id="trial" src="../palm-billboard/frame.html?follow=0&amp;paint=flow" title="葉先へ側片が流れる試作"></iframe></figure>
+</section>
+<footer>同じ形・同じ光。風とカメラ追従は切り、画像だけを比較します。<a href="./README.md">制作記録</a> · <a href="../palm-wind/">風の比較</a></footer>
+<details open><summary>葉の流れ</summary><div class="native">
+<figure><figcaption>見本（左）と前案（右）</figcaption><img style="height:360px;object-fit:contain;background:#fff" src="./reference/leaf-flow.png" alt="ユーザーが指摘した葉の流れの比較"></figure>
+<figure><figcaption>現在</figcaption><img style="height:600px;object-fit:contain" src="./assets/frond-soft-v2.png" alt="側片が根元に向かって反る前案"></figure>
+<figure><figcaption>試作</figcaption><img style="height:600px;object-fit:contain" src="./assets/frond-flow-v3.png" alt="側片と葉脈が葉先へ流れる新案"></figure>
+</div></details>
+<details open><summary>Blenderで貼り付けを確認した画像</summary><div class="native">
+<figure><figcaption>現在</figcaption><img src="./shots/v4-flow/current-40-0.png" alt="Blenderで確認した直前の材質"></figure>
+<figure><figcaption>試作</figcaption><img src="./shots/v4-flow/painted-40-0.png" alt="Blenderで確認した葉先へ流れる側片"></figure>
+</div></details>
+<details open><summary>以前の全体案（今回の葉の向き修正は未反映）</summary><div class="native">
+<figure><figcaption>前回の修正 <span>側面を丸く・少し明るく</span></figcaption><img style="height:min(85vh,900px);object-fit:contain" src="./concepts/palm-soft-v2.png" alt="葉の側面を丸くし明るく柔らかくした全体案"></figure>
+<figure><figcaption>添付見本からの全体案 <span>ユーザー評価「これ、いいね」</span></figcaption><img style="height:min(85vh,900px);object-fit:contain" src="./concepts/palm-reference-approved.png" alt="ユーザーが評価した幅広い葉の全体案"></figure>
+<figure><figcaption>実物の構造を参考にした全体案</figcaption><img style="height:min(85vh,900px);object-fit:contain" src="./concepts/palm-natural.png" alt="実物の垂れる小葉を参考にした全体案"></figure>
+</div></details>
+</main></body></html>
