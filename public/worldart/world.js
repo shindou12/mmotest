@@ -215,7 +215,7 @@ function groundMaterial(shell = null) {
     if (GROUND_EDGE_ON) Object.assign(sh.uniforms, GROUND_EDGE_UNIFORMS);
     if (GROUND_WIDE_ON) Object.assign(sh.uniforms, { tSplat: GB.tSplat, uST: GB.uST, uGWide: { value: GROUND_WIDE } });
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
+      .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;' + (shell ? '\nuniform float uShellH, uShellHeight;' : ''))
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vSplat = color;
 vW = (modelMatrix * vec4(position,1.0)).xyz;
