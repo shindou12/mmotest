@@ -1,0 +1,14 @@
+[
+  {"group": "全体", "title": "このリポジトリの案内", "path": "CLAUDE.md", "note": "Claude が最初に読む。分担・引継ぎ・背景のグラフィックの入口"},
+  {"group": "全体", "title": "Codex（Luna）の守ること", "path": "AGENTS.md", "note": "触ってよいファイルだけ・コミットしない・見た目の判断をしない"},
+  {"group": "全体", "title": "分担と確かめ方", "path": "docs/agents/collaboration.md", "note": "Opus がリーダー、実装は Luna か Sonnet"},
+  {"group": "全体", "title": "今の作業と引継ぎ", "path": "docs/handoff/README.md", "note": "会話の切り替えの表"},
+  {"group": "全体", "title": "Maestro の進め方", "path": "maestro/README.md", "note": "チケットの形・握る・渡す"},
+  {"group": "ワールドアート", "title": "規則集（第 3 世代）", "path": "docs/world-art/rulebook.md", "note": "カメラ・尺度・光・地面・崖・植生・検証の目標"},
+  {"group": "ワールドアート", "title": "L29 の見直し", "path": "docs/world-art/rules/review-L29.md", "note": "今の研究の状態・草のシェル・輪郭"},
+  {"group": "ワールドアート", "title": "L27・L28 の記録", "path": "docs/world-art/rules/ab-L27.md", "note": "仮説ごとの結果とユーザーの評価"},
+  {"group": "ワールドアート", "title": "手順", "path": "docs/world-art/pipeline.md", "note": "Blender から three.js まで・失敗の一覧（F 番号）"},
+  {"group": "ワールドアート", "title": "出典", "path": "docs/world-art/sources.md", "note": "参考にした手法・オープンソース"},
+  {"group": "Godot", "title": "目標", "path": "docs/godot/goal.md", "note": "大剣ブランチ全体を Godot へ"},
+  {"group": "Godot", "title": "Windows の道具の場所", "path": "docs/godot/windows-setup.md", "note": "Node・Python・Blender 4.2.23・Godot"}
+]
