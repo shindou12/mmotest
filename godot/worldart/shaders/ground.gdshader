@@ -20,7 +20,11 @@ uniform sampler2D t_dirt : source_color, filter_linear_mipmap_anisotropic, repea
 uniform sampler2D t_alt : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D t_rock : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D t_noise : filter_linear_mipmap, repeat_enable;
-#include "water_w1.gdshaderinc"
+uniform sampler2D t_skyvis : filter_linear, repeat_disable;
+uniform vec2 skyvis_origin = vec2(0.0);
+uniform float skyvis_size = 1.0;
+uniform float bake = 0.0;
+uniform bool skyvis_on = false;
 varying vec3 v_w;
 varying vec3 v_wn;
 void vertex() { v_w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz; v_wn = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz); }
@@ -63,16 +67,9 @@ void fragment() {
 	}
 	ALBEDO = wa_desat(col, wa_albedo_sat);
 	EMISSION = wa_hemi(ALBEDO, normalize(v_wn));
-	if (wa_water.y > 1.5 && u_wt.z > 0.0 && v_w.y < wa_water.x) {   // 水の下: 水面（y = 水の高さ）の色を不透明度で重ねる（water_w1.gdshaderinc）
-		vec3 cam = CAMERA_POSITION_WORLD;
-		vec3 dv = v_w - cam;
-		float tt = (wa_water.x - cam.y) / dv.y;
-		if (tt > 0.0 && tt < 1.0) {
-			vec3 wlit; float wal;
-			wa_water_w1(cam + dv * tt, cam, u_wtime >= 0.0 ? u_wtime : TIME, wlit, wal);
-			EMISSION = EMISSION * (1.0 - wal) + wlit * wal;
-			ALBEDO *= 1.0 - wal;
-		}
+	if (skyvis_on && bake > 0.0) {
+		float sky_visibility = texture(t_skyvis, (v_w.xz - skyvis_origin) / skyvis_size).r;
+		EMISSION *= mix(1.0, sky_visibility, bake);
 	}
 }
 void light() { DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * clamp(dot(NORMAL, LIGHT), 0.0, 1.0) / PI; }

@@ -11,7 +11,7 @@ extends Node3D
 ##     （仕上げは hint_screen_texture を読むので、先に描くと上書きされる。visuals.gd の mat() と同じ決まり）。
 ##   * 閃光 = OmniLight3D（4 つのプール。three の PointLight(強さ, 距離, 減衰 2) と同じ数値。flat / ground 系のシェーダーの light() が拾う）。
 ##   * 雷・火花 = ImmediateMesh の線（元も 1 ピクセルの線）。
-## 元と違う所: Bloom（UnrealBloomPass。style の bloom の値）は仕上げの板にないので、にじみは出さない（gain と粒の芯で近づける）。武器の振りの軌跡（swordTrail）・残像（ghost）は人物の武器モデル待ち。
+## Bloom は WorldEnvironment.glow に渡す（UnrealBloomPass strength / radius / threshold を適用）。武器の振りの軌跡（swordTrail）・残像（ghost）は人物の武器モデル待ち。
 
 const MAXP := 3000
 const PRIO := 110
@@ -77,7 +77,7 @@ void fragment() {
 		col = vC * 1.2;
 		a *= 0.9;
 	}
-	ALBEDO = fxm(col);
+	ALBEDO = col;
 	ALPHA = a * vA;
 }
 """
@@ -110,7 +110,7 @@ void fragment() {
 	float c1 = 1.0 - uFeather * 0.5;
 	float core = mix(smoothstep(c0, c1, s), step(c0, s), uHard);
 	vec3 c = mix(uColor * uGain, vec3(1.0), core * 0.85);
-	ALBEDO = fxm(c);
+	ALBEDO = c;
 	ALPHA = a * uOpacity;
 }
 """
@@ -133,7 +133,7 @@ void fragment() {
 	float fill = uFill * smoothstep(0.2, 1.0, r) * step(r, 1.0);
 	float a = (band + fill) * (1.0 - uK);
 	vec3 c = mix(uColor * uGain, vec3(1.0), band * (1.0 - uK) * mix(0.4, 0.55, uHard));
-	ALBEDO = fxm(c);
+	ALBEDO = c;
 	ALPHA = a;
 }
 """
@@ -145,7 +145,7 @@ render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
 vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform vec3 uColor : source_color = vec3(1.0);
 uniform float uA = 1.0;
-void fragment() { ALBEDO = fxm(uColor); ALPHA = uA; }
+void fragment() { ALBEDO = uColor; ALPHA = uA; }
 """
 const FLAT_NODEPTH_SHADER := """
 shader_type spatial;
@@ -153,7 +153,7 @@ render_mode unshaded, blend_add, depth_draw_never, depth_test_disabled, cull_dis
 vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
 uniform vec3 uColor : source_color = vec3(1.0);
 uniform float uA = 1.0;
-void fragment() { ALBEDO = fxm(uColor); ALPHA = uA; }
+void fragment() { ALBEDO = uColor; ALPHA = uA; }
 """
 
 ## 光の柱
@@ -167,7 +167,7 @@ uniform float uFade = 1.0;
 void fragment() {
 	float h = UV.y;   // 0 = 根元 … 1 = 先（_tube が作る向き）
 	float a = pow(1.0 - h, 1.6) * (0.6 + 0.4 * sin(h * 20.0 - uTime * 6.0));
-	ALBEDO = fxm(uColor * 1.6 * 0.85);
+	ALBEDO = uColor * 1.6;
 	ALPHA = a * uFade;
 }
 """
@@ -177,7 +177,7 @@ const LINE_SHADER := """
 shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
 vec3 fxm(vec3 c) { c = c / (1.0 + 0.45 * c); float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return max(vec3(l) + (c - vec3(l)) * 0.95, vec3(0.0)); }   // 仕上げ（階調）の後に足すので、元の（階調の前に足されて明るい所ほど圧縮される）明るさに近づける曲線
-void fragment() { ALBEDO = fxm(COLOR.rgb); ALPHA = COLOR.a; }
+void fragment() { ALBEDO = COLOR.rgb; ALPHA = COLOR.a; }
 """
 
 var st: Variant = null          # Dictionary（様式）か null（classic）
@@ -250,6 +250,11 @@ func set_style(name: String) -> void:
 
 
 func bloom() -> float: return float(st["bloom"]) if st != null else 0.5
+
+
+## public/js/game/render.js UnrealBloomPass の radius / threshold。
+func bloom_radius() -> float: return 0.45
+func bloom_threshold() -> float: return 0.95
 
 
 func _mk_shader_mat(code: String) -> ShaderMaterial:
@@ -418,10 +423,15 @@ func update(dt: float) -> void:
 	var i := _items.size() - 1
 	while i >= 0:
 		var it: Dictionary = _items[i]
-		it["life"] = float(it["life"]) - dt
-		var k := 1.0 - maxf(0.0, float(it["life"])) / float(it["max"])
+		if not is_instance_valid(it["obj"]):
+			_items.remove_at(i)
+			i -= 1
+			continue
+		var persistent := float(it["max"]) == INF
+		if not persistent: it["life"] = float(it["life"]) - dt
+		var k := 0.0 if persistent else 1.0 - maxf(0.0, float(it["life"])) / float(it["max"])
 		if (it["update"] as Callable).is_valid(): (it["update"] as Callable).call(it["obj"], k, dt)
-		if float(it["life"]) <= 0.0:
+		if not persistent and float(it["life"]) <= 0.0:
 			if is_instance_valid(it["obj"]): (it["obj"] as Node).queue_free()
 			_items.remove_at(i)
 		i -= 1
@@ -607,25 +617,35 @@ func _ring_one(x: float, z: float, color, max_r: float, life: float, y: float, R
 		m.set_shader_parameter("uK", t))
 
 
-## 光の柱（ドロップ・レベルアップ・技の演出）
-func beam(x: float, z: float, color, height := 14.0, radius := 0.45, life := 1.0) -> void:
+## fx.js FX.beam。円筒、色、有限寿命の消える間の拡大を移す。Infinity は静止したまま返して呼び出し元から消す。
+func beam(x: float, z: float, color, height := 14.0, radius := 0.45, life := INF) -> Node3D:
 	var cm := _tube(radius, radius * 1.4, height, 16)
 	var m := _mk_shader_mat(BEAM_SHADER)
 	m.set_shader_parameter("uColor", color_of(color))
 	m.set_shader_parameter("uTime", 0.0)
 	var mesh := _mesh_node(cm, m)
-	var clock := [0.0]
 	var root := Node3D.new()
 	root.add_child(mesh)
 	root.position = Vector3(x, _ground(x, z), z)
+	if life == INF: return add_item(root, INF)
+	var clock := [0.0]
 	add_item(root, life, func(o, k, dt):
 		clock[0] += dt
 		m.set_shader_parameter("uTime", clock[0])
 		m.set_shader_parameter("uFade", 1.0 - k)
 		(o as Node3D).scale = Vector3(1.0 + k * 1.5, 1.0, 1.0 + k * 1.5))
+	return root
 
 
-## 筒（上下の蓋なし）。uv.y: 0 = 根元 … 1 = 先（CylinderGeometry(上の半径, 下の半径, 高さ, 分割, 1, true) を根元から上へ）
+func remove_item(obj: Node3D) -> void:
+	for i in range(_items.size() - 1, -1, -1):
+		if _items[i]["obj"] == obj:
+			_items.remove_at(i)
+			break
+	if is_instance_valid(obj): obj.queue_free()
+
+
+## fx.js FX.beam の CylinderGeometry(上の半径, 下の半径, 高さ, 16, 1, true)。uv.y: 0 = 根元 … 1 = 先
 func _tube(r_top: float, r_bot: float, height: float, seg: int) -> ArrayMesh:
 	var pos := PackedVector3Array(); var uv := PackedVector2Array(); var idx := PackedInt32Array()
 	for i in seg + 1:
