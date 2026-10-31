@@ -3,6 +3,7 @@ world-save.json
 
 world-save-coop-hard.json
 out/
+/debug.log
 *.blend1
 __pycache__/
 
