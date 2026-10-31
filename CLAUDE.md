@@ -4,6 +4,7 @@
 - まず https://m4estro.netlify.app/api/lead を読む。作業はチケットを先に作り、Maestro の決まりに従う。
 - 道具は会話の開始時に自動で取られる（なければ `curl -fsS https://m4estro.netlify.app/api/tools/fetch.sh | sh`）。
 - まとめ役は自分で直さず Luna かサブエージェントに渡す。Luna はネットにつながらないので、ネットの要る追加（npm install・ダウンロード）はまとめ役がしてから渡す。
+- 本線は `dev`。作業はチケットごとに dev から `maestro/M-<番号>-<短い英語>` を切り、Luna は worktree で走らせる。確かめて dev に `--no-ff` で取り込む。
 
 どの作業でも守る決まり（日本語で答える・進捗ログ・実装の決まり・相談すること）は、ユーザー個人の `~/.claude/CLAUDE.md` にある。ここにはこのリポジトリの決まりだけを書く。
 
