@@ -2034,7 +2034,7 @@
    "trees": [
     "maple2_s",
     "maple2_t",
-    "fir3_a",
+    "fir4_a",
     "maple2_a",
     "maple2_t"
    ],
@@ -2390,7 +2390,7 @@
    "scale": 0.91
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -21.84,
     -12.43
@@ -2398,7 +2398,7 @@
    "scale": 0.97
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -19.91,
     -13.62
@@ -2406,7 +2406,7 @@
    "scale": 1.02
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -23.47,
     -10.52
@@ -2414,7 +2414,7 @@
    "scale": 1.06
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -30.2,
     9.13
@@ -2422,7 +2422,7 @@
    "scale": 0.9
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -32.74,
     9.54
@@ -2430,7 +2430,7 @@
    "scale": 0.98
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -30.2,
     6.45
@@ -2446,7 +2446,7 @@
    "scale": 1.02
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -23.78,
     9.54
@@ -2454,7 +2454,7 @@
    "scale": 1.06
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -21.97,
     13.28
@@ -2462,7 +2462,7 @@
    "scale": 1.08
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -26.72,
     13.79
@@ -2470,7 +2470,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -26.05,
     10.22
@@ -2486,7 +2486,7 @@
    "scale": 0.93
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -48.34,
     4.68
@@ -2534,7 +2534,7 @@
    "scale": 0.93
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -34.86,
     12.68
@@ -2542,7 +2542,7 @@
    "scale": 0.99
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -25.95,
     -30.45
@@ -2550,7 +2550,7 @@
    "scale": 1.04
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -28.51,
     -29.53
@@ -2566,7 +2566,7 @@
    "scale": 0.99
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -24.52,
     -32.5
@@ -2582,7 +2582,7 @@
    "scale": 1.01
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -43.68,
     -11.15
@@ -2590,7 +2590,7 @@
    "scale": 0.97
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -46.29,
     -10.55
@@ -2598,7 +2598,7 @@
    "scale": 1.01
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -42.37,
     -13.25
@@ -2606,7 +2606,7 @@
    "scale": 1.05
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -41.33,
     -10.58
@@ -2614,7 +2614,7 @@
    "scale": 0.99
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -17.18,
     7.21
@@ -2630,7 +2630,7 @@
    "scale": 1.04
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -19.34,
     6.03
@@ -2638,7 +2638,7 @@
    "scale": 0.92
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -33.24,
     -27.68
@@ -2646,7 +2646,7 @@
    "scale": 1.04
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -31.95,
     -25.7
@@ -2662,7 +2662,7 @@
    "scale": 0.93
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -32.22,
     16.06
@@ -2678,7 +2678,7 @@
    "scale": 1.06
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -31.55,
     13.86
@@ -2702,7 +2702,7 @@
    "scale": 1.05
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -48.3,
     12.65
@@ -2710,7 +2710,7 @@
    "scale": 0.95
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -50.35,
     10.84
@@ -2718,7 +2718,7 @@
    "scale": 1.01
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -48.11,
     10.06
@@ -2726,7 +2726,7 @@
    "scale": 1.03
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -46.29,
     13.62
@@ -2750,7 +2750,7 @@
    "scale": 0.91
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -30.64,
     21.86
@@ -2758,7 +2758,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -28.78,
     18.56
@@ -2766,7 +2766,7 @@
    "scale": 1.08
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -25.82,
     21.56
@@ -2774,7 +2774,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -43.47,
     8.43
@@ -2782,7 +2782,7 @@
    "scale": 0.94
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -40.94,
     7.49
@@ -2798,7 +2798,7 @@
    "scale": 0.91
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -58.06,
     -0.34
@@ -2806,7 +2806,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -56.74,
     1.99
@@ -2814,7 +2814,7 @@
    "scale": 1.03
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -59.23,
     -2.82
@@ -2846,7 +2846,7 @@
    "scale": 0.94
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -27.66,
     -20.51
@@ -2862,7 +2862,7 @@
    "scale": 0.93
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -17.0,
     12.49
@@ -2878,7 +2878,7 @@
    "scale": 1.02
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -14.38,
     11.68
@@ -2886,7 +2886,7 @@
    "scale": 0.99
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -33.99,
     -16.26
@@ -2894,7 +2894,7 @@
    "scale": 0.92
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -36.22,
     -14.93
@@ -2902,7 +2902,7 @@
    "scale": 1.07
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -35.93,
     -18.36
@@ -2910,7 +2910,7 @@
    "scale": 0.95
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -15.15,
     -14.0
@@ -2918,7 +2918,7 @@
    "scale": 1.01
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -16.06,
     -16.39
@@ -2926,7 +2926,7 @@
    "scale": 1.03
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -13.91,
     -12.04
@@ -2934,7 +2934,7 @@
    "scale": 0.93
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     11.92,
     -19.21
@@ -2950,7 +2950,7 @@
    "scale": 1.08
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     14.31,
     -18.8
@@ -2974,7 +2974,7 @@
    "scale": 0.92
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -8.92,
     -12.15
@@ -3006,7 +3006,7 @@
    "scale": 0.93
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -18.23,
     -21.37
@@ -3022,7 +3022,7 @@
    "scale": 1.01
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -10.21,
     -29.12
@@ -3078,7 +3078,7 @@
    "scale": 1.06
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     9.01,
     -28.33
@@ -3086,7 +3086,7 @@
    "scale": 1.05
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -4.98,
     -37.47
@@ -3102,7 +3102,7 @@
    "scale": 1.05
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -4.24,
     -12.82
@@ -3110,7 +3110,7 @@
    "scale": 0.91
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -6.39,
     -14.33
@@ -3118,7 +3118,7 @@
    "scale": 0.91
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -2.03,
     -11.23
@@ -3142,7 +3142,7 @@
    "scale": 1.04
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     9.61,
     -12.22
@@ -3166,7 +3166,7 @@
    "scale": 1.04
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     9.74,
     -9.56
@@ -3486,7 +3486,7 @@
    "scale": 0.96
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -19.92,
     1.47
@@ -3494,7 +3494,7 @@
    "scale": 0.99
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -27.46,
     -8.47

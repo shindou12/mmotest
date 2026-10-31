@@ -1710,7 +1710,7 @@
    "trees": [
     "maple2_s",
     "maple2_t",
-    "fir3_a",
+    "fir4_a",
     "maple2_a",
     "maple2_t"
    ],
@@ -1724,7 +1724,7 @@
  "groves": [],
  "trees": [
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     10.5,
     -23.23
@@ -1740,7 +1740,7 @@
    "scale": 0.99
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     10.26,
     -20.97
@@ -1756,7 +1756,7 @@
    "scale": 0.94
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -14.25,
     -24.74
@@ -1772,7 +1772,7 @@
    "scale": 0.95
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -16.4,
     -23.52
@@ -1796,7 +1796,7 @@
    "scale": 1.05
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -0.66,
     -26.53
@@ -1804,7 +1804,7 @@
    "scale": 0.96
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     2.04,
     -23.2
@@ -1836,7 +1836,7 @@
    "scale": 1.02
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     14.16,
     -17.0
@@ -1852,7 +1852,7 @@
    "scale": 1.03
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -7.97,
     -21.98
@@ -1860,7 +1860,7 @@
    "scale": 0.96
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -8.07,
     -27.48
@@ -1900,7 +1900,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -6.24,
     -20.45
@@ -1916,7 +1916,7 @@
    "scale": 1.07
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -1.34,
     -20.69
@@ -1924,7 +1924,7 @@
    "scale": 1.02
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -20.92,
     -18.83
@@ -1940,7 +1940,7 @@
    "scale": 1.02
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -20.4,
     -21.24
@@ -1948,7 +1948,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -20.79,
     -0.14
@@ -1964,7 +1964,7 @@
    "scale": 0.96
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -30.08,
     3.69
@@ -1972,7 +1972,7 @@
    "scale": 1.01
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -31.25,
     6.11
@@ -1980,7 +1980,7 @@
    "scale": 1.07
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -29.22,
     1.45
@@ -1988,7 +1988,7 @@
    "scale": 1.08
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -19.72,
     -9.46
@@ -1996,7 +1996,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_b",
+   "asset": "fir4_b",
    "world": [
     -19.5,
     -11.71
@@ -2012,7 +2012,7 @@
    "scale": 1.0
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -23.7,
     -10.93
@@ -2020,7 +2020,7 @@
    "scale": 0.99
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_c",
    "world": [
     -24.74,
     -13.46
@@ -2028,7 +2028,7 @@
    "scale": 1.03
   },
   {
-   "asset": "fir3_a",
+   "asset": "fir4_a",
    "world": [
     -22.09,
     -9.17
