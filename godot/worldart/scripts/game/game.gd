@@ -59,6 +59,7 @@ const SETTINGS_PATH := "user://eterna_settings_v1.json"
 
 @onready var world: Node3D = $World
 var net := GameNet.new()
+var local_server := GameLocalServer.new()
 var cam := Camera3D.new()
 var post := MeshInstance3D.new()
 var hud := CanvasLayer.new()
@@ -131,6 +132,7 @@ func _ready() -> void:
 	combat = GameCombat.new(self)
 	items = GameItems.new(self)
 	add_child(net)
+	add_child(local_server)
 	net.message.connect(_on_msg)
 	net.closed.connect(func(): _log("サーバーとの接続が切れました", Color(1, 0.4, 0.4)))
 	_load_char()
@@ -404,6 +406,11 @@ func _start(pname: String, url: String, color_hex: String = "", kind: String = "
 		debug_panel.set_active(args.has("debug"))
 		if args.has("debug") and args.has("debug-panel"): debug_panel.panel.visible = true
 	_log("接続中: " + url)
+	var local_server_result: int = await local_server.start_if_missing(url)
+	if local_server_result == GameLocalServer.StartResult.STARTED:
+		_log("ゲームのサーバーを起動しました（node server.js）")
+	elif local_server_result == GameLocalServer.StartResult.FAILED:
+		_log("ゲームのサーバーを起動できませんでした")
 	net.connect_to(url)
 	net.opened.connect(func(): net.send({"t": "hello", "name": ch["name"], "color": ch["color"], "lv": ch["lv"]}), CONNECT_ONE_SHOT)
 
