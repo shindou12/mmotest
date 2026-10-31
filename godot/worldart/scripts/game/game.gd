@@ -1096,6 +1096,7 @@ func _process(real_dt: float) -> void:
 			print("SHOT ", sp[1])
 			get_tree().quit()
 	if not started or area.is_empty(): return
+	if me_node == null: return   # ログインしてからサーバーの welcome が届くまでは、自分の人物がまだない
 	_apply_requested_panel()
 	_tick_waypoint()
 	if args.has("fall") and not args.has("_fell") and t_now > float(args["fall"]) and not me.dead and not me.crawl:

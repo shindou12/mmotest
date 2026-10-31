@@ -376,8 +376,6 @@ func _spark(x: float, y: float, z: float, speed: float, color) -> void:
 
 func _update_sparks(dt: float) -> void:
 	_spark_mesh.clear_surfaces()
-	if _sparks.is_empty(): return
-	_spark_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 	var i := _sparks.size() - 1
 	while i >= 0:
 		var p: Dictionary = _sparks[i]
@@ -385,6 +383,8 @@ func _update_sparks(dt: float) -> void:
 		if p["life"] <= 0.0:
 			_sparks.remove_at(i)
 		i -= 1
+	if _sparks.is_empty(): return   # 頂点 0 で surface_end するとエラーになる
+	_spark_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
 	for p in _sparks:
 		p["vy"] -= 18.0 * dt
 		p["x"] += p["vx"] * dt; p["y"] += p["vy"] * dt; p["z"] += p["vz"] * dt
