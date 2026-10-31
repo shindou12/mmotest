@@ -1,0 +1,815 @@
+{
+  "sample_rate": 44100,
+  "channels": 2,
+  "bit_depth": 16,
+  "sounds": [
+    {
+      "name": "swing",
+      "file": "swing.wav",
+      "length_seconds": 0.3363,
+      "peak_dbfs": -28.41,
+      "source": "swing",
+      "options": {}
+    },
+    {
+      "name": "hit",
+      "file": "hit.wav",
+      "length_seconds": 0.2943,
+      "peak_dbfs": -21.32,
+      "source": "hit",
+      "options": {}
+    },
+    {
+      "name": "skill",
+      "file": "skill.wav",
+      "length_seconds": 2.144,
+      "peak_dbfs": -21.42,
+      "source": "skill",
+      "options": {}
+    },
+    {
+      "name": "dodge",
+      "file": "dodge.wav",
+      "length_seconds": 0.3293,
+      "peak_dbfs": -37.83,
+      "source": "dodge",
+      "options": {}
+    },
+    {
+      "name": "perfect",
+      "file": "perfect.wav",
+      "length_seconds": 2.4089,
+      "peak_dbfs": -20.07,
+      "source": "perfect",
+      "options": {}
+    },
+    {
+      "name": "hurt",
+      "file": "hurt.wav",
+      "length_seconds": 0.3285,
+      "peak_dbfs": -29.5,
+      "source": "hurt",
+      "options": {}
+    },
+    {
+      "name": "block",
+      "file": "block.wav",
+      "length_seconds": 2.2655,
+      "peak_dbfs": -29.95,
+      "source": "block",
+      "options": {}
+    },
+    {
+      "name": "telegraph",
+      "file": "telegraph.wav",
+      "length_seconds": 0.2719,
+      "peak_dbfs": -43.44,
+      "source": "telegraph",
+      "options": {}
+    },
+    {
+      "name": "impact",
+      "file": "impact.wav",
+      "length_seconds": 0.528,
+      "peak_dbfs": -18.83,
+      "source": "impact",
+      "options": {}
+    },
+    {
+      "name": "thunder",
+      "file": "thunder.wav",
+      "length_seconds": 0.5269,
+      "peak_dbfs": -19.25,
+      "source": "thunder",
+      "options": {}
+    },
+    {
+      "name": "wave",
+      "file": "wave.wav",
+      "length_seconds": 1.9732,
+      "peak_dbfs": -29.45,
+      "source": "wave",
+      "options": {}
+    },
+    {
+      "name": "flame",
+      "file": "flame.wav",
+      "length_seconds": 0.4464,
+      "peak_dbfs": -34.67,
+      "source": "flame",
+      "options": {}
+    },
+    {
+      "name": "mobdie",
+      "file": "mobdie.wav",
+      "length_seconds": 0.4046,
+      "peak_dbfs": -33.26,
+      "source": "mobdie",
+      "options": {}
+    },
+    {
+      "name": "levelup",
+      "file": "levelup.wav",
+      "length_seconds": 2.9256,
+      "peak_dbfs": -16.71,
+      "source": "levelup",
+      "options": {}
+    },
+    {
+      "name": "drop",
+      "file": "drop.wav",
+      "length_seconds": 0.2784,
+      "peak_dbfs": -38.83,
+      "source": "drop",
+      "options": {}
+    },
+    {
+      "name": "shard",
+      "file": "shard.wav",
+      "length_seconds": 1.8508,
+      "peak_dbfs": -29.67,
+      "source": "shard",
+      "options": {}
+    },
+    {
+      "name": "lootpop",
+      "file": "lootpop.wav",
+      "length_seconds": 0.264,
+      "peak_dbfs": -35.55,
+      "source": "lootpop",
+      "options": {}
+    },
+    {
+      "name": "pickup",
+      "file": "pickup.wav",
+      "length_seconds": 0.3299,
+      "peak_dbfs": -32.56,
+      "source": "pickup",
+      "options": {}
+    },
+    {
+      "name": "coin",
+      "file": "coin.wav",
+      "length_seconds": 0.2888,
+      "peak_dbfs": -38.96,
+      "source": "coin",
+      "options": {}
+    },
+    {
+      "name": "coins",
+      "file": "coins.wav",
+      "length_seconds": 0.5493,
+      "peak_dbfs": -30.36,
+      "source": "coins",
+      "options": {}
+    },
+    {
+      "name": "bag",
+      "file": "bag.wav",
+      "length_seconds": 2.1637,
+      "peak_dbfs": -27.7,
+      "source": "bag",
+      "options": {}
+    },
+    {
+      "name": "potion",
+      "file": "potion.wav",
+      "length_seconds": 0.4336,
+      "peak_dbfs": -28.62,
+      "source": "potion",
+      "options": {}
+    },
+    {
+      "name": "roar",
+      "file": "roar.wav",
+      "length_seconds": 2.6743,
+      "peak_dbfs": -15.54,
+      "source": "roar",
+      "options": {}
+    },
+    {
+      "name": "clear",
+      "file": "clear.wav",
+      "length_seconds": 3.2736,
+      "peak_dbfs": -18.94,
+      "source": "clear",
+      "options": {}
+    },
+    {
+      "name": "death",
+      "file": "death.wav",
+      "length_seconds": 2.808,
+      "peak_dbfs": -23.44,
+      "source": "death",
+      "options": {}
+    },
+    {
+      "name": "warp",
+      "file": "warp.wav",
+      "length_seconds": 2.461,
+      "peak_dbfs": -23.69,
+      "source": "warp",
+      "options": {}
+    },
+    {
+      "name": "charge",
+      "file": "charge.wav",
+      "length_seconds": 1.7632,
+      "peak_dbfs": -40.43,
+      "source": "charge",
+      "options": {}
+    },
+    {
+      "name": "charged",
+      "file": "charged.wav",
+      "length_seconds": 2.1567,
+      "peak_dbfs": -27.11,
+      "source": "charged",
+      "options": {}
+    },
+    {
+      "name": "heavy",
+      "file": "heavy.wav",
+      "length_seconds": 0.5205,
+      "peak_dbfs": -19.14,
+      "source": "heavy",
+      "options": {}
+    },
+    {
+      "name": "buff",
+      "file": "buff.wav",
+      "length_seconds": 2.3589,
+      "peak_dbfs": -22.8,
+      "source": "buff",
+      "options": {}
+    },
+    {
+      "name": "phase",
+      "file": "phase.wav",
+      "length_seconds": 2.6876,
+      "peak_dbfs": -15.99,
+      "source": "phase",
+      "options": {}
+    },
+    {
+      "name": "ui",
+      "file": "ui.wav",
+      "length_seconds": 0.2352,
+      "peak_dbfs": -43.02,
+      "source": "ui",
+      "options": {}
+    },
+    {
+      "name": "stack",
+      "file": "stack.wav",
+      "length_seconds": 2.8432,
+      "peak_dbfs": -19.13,
+      "source": "stack",
+      "options": {}
+    },
+    {
+      "name": "awayMark",
+      "file": "awayMark.wav",
+      "length_seconds": 0.8564,
+      "peak_dbfs": -13.75,
+      "source": "awayMark",
+      "options": {}
+    },
+    {
+      "name": "stunBreak",
+      "file": "stunBreak.wav",
+      "length_seconds": 2.6362,
+      "peak_dbfs": -10.62,
+      "source": "stunBreak",
+      "options": {}
+    },
+    {
+      "name": "stunTweet",
+      "file": "stunTweet.wav",
+      "length_seconds": 1.0912,
+      "peak_dbfs": -34.99,
+      "source": "stunTweet",
+      "options": {}
+    },
+    {
+      "name": "stunHit",
+      "file": "stunHit.wav",
+      "length_seconds": 1.5894,
+      "peak_dbfs": -23.69,
+      "source": "stunHit",
+      "options": {}
+    },
+    {
+      "name": "stunEnd",
+      "file": "stunEnd.wav",
+      "length_seconds": 2.2366,
+      "peak_dbfs": -28.17,
+      "source": "stunEnd",
+      "options": {}
+    },
+    {
+      "name": "equip",
+      "file": "equip.wav",
+      "length_seconds": 0.2979,
+      "peak_dbfs": -35.79,
+      "source": "equip",
+      "options": {}
+    },
+    {
+      "name": "step",
+      "file": "step.wav",
+      "length_seconds": 0.215,
+      "peak_dbfs": -58.25,
+      "source": "step",
+      "options": {}
+    },
+    {
+      "name": "enrage",
+      "file": "enrage.wav",
+      "length_seconds": 2.4373,
+      "peak_dbfs": -20.82,
+      "source": "enrage",
+      "options": {}
+    },
+    {
+      "name": "swing_heavy",
+      "file": "swing_heavy.wav",
+      "length_seconds": 0.3312,
+      "peak_dbfs": -28.84,
+      "source": "swing",
+      "options": {
+        "heavy": true
+      }
+    },
+    {
+      "name": "hit_crit",
+      "file": "hit_crit.wav",
+      "length_seconds": 1.8368,
+      "peak_dbfs": -20.61,
+      "source": "hit",
+      "options": {
+        "crit": true
+      }
+    },
+    {
+      "name": "charge_lv1",
+      "file": "charge_lv1.wav",
+      "length_seconds": 1.6104,
+      "peak_dbfs": -40.87,
+      "source": "charge",
+      "options": {
+        "lv": 1
+      }
+    },
+    {
+      "name": "shard_drop",
+      "file": "shard_drop.wav",
+      "length_seconds": 1.5522,
+      "peak_dbfs": -34.82,
+      "source": "shard",
+      "options": {
+        "drop": true
+      }
+    },
+    {
+      "name": "coin_soft",
+      "file": "coin_soft.wav",
+      "length_seconds": 0.2865,
+      "peak_dbfs": -45.35,
+      "source": "coin",
+      "options": {
+        "vol": 0.45
+      }
+    },
+    {
+      "name": "coins_small",
+      "file": "coins_small.wav",
+      "length_seconds": 0.4076,
+      "peak_dbfs": -31.18,
+      "source": "coins",
+      "options": {
+        "n": 1
+      }
+    },
+    {
+      "name": "coins_large",
+      "file": "coins_large.wav",
+      "length_seconds": 0.692,
+      "peak_dbfs": -30.08,
+      "source": "coins",
+      "options": {
+        "n": 7
+      }
+    },
+    {
+      "name": "drop_r3_bag",
+      "file": "drop_r3_bag.wav",
+      "length_seconds": 2.149,
+      "peak_dbfs": -24.4,
+      "source": "drop",
+      "options": {
+        "rarity": 3
+      }
+    },
+    {
+      "name": "drop_r0_weapon",
+      "file": "drop_r0_weapon.wav",
+      "length_seconds": 0.3866,
+      "peak_dbfs": -31.11,
+      "source": "drop",
+      "options": {
+        "rarity": 0,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r0_armor",
+      "file": "drop_r0_armor.wav",
+      "length_seconds": 0.3099,
+      "peak_dbfs": -30.31,
+      "source": "drop",
+      "options": {
+        "rarity": 0,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r0_acc",
+      "file": "drop_r0_acc.wav",
+      "length_seconds": 0.352,
+      "peak_dbfs": -38,
+      "source": "drop",
+      "options": {
+        "rarity": 0,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r0_title",
+      "file": "drop_r0_title.wav",
+      "length_seconds": 0.312,
+      "peak_dbfs": -34.8,
+      "source": "drop",
+      "options": {
+        "rarity": 0,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r1_weapon",
+      "file": "drop_r1_weapon.wav",
+      "length_seconds": 0.3866,
+      "peak_dbfs": -30.96,
+      "source": "drop",
+      "options": {
+        "rarity": 1,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r1_armor",
+      "file": "drop_r1_armor.wav",
+      "length_seconds": 0.3151,
+      "peak_dbfs": -29.88,
+      "source": "drop",
+      "options": {
+        "rarity": 1,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r1_acc",
+      "file": "drop_r1_acc.wav",
+      "length_seconds": 0.352,
+      "peak_dbfs": -37.25,
+      "source": "drop",
+      "options": {
+        "rarity": 1,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r1_title",
+      "file": "drop_r1_title.wav",
+      "length_seconds": 0.3046,
+      "peak_dbfs": -34.83,
+      "source": "drop",
+      "options": {
+        "rarity": 1,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r2_weapon",
+      "file": "drop_r2_weapon.wav",
+      "length_seconds": 0.4117,
+      "peak_dbfs": -31.11,
+      "source": "drop",
+      "options": {
+        "rarity": 2,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r2_armor",
+      "file": "drop_r2_armor.wav",
+      "length_seconds": 0.3912,
+      "peak_dbfs": -30.7,
+      "source": "drop",
+      "options": {
+        "rarity": 2,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r2_acc",
+      "file": "drop_r2_acc.wav",
+      "length_seconds": 0.4002,
+      "peak_dbfs": -34.7,
+      "source": "drop",
+      "options": {
+        "rarity": 2,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r2_title",
+      "file": "drop_r2_title.wav",
+      "length_seconds": 0.384,
+      "peak_dbfs": -34.72,
+      "source": "drop",
+      "options": {
+        "rarity": 2,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r3_weapon",
+      "file": "drop_r3_weapon.wav",
+      "length_seconds": 1.9525,
+      "peak_dbfs": -27.14,
+      "source": "drop",
+      "options": {
+        "rarity": 3,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r3_armor",
+      "file": "drop_r3_armor.wav",
+      "length_seconds": 1.893,
+      "peak_dbfs": -27.93,
+      "source": "drop",
+      "options": {
+        "rarity": 3,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r3_acc",
+      "file": "drop_r3_acc.wav",
+      "length_seconds": 2.082,
+      "peak_dbfs": -28.06,
+      "source": "drop",
+      "options": {
+        "rarity": 3,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r3_title",
+      "file": "drop_r3_title.wav",
+      "length_seconds": 2.0785,
+      "peak_dbfs": -27.63,
+      "source": "drop",
+      "options": {
+        "rarity": 3,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r4_weapon",
+      "file": "drop_r4_weapon.wav",
+      "length_seconds": 2.2774,
+      "peak_dbfs": -23.36,
+      "source": "drop",
+      "options": {
+        "rarity": 4,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r4_armor",
+      "file": "drop_r4_armor.wav",
+      "length_seconds": 2.3149,
+      "peak_dbfs": -22.51,
+      "source": "drop",
+      "options": {
+        "rarity": 4,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r4_acc",
+      "file": "drop_r4_acc.wav",
+      "length_seconds": 2.2573,
+      "peak_dbfs": -22.62,
+      "source": "drop",
+      "options": {
+        "rarity": 4,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r4_title",
+      "file": "drop_r4_title.wav",
+      "length_seconds": 2.4117,
+      "peak_dbfs": -22.47,
+      "source": "drop",
+      "options": {
+        "rarity": 4,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r5_weapon",
+      "file": "drop_r5_weapon.wav",
+      "length_seconds": 2.3381,
+      "peak_dbfs": -21.88,
+      "source": "drop",
+      "options": {
+        "rarity": 5,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r5_armor",
+      "file": "drop_r5_armor.wav",
+      "length_seconds": 2.5529,
+      "peak_dbfs": -22.24,
+      "source": "drop",
+      "options": {
+        "rarity": 5,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r5_acc",
+      "file": "drop_r5_acc.wav",
+      "length_seconds": 2.3417,
+      "peak_dbfs": -22.24,
+      "source": "drop",
+      "options": {
+        "rarity": 5,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r5_title",
+      "file": "drop_r5_title.wav",
+      "length_seconds": 2.3717,
+      "peak_dbfs": -21.87,
+      "source": "drop",
+      "options": {
+        "rarity": 5,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r6_weapon",
+      "file": "drop_r6_weapon.wav",
+      "length_seconds": 3.2942,
+      "peak_dbfs": -14.55,
+      "source": "drop",
+      "options": {
+        "rarity": 6,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r6_armor",
+      "file": "drop_r6_armor.wav",
+      "length_seconds": 3.403,
+      "peak_dbfs": -14.28,
+      "source": "drop",
+      "options": {
+        "rarity": 6,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r6_acc",
+      "file": "drop_r6_acc.wav",
+      "length_seconds": 3.3168,
+      "peak_dbfs": -14.44,
+      "source": "drop",
+      "options": {
+        "rarity": 6,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r6_title",
+      "file": "drop_r6_title.wav",
+      "length_seconds": 3.3497,
+      "peak_dbfs": -14.41,
+      "source": "drop",
+      "options": {
+        "rarity": 6,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r7_weapon",
+      "file": "drop_r7_weapon.wav",
+      "length_seconds": 3.5314,
+      "peak_dbfs": -8.76,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "weapon"
+      }
+    },
+    {
+      "name": "drop_r7_armor",
+      "file": "drop_r7_armor.wav",
+      "length_seconds": 3.4449,
+      "peak_dbfs": -8.38,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "armor"
+      }
+    },
+    {
+      "name": "drop_r7_acc",
+      "file": "drop_r7_acc.wav",
+      "length_seconds": 3.4574,
+      "peak_dbfs": -9.33,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "acc"
+      }
+    },
+    {
+      "name": "drop_r7_title",
+      "file": "drop_r7_title.wav",
+      "length_seconds": 3.4381,
+      "peak_dbfs": -9.55,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "title"
+      }
+    },
+    {
+      "name": "drop_r7_weapon_stars1",
+      "file": "drop_r7_weapon_stars1.wav",
+      "length_seconds": 3.4104,
+      "peak_dbfs": -8.91,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "weapon",
+        "stars": 1
+      }
+    },
+    {
+      "name": "drop_r7_weapon_stars2",
+      "file": "drop_r7_weapon_stars2.wav",
+      "length_seconds": 3.4277,
+      "peak_dbfs": -7.75,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "weapon",
+        "stars": 2
+      }
+    },
+    {
+      "name": "drop_r7_weapon_stars3",
+      "file": "drop_r7_weapon_stars3.wav",
+      "length_seconds": 3.5374,
+      "peak_dbfs": -8.72,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "weapon",
+        "stars": 3
+      }
+    },
+    {
+      "name": "drop_r7_weapon_stars4",
+      "file": "drop_r7_weapon_stars4.wav",
+      "length_seconds": 3.5205,
+      "peak_dbfs": -9.04,
+      "source": "drop",
+      "options": {
+        "rarity": 7,
+        "slot": "weapon",
+        "stars": 4
+      }
+    }
+  ]
+}

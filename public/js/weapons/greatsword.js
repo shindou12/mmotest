@@ -155,17 +155,63 @@ const heavy = {
     name: '兜割り', desc: '前方へ叩きつけ、衝撃で周囲を巻き込む',
     run(c, lv) {
       const a = c.aim(), [dx, dz] = fwd(a, 2.6), x = c.me.x + dx, z = c.me.z + dz;
-      const r = lv === 2 ? 3.8 : 3.0;
-      c.fx.slash(c.me.x, c.me.z, a, 3.4, 90, c.col(), 2.2);
+      const r = lv === 2 ? 3.8 : 3.0, reach = 0.8; // 横幅は r のまま、前へ reach だけ縦に長い
+      const [mx, mz] = fwd(a, reach / 2), cx = x + mx, cz = z + mz; // 衝撃の見た目は伸ばした当たりの真ん中に
+      c.fx.slash(c.me.x, c.me.z, a, 3.4 + reach, 90, c.col(), 2.2);
       c.later(0.12, () => {
-        c.circle(x, z, r, lv === 2 ? 4.6 : 3.0, { type: 'heavy' });
-        c.fx.ringWave(x, z, c.col(), r + 1, 0.4);
-        c.fx.parts.burst(x, 0.3, z, 40, { color: 0xc8b090, speed: 7, size: 0.5, life: 0.6, up: 2 });
+        c.circle(x, z, r, lv === 2 ? 4.6 : 3.0, { type: 'heavy', a, reach });
+        c.fx.ringWave(cx, cz, c.col(), r + 1, 0.4);
+        c.fx.parts.burst(cx, 0.3, cz, 40, { color: 0xc8b090, speed: 7, size: 0.5, life: 0.6, up: 2 });
         c.shake(lv === 2 ? 0.5 : 0.3);
         if (c.S().flags.has('quake')) c.later(0.15, () => { c.circle(x, z, 6.5, 1.5, { type: 'heavy' }); c.fx.ringWave(x, z, 0xffd27a, 7, 0.5); });
       });
     },
   };
+
+// ---------------------------------------------------------------------------
+// 構え（motions/index.js が近接の動きに上書きする）。溜めと強攻撃の振りだけ大剣の動き、ほかは近接と同じ
+//   溜め: 頭の後ろへ大きく振りかぶり、溜まるほど刃を右肩の後ろへ倒して上体を反らし、ひねる
+//   強攻撃: 溜めの振りかぶりを一瞬保ってから、前へ腕を伸ばして振り下ろす（当たりは 0.12 秒 = k 0.24）
+// ---------------------------------------------------------------------------
+const motion = (rig) => {
+  const { THREE, aimHand, orientWeapon, ease, applyMeleePose } = rig;
+  const lerp = (a, b, k) => a + (b - a) * k;
+  // 姿勢: 右手の位置（体の向き基準）・刃の向き（pitch: 上向き。π/2 を越えると背中側 / yaw: 左右）・上体の前後の傾き（lean）とひねり（twist）・足の開き（stance）
+  const REST = { x: -.04, y: 1.15, z: .34, pitch: .60, yaw: 0, lean: 0, twist: 0, stance: 0 };
+  // 溜め: 両手を頭の後ろへ上げ、刃を右肩の後ろへ深く倒す（溜めきると刃先は背中側のやや上）。上体を反らして右肩を大きく引き、足を前後に開く
+  const windup = (c) => ({ x: lerp(-.04, .02, c), y: lerp(1.60, 1.76, c), z: lerp(.06, -.22, c), pitch: lerp(1.75, 2.65, c), yaw: lerp(0, -.35, c), lean: lerp(-.06, -.26, c), twist: lerp(0, -.5, c), stance: c });
+  const STRIKE = { x: -.04, y: 1.12, z: .50, pitch: -.20, yaw: 0, lean: .26, twist: .12, stance: 1 };
+  const mix = (a, b, k) => Object.fromEntries(Object.keys(a).map((key) => [key, lerp(a[key], b[key], k)]));
+  function hold(u, s, p) {
+    u.armR.position.z = 0;
+    if (!(s.dodge > 0) && !(s.down > 0) && !(s.hurt > 0)) {
+      u.body.rotation.x = p.lean; u.body.rotation.y = p.twist;
+      // 足は体に付いているので、反らした分を戻して地面に立たせ、前後に踏ん張る（歩いているときは歩きのまま）
+      if (!s.moving) { u.legs[0].rotation.x = -p.lean - .35 * p.stance; u.legs[1].rotation.x = -p.lean + .25 * p.stance; }
+      u.head.rotation.y = -p.twist * .6;
+    }
+    const grip = aimHand(u.armR, u.elbowR, new THREE.Vector3(p.x, p.y, p.z), new THREE.Vector3(1, -.6, -.2));
+    const axis = new THREE.Vector3(Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch), Math.cos(p.yaw) * Math.cos(p.pitch));
+    aimHand(u.armL, u.elbowL, grip.clone().addScaledVector(axis, -.18), new THREE.Vector3(-1, -.6, -.2));
+    orientWeapon(u, p.yaw, p.pitch, Math.PI / 2); // 縦振り: 刃を前へ
+  }
+  return {
+    pose(u, s) {
+      const k = s.swing ?? -1;
+      if (s.heavy && k >= 0) {
+        // 振りかぶりを保つ → 一気に振り下ろす → 構えに戻る
+        const top = windup(1);
+        const p = k < .06 ? top : k < .28 ? mix(top, STRIKE, ease((k - .06) / .22)) : k < .62 ? STRIKE : mix(STRIKE, REST, ease((k - .62) / .38));
+        hold(u, s, p);
+      } else if (s.charging && k >= 0 && k <= .02) {
+        // 溜めの前半で振りかぶりきり、溜めきったら力をこめて小さく震える
+        const charge = Math.min(1, Math.max(0, s.charge ?? 0)), p = windup(ease(Math.min(1, charge / .6)));
+        if (charge >= 1) p.pitch += Math.sin((s.t ?? 0) * 45) * .02;
+        hold(u, s, p);
+      } else applyMeleePose(u, s);
+    },
+  };
+};
 
 // ---------------------------------------------------------------------------
 // 武器スキル（武器に付くスキル。鍛冶屋で付け替えられる）
@@ -354,4 +400,4 @@ function effects({ player, attack, tree, show, register }) {
 // 武器の登録（weapons/index.js が集める）
 //   kindOrder・stats: サーバーと共通の数値（WEAPONS の並び順と中身） / tab・glyph: 武器ツリー画面のタブの並び・装備アイコンの文字 / tree・skills・mods・legacy: 武器ツリー
 //   heavy: 強攻撃 / weaponSkills: 武器スキル / model: 形 / motion: 構え（なければ近接） / effects: 武器ツリーの効果（install(api)）
-export default { wk: 'greatsword', kindOrder: 1, stats, tab: 2, glyph: '大', tree: GREATSWORD, skills, mods, legacy, heavy, weaponSkills, model, effects };
+export default { wk: 'greatsword', kindOrder: 1, stats, tab: 2, glyph: '大', tree: GREATSWORD, skills, mods, legacy, heavy, weaponSkills, model, motion, effects };

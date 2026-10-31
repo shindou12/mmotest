@@ -23,11 +23,12 @@ export class Net {
     });
   }
 
-  async startSolo() {
+  // key: ソロのワールド（階層解放・共有ボックス）の保存先 / unlocked: 最初から解放しておく階層（デバッグ部屋）
+  async startSolo(key = 'eterna_coop_hard_solo_world_v1', unlocked = 1) {
     const { World } = await import('../shared/sim.js');
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem('eterna_coop_hard_solo_world_v1') || '{}'); } catch { /* */ }
-    this.world = new World({ unlocked: saved.unlocked || 1, box: saved.box || [], onSave: (d) => { try { localStorage.setItem('eterna_coop_hard_solo_world_v1', JSON.stringify(d)); } catch { /* */ } } });
+    try { saved = JSON.parse(localStorage.getItem(key) || '{}'); } catch { /* */ }
+    this.world = new World({ unlocked: Math.max(unlocked, saved.unlocked || 1), box: saved.box || [], onSave: (d) => { try { localStorage.setItem(key, JSON.stringify(d)); } catch { /* */ } } });
     this.world.addPlayer(1, (m) => queueMicrotask(() => this.onMsg(m)));
     let last = performance.now();
     setInterval(() => { const now = performance.now(); this.world.tick(Math.min(0.1, (now - last) / 1000)); last = now; }, 50);

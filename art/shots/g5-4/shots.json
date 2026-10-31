@@ -1,0 +1,14 @@
+[
+  {"id":"lake-nushi","area":"f1_lake","label":"f1_lake / ヌシ・ギガスライム","at":[24.89298,-4.3893],"focus":[5.13135,16.47899]},
+  {"id":"f1-dun-elite","area":"f1_dun","label":"f1_dun / 精鋭","at":[4,4],"focus":[12,4]},
+  {"id":"f2-gatekeeper","area":"f2_lab","label":"f2_lab / 門番","at":[0,-30],"focus":[0,-44]},
+  {"id":"f2-traps","area":"f2_lab","label":"f2_lab / 罠床","at":[0,-12],"focus":[0,-16]},
+  {"id":"f1-lab-sentinel","area":"f1_lab","label":"f1_lab / 番兵 K","at":[0,-36],"focus":[0,-36]},
+  {"id":"f1-lab-swarm","area":"f1_lab","label":"f1_lab / 群れ w","at":[28,20],"focus":[28,8]},
+  {"id":"f3-plate-unlit","area":"f3_lab","label":"f3_lab / 感圧板 消灯","at":[-48,7],"focus":[-48,2]},
+  {"id":"f3-plate-lit","area":"f3_lab","label":"f3_lab / 感圧板 点灯","at":[-49.7,2],"focus":[-48,2]},
+  {"id":"f1-lab-boss","area":"f1_lab","label":"f1_lab / ボスの輪・オーラ","at":[0,-80],"focus":[0,-80]},
+  {"id":"f1-lab-lever","area":"f1_lab","label":"f1_lab / レバー","at":[48,41],"focus":[48,44]},
+  {"id":"f1-lab-door-closed","area":"f1_lab","label":"f1_lab / 扉 閉","at":[0,-56],"focus":[0,-60]},
+  {"id":"f1-lab-door-open","area":"f1_lab","label":"f1_lab / 扉 開","at":[48,44],"focus":[0,-60],"openDoor":true}
+]

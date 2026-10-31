@@ -6,7 +6,7 @@ export function installSettings(ui) {
   P.settings = () => {
     const s = game.settings;
     for (const k of ['master', 'music', 'sfx', 'amb']) { SET[k].set({ value: Math.round(s[k] * 100) }); SET[k].out.set({ text: String(Math.round(s[k] * 100)) }); }
-    SET.quality.set({ value: s.quality });
+    SET.quality.set({ value: s.quality }); SET.fx.set({ value: s.fx });
     SET.shake.set({ checked: s.shake }); SET.dmgnum.set({ checked: s.dmgnum }); SET.occlusion.set({ checked: s.occlusion !== false });
   };
 }

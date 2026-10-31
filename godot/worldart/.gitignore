@@ -1,0 +1,4 @@
+.godot/
+# GLB の取り込みで取り出される絵（取り込み直せば作られる）
+data/assets/*.png
+data/assets/*.png.import

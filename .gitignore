@@ -3,3 +3,29 @@ world-save.json
 
 world-save-coop-hard.json
 out/
+*.blend1
+__pycache__/
+
+# Luna（codex exec）の実行の記録と依頼の札（docs/agents/collaboration.md）
+.agents/
+
+# Godot に書き出した地図とアセットのうち、まだ入れていないもの（作り直せる: python3 -I tools/worldart/godot/export_godot.py <地図…>）
+# 入っている f1_field・assets の既存のファイルは追跡のまま。新しく入れるときは git add -f
+godot/worldart/data/*/
+!godot/worldart/data/f1_field/
+!godot/worldart/data/models/
+!godot/worldart/data/tex/
+godot/worldart/data/assets/*
+# 試しの撮影
+art/shots/port/
+
+# サブエージェントの作業用の worktree（Agent の isolation: worktree）
+.claude/worktrees/
+# 姿勢の照合の生の値（4MB。node tools/worldart/godot/export_rig.mjs で作り直せる。client_test.sh がなければ作る）
+godot/worldart/data/poses_golden.json
+# 戦闘の照合の生の値（5MB。node tools/worldart/godot/golden_combat.mjs で作り直せる。client_test.sh がなければ作る）
+godot/worldart/data/combat_golden.json
+# 当たりの照合の生の値（node tools/worldart/godot/golden_strikes.mjs で作り直せる。client_test.sh がなければ作る）
+godot/worldart/data/strikes_golden.json
+# 敵の動きの照合用、生の期待値
+godot/worldart/data/mobs_golden.json

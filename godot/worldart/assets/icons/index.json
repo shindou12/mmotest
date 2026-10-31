@@ -1,0 +1,817 @@
+{
+  "sw_aircut": {
+    "file": "sw_aircut.png",
+    "symbol": "〰",
+    "type": "skill"
+  },
+  "sw_parry": {
+    "file": "sw_parry.png",
+    "symbol": "⛨",
+    "type": "skill"
+  },
+  "sw_slant": {
+    "file": "sw_slant.png",
+    "symbol": "⟫",
+    "type": "skill"
+  },
+  "sw_norm": {
+    "file": "sw_norm.png",
+    "symbol": "⚔",
+    "type": "tree"
+  },
+  "sw_light": {
+    "file": "sw_light.png",
+    "symbol": "➶",
+    "type": "tree"
+  },
+  "sw_cycle": {
+    "file": "sw_cycle.png",
+    "symbol": "⟲",
+    "type": "tree"
+  },
+  "sw_mage": {
+    "file": "sw_mage.png",
+    "symbol": "✧",
+    "type": "tree"
+  },
+  "sw_glad": {
+    "file": "sw_glad.png",
+    "symbol": "♨",
+    "type": "tree"
+  },
+  "sw_guard": {
+    "file": "sw_guard.png",
+    "symbol": "⛉",
+    "type": "tree"
+  },
+  "sw_edge": {
+    "file": "sw_edge.png",
+    "symbol": "✦",
+    "type": "tree"
+  },
+  "sw_tough": {
+    "file": "sw_tough.png",
+    "symbol": "⛨",
+    "type": "tree"
+  },
+  "sw_side": {
+    "file": "sw_side.png",
+    "symbol": "↷",
+    "type": "skill"
+  },
+  "sw_dance": {
+    "file": "sw_dance.png",
+    "symbol": "♪",
+    "type": "skill"
+  },
+  "sw_brave": {
+    "file": "sw_brave.png",
+    "symbol": "♥",
+    "type": "skill"
+  },
+  "sw_heaven": {
+    "file": "sw_heaven.png",
+    "symbol": "☼",
+    "type": "tree"
+  },
+  "sw_phantom": {
+    "file": "sw_phantom.png",
+    "symbol": "◐",
+    "type": "tree"
+  },
+  "sw_saint": {
+    "file": "sw_saint.png",
+    "symbol": "✪",
+    "type": "tree"
+  },
+  "sw_berserk": {
+    "file": "sw_berserk.png",
+    "symbol": "☠",
+    "type": "tree"
+  },
+  "sw_paladin": {
+    "file": "sw_paladin.png",
+    "symbol": "✚",
+    "type": "tree"
+  },
+  "sw_avenger": {
+    "file": "sw_avenger.png",
+    "symbol": "⚡",
+    "type": "tree"
+  },
+  "gt_rising": {
+    "file": "gt_rising.png",
+    "symbol": "⤒",
+    "type": "skill"
+  },
+  "gt_broad": {
+    "file": "gt_broad.png",
+    "symbol": "⟷",
+    "type": "skill"
+  },
+  "gt_recoil": {
+    "file": "gt_recoil.png",
+    "symbol": "☾",
+    "type": "skill"
+  },
+  "gt_charge": {
+    "file": "gt_charge.png",
+    "symbol": "◎",
+    "type": "tree"
+  },
+  "gt_armor": {
+    "file": "gt_armor.png",
+    "symbol": "⛉",
+    "type": "tree"
+  },
+  "gt_moon": {
+    "file": "gt_moon.png",
+    "symbol": "☽",
+    "type": "tree"
+  },
+  "gt_wave": {
+    "file": "gt_wave.png",
+    "symbol": "☾",
+    "type": "tree"
+  },
+  "gt_blow": {
+    "file": "gt_blow.png",
+    "symbol": "⚒",
+    "type": "tree"
+  },
+  "gt_counter": {
+    "file": "gt_counter.png",
+    "symbol": "⚔",
+    "type": "tree"
+  },
+  "gt_break": {
+    "file": "gt_break.png",
+    "symbol": "✸",
+    "type": "tree"
+  },
+  "gt_eye": {
+    "file": "gt_eye.png",
+    "symbol": "◉",
+    "type": "tree"
+  },
+  "gt_guillo": {
+    "file": "gt_guillo.png",
+    "symbol": "⇓",
+    "type": "skill"
+  },
+  "gt_slam": {
+    "file": "gt_slam.png",
+    "symbol": "⤓",
+    "type": "skill"
+  },
+  "gt_siege": {
+    "file": "gt_siege.png",
+    "symbol": "♜",
+    "type": "skill"
+  },
+  "gt_fullmoon": {
+    "file": "gt_fullmoon.png",
+    "symbol": "○",
+    "type": "tree"
+  },
+  "gt_eclipse": {
+    "file": "gt_eclipse.png",
+    "symbol": "●",
+    "type": "tree"
+  },
+  "gt_judge": {
+    "file": "gt_judge.png",
+    "symbol": "⚖",
+    "type": "tree"
+  },
+  "gt_unyield": {
+    "file": "gt_unyield.png",
+    "symbol": "⛰",
+    "type": "tree"
+  },
+  "gt_iai": {
+    "file": "gt_iai.png",
+    "symbol": "⚡",
+    "type": "tree"
+  },
+  "gt_mirror": {
+    "file": "gt_mirror.png",
+    "symbol": "◇",
+    "type": "tree"
+  },
+  "dk_flank": {
+    "file": "dk_flank.png",
+    "symbol": "»",
+    "type": "skill"
+  },
+  "dk_vital": {
+    "file": "dk_vital.png",
+    "symbol": "✕",
+    "type": "skill"
+  },
+  "dk_bleed": {
+    "file": "dk_bleed.png",
+    "symbol": "≋",
+    "type": "skill"
+  },
+  "dk_combo": {
+    "file": "dk_combo.png",
+    "symbol": "⚡",
+    "type": "tree"
+  },
+  "dk_agile": {
+    "file": "dk_agile.png",
+    "symbol": "➶",
+    "type": "tree"
+  },
+  "dk_vitalp": {
+    "file": "dk_vitalp.png",
+    "symbol": "✦",
+    "type": "tree"
+  },
+  "dk_venom": {
+    "file": "dk_venom.png",
+    "symbol": "☠",
+    "type": "tree"
+  },
+  "dk_assassin": {
+    "file": "dk_assassin.png",
+    "symbol": "◣",
+    "type": "tree"
+  },
+  "dk_blades": {
+    "file": "dk_blades.png",
+    "symbol": "⚡",
+    "type": "tree"
+  },
+  "dk_toxin": {
+    "file": "dk_toxin.png",
+    "symbol": "⚗",
+    "type": "tree"
+  },
+  "dk_shadow": {
+    "file": "dk_shadow.png",
+    "symbol": "◌",
+    "type": "tree"
+  },
+  "dk_poison": {
+    "file": "dk_poison.png",
+    "symbol": "☠",
+    "type": "skill"
+  },
+  "dk_smoke": {
+    "file": "dk_smoke.png",
+    "symbol": "☁",
+    "type": "skill"
+  },
+  "dk_pin": {
+    "file": "dk_pin.png",
+    "symbol": "†",
+    "type": "skill"
+  },
+  "dk_burst": {
+    "file": "dk_burst.png",
+    "symbol": "✺",
+    "type": "tree"
+  },
+  "dk_spread": {
+    "file": "dk_spread.png",
+    "symbol": "❋",
+    "type": "tree"
+  },
+  "dk_step": {
+    "file": "dk_step.png",
+    "symbol": "↶",
+    "type": "tree"
+  },
+  "dk_exec": {
+    "file": "dk_exec.png",
+    "symbol": "☩",
+    "type": "tree"
+  },
+  "dk_thousand": {
+    "file": "dk_thousand.png",
+    "symbol": "⋔",
+    "type": "tree"
+  },
+  "dk_gale": {
+    "file": "dk_gale.png",
+    "symbol": "≫",
+    "type": "tree"
+  },
+  "sp_fan": {
+    "file": "sp_fan.png",
+    "symbol": "⋔",
+    "type": "skill"
+  },
+  "sp_sweep": {
+    "file": "sp_sweep.png",
+    "symbol": "⌒",
+    "type": "skill"
+  },
+  "sp_bash": {
+    "file": "sp_bash.png",
+    "symbol": "⛉",
+    "type": "skill"
+  },
+  "sp_iron": {
+    "file": "sp_iron.png",
+    "symbol": "⛨",
+    "type": "tree"
+  },
+  "sp_shield": {
+    "file": "sp_shield.png",
+    "symbol": "◈",
+    "type": "tree"
+  },
+  "sp_spear": {
+    "file": "sp_spear.png",
+    "symbol": "➹",
+    "type": "tree"
+  },
+  "sp_dragoon": {
+    "file": "sp_dragoon.png",
+    "symbol": "⇑",
+    "type": "tree"
+  },
+  "sp_reach": {
+    "file": "sp_reach.png",
+    "symbol": "↦",
+    "type": "tree"
+  },
+  "sp_knight": {
+    "file": "sp_knight.png",
+    "symbol": "♞",
+    "type": "tree"
+  },
+  "sp_brk": {
+    "file": "sp_brk.png",
+    "symbol": "✸",
+    "type": "tree"
+  },
+  "sp_ctr": {
+    "file": "sp_ctr.png",
+    "symbol": "↺",
+    "type": "tree"
+  },
+  "sp_stake": {
+    "file": "sp_stake.png",
+    "symbol": "⚡",
+    "type": "skill"
+  },
+  "sp_intercept": {
+    "file": "sp_intercept.png",
+    "symbol": "⛊",
+    "type": "skill"
+  },
+  "sp_taunt": {
+    "file": "sp_taunt.png",
+    "symbol": "!",
+    "type": "skill"
+  },
+  "sp_fang": {
+    "file": "sp_fang.png",
+    "symbol": "✷",
+    "type": "tree"
+  },
+  "sp_soar": {
+    "file": "sp_soar.png",
+    "symbol": "⇈",
+    "type": "tree"
+  },
+  "sp_pierce": {
+    "file": "sp_pierce.png",
+    "symbol": "➶",
+    "type": "tree"
+  },
+  "sp_hold": {
+    "file": "sp_hold.png",
+    "symbol": "⇤",
+    "type": "tree"
+  },
+  "sp_banner": {
+    "file": "sp_banner.png",
+    "symbol": "⚑",
+    "type": "tree"
+  },
+  "sp_bolt": {
+    "file": "sp_bolt.png",
+    "symbol": "☇",
+    "type": "tree"
+  },
+  "ax_hook": {
+    "file": "ax_hook.png",
+    "symbol": "⟲",
+    "type": "skill"
+  },
+  "ax_return": {
+    "file": "ax_return.png",
+    "symbol": "⟳",
+    "type": "skill"
+  },
+  "ax_stomp": {
+    "file": "ax_stomp.png",
+    "symbol": "⊚",
+    "type": "skill"
+  },
+  "ax_heavy": {
+    "file": "ax_heavy.png",
+    "symbol": "◎",
+    "type": "tree"
+  },
+  "ax_blood": {
+    "file": "ax_blood.png",
+    "symbol": "♥",
+    "type": "tree"
+  },
+  "ax_swing": {
+    "file": "ax_swing.png",
+    "symbol": "⌒",
+    "type": "tree"
+  },
+  "ax_berserk": {
+    "file": "ax_berserk.png",
+    "symbol": "♨",
+    "type": "tree"
+  },
+  "ax_crush": {
+    "file": "ax_crush.png",
+    "symbol": "✸",
+    "type": "tree"
+  },
+  "ax_throw": {
+    "file": "ax_throw.png",
+    "symbol": "⟳",
+    "type": "tree"
+  },
+  "ax_brk": {
+    "file": "ax_brk.png",
+    "symbol": "✸",
+    "type": "tree"
+  },
+  "ax_rage": {
+    "file": "ax_rage.png",
+    "symbol": "♨",
+    "type": "tree"
+  },
+  "ax_exec": {
+    "file": "ax_exec.png",
+    "symbol": "☩",
+    "type": "skill"
+  },
+  "ax_lust": {
+    "file": "ax_lust.png",
+    "symbol": "♥",
+    "type": "skill"
+  },
+  "ax_rush": {
+    "file": "ax_rush.png",
+    "symbol": "»",
+    "type": "skill"
+  },
+  "ax_undying": {
+    "file": "ax_undying.png",
+    "symbol": "✚",
+    "type": "tree"
+  },
+  "ax_reckless": {
+    "file": "ax_reckless.png",
+    "symbol": "☠",
+    "type": "tree"
+  },
+  "ax_quake": {
+    "file": "ax_quake.png",
+    "symbol": "⚡",
+    "type": "tree"
+  },
+  "ax_shatter": {
+    "file": "ax_shatter.png",
+    "symbol": "✷",
+    "type": "tree"
+  },
+  "ax_storm": {
+    "file": "ax_storm.png",
+    "symbol": "✺",
+    "type": "tree"
+  },
+  "ax_catch": {
+    "file": "ax_catch.png",
+    "symbol": "✋",
+    "type": "tree"
+  },
+  "bw_double": {
+    "file": "bw_double.png",
+    "symbol": "⇉",
+    "type": "skill"
+  },
+  "bw_tether": {
+    "file": "bw_tether.png",
+    "symbol": "⊸",
+    "type": "skill"
+  },
+  "bw_back": {
+    "file": "bw_back.png",
+    "symbol": "↶",
+    "type": "skill"
+  },
+  "bw_zone": {
+    "file": "bw_zone.png",
+    "symbol": "◎",
+    "type": "tree"
+  },
+  "bw_draw": {
+    "file": "bw_draw.png",
+    "symbol": "◉",
+    "type": "tree"
+  },
+  "bw_roll": {
+    "file": "bw_roll.png",
+    "symbol": "➶",
+    "type": "tree"
+  },
+  "bw_sniper": {
+    "file": "bw_sniper.png",
+    "symbol": "◎",
+    "type": "tree"
+  },
+  "bw_rapid": {
+    "file": "bw_rapid.png",
+    "symbol": "⇶",
+    "type": "tree"
+  },
+  "bw_trapper": {
+    "file": "bw_trapper.png",
+    "symbol": "⌖",
+    "type": "tree"
+  },
+  "bw_crit": {
+    "file": "bw_crit.png",
+    "symbol": "✦",
+    "type": "tree"
+  },
+  "bw_quiver": {
+    "file": "bw_quiver.png",
+    "symbol": "⟲",
+    "type": "tree"
+  },
+  "bw_trap": {
+    "file": "bw_trap.png",
+    "symbol": "⌖",
+    "type": "skill"
+  },
+  "bw_chime": {
+    "file": "bw_chime.png",
+    "symbol": "◌",
+    "type": "skill"
+  },
+  "bw_side": {
+    "file": "bw_side.png",
+    "symbol": "⇋",
+    "type": "skill"
+  },
+  "bw_hawk": {
+    "file": "bw_hawk.png",
+    "symbol": "⚡",
+    "type": "tree"
+  },
+  "bw_aim": {
+    "file": "bw_aim.png",
+    "symbol": "◎",
+    "type": "tree"
+  },
+  "bw_storm": {
+    "file": "bw_storm.png",
+    "symbol": "☔",
+    "type": "tree"
+  },
+  "bw_quick": {
+    "file": "bw_quick.png",
+    "symbol": "»",
+    "type": "tree"
+  },
+  "bw_shot": {
+    "file": "bw_shot.png",
+    "symbol": "✸",
+    "type": "tree"
+  },
+  "bw_lure": {
+    "file": "bw_lure.png",
+    "symbol": "⌖",
+    "type": "tree"
+  },
+  "tag_wave": {
+    "file": "tag_wave.png",
+    "symbol": "〰",
+    "type": "tree"
+  },
+  "tag_cd": {
+    "file": "tag_cd.png",
+    "symbol": "⟲",
+    "type": "tree"
+  },
+  "tag_crit": {
+    "file": "tag_crit.png",
+    "symbol": "✦",
+    "type": "tree"
+  },
+  "tag_dodge": {
+    "file": "tag_dodge.png",
+    "symbol": "➶",
+    "type": "tree"
+  },
+  "tag_hurt": {
+    "file": "tag_hurt.png",
+    "symbol": "⛨",
+    "type": "tree"
+  },
+  "tag_charge": {
+    "file": "tag_charge.png",
+    "symbol": "◎",
+    "type": "tree"
+  },
+  "tag_light": {
+    "file": "tag_light.png",
+    "symbol": "☾",
+    "type": "tree"
+  },
+  "tag_recv": {
+    "file": "tag_recv.png",
+    "symbol": "⛉",
+    "type": "tree"
+  },
+  "tag_poison": {
+    "file": "tag_poison.png",
+    "symbol": "☠",
+    "type": "tree"
+  },
+  "tag_move": {
+    "file": "tag_move.png",
+    "symbol": "»",
+    "type": "tree"
+  },
+  "tag_shield": {
+    "file": "tag_shield.png",
+    "symbol": "⛉",
+    "type": "tree"
+  },
+  "tag_thrust": {
+    "file": "tag_thrust.png",
+    "symbol": "➹",
+    "type": "tree"
+  },
+  "tag_break": {
+    "file": "tag_break.png",
+    "symbol": "✸",
+    "type": "tree"
+  },
+  "tag_blood": {
+    "file": "tag_blood.png",
+    "symbol": "♥",
+    "type": "tree"
+  },
+  "tag_throw": {
+    "file": "tag_throw.png",
+    "symbol": "⟳",
+    "type": "tree"
+  },
+  "tag_zone": {
+    "file": "tag_zone.png",
+    "symbol": "◎",
+    "type": "tree"
+  },
+  "tag_trap": {
+    "file": "tag_trap.png",
+    "symbol": "⌖",
+    "type": "tree"
+  },
+  "sv_twin": {
+    "file": "sv_twin.png",
+    "symbol": "⟳",
+    "type": "buff"
+  },
+  "sv_giant": {
+    "file": "sv_giant.png",
+    "symbol": "⬣",
+    "type": "buff"
+  },
+  "sv_rapid": {
+    "file": "sv_rapid.png",
+    "symbol": "⚡",
+    "type": "buff"
+  },
+  "sv_blaze": {
+    "file": "sv_blaze.png",
+    "symbol": "🔥",
+    "type": "buff"
+  },
+  "sv_storm": {
+    "file": "sv_storm.png",
+    "symbol": "⚡",
+    "type": "buff"
+  },
+  "sv_drain": {
+    "file": "sv_drain.png",
+    "symbol": "♥",
+    "type": "buff"
+  },
+  "sv_blink": {
+    "file": "sv_blink.png",
+    "symbol": "➶",
+    "type": "buff"
+  },
+  "sv_quake": {
+    "file": "sv_quake.png",
+    "symbol": "◎",
+    "type": "buff"
+  },
+  "sv_frost": {
+    "file": "sv_frost.png",
+    "symbol": "❄",
+    "type": "buff"
+  },
+  "sv_gale": {
+    "file": "sv_gale.png",
+    "symbol": "🌀",
+    "type": "buff"
+  },
+  "sv_heavy": {
+    "file": "sv_heavy.png",
+    "symbol": "✊",
+    "type": "buff"
+  },
+  "sv_holy": {
+    "file": "sv_holy.png",
+    "symbol": "✚",
+    "type": "buff"
+  },
+  "sv_venom": {
+    "file": "sv_venom.png",
+    "symbol": "☠",
+    "type": "buff"
+  },
+  "sv_meteor": {
+    "file": "sv_meteor.png",
+    "symbol": "☄",
+    "type": "buff"
+  },
+  "sv_haste": {
+    "file": "sv_haste.png",
+    "symbol": "»",
+    "type": "buff"
+  },
+  "sv_ward": {
+    "file": "sv_ward.png",
+    "symbol": "⛨",
+    "type": "buff"
+  },
+  "area_town": {
+    "file": "area_town.png",
+    "symbol": "⌂",
+    "type": "area"
+  },
+  "area_camp": {
+    "file": "area_camp.png",
+    "symbol": "⛺",
+    "type": "area"
+  },
+  "area_field": {
+    "file": "area_field.png",
+    "symbol": "✿",
+    "type": "area"
+  },
+  "area_hunt": {
+    "file": "area_hunt.png",
+    "symbol": "⚔",
+    "type": "area"
+  },
+  "area_secret": {
+    "file": "area_secret.png",
+    "symbol": "✧",
+    "type": "area"
+  },
+  "area_dungeon": {
+    "file": "area_dungeon.png",
+    "symbol": "◈",
+    "type": "area"
+  },
+  "area_labyrinth": {
+    "file": "area_labyrinth.png",
+    "symbol": "♜",
+    "type": "area"
+  },
+  "weather_rain": {
+    "file": "weather_rain.png",
+    "symbol": "🌧",
+    "type": "area"
+  },
+  "weather_fog": {
+    "file": "weather_fog.png",
+    "symbol": "🌫",
+    "type": "area"
+  },
+  "weather_sandstorm": {
+    "file": "weather_sandstorm.png",
+    "symbol": "🌪",
+    "type": "area"
+  }
+}

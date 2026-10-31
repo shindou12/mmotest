@@ -1,0 +1,231 @@
+{
+  "format": "WAV PCM",
+  "sample_rate": 44100,
+  "channels": 2,
+  "bit_depth": 16,
+  "randomness": {
+    "deterministic": true,
+    "algorithm": "LCG32",
+    "per_file_seed": true
+  },
+  "loop_check": {
+    "crossfade_ms": 50,
+    "measured": "loop 末尾と先頭のサンプル差",
+    "max_seam_boundary_delta_dbfs": -67.54
+  },
+  "beds": [
+    {
+      "kind": "meadow",
+      "file": "bed_meadow.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -35.38,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -142.89
+    },
+    {
+      "kind": "forest",
+      "file": "bed_forest.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -28.46,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -168.58
+    },
+    {
+      "kind": "desert",
+      "file": "bed_desert.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -32.43,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -133.25
+    },
+    {
+      "kind": "cave",
+      "file": "bed_cave.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -26.3,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -118.17
+    },
+    {
+      "kind": "lava",
+      "file": "bed_lava.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -15.76,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -112.35
+    },
+    {
+      "kind": "snow",
+      "file": "bed_snow.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -28.67,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -107.65
+    },
+    {
+      "kind": "underwater",
+      "file": "bed_underwater.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -18.23,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -113.25
+    },
+    {
+      "kind": "storm",
+      "file": "bed_storm.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -26.22,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -113.86
+    },
+    {
+      "kind": "void",
+      "file": "bed_void.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -24.16,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -112.62
+    },
+    {
+      "kind": "heaven",
+      "file": "bed_heaven.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -33.6,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -100.11
+    }
+  ],
+  "events": [
+    {
+      "event": "bird",
+      "environment": "meadow",
+      "file": "event_bird.ogg",
+      "length_seconds": 0.9096,
+      "peak_dbfs": -40.88,
+      "size_bytes": 160496,
+      "random_seed": 3320892091,
+      "ambient_event_attempts": 19
+    },
+    {
+      "event": "owl",
+      "environment": "forest",
+      "file": "event_owl.ogg",
+      "length_seconds": 1.9644,
+      "peak_dbfs": -37.2,
+      "size_bytes": 346572,
+      "random_seed": 2569950998,
+      "ambient_event_attempts": 17
+    },
+    {
+      "event": "drip",
+      "environment": "cave",
+      "file": "event_drip.ogg",
+      "length_seconds": 1.0363,
+      "peak_dbfs": -40.42,
+      "size_bytes": 182844,
+      "random_seed": 3213664987,
+      "ambient_event_attempts": 5
+    },
+    {
+      "event": "chime",
+      "environment": "cave",
+      "file": "event_chime.ogg",
+      "length_seconds": 1.4046,
+      "peak_dbfs": -41.66,
+      "size_bytes": 247816,
+      "random_seed": 2548483108,
+      "ambient_event_attempts": 4
+    },
+    {
+      "event": "crackle",
+      "environment": "lava",
+      "file": "event_crackle.ogg",
+      "length_seconds": 0.3546,
+      "peak_dbfs": -36.55,
+      "size_bytes": 62596,
+      "random_seed": 1773022913,
+      "ambient_event_attempts": 11
+    },
+    {
+      "event": "rumble",
+      "environment": "lava",
+      "file": "event_rumble.ogg",
+      "length_seconds": 1.786,
+      "peak_dbfs": -24.24,
+      "size_bytes": 315096,
+      "random_seed": 4052147845,
+      "ambient_event_attempts": 90
+    },
+    {
+      "event": "thunder",
+      "environment": "storm",
+      "file": "event_thunder.ogg",
+      "length_seconds": 3.0392,
+      "peak_dbfs": -19.94,
+      "size_bytes": 536160,
+      "random_seed": 3357851834,
+      "ambient_event_attempts": 7
+    },
+    {
+      "event": "bubble",
+      "environment": "underwater",
+      "file": "event_bubble.ogg",
+      "length_seconds": 0.3069,
+      "peak_dbfs": -42.3,
+      "size_bytes": 54176,
+      "random_seed": 839544526,
+      "ambient_event_attempts": 11
+    },
+    {
+      "event": "whisper",
+      "environment": "void",
+      "file": "event_whisper.ogg",
+      "length_seconds": 1.4845,
+      "peak_dbfs": -44.06,
+      "size_bytes": 261908,
+      "random_seed": 2603476298,
+      "ambient_event_attempts": 27
+    },
+    {
+      "event": "gust",
+      "environment": "desert",
+      "file": "event_gust.ogg",
+      "length_seconds": 1.7702,
+      "peak_dbfs": -35.74,
+      "size_bytes": 312300,
+      "random_seed": 2241265015,
+      "ambient_event_attempts": 96
+    }
+  ],
+  "weather": [
+    {
+      "kind": "rain",
+      "file": "weather_rain.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -25.54,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -94.92
+    },
+    {
+      "kind": "fog",
+      "file": "weather_fog.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -24.71,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -120.1
+    },
+    {
+      "kind": "sandstorm",
+      "file": "weather_sandstorm.ogg",
+      "length_seconds": 12,
+      "peak_dbfs": -21.52,
+      "size_bytes": 2116844,
+      "seam_boundary_delta_dbfs": -100.61
+    }
+  ],
+  "counts": {
+    "beds": 10,
+    "events": 10,
+    "weather": 3
+  }
+}

@@ -1,0 +1,19 @@
+Godot Engine v4.3.stable.official.77dcf97d8 - https://godotengine.org
+Vulkan 1.4.341 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4070 SUPER
+
+ERROR: Failed to read the root certificate store.
+   at: (platform/windows/os_windows.cpp:1873)
+INV_DEMO_STATE_JSON={"autoSalvage":-1,"codex":{},"color":"#448a9b","eq":{"acc":{"affixes":[["crit",2]],"atk":4,"enh":0,"fx":[],"hp":3,"id":"demo-eq-acc","ilvl":14,"name":"銀の首飾り","rarity":2,"slot":"acc"},"armor":{"affixes":[["hpp",3],["def",2]],"armor":"medium","atype":"leather","base":["def",2],"def":4,"enh":1,"fx":[],"hp":18,"id":"demo-eq-armor","ilvl":16,"name":"革の鎧","rarity":3,"slot":"armor"},"title":{"affixes":[],"enh":0,"id":"demo-eq-title","ilvl":1,"kind":null,"name":"「コボルド王を討つ者」","rarity":4,"req":null,"slot":"title","title":"t_boss1","weight":0},"weapon":{"affixes":[["atkp",3],["crit",2]],"atk":30,"enh":2,"fx":[],"id":"demo-eq-weapon","ilvl":18,"kind":"sword","name":"紅蓮の細剣","rarity":4,"skill":"leap","slot":"weapon"}},"gold":1234,"inv":[{"affixes":[["atkp",4],["sv_blaze",3],["crit",6]],"atk":34,"enh":3,"fx":[],"id":"demo-inv-weapon","ilvl":22,"kind":"sword","name":"炎纏う剣","rarity":5,"skill":"leap","slot":"weapon"},{"affixes":[],"armor":"light","atype":"cloth","def":0,"enh":0,"fx":[],"hp":6,"id":"demo-inv-cloth","ilvl":8,"name":"布の服","rarity":0,"slot":"armor"},{"affixes":[["crit",1]],"atk":2,"enh":0,"fx":[],"id":"demo-inv-ring","ilvl":10,"name":"銅の指輪","rarity":1,"slot":"acc"},{"affixes":[["atkp",2]],"atk":24,"enh":1,"fx":[],"id":"demo-inv-greatsword","ilvl":14,"kind":"greatsword","name":"砕岩の大剣","rarity":2,"skill":"cyclone","slot":"weapon"},{"affixes":[["move",3],["crit",3]],"atk":18,"enh":0,"fx":[],"id":"demo-inv-dagger","ilvl":15,"kind":"dagger","name":"夜風の短剣","rarity":3,"skill":"shadow","slot":"weapon"},{"affixes":[["hpp",2],["def",2]],"atk":27,"enh":1,"fx":[],"id":"demo-inv-spear","ilvl":18,"kind":"spear","name":"銀嶺の盾槍","rarity":4,"skill":"lance","slot":"weapon"},{"affixes":[["atkp",3]],"atk":25,"enh":2,"fx":[],"id":"demo-inv-axe","ilvl":16,"kind":"axe","name":"旅人の斧","rarity":3,"skill":"rampage","slot":"weapon"},{"affixes":[["crit",3]],"atk":17,"enh":0,"fx":[],"id":"demo-inv-bow","ilvl":13,"kind":"bow","name":"狙撃の長弓","rarity":2,"slot":"weapon"},{"affixes":[["vamp",3]],"armor":"medium","atype":"dragonhide","base":["vamp",1],"def":5,"enh":2,"fx":[],"hp":22,"id":"demo-inv-dragonhide","ilvl":19,"name":"竜革の鎧","rarity":4,"slot":"armor"},{"affixes":[["def",3]],"armor":"heavy","atype":"plate","def":8,"enh":4,"fx":[],"hp":30,"id":"demo-inv-heavy","ilvl":20,"name":"白銀の甲冑","rarity":5,"slot":"armor"},{"affixes":[["hpp",1]],"enh":0,"fx":[],"hp":4,"id":"demo-inv-amulet","ilvl":7,"name":"お守り","rarity":0,"slot":"acc"},{"affixes":[],"enh":0,"id":"demo-inv-title","ilvl":1,"kind":null,"name":"「疾風」","rarity":3,"req":null,"slot":"title","title":"t_wind","weight":0}],"lv":5,"mats":{"gems":{},"shard":23},"name":"InvTest","prof":{},"slots":["focus","warstomp"],"titles":{},"tree":{},"wt":{},"xp":130}
+LOG 接続中: ws://127.0.0.1:8080/ws
+INV_UI_LAYOUT_JSON={"bodyHeight":673,"bodyMinimum":673,"columnMinimum":[752,717],"equipment":4,"firstCell":[643,120,70,62],"grid":[643,120,520,130],"gridColumns":7,"gridMinimum":[470,130],"headerHeight":34,"items":12,"leftContentMinimum":[260,673],"panel":[356,63,820,743],"stats":[369,370,260,423],"statsContent":[244,407],"tooltip":[694,161,280,315],"tooltipVisible":true,"viewport":[1532,869],"weight":10.5}
+LEGACY_SHADOWS f1_town: Godot=267 Browser=267
+LOG はじまりの街
+LOG InvTest が浮遊城エテルナに降り立った
+LOG ひだまりの草原
+SHOT C:/Users/shind/mmotest/art/shots/g7-4-inv/godot.png
+WARNING: 1 RID of type "CanvasItem" was leaked.
+     at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2483)
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+     at: cleanup (core/object/object.cpp:2284)
+ERROR: 3 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:604)
