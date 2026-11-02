@@ -131,7 +131,9 @@ fitShadow();
 // ---------------------------------------------------------------- テクスチャ
 const texLoader = new THREE.TextureLoader();
 const tex = (name, srgb = true) => {
-  const t = texLoader.load(`${BASE}tex/${name}.png`);
+  const paintedGround = !flag('notex', false) && spec.ground?.texDir && ['ground_grass', 'rock_crack', 'rock_face'].includes(name);
+  const dir = paintedGround ? spec.ground.texDir : 'tex';
+  const t = texLoader.load(`${BASE}${dir}/${name}.png`);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -473,8 +475,9 @@ function dilateMap(tex) {
 // 葉の絵の差し替え（L27 仮説 A2）: ltex=<フォルダ>（public/worldart の下）の index.json に書いた名前の絵を、GLB の中の同じ名前の絵の代わりに使う。
 // アセットを組み直さずに、描き方を変えた葉の絵を入／切で比べるため
 const LTEX = new Map();
-if (q.get('ltex')) {
-  const dir = `${BASE}${q.get('ltex')}`;
+const ltex = q.get('ltex') || spec.foliage?.ltex;
+if (ltex && !flag('notex', false)) {
+  const dir = `${BASE}${ltex}`;
   const names = await (await fetch(`${dir}/index.json`)).json();
   await Promise.all(names.map(async (nm) => LTEX.set(nm, await texLoader.loadAsync(`${dir}/${nm}.png`))));
 }
