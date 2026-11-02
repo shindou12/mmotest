@@ -315,7 +315,7 @@
       "scale": 0.72
     },
     {
-      "asset": "fence_w_200",
+      "asset": "fence_w_200_a",
       "world": [
         -6.0,
         -0.1
@@ -323,7 +323,16 @@
       "rot": 10.0
     },
     {
-      "asset": "fence_w_150",
+      "asset": "grass_tall_a",
+      "world": [
+        -5.96527,
+        0.096962
+      ],
+      "rot": 0,
+      "scale": 0.45
+    },
+    {
+      "asset": "fence_w_150_b",
       "world": [
         -4.030384,
         -0.447296
@@ -331,7 +340,7 @@
       "rot": 25.000000000000007
     },
     {
-      "asset": "fence_w_200",
+      "asset": "fence_w_200_c",
       "world": [
         -2.670923,
         -1.081224
@@ -339,7 +348,16 @@
       "rot": 45.0
     },
     {
-      "asset": "fence_w_200",
+      "asset": "grass_tall_a",
+      "world": [
+        -2.529502,
+        -0.939803
+      ],
+      "rot": 274,
+      "scale": 0.45
+    },
+    {
+      "asset": "fence_w_200_a",
       "world": [
         -1.256709,
         -2.495437
@@ -347,7 +365,7 @@
       "rot": 49.99999999999999
     },
     {
-      "asset": "fence_w_150",
+      "asset": "fence_w_150_b",
       "world": [
         0.028866,
         -4.027526
@@ -355,7 +373,16 @@
       "rot": 29.999999999999996
     },
     {
-      "asset": "fence_w_200",
+      "asset": "grass_tall_a",
+      "world": [
+        0.128866,
+        -3.854321
+      ],
+      "rot": 188,
+      "scale": 0.45
+    },
+    {
+      "asset": "fence_w_200_c",
       "world": [
         1.327904,
         -4.777526
@@ -363,7 +390,7 @@
       "rot": 14.999999999999996
     },
     {
-      "asset": "fence_w_post",
+      "asset": "fence_w_post_a",
       "world": [
         3.2597557265803596,
         -5.295164286761002
@@ -371,7 +398,16 @@
       "rot": 14.999999999999996
     },
     {
-      "asset": "fence_w_80",
+      "asset": "grass_tall_a",
+      "world": [
+        3.31152,
+        -5.101979
+      ],
+      "rot": 102,
+      "scale": 0.45
+    },
+    {
+      "asset": "fence_w_80_a",
       "world": [
         -6.3,
         1.1
@@ -379,7 +415,16 @@
       "rot": -0.0
     },
     {
-      "asset": "fence_w_150",
+      "asset": "grass_tall_a",
+      "world": [
+        -6.3,
+        1.3
+      ],
+      "rot": 0,
+      "scale": 0.45
+    },
+    {
+      "asset": "fence_w_150_b",
       "world": [
         -5.5,
         1.1
@@ -387,7 +432,7 @@
       "rot": -0.0
     },
     {
-      "asset": "fence_w_200",
+      "asset": "fence_w_200_c",
       "world": [
         -4.0,
         1.1
@@ -395,7 +440,16 @@
       "rot": -0.0
     },
     {
-      "asset": "fence_w_post",
+      "asset": "grass_tall_a",
+      "world": [
+        -4.0,
+        1.3
+      ],
+      "rot": 274,
+      "scale": 0.45
+    },
+    {
+      "asset": "fence_w_post_a",
       "world": [
         -2,
         1.1
