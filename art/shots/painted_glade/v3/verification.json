@@ -1,0 +1,24 @@
+{
+  "blender": "4.2.23 LTS",
+  "body_triangles": 3800,
+  "glb_triangles": 4532,
+  "baked_size": [
+    1024,
+    1024
+  ],
+  "screenshots": {
+    "main.png": [
+      1532,
+      869
+    ],
+    "close.png": [
+      1532,
+      869
+    ],
+    "stages.png": [
+      2080,
+      566
+    ]
+  },
+  "game_log": "art/shots/painted_glade/v3/main.png 85s\nart/shots/painted_glade/v3/close.png 89s\nno errors"
+}
