@@ -6,12 +6,27 @@ import json
 import math
 
 
-def asset_name(length):
+VARIANTS = ('a', 'b', 'c')
+
+
+def asset_name(length, variant=None):
     """cm 表記を名前にする。端数は p で区切り、長さを丸めない。"""
     cm = format(Decimal(str(length)) * 100, 'f')
     if '.' in cm:
         cm = cm.rstrip('0').rstrip('.')
-    return 'fence_w_' + cm.replace('.', 'p')
+    name = 'fence_w_' + cm.replace('.', 'p')
+    return name if variant is None else name + '_' + variant
+
+
+def post_props(position, rotation, index):
+    """柱の半分に、既存の草を短くして一房添える。"""
+    if index % 2:
+        return []
+    angle = math.radians(rotation)
+    return [dict(asset='grass_tall_a',
+                 world=[round(position[0] + .20 * math.sin(angle), 6),
+                        round(position[1] + .20 * math.cos(angle), 6)],
+                 rot=(index * 137) % 360, scale=.45)]
 
 
 def fit_lengths(distance, lengths, previous=None):
@@ -49,7 +64,7 @@ def fence_fit(polyline, lengths):
     """各折れ点に柱を置く。+X の部品を three.js の Y 回転（度）へ合わせる。"""
     if len(polyline) < 2 or any(len(p) != 2 or not all(math.isfinite(x) for x in p) for p in polyline):
         raise ValueError('折れ線には有限な [x,z] を 2 点以上指定してください')
-    props, previous = [], None
+    props, previous, index = [], None, 0
     for start, end in zip(polyline, polyline[1:]):
         dx, dz = end[0] - start[0], end[1] - start[1]
         distance = math.hypot(dx, dz)
@@ -60,12 +75,17 @@ def fence_fit(polyline, lengths):
         rotation = -math.degrees(math.atan2(dz, dx))
         offset = 0.0
         for length in sequence:
-            props.append(dict(asset=asset_name(length),
-                              world=[round(start[0] + dx * offset / distance, 6),
-                                     round(start[1] + dz * offset / distance, 6)], rot=rotation))
+            position = [round(start[0] + dx * offset / distance, 6),
+                        round(start[1] + dz * offset / distance, 6)]
+            props.append(dict(asset=asset_name(length, VARIANTS[index % 3]),
+                              world=position, rot=rotation))
+            props.extend(post_props(position, rotation, index))
+            index += 1
             offset += length
         previous = sequence[-1]
-    props.append(dict(asset='fence_w_post', world=list(polyline[-1]), rot=rotation))
+    props.append(dict(asset='fence_w_post_' + VARIANTS[index % 3],
+                      world=list(polyline[-1]), rot=rotation))
+    props.extend(post_props(polyline[-1], rotation, index))
     return props
 
 
