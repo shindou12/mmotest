@@ -8,17 +8,64 @@ from pathlib import Path
 import random
 import sys
 
-import bpy
-from mathutils import Vector
-
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/worldart/maps'))
 from fence_fit import asset_name
 
 TEXTURE = ROOT / 'public/worldart/tex/fence_trim.png'
 OUT = ROOT / 'public/worldart/assets'
-SHOTS = ROOT / 'art/shots/painted_glade/v4'
+SHOTS = ROOT / 'art/shots/painted_glade/v5'
 REPEATS_PER_M = 1.0
+POST_WIDTH = .32
+POST_HEIGHT = 1.10
+POST_BURY = .10
+RAIL_WIDTH = .12
+RAIL_HEIGHT = .24
+RAIL_BEVEL = .008
+RAIL_LEVELS = (.42, .80)
+RAIL_STEP = .5
+RAIL_OFFSET_Y = .004
+RAIL_WAVE_Y = .0045
+RAIL_WAVE_Z = .009
+VERTEX_SHADE_HEIGHT = 1.15
+TRIM_SATURATION = .70
+TRIM_HUE_SHIFT = -.015
+TRIM_VALUE = .90
+
+if '--trim-only' not in sys.argv:
+    import bpy
+    from mathutils import Vector
+
+
+def assemble_trim():
+    """元絵から v4 と同じ帯を組み、光と階調を保って色だけを補正する。"""
+    from PIL import Image
+    import numpy as np
+    src = Image.open(ROOT / 'art/painted-gen/fence/wood_source.png').convert('RGB')
+    w, h = src.size
+    atlas = np.zeros((1024, 1024, 3), np.uint8)
+    for i in range(3):
+        crop = src.crop((0, round(h * (i * .25 + .012)), w, round(h * ((i + 1) * .25 - .012))))
+        a = np.array(crop.resize((1024, 256), Image.Resampling.LANCZOS), dtype=float)
+        common = (a[:, 0] + a[:, -1]) * .5
+        for j in range(80):
+            blend = (1 - j / 79) ** 2
+            a[:, j] = a[:, j] * (1 - blend) + common * blend
+            a[:, -1 - j] = a[:, -1 - j] * (1 - blend) + common * blend
+        for y in range(256):
+            top = max(0, 1 - abs(y - 10) / 9) * .22
+            bottom = max(0, 1 - abs(y - 245) / 6) * .32
+            a[y] = a[y] * (1 - bottom) * (1 - top) + np.array([255, 216, 139]) * top
+        atlas[i * 256:(i + 1) * 256] = np.clip(a, 0, 255).astype(np.uint8)
+    atlas[768:] = [183, 124, 62]
+    end = src.crop((0, round(h * .70), round(w * .32), h)).resize((240, 240), Image.Resampling.LANCZOS)
+    atlas[776:1016, 8:248] = np.array(end)
+    hsv = np.array(Image.fromarray(atlas).convert('HSV'), dtype=float)
+    hsv[:, :, 0] = (hsv[:, :, 0] + TRIM_HUE_SHIFT * 255) % 256
+    hsv[:, :, 1] *= TRIM_SATURATION
+    hsv[:, :, 2] *= TRIM_VALUE
+    Image.fromarray(hsv.astype(np.uint8), 'HSV').convert('RGB').save(TEXTURE)
+    print('TRIM', TRIM_SATURATION, TRIM_HUE_SHIFT, TRIM_VALUE)
 
 
 def material():
@@ -68,8 +115,11 @@ class TimberMesh:
             if reverse:
                 indices.reverse()
             self.faces.append(tuple(base + j * sides + i for i in indices))
-            self.uvs.append(tuple(((128 + section[i][0] / 0.11 * 100) / 1024,
-                                   1 - (896 + section[i][1] / 0.11 * 100) / 1024) for i in indices))
+            # 断面が太くなっても木口を専用の正方形内に収める。
+            half_a = max(abs(a) for a, _ in section)
+            half_b = max(abs(b) for _, b in section)
+            self.uvs.append(tuple(((128 + section[i][0] / half_a * 100) / 1024,
+                                   1 - (896 + section[i][1] / half_b * 100) / 1024) for i in indices))
         if axis == 'X':
             self.rail_checks.append(dict(meters=along[-1], u_span=along[-1] * REPEATS_PER_M))
 
@@ -77,26 +127,30 @@ class TimberMesh:
         rng = random.Random(seed)
         section = [(-.075, -.10), (.071, -.10), (.10, -.071), (.10, .073),
                    (.072, .10), (-.073, .10), (-.10, .073), (-.10, -.072)]
-        section = [(x * rng.uniform(.96, 1.04), y * rng.uniform(.96, 1.04)) for x, y in section]
+        section = [(x * POST_WIDTH / .2 * rng.uniform(.96, 1.04),
+                    y * POST_WIDTH / .2 * rng.uniform(.96, 1.04)) for x, y in section]
         first = len(self.vertices)
-        self.tube([((0, 0, -.10), 1.04), ((.008, -.004, .45), 1.0), ((.012, .003, 1.05), .96)], section, 2, 'Z')
+        self.tube([((0, 0, -POST_BURY), 1.04), ((.004, -.002, .45), 1.0),
+                   ((.006, .0015, POST_HEIGHT), .96)], section, 2, 'Z')
         for i in range(first + 16, first + 24):
             x, y, z = self.vertices[i]
             self.vertices[i] = (x, y, z + .26 * x - .12 * y)
 
     def rail(self, length, height, seed, band):
         rng = random.Random(seed)
-        section = [(-.052, -.070), (.054, -.070), (.070, -.047), (.070, .049),
-                   (.050, .070), (-.051, .070), (-.070, .048), (-.070, -.050)]
+        # 小さな面取りだけを残した平たい角材。
+        a, b, bevel = RAIL_WIDTH / 2, RAIL_HEIGHT / 2, RAIL_BEVEL
+        section = [(-a + bevel, -b), (a - bevel, -b), (a, -b + bevel), (a, b - bevel),
+                   (a - bevel, b), (-a + bevel, b), (-a, b - bevel), (-a, -b + bevel)]
         section = [(a * rng.uniform(.95, 1.05), b * rng.uniform(.95, 1.05)) for a, b in section]
-        # 両端を柱の外へ出す。中心線の実長を UV の U に使う。
-        count = max(2, math.ceil(length / .5))
+        # 両端は柱の中心で止める。横方向も柱内に収め、隣の横木と重ねない。
+        count = max(2, math.ceil(length / RAIL_STEP))
         rings = []
         for j in range(count + 1):
             t = j / count
-            x = -.12 + (length + .24) * t
-            rings.append(((x, -.125 + .008 * math.sin(length * 2.3 + seed) + .009 * math.sin(math.pi * t),
-                           height + .018 * math.sin(2 * math.pi * t + .2 * band)),
+            x = length * t
+            rings.append(((x, RAIL_OFFSET_Y * math.sin(length * 2.3 + seed) + RAIL_WAVE_Y * math.sin(math.pi * t),
+                           height + RAIL_WAVE_Z * math.sin(2 * math.pi * t + .2 * band)),
                           1 + .035 * math.sin(math.pi * t)))
         self.tube(rings, section, band, 'X')
 
@@ -106,14 +160,14 @@ class TimberMesh:
         mesh.update()
         mesh.uv_layers.new(name='UVMap')
         colors = mesh.color_attributes.new(name='Col', type='FLOAT_COLOR', domain='CORNER')
-        # ????????? UV ??????Blender ????????????
+        # 色属性の追加後に UV の参照を取り直す。
         uv = mesh.uv_layers['UVMap']
         for polygon, coords in zip(mesh.polygons, self.uvs):
             polygon.use_smooth = False
             for loop, coord in zip(polygon.loop_indices, coords):
                 uv.data[loop].uv = coord
                 z = mesh.vertices[mesh.loops[loop].vertex_index].co.z
-                c = .7 + .3 * max(0, min(1, (z + .1) / 1.15))
+                c = .7 + .3 * max(0, min(1, (z + POST_BURY) / VERTEX_SHADE_HEIGHT))
                 colors.data[loop].color = (c, c, c, 1)
         mesh.materials.append(material())
         obj = bpy.data.objects.new(name, mesh)
@@ -127,7 +181,7 @@ def fence_w(length, seed=156):
         raise ValueError('長さは正の有限数にしてください')
     timber = TimberMesh()
     timber.post(seed)
-    for i, height in enumerate((.42, .80)):
+    for i, height in enumerate(RAIL_LEVELS):
         timber.rail(length, height, seed + i + 1, i)
     obj = timber.object(asset_name(length))
     obj['length_m'] = length
@@ -211,11 +265,13 @@ def main():
     results = [export(fence_w(length, args.seed)) for length in lengths]
     results.append(export(fence_w_post(args.seed)))
     report = dict(blender=bpy.app.version_string, repeats_per_meter=REPEATS_PER_M, assets=results)
-    (SHOTS / 'geometry.json').write_text(json.dumps(report, indent=2), encoding='utf8')
     print('FENCE_RESULT', json.dumps(report))
     if args.preview:
         preview()
 
 
 if __name__ == '__main__':
-    main()
+    if '--trim-only' in sys.argv:
+        assemble_trim()
+    else:
+        main()
