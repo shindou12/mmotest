@@ -89,6 +89,7 @@ M_MEANDER = lambda: material('stone_meander', 'stone_meander.png')
 M_FLAG = lambda: material('flagstone', 'ground_flagstone.png')
 M_FLOWER = lambda: material('leaf_flower', 'flowers.png', alpha=True)
 M_PALM = lambda: material('leaf_palm', 'leaf_palm.png', alpha=True)
+M_STUMP_PAINTED = lambda: material('stump_painted', 'stump_painted.png')
 
 
 # ------------------------------------------------------------ メッシュの組み立て
@@ -1200,6 +1201,58 @@ def stump(name, seed, r=0.42, h=0.55):
     return B.build(name)
 
 
+def painted_stump(name, r=0.5, h=0.55):
+    """手描きの切り株。側面は下の帯、木口は上の円へ UV を合わせる。"""
+    B = Builder(); n = 32
+    profiles = ((0.0, 0.84), (0.12, 0.74), (0.48, 0.80), (1.0, 1.0))
+    side_u0, side_u1 = 27 / 1254, 1225 / 1254
+    side_v0, side_v1 = 1 - 1225 / 1254, 1 - 577 / 1254
+    rings = []
+    for zf, scale in profiles:
+        z = h * zf
+        rings.append([B.add_v(Vector((math.cos(2 * math.pi * i / n) * r * scale,
+                                      math.sin(2 * math.pi * i / n) * r * scale, z))) for i in range(n)])
+    for j in range(len(rings) - 1):
+        z0, z1 = profiles[j][0], profiles[j + 1][0]
+        c0, c1 = 0.75 + 0.25 * z0, 0.75 + 0.25 * z1
+        for i in range(n):
+            u0 = side_u0 + (side_u1 - side_u0) * i / n
+            u1 = side_u0 + (side_u1 - side_u0) * (i + 1) / n
+            v0 = side_v0 + (side_v1 - side_v0) * z0
+            v1 = side_v0 + (side_v1 - side_v0) * z1
+            B.face([rings[j][i], rings[j][(i + 1) % n], rings[j + 1][(i + 1) % n], rings[j + 1][i]],
+                   [(u0, v0), (u1, v0), (u1, v1), (u0, v1)],
+                   [(c0,) * 3, (c0,) * 3, (c1,) * 3, (c1,) * 3], None, M_STUMP_PAINTED())
+
+    # 木口は独立した頂点にし、側面と法線を混ぜない。
+    top_start = len(B.f)
+    top_ring = [B.add_v(Vector((math.cos(2 * math.pi * i / n) * r,
+                                math.sin(2 * math.pi * i / n) * r, h))) for i in range(n)]
+    top_center = B.add_v(Vector((0, 0, h)))
+    uc, vc, ur = 325 / 1254, 1 - 285 / 1254, 275 / 1254
+    top_uv = [(uc + math.cos(2 * math.pi * i / n) * ur,
+               vc + math.sin(2 * math.pi * i / n) * ur) for i in range(n)]
+    center_uv = (uc, vc)
+    for i in range(n):
+        j = (i + 1) % n
+        B.face([top_ring[i], top_ring[j], top_center], [top_uv[i], top_uv[j], center_uv],
+               [(1.0,) * 3] * 3, None, M_STUMP_PAINTED())
+
+    bottom_ring = [B.add_v(Vector((math.cos(2 * math.pi * i / n) * r * profiles[0][1],
+                                   math.sin(2 * math.pi * i / n) * r * profiles[0][1], 0))) for i in range(n)]
+    bottom_center = B.add_v(Vector((0, 0, 0)))
+    bottom_uv = (0.5, side_v0)
+    for i in range(n):
+        j = (i + 1) % n
+        B.face([bottom_ring[j], bottom_ring[i], bottom_center], [bottom_uv, bottom_uv, bottom_uv],
+               [(0.75,) * 3] * 3, None, M_STUMP_PAINTED())
+
+    ob = B.build(name)
+    for poly in list(ob.data.polygons)[top_start:]:
+        poly.use_smooth = False
+    return ob
+
+
 def lavender_bush(name, seed):
     """ラベンダーの株: 6 枚の縦のカードを放射状に（下端が根元）。法線は外向き + 上"""
     R_ = random.Random(seed); B = Builder()
@@ -1640,6 +1693,7 @@ ASSETS = {
     'cart_frame': lambda n: cart_frame(n, 1004),
     'cart_frame2': lambda n: cart_frame2(n, 2055),
     'stump': lambda n: stump(n, 1005),
+    'stump_p': lambda n: painted_stump(n),
     'lavender': lambda n: lavender_bush(n, 1006),
     'stone_steps': lambda n: stone_steps(n, 1007),
     'statue': lambda n: pedestal_statue(n, 1008),
