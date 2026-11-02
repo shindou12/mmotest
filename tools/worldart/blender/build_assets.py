@@ -21,6 +21,7 @@ def arg(name, default):
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 OUT = os.path.join(ROOT, arg('--out', 'public/worldart/assets'))
 BLEND = os.path.join(ROOT, arg('--blend', 'art/blender/assets.blend'))
+ROCKMASK = arg('--rockmask', None)
 TEX = os.path.join(ROOT, 'public/worldart/tex')
 os.makedirs(OUT, exist_ok=True); os.makedirs(os.path.dirname(BLEND), exist_ok=True)
 
@@ -959,6 +960,11 @@ def smooth_rock(name, seed, size=(2.6, 1.8, 2.2), bulge=0.22, sub=4, flat_top=Tr
             ca.data[l].color = (a, a, a, 1)
     ob.location.z = size[2] * 0.25 * 0.7
     bpy.ops.object.transform_apply(location=True); ob.select_set(False)
+    if name == 'outcrop_a' and ROCKMASK is not None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if script_dir not in sys.path: sys.path.insert(0, script_dir)
+        from rock_mask import apply_rock_mask
+        apply_rock_mask(ob, float(ROCKMASK))
     return ob
 
 
