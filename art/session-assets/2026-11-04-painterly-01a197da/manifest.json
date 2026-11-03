@@ -17,6 +17,18 @@
       ]
     },
     {
+      "name": "木箱・描き込みX版",
+      "path": "current/crate-painted-x.zip",
+      "bytes": 4562115,
+      "sha256": "e73634dd4a4a02bceb7e0973d000df7dec99a7ece2d87e35e51aca8730a99b46",
+      "contents": [
+        "crate_sol_painted_x.glb",
+        "crate_sol_painted_x.blend",
+        "crate_painted_x_basecolor.png",
+        "README.txt"
+      ]
+    },
+    {
       "name": "木の柵",
       "path": "current/fence.zip",
       "bytes": 8426942,
