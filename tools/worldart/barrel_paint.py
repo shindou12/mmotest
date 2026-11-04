@@ -2,7 +2,7 @@
 """樽の色の絵を 1 枚に塗る。生成した木と金属の絵を、板・たが・縁・ふた・鋲の場所へ置く。
 
 光・落ち影・AO は焼かない。入れる明暗は塗りの色面だけ。
-使い方: python barrel_paint.py <layout.json> <出力.png>
+使い方: python barrel_paint.py <layout.json> <出力.png> [<ao.png> <edge.png> <下絵.png>]
 """
 import json
 import math
@@ -10,7 +10,7 @@ import random
 import sys
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 SIZE = 1024
 ART = "art/painted-gen/barrel_m0164/"
@@ -18,7 +18,7 @@ ART = "art/painted-gen/barrel_m0164/"
 # 色と強さはここにまとめる。sRGB。
 WOOD_COLOR = (205, 145, 100)
 WOOD_DARK_LINE = (98, 58, 44)
-WOOD_LINE_WIDTH = 10         # 画素。1024 で 1m ≈ 427 画素。ゲームの画面で約 2 画素
+WOOD_LINE_WIDTH = 7          # 画素。1024 で 1m ≈ 427 画素。ゲームの画面で約 1.4 画素
 STAVE_VALUE_RANGE = 0.07     # 板ごとの明るさの違い
 LOWER_ZONE_VALUE = 0.92      # 胴の下側の暗い色面
 LOWER_ZONE_HEIGHT = 0.46     # 胴の高さに対する色面の境
@@ -28,6 +28,9 @@ LID_VALUE = 0.94
 METAL_COLOR = (130, 108, 116)
 METAL_EDGE_LIGHT = 1.25
 METAL_EDGE_DARK = 0.72
+AO_FLOOR = 0.45              # 一番奥まった所の明るさ
+EDGE_LIGHT = 0.30            # 角の明るさの足し分
+EDGE_THRESHOLD = 0.55
 RIVET_COLORS = ((92, 72, 80), (168, 138, 136), (232, 208, 196))
 
 
@@ -121,20 +124,29 @@ def paint_lid(atlas, wood, rng):
 
 
 def paint_rivet(atlas):
-    """鋲: 根元が暗く、頂が明るい縦の階調。UV は u = 0.42、v = 0.02〜0.08。"""
-    x0, x1 = int(0.40 * SIZE), int(0.44 * SIZE)
-    stops = [(0.02, RIVET_COLORS[0]), (0.05, RIVET_COLORS[1]), (0.08, RIVET_COLORS[2])]
-    for y in range(v_to_y(0.10), v_to_y(0.0)):
-        v = 1.0 - y / SIZE
-        if v <= stops[0][0]:
-            color = stops[0][1]
-        elif v >= stops[-1][0]:
-            color = stops[-1][1]
-        else:
-            low, high = (stops[0], stops[1]) if v < stops[1][0] else (stops[1], stops[2])
-            t = (v - low[0]) / (high[0] - low[0])
-            color = [low[1][i] * (1 - t) + high[1][i] * t for i in range(3)]
-        atlas[y, x0:x1] = color
+    """鋲: 上から見た丸い頭。中央 (u, v) = (0.42, 0.06)、半径 0.05。縁が暗く、中が明るい。"""
+    cx, cy, radius = 0.42 * SIZE, (1.0 - 0.06) * SIZE, 0.05 * SIZE
+    yy, xx = np.mgrid[int(cy - radius - 6):int(cy + radius + 6), int(cx - radius - 6):int(cx + radius + 6)]
+    d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / radius
+    # 左上に寄せた明るい点で丸みを描く。
+    h = np.sqrt((xx - cx + radius * 0.2) ** 2 + (yy - cy + radius * 0.2) ** 2) / radius
+    t = np.clip(1.0 - h, 0.0, 1.0)[..., None]
+    dark, light = np.array(RIVET_COLORS[0], np.float32), np.array(RIVET_COLORS[2], np.float32)
+    color = dark * (1.0 - t) + light * t
+    atlas[yy, xx] = color
+
+
+def make_guide(atlas, ao_path, edge_path, out):
+    """色の下絵に形の情報を重ねる: 奥まりを暗く、角を明るく。"""
+    ao = np.asarray(Image.open(ao_path).convert("L").filter(ImageFilter.GaussianBlur(2))).astype(np.float32) / 255.0
+    edge = np.asarray(Image.open(edge_path).convert("L").filter(ImageFilter.GaussianBlur(1))).astype(np.float32) / 255.0
+    # 細長い明るい線だけを角として使う。三角形の対角の模様は弱いので切り捨てる。
+    edge = np.clip((edge - EDGE_THRESHOLD) / (1.0 - EDGE_THRESHOLD), 0.0, 1.0)
+    guide = atlas * (AO_FLOOR + (1.0 - AO_FLOOR) * ao[..., None]) * (1.0 + EDGE_LIGHT * edge[..., None])
+    # 鋲の絵と余白には形の情報を重ねない。
+    rivet_y0, rivet_x0, rivet_x1 = v_to_y(0.13), int(0.34 * SIZE), int(0.50 * SIZE)
+    guide[rivet_y0:, rivet_x0:rivet_x1] = atlas[rivet_y0:, rivet_x0:rivet_x1]
+    Image.fromarray(np.clip(guide, 0, 255).astype(np.uint8)).save(out)
 
 
 def main():
@@ -153,6 +165,8 @@ def main():
     paint_lid(atlas, wood, rng)
     paint_rivet(atlas)
     Image.fromarray(np.clip(atlas, 0, 255).astype(np.uint8)).save(out)
+    if len(sys.argv) > 3:
+        make_guide(atlas, sys.argv[3], sys.argv[4], sys.argv[5])
 
 
 if __name__ == "__main__":

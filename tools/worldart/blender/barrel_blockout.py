@@ -54,6 +54,7 @@ def arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
     parser.add_argument("--stage", type=int, default=1, choices=(1, 2, 3, 4))
+    parser.add_argument("--bake-guides", action="store_true", help="stage 4: 形の情報を焼いて終わる")
     parser.add_argument("--atlas", help="stage 4: 塗った絵。なければ灰色で UV だけ作る")
     return parser.parse_args(argv)
 
@@ -125,6 +126,8 @@ RIVETS_PER_BAND = 8
 RIVET_RADIUS = 0.038     # 見本の鋲の直径は約 8cm（ゲームの画面で約 6 画素）
 RIVET_HEIGHT = 0.017
 RIVET_SIDES = 6
+RIVET_UV_CENTER = (0.42, 0.06)
+RIVET_UV_RADIUS = 0.05
 RIM_CHIPS = {2: (0.012, 0.006), 7: (0.009, 0.004)}  # 板の番号: (下げる高さ, 削る厚み)
 
 
@@ -150,9 +153,17 @@ def add_rivet(bm, center, normal, uv_layer=None):
     for face in faces:
         face.smooth = True
         if uv_layer is not None:
+            # 鋲は全部同じ丸い絵を共有する。上から見た丸として展開する。
             for loop in face.loops:
-                height = 0.02 if loop.vert in base else 0.05 if loop.vert in shoulder else 0.08
-                loop[uv_layer].uv = (0.42, height)
+                if loop.vert in base:
+                    index, radius = base.index(loop.vert), RIVET_UV_RADIUS
+                elif loop.vert in shoulder:
+                    index, radius = shoulder.index(loop.vert), RIVET_UV_RADIUS * 0.62
+                else:
+                    index, radius = 0, 0.0
+                angle = 2.0 * math.pi * index / RIVET_SIDES
+                loop[uv_layer].uv = (RIVET_UV_CENTER[0] + radius * math.cos(angle),
+                                     RIVET_UV_CENTER[1] + radius * math.sin(angle))
     return len(faces)
 
 
@@ -185,8 +196,10 @@ def assign_atlas_uv(bm, rings, columns, start):
         return 0.5 + 0.5 * PROFILE[row][1] / 0.96
 
     # 面の下の行 → (下の行の v, 上の行の v)。None は胴の高さで決める。
-    fixed_v = {3: (0.30, 0.30), 4: (0.30, 0.38), 5: (0.38, 0.38), 10: (0.40, 0.40), 11: (0.40, 0.48),
-               12: (0.48, 0.48), 15: (0.24, 0.28), 16: (0.20, 0.24)}
+    # たがの段差の面は絵の縁に置くと明るい擦れを拾って白い帯になるので、帯の内側の色を使う。
+    # 鋲の跡（帯の中央の高さ）も避ける。
+    fixed_v = {3: (0.315, 0.315), 4: (0.30, 0.38), 5: (0.365, 0.365), 10: (0.415, 0.415), 11: (0.40, 0.48),
+               12: (0.465, 0.465), 15: (0.24, 0.28), 16: (0.20, 0.24)}
     for row, (lower, upper) in enumerate(zip(rings, rings[1:])):
         lookup = {}
         for side, vert in enumerate(lower):
@@ -312,6 +325,60 @@ def build_barrel_stage2(seed=7, details=False, uv_layout=None):
     return obj, triangles, non_manifold
 
 
+def bake_guides(obj, out):
+    """形の情報を UV へ焼く: 奥まり（AO）と角（Bevel とそのままの法線の差）。光は使わない。"""
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 64
+    scene.cycles.device = "CPU"
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    material = obj.data.materials[0]
+    material.use_nodes = True
+    nodes, links = material.node_tree.nodes, material.node_tree.links
+    output = next(node for node in nodes if node.type == "OUTPUT_MATERIAL")
+
+    def target(name):
+        image = bpy.data.images.new(name, 1024, 1024, alpha=False, float_buffer=False)
+        node = nodes.new("ShaderNodeTexImage")
+        node.image = image
+        nodes.active = node
+        node.select = True
+        return image
+
+    ao = target("guide_ao")
+    bpy.ops.object.bake(type="AO", margin=8, use_clear=True)
+    ao.filepath_raw = os.path.join(out, "guide_ao.png")
+    ao.file_format = "PNG"
+    ao.save()
+
+    bevel = nodes.new("ShaderNodeBevel")
+    bevel.samples = 8
+    bevel.inputs["Radius"].default_value = 0.022
+    geometry = nodes.new("ShaderNodeNewGeometry")
+    dot = nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    links.new(bevel.outputs["Normal"], dot.inputs[0])
+    links.new(geometry.outputs["True Normal"], dot.inputs[1])
+    invert = nodes.new("ShaderNodeMath")
+    invert.operation = "SUBTRACT"
+    invert.inputs[0].default_value = 1.0
+    links.new(dot.outputs["Value"], invert.inputs[1])
+    gain = nodes.new("ShaderNodeMath")
+    gain.operation = "MULTIPLY"
+    gain.inputs[1].default_value = 8.0
+    links.new(invert.outputs[0], gain.inputs[0])
+    emission = nodes.new("ShaderNodeEmission")
+    links.new(gain.outputs[0], emission.inputs["Color"])
+    links.new(emission.outputs[0], output.inputs["Surface"])
+    edge = target("guide_edge")
+    bpy.ops.object.bake(type="EMIT", margin=8, use_clear=True)
+    edge.filepath_raw = os.path.join(out, "guide_edge.png")
+    edge.file_format = "PNG"
+    edge.save()
+
+
 def attach_atlas(mesh, path):
     material = bpy.data.materials.new("barrel_paint")
     material.use_nodes = True
@@ -392,6 +459,9 @@ def main():
     if layout is not None:
         with open(os.path.join(out, "layout.json"), "w", encoding="utf8") as handle:
             json.dump(layout, handle)
+        if args.bake_guides:
+            bake_guides(obj, out)
+            return
         if args.atlas:
             attach_atlas(obj.data, os.path.abspath(args.atlas))
     scene, camera = setup_scene()
