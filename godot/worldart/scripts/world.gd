@@ -26,6 +26,8 @@ var gshell_mottle := clampf(_arg_float("gshell_mottle", 0.8), 0.0, 1.0)
 const GSHELL_HEIGHT := 0.18
 const GSHELL_SPACING := 0.045
 const GSHELL_CHUNK := 8.0   # シェルを分ける正方形の一辺（m）。視錐台の外を切るため
+## 置き物（木・岩など）を分ける正方形の一辺（m）。--achunk=<m>、0 で分けずに種類ごと 1 つ（M-0161）
+var asset_chunk := maxf(0.0, _arg_float("achunk", 16.0))
 ## 層の間引き（カメラからの距離 m）。注目点（カメラの真正面、約 33 m）の前後 band1 までは全層、band2 までは半分、その先は 1/4。
 ## 固定角度のカメラでは距離が画面の縦位置に当たるので、人物の周りだけ全層になる
 var gshell_band := [_arg_float("gshell_c", 33.0), _arg_float("gshell_w1", 2.0), _arg_float("gshell_w2", 3.5)]
@@ -916,20 +918,36 @@ func _build_assets() -> void:
 			while p != sc and p is Node3D:
 				local = p.transform * local
 				p = p.get_parent()
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.mesh = mesh
-			mm.instance_count = items.size()
+			var is_grass := aname.begins_with("grass")
+			var cast := GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if shadow_only else (GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if is_grass else GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
+			# 正方形の区画ごとに MultiMesh を分ける（視錐台・影の段の外はエンジンが AABB で切る）。位置は区画の中心から
+			var groups := {}   # 区画 → 項目の番号
 			for i in items.size():
 				var it: Array = items[i]
-				var b := Basis(Vector3.UP, float(it[3])).scaled(Vector3.ONE * float(it[4]))
-				mm.set_instance_transform(i, Transform3D(b, Vector3(it[0], it[1], it[2])) * local)
-			var mmi := MultiMeshInstance3D.new()
-			mmi.name = key
-			mmi.multimesh = mm
-			var is_grass := aname.begins_with("grass")
-			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if shadow_only else (GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if is_grass else GeometryInstance3D.SHADOW_CASTING_SETTING_ON)
-			holder.add_child(mmi)
+				var gk := Vector2i.ZERO
+				if asset_chunk > 0.0:
+					gk = Vector2i(floori(float(it[0]) / asset_chunk), floori(float(it[2]) / asset_chunk))
+				if not groups.has(gk): groups[gk] = []
+				groups[gk].append(i)
+			for gk in groups.keys():
+				var ids: Array = groups[gk]
+				var org := Vector3.ZERO
+				if asset_chunk > 0.0:
+					org = Vector3((gk.x + 0.5) * asset_chunk, 0.0, (gk.y + 0.5) * asset_chunk)
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.mesh = mesh
+				mm.instance_count = ids.size()
+				for j in ids.size():
+					var it: Array = items[ids[j]]
+					var b := Basis(Vector3.UP, float(it[3])).scaled(Vector3.ONE * float(it[4]))
+					mm.set_instance_transform(j, Transform3D(b, Vector3(it[0], it[1], it[2]) - org) * local)
+				var mmi := MultiMeshInstance3D.new()
+				mmi.name = key if asset_chunk <= 0.0 else "%s_%d_%d" % [key, gk.x, gk.y]
+				mmi.multimesh = mm
+				mmi.cast_shadow = cast
+				mmi.position = org
+				holder.add_child(mmi)
 		sc.free()
 
 
