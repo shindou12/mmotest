@@ -27,8 +27,20 @@ uniform bool skyvis_on = false;
 varying vec3 v_w;
 varying vec3 v_wn;
 
+vec3 wa_water_adjust(vec3 col) {
+	if (wa_water.y > 1.5) {   // 水の規則 w1: 水の上の水際だけ明るく、水の下の底は沈んで暗い
+		float hw = v_w.y - wa_water.x;
+		float wet = smoothstep(0.16, 0.0, hw) * smoothstep(-0.12, 0.02, hw);
+		col = mix(col, col * 1.12 + vec3(0.06, 0.06, 0.04), wet * 0.7);
+		col *= mix(1.0, 0.5, smoothstep(0.0, -0.7, hw));
+	} else if (wa_water.y > 0.5) {   // 水際の濡れた地面（第 2 世代）
+		float wet = smoothstep(0.55, 0.05, v_w.y - wa_water.x);
+		col *= mix(vec3(1.0), vec3(0.72, 0.74, 0.76), wet);
+	}
+	return col;
+}
 // 地面の色。gw は草が生える重み（土・砂・岩肌のどれでもない割合）。シェルが使う
-vec3 wa_ground_col(vec4 splat, out float gw) {
+vec3 wa_ground_col2(vec4 splat, out float gw, out vec3 grass_col) {
 	vec2 wp = v_w.xz;
 	vec3 an = abs(normalize(v_wn)); an = an * an; an /= (an.x + an.y + an.z);
 	vec3 g1 = texture(t_grass, v_w.zy / 7.0).rgb * an.x + texture(t_grass, v_w.xy / 7.0).rgb * an.z + texture(t_grass, wp / 7.0).rgb * an.y;
@@ -56,16 +68,14 @@ vec3 wa_ground_col(vec4 splat, out float gw) {
 	vec3 col = mix(grass, dirt, wd);
 	col = mix(col, alt, wa);
 	col = mix(col, rock * wa_rock_tint, wr);
-	if (wa_water.y > 1.5) {   // 水の規則 w1: 水の上の水際だけ明るく、水の下の底は沈んで暗い
-		float hw = v_w.y - wa_water.x;
-		float wet = smoothstep(0.16, 0.0, hw) * smoothstep(-0.12, 0.02, hw);
-		col = mix(col, col * 1.12 + vec3(0.06, 0.06, 0.04), wet * 0.7);
-		col *= mix(1.0, 0.5, smoothstep(0.0, -0.7, hw));
-	} else if (wa_water.y > 0.5) {   // 水際の濡れた地面（第 2 世代）
-		float wet = smoothstep(0.55, 0.05, v_w.y - wa_water.x);
-		col *= mix(vec3(1.0), vec3(0.72, 0.74, 0.76), wet);
-	}
+	col = wa_water_adjust(col);
+	grass_col = wa_water_adjust(grass);
 	return col;
+}
+
+vec3 wa_ground_col(vec4 splat, out float gw) {
+	vec3 g;
+	return wa_ground_col2(splat, gw, g);
 }
 
 // 空の光（半球光）。skyvis の焼きで弱める。n は世界の法線
