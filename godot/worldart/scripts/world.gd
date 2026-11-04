@@ -17,6 +17,15 @@ var spec: Dictionary
 var placed: Dictionary
 var terrain_mesh: MeshInstance3D
 var ground_material: ShaderMaterial
+var shell_materials: Array[ShaderMaterial] = []   # 草のシェル（ground_shell.gdshader）。[近い区画, 遠い区画]。地面と同じ絵の引数を持つ
+## 草のシェルの層数（--gshell=<層数>、0 で切って草の房に戻す）。高さと間隔は world.js の GSH・GSD
+var gshell := _arg_gshell()
+const GSHELL_HEIGHT := 0.18
+const GSHELL_SPACING := 0.045
+const GSHELL_CHUNK := 8.0   # シェルを分ける正方形の一辺（m）。視錐台の外を切るため
+## 層の間引き（カメラからの距離 m）。注目点（カメラの真正面、約 33 m）の前後 band1 までは全層、band2 までは半分、その先は 1/4。
+## 固定角度のカメラでは距離が画面の縦位置に当たるので、人物の周りだけ全層になる
+var gshell_band := [_arg_float("gshell_c", 33.0), _arg_float("gshell_w1", 2.0), _arg_float("gshell_w2", 3.5)]
 var skyvis_available := false
 var sun: DirectionalLight3D
 var env: WorldEnvironment
@@ -29,6 +38,7 @@ var pressure_plate_materials: Array[ShaderMaterial] = []
 var pressure_plate_states: Array = []
 
 const SH_GROUND := preload("res://shaders/ground.gdshader")
+const SH_GROUND_SHELL := preload("res://shaders/ground_shell.gdshader")
 const SH_FOLIAGE := preload("res://shaders/foliage.gdshader")
 const SH_LAMBERT := preload("res://shaders/lambert.gdshader")
 const SH_ROCK := preload("res://shaders/rock.gdshader")
@@ -522,8 +532,11 @@ func set_shadow_radius(radius: float) -> void:
 
 ## skyvis がある地図だけ、空の間接光を焼いた可視率で弱める。
 func set_bake(amount: float) -> void:
+	var b := clampf(amount, 0.0, 1.0) if skyvis_available else 0.0
 	if ground_material != null and is_instance_valid(ground_material):
-		ground_material.set_shader_parameter("bake", clampf(amount, 0.0, 1.0) if skyvis_available else 0.0)
+		ground_material.set_shader_parameter("bake", b)
+	for sm in shell_materials:
+		sm.set_shader_parameter("bake", b)
 
 
 # ---------------------------------------------------------------- 地形
@@ -547,15 +560,27 @@ func _build_terrain() -> void:
 	var G: Dictionary = spec.get("ground", {})
 	var alt: String = {"cobble": "ground_cobble", "flagstone": "ground_flagstone"}.get(G.get("alt", ""), "ground_sand")
 	var rk: String = {"face": "rock_face", "crack": "rock_crack"}.get(G.get("rock", ""), "rock")
-	for k in [["t_grass", "ground_grass"], ["t_dirt", "ground_dirt"], ["t_alt", alt], ["t_rock", rk], ["t_noise", "noise_soft"]]:
-		m.set_shader_parameter(k[0], _tex(k[1]))
+	shell_materials.clear()
+	if gshell > 0:
+		for layers in _shell_layers():   # 近い・半分・1/4 の層数ごとに材質
+			var sm := ShaderMaterial.new()
+			sm.shader = SH_GROUND_SHELL
+			sm.set_shader_parameter("shell_layers", float(layers))
+			sm.set_shader_parameter("shell_height", GSHELL_HEIGHT)
+			sm.set_shader_parameter("shell_spacing", GSHELL_SPACING)
+			shell_materials.append(sm)
+	var sms: Array = [m] + shell_materials   # 地面とシェルで同じ絵の引数を入れる
+	for mat in sms:
+		for k in [["t_grass", "ground_grass"], ["t_dirt", "ground_dirt"], ["t_alt", alt], ["t_rock", rk], ["t_noise", "noise_soft"]]:
+			mat.set_shader_parameter(k[0], _tex(k[1]))
 	var skyvis_path := "res://data/%s/skyvis.png" % map_name
 	if FileAccess.file_exists(skyvis_path) and placed.has("terrain"):
 		var tm: Dictionary = placed["terrain"]
-		m.set_shader_parameter("t_skyvis", load(skyvis_path))
-		m.set_shader_parameter("skyvis_origin", Vector2(float(tm["x0"]), float(tm["z0"])))
-		m.set_shader_parameter("skyvis_size", float(tm["size"]))
-		m.set_shader_parameter("skyvis_on", true)
+		for mat in sms:
+			mat.set_shader_parameter("t_skyvis", load(skyvis_path))
+			mat.set_shader_parameter("skyvis_origin", Vector2(float(tm["x0"]), float(tm["z0"])))
+			mat.set_shader_parameter("skyvis_size", float(tm["size"]))
+			mat.set_shader_parameter("skyvis_on", true)
 		skyvis_available = true
 	terrain_mesh = MeshInstance3D.new()
 	terrain_mesh.name = "Terrain"
@@ -564,8 +589,96 @@ func _build_terrain() -> void:
 	terrain_mesh.transform = xf
 	terrain_mesh.material_override = m
 	add_child(terrain_mesh)
+	if gshell > 0: _build_shells(mesh, xf, bool(G.get("rockPix", false)))
 	if not Engine.is_editor_hint():
 		terrain_mesh.create_trimesh_collision()   # 歩くときの地面の高さ（scripts/main.gd が光線で引く）
+
+
+## 起動の引数 --gshell=<層数>（既定 16）
+static func _arg_gshell() -> int:
+	return maxi(0, int(_arg_float("gshell", 16.0)))
+
+
+## 層数の段（全層・半分・1/4）。高さの形は同じで層の間隔だけ粗くなる
+func _shell_layers() -> Array[int]:
+	return [gshell, maxi(1, gshell / 2), maxi(1, gshell / 4)]
+
+
+static func _arg_float(key: String, default: float) -> float:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--%s=" % key): return float(a.substr(key.length() + 3))
+	return default
+
+
+## 草のシェル（world.js の GSHELL）。草が生える三角（頂点色が土・砂・岩肌だけの三角は除く）だけを、正方形の区画ごとに
+## 区画の中心からの位置の ArrayMesh にして、層ごとのインスタンス（INSTANCE_ID が層）の MultiMesh で描く。影は落とさず受ける。歩く当たりは土台のみ
+func _build_shells(mesh: Mesh, xf: Transform3D, rock_pix: bool) -> void:
+	var a := mesh.surface_get_arrays(0)
+	var P: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var N: PackedVector3Array = a[Mesh.ARRAY_NORMAL]
+	var C: PackedColorArray = a[Mesh.ARRAY_COLOR]
+	var I: PackedInt32Array = a[Mesh.ARRAY_INDEX] if a[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if I.is_empty():
+		I.resize(P.size())
+		for i in P.size(): I[i] = i
+	var nb := xf.basis.inverse().transposed()
+	var chunks := {}   # 区画 → {remap, P, N, C, I}
+	for t in range(0, I.size(), 3):
+		var i0 := I[t]; var i1 := I[t + 1]; var i2 := I[t + 2]
+		# 土・砂が全部の頂点で濃い三角は草が生えない（境の揺らぎ n*0.9 を見込んで 0.9）。岩肌は rockPix のときは画素で決まるので残す
+		var dead := true
+		for k in [i0, i1, i2]:
+			var c := C[k]
+			if c.r < 0.9 and c.g < 0.9 and (rock_pix or c.b < 0.9): dead = false
+		if dead: continue
+		var cen := (xf * P[i0] + xf * P[i1] + xf * P[i2]) / 3.0
+		var key := Vector2i(floori(cen.x / GSHELL_CHUNK), floori(cen.z / GSHELL_CHUNK))
+		if not chunks.has(key):
+			chunks[key] = {"o": (Vector2(key) + Vector2(0.5, 0.5)) * GSHELL_CHUNK, "remap": {}, "P": PackedVector3Array(), "N": PackedVector3Array(), "C": PackedColorArray(), "I": PackedInt32Array()}
+		var ch: Dictionary = chunks[key]
+		for k in [i0, i1, i2]:
+			if not ch["remap"].has(k):
+				ch["remap"][k] = ch["P"].size()
+				ch["P"].append(xf * P[k] - Vector3(ch["o"].x, 0.0, ch["o"].y))   # 区画の中心からの位置
+				ch["N"].append((nb * N[k]).normalized())
+				ch["C"].append(C[k])
+			ch["I"].append(ch["remap"][k])
+	var holder := Node3D.new()
+	holder.name = "GrassShells"
+	add_child(holder)
+	var tris := 0
+	for key in chunks.keys():
+		var ch: Dictionary = chunks[key]
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = ch["P"]
+		arrays[Mesh.ARRAY_NORMAL] = ch["N"]
+		arrays[Mesh.ARRAY_COLOR] = ch["C"]
+		arrays[Mesh.ARRAY_INDEX] = ch["I"]
+		var am := ArrayMesh.new()
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		am.custom_aabb = am.get_aabb().grow(GSHELL_HEIGHT)   # 持ち上げた分も含める
+		tris += ch["I"].size() / 3
+		var c: float = gshell_band[0]; var w1: float = gshell_band[1]; var w2: float = gshell_band[2]
+		# 段・カメラからの距離の範囲（begin, end。end 0 は果てまで）。全層は中央の帯、半分はその両側、1/4 はさらに外
+		for e in [[0, c - w1, c + w1], [1, c - w2, c - w1], [1, c + w1, c + w2], [2, 0.0, c - w2], [2, c + w2, 0.0]]:
+			var layers := _shell_layers()[e[0]]
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = am
+			mm.instance_count = layers
+			for i in layers: mm.set_instance_transform(i, Transform3D.IDENTITY)
+			var mmi := MultiMeshInstance3D.new()
+			mmi.name = "Shell_%d_%d_%d" % [key.x, key.y, e[0]]
+			mmi.multimesh = mm
+			mmi.material_override = shell_materials[e[0]]
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mmi.position = Vector3(ch["o"].x, 0.0, ch["o"].y)
+			mmi.visibility_range_begin = e[1]
+			mmi.visibility_range_end = e[2]
+			mmi.set_meta("wa_shell", true)
+			holder.add_child(mmi)
+	print("[gshell] 層 %d / 区画 %d / 三角 %d（×層で %d）" % [gshell, chunks.size(), tris, tris * gshell])
 
 
 ## 水面（world.js waterMaterial）: 作り方は scripts/water.gd（WorldWater.make）。高さマップ data/<地図>/height.png から深さを出す
@@ -641,6 +754,7 @@ func _build_assets() -> void:
 	for key in A.keys():
 		var shadow_only: bool = key.ends_with("@shadow")
 		var aname: String = key.replace("@shadow", "")
+		if gshell > 0 and aname.begins_with("grass"): continue   # 草はシェルで生やす
 		var sc: Node = load("res://data/assets/%s.glb" % aname).instantiate()
 		var items: Array = A[key]
 		for mi in sc.find_children("*", "MeshInstance3D", true, false):
