@@ -20,6 +20,9 @@ var ground_material: ShaderMaterial
 var shell_materials: Array[ShaderMaterial] = []   # 草のシェル（ground_shell.gdshader）。[近い区画, 遠い区画]。地面と同じ絵の引数を持つ
 ## 草のシェルの層数（--gshell=<層数>、0 で切って草の房に戻す）。高さと間隔は world.js の GSH・GSD
 var gshell := _arg_gshell()
+## 草が短くなる幅 (m) と境のまだらの強さ (0..1)
+var gshell_edge_width := clampf(_arg_float("gshell_edge", 1.25), 0.25, 3.0)
+var gshell_mottle := clampf(_arg_float("gshell_mottle", 0.8), 0.0, 1.0)
 const GSHELL_HEIGHT := 0.18
 const GSHELL_SPACING := 0.045
 const GSHELL_CHUNK := 8.0   # シェルを分ける正方形の一辺（m）。視錐台の外を切るため
@@ -695,22 +698,166 @@ func _build_water(src: MeshInstance3D) -> void:
 
 # アイデア01: 地形の頂点色（R=土 G=砂/石畳）を格子と同じ解像度の絵に写す（草の房の根元が引く）
 var splat_tex: ImageTexture
+var grass_edge_tex: ImageTexture
+var grass_edge_st := Vector3(0.0, 0.0, 1.0)
 func _build_splat() -> void:
 	var tm: Dictionary = placed["terrain"]
 	var cell := float(spec["terrain"].get("cell", 0.5))
 	var R := int(round(float(tm["size"]) / cell)) + 1
 	var img := Image.create(R, R, false, Image.FORMAT_RGBA8)
+	var edge_weights := PackedFloat32Array()
+	var edge_mottles := PackedFloat32Array()
+	if gshell > 0:
+		edge_weights.resize(R * R)
+		edge_mottles.resize(R * R)
+		for z in R:
+			for x in R:
+				edge_mottles[z * R + x] = _grass_mottle_noise(x, z)
 	var a := terrain_mesh.mesh.surface_get_arrays(0)
 	var P: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
 	var C: PackedColorArray = a[Mesh.ARRAY_COLOR]
+	var G: Dictionary = spec.get("ground", {})
+	var rock_pix := bool(G.get("rockPix", false))
 	for i in P.size():
 		var p := terrain_mesh.transform * P[i]
 		var ix := int(round((p.x - float(tm["x0"])) / cell))
 		var iz := int(round((p.z - float(tm["z0"])) / cell))
 		if ix >= 0 and iz >= 0 and ix < R and iz < R:
 			img.set_pixel(ix, iz, Color(C[i].r, C[i].g, C[i].b, 1.0))
+			if gshell > 0:
+				var color := C[i]
+				var dirt := _grass_smoothstep(0.4, 0.6, color.r)
+				var alt := _grass_smoothstep(0.4, 0.6, color.g)
+				var rock := _grass_smoothstep(0.35, 0.65, color.b) if not rock_pix else 0.0
+				edge_weights[iz * R + ix] = (1.0 - dirt) * (1.0 - alt) * (1.0 - rock)
 	splat_tex = ImageTexture.create_from_image(img)
 	RenderingServer.global_shader_parameter_set("wa_splat_st", Vector3(float(tm["x0"]), float(tm["z0"]), (R - 1) * cell))
+	if gshell > 0:
+		# 草の縁までの符号つき距離（m。草の内側が正、土・砂・岩の側が負。R 画素に ±GEDGE_RANGE で入れる）。細い道でも幅が崩れない
+		edge_weights = _blur_grass_weights(edge_weights, R, 1.0)   # 画素の階段を少しならす
+		edge_weights = _grass_signed_distance(edge_weights, R, cell)
+		var edge_img := Image.create(R, R, false, Image.FORMAT_RGBA8)
+		for z in R:
+			for x in R:
+				var index := z * R + x
+				var value := Vector2(clampf(0.5 + edge_weights[index] / (2.0 * GEDGE_RANGE), 0.0, 1.0), edge_mottles[index])
+				edge_img.set_pixel(x, z, Color(value.x, value.y, 0.0, 1.0))
+		grass_edge_tex = ImageTexture.create_from_image(edge_img)
+		grass_edge_st = Vector3(float(tm["x0"]) - 0.5 * cell, float(tm["z0"]) - 0.5 * cell, R * cell)   # 画素 i の中心が x0 + i*cell（半画素ずらして引く）
+		ground_material.set_shader_parameter("t_grass_edge", grass_edge_tex)
+		ground_material.set_shader_parameter("grass_edge_st", grass_edge_st)
+		ground_material.set_shader_parameter("edge_tint", 1.0)
+		for sm in shell_materials:
+			sm.set_shader_parameter("t_grass_edge", grass_edge_tex)
+			sm.set_shader_parameter("grass_edge_st", grass_edge_st)
+			sm.set_shader_parameter("shell_edge_mottle", gshell_mottle)
+			sm.set_shader_parameter("edge_w", gshell_edge_width)
+		ground_material.set_shader_parameter("edge_w", gshell_edge_width)
+		ground_material.set_shader_parameter("shell_edge_mottle", gshell_mottle)
+
+
+const GEDGE_RANGE := 3.0
+
+
+## 草の重み（0.5 を境）から、境までの符号つき距離（m）の絵を作る（2 回なぞる近似の距離変換）
+static func _grass_signed_distance(weights: PackedFloat32Array, resolution: int, cell: float) -> PackedFloat32Array:
+	var n := resolution * resolution
+	var inf := 1.0e6
+	var d_in := PackedFloat32Array()   # 草のセルから非草のセルまで
+	var d_out := PackedFloat32Array()   # 非草のセルから草のセルまで
+	d_in.resize(n)
+	d_out.resize(n)
+	for i in n:
+		var grass := weights[i] > 0.5
+		d_in[i] = inf if grass else 0.0
+		d_out[i] = 0.0 if grass else inf
+	d_in = _chamfer(d_in, resolution)
+	d_out = _chamfer(d_out, resolution)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		out[i] = (minf(d_in[i], 50.0) - 0.5) * cell if weights[i] > 0.5 else -(minf(d_out[i], 50.0) - 0.5) * cell
+	return out
+
+
+static func _chamfer(f: PackedFloat32Array, resolution: int) -> PackedFloat32Array:
+	for z in resolution:
+		for x in resolution:
+			var i := z * resolution + x
+			var v := f[i]
+			if x > 0: v = minf(v, f[i - 1] + 1.0)
+			if z > 0:
+				v = minf(v, f[i - resolution] + 1.0)
+				if x > 0: v = minf(v, f[i - resolution - 1] + 1.4142)
+				if x < resolution - 1: v = minf(v, f[i - resolution + 1] + 1.4142)
+			f[i] = v
+	for z in range(resolution - 1, -1, -1):
+		for x in range(resolution - 1, -1, -1):
+			var i := z * resolution + x
+			var v := f[i]
+			if x < resolution - 1: v = minf(v, f[i + 1] + 1.0)
+			if z < resolution - 1:
+				v = minf(v, f[i + resolution] + 1.0)
+				if x < resolution - 1: v = minf(v, f[i + resolution + 1] + 1.4142)
+				if x > 0: v = minf(v, f[i + resolution - 1] + 1.4142)
+			f[i] = v
+	return f
+
+
+static func _grass_smoothstep(edge0: float, edge1: float, value: float) -> float:
+	var t := clampf((value - edge0) / (edge1 - edge0), 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
+
+
+func _grass_mottle_noise(x: int, z: int) -> float:
+	var lx := int(x / 2)
+	var lz := int(z / 2)
+	var tx := _grass_smoothstep(0.0, 1.0, float(x % 2) * 0.5)
+	var tz := _grass_smoothstep(0.0, 1.0, float(z % 2) * 0.5)
+	var a := _grass_mottle_hash(lx, lz)
+	var b := _grass_mottle_hash(lx + 1, lz)
+	var c := _grass_mottle_hash(lx, lz + 1)
+	var d := _grass_mottle_hash(lx + 1, lz + 1)
+	return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), tz)
+
+
+static func _grass_mottle_hash(x: int, z: int) -> float:
+	var value: int = posmod(x * 73856093 + z * 19349663 + 83492791, 2147483647)
+	value = posmod(value * 48271, 2147483647)
+	return float(value) / 2147483647.0
+
+
+static func _blur_grass_weights(source: PackedFloat32Array, resolution: int, sigma_pixels: float) -> PackedFloat32Array:
+	var sigma := maxf(sigma_pixels, 0.1)
+	var radius := maxi(1, int(ceil(sigma * 3.0)))
+	var kernel := PackedFloat32Array()
+	kernel.resize(radius * 2 + 1)
+	var kernel_sum := 0.0
+	for i in kernel.size():
+		var offset := i - radius
+		var weight := exp(-float(offset * offset) / (2.0 * sigma * sigma))
+		kernel[i] = weight
+		kernel_sum += weight
+	for i in kernel.size(): kernel[i] /= kernel_sum
+	var horizontal := PackedFloat32Array()
+	horizontal.resize(resolution * resolution)
+	for z in resolution:
+		for x in resolution:
+			var sum := 0.0
+			for k in kernel.size():
+				var sx := clampi(x + k - radius, 0, resolution - 1)
+				sum += source[z * resolution + sx] * kernel[k]
+			horizontal[z * resolution + x] = sum
+	var blurred := PackedFloat32Array()
+	blurred.resize(resolution * resolution)
+	for z in resolution:
+		for x in resolution:
+			var sum := 0.0
+			for k in kernel.size():
+				var sz := clampi(z + k - radius, 0, resolution - 1)
+				sum += horizontal[sz * resolution + x] * kernel[k]
+			blurred[z * resolution + x] = sum
+	return blurred
 
 
 # ---------------------------------------------------------------- 配置（アセットごとに MultiMesh）
