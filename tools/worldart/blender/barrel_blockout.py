@@ -6,6 +6,7 @@
 """
 
 import argparse
+import json
 import math
 import os
 import random
@@ -52,7 +53,8 @@ def arguments():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
-    parser.add_argument("--stage", type=int, default=1, choices=(1, 2, 3))
+    parser.add_argument("--stage", type=int, default=1, choices=(1, 2, 3, 4))
+    parser.add_argument("--atlas", help="stage 4: 塗った絵。なければ灰色で UV だけ作る")
     return parser.parse_args(argv)
 
 
@@ -126,7 +128,7 @@ RIVET_SIDES = 6
 RIM_CHIPS = {2: (0.012, 0.006), 7: (0.009, 0.004)}  # 板の番号: (下げる高さ, 削る厚み)
 
 
-def add_rivet(bm, center, normal):
+def add_rivet(bm, center, normal, uv_layer=None):
     """たがの面に乗せる低い丸頭。裏は見えないので閉じない。"""
     normal = normal.normalized()
     up = Vector((0.0, 0.0, 1.0))
@@ -147,10 +149,14 @@ def add_rivet(bm, center, normal):
         faces.append(bm.faces.new((shoulder[side], shoulder[next_side], tip)))
     for face in faces:
         face.smooth = True
+        if uv_layer is not None:
+            for loop in face.loops:
+                height = 0.02 if loop.vert in base else 0.05 if loop.vert in shoulder else 0.08
+                loop[uv_layer].uv = (0.42, height)
     return len(faces)
 
 
-def add_rivets(bm, rng, tilts):
+def add_rivets(bm, rng, tilts, uv_layer=None):
     """上下のたがに鋲を並べる。行 4-5 が下のたが、行 11-12 が上のたが。"""
     triangles = 0
     for rows, tilt in (((4, 5), tilts[0]), ((11, 12), tilts[1])):
@@ -164,12 +170,57 @@ def add_rivets(bm, rng, tilts):
             center = Vector((radius * cos_a, radius * sin_a,
                              height + tilt[1] * math.sin(angle + tilt[0])))
             normal = Vector((slope.x * cos_a, slope.x * sin_a, slope.z))
-            add_rivet(bm, center, normal)
+            add_rivet(bm, center, normal, uv_layer)
             triangles += RIVET_SIDES * 3
     return triangles
 
 
-def build_barrel_stage2(seed=7, details=False):
+def assign_atlas_uv(bm, rings, columns, start):
+    """1 枚の絵の中の場所を面ごとに決める。胴は上半分、たが・縁・ふた・鋲は下半分。"""
+    uv_layer = bm.loops.layers.uv.new("UVMap")
+    count = len(columns)
+    us = [(angle - start) / (2.0 * math.pi) for angle, _, _ in columns]
+
+    def body_v(row):
+        return 0.5 + 0.5 * PROFILE[row][1] / 0.96
+
+    # 面の下の行 → (下の行の v, 上の行の v)。None は胴の高さで決める。
+    fixed_v = {3: (0.30, 0.30), 4: (0.30, 0.38), 5: (0.38, 0.38), 10: (0.40, 0.40), 11: (0.40, 0.48),
+               12: (0.48, 0.48), 15: (0.24, 0.28), 16: (0.20, 0.24)}
+    for row, (lower, upper) in enumerate(zip(rings, rings[1:])):
+        lookup = {}
+        for side, vert in enumerate(lower):
+            lookup[vert] = (side, 0)
+        for side, vert in enumerate(upper):
+            lookup[vert] = (side, 1)
+        faces = {face for vert in lower for face in vert.link_faces
+                 if all(loop.vert in lookup for loop in face.loops)}
+        for face in faces:
+            if row == 0:
+                for loop in face.loops:
+                    loop[uv_layer].uv = (0.35, 0.10)
+                continue
+            if row == 17:
+                for loop in face.loops:
+                    x, y, _ = loop.vert.co
+                    loop[uv_layer].uv = (0.10 + 0.09 * x / 0.222, 0.10 + 0.09 * y / 0.222)
+                continue
+            sides = {lookup[loop.vert][0] for loop in face.loops}
+            wraps = 0 in sides and count - 1 in sides
+            for loop in face.loops:
+                side, is_upper = lookup[loop.vert]
+                u = us[side]
+                if wraps and side == 0:
+                    u = 1.0
+                if row in fixed_v:
+                    v = fixed_v[row][is_upper]
+                else:
+                    v = body_v(row + is_upper)
+                loop[uv_layer].uv = (u, v)
+    return uv_layer, us
+
+
+def build_barrel_stage2(seed=7, details=False, uv_layout=None):
     """板 12 枚の胴に分ける。各板は境が谷、中央が山。縁は板の頭ごとに高さが違う。"""
     rng = random.Random(seed)
     weights = [1.0 + rng.uniform(-STAVE_WIDTH_JITTER, STAVE_WIDTH_JITTER) for _ in range(STAVES)]
@@ -246,8 +297,12 @@ def build_barrel_stage2(seed=7, details=False):
                 if edge is not None:
                     edge.smooth = False
     non_manifold = sum(1 for edge in bm.edges if not edge.is_manifold)
+    uv_layer = None
+    if uv_layout is not None:
+        uv_layer, us = assign_atlas_uv(bm, rings, columns, start)
+        uv_layout["stave_edges"] = us[0::2]
     if details:
-        add_rivets(bm, rng, tilts)
+        add_rivets(bm, rng, tilts, uv_layer)
     bm.to_mesh(mesh)
     triangles = sum(len(face.verts) - 2 for face in bm.faces)
     bm.free()
@@ -255,6 +310,18 @@ def build_barrel_stage2(seed=7, details=False):
     bpy.context.collection.objects.link(obj)
     attach_gray(mesh)
     return obj, triangles, non_manifold
+
+
+def attach_atlas(mesh, path):
+    material = bpy.data.materials.new("barrel_paint")
+    material.use_nodes = True
+    principled = material.node_tree.nodes["Principled BSDF"]
+    principled.inputs["Roughness"].default_value = 0.95
+    texture = material.node_tree.nodes.new("ShaderNodeTexImage")
+    texture.image = bpy.data.images.load(path)
+    material.node_tree.links.new(texture.outputs["Color"], principled.inputs["Base Color"])
+    mesh.materials.clear()
+    mesh.materials.append(material)
 
 
 def attach_gray(mesh):
@@ -319,15 +386,22 @@ def main():
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    layout = {} if args.stage == 4 else None
     obj, triangles, non_manifold = (build_barrel() if args.stage == 1 else
-                                    build_barrel_stage2(details=args.stage == 3))
+                                    build_barrel_stage2(details=args.stage >= 3, uv_layout=layout))
+    if layout is not None:
+        with open(os.path.join(out, "layout.json"), "w", encoding="utf8") as handle:
+            json.dump(layout, handle)
+        if args.atlas:
+            attach_atlas(obj.data, os.path.abspath(args.atlas))
     scene, camera = setup_scene()
 
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
     bpy.ops.export_scene.gltf(filepath=os.path.join(out, "barrel_stage%d.glb" % args.stage), export_format="GLB",
-                              use_selection=True, export_yup=True, export_apply=True)
+                              use_selection=True, export_yup=True, export_apply=True,
+                              export_image_format="JPEG", export_jpeg_quality=90)
 
     # 輪郭を見本と重ねるための正面（1m = 300 画素の平行投影、背景は透明）
     camera.data.type = "ORTHO"
