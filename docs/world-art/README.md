@@ -15,6 +15,7 @@ Blender でのアセット制作から three.js の画面まで、一貫して�
 | `docs/world-art/rules/` | 見本 23 枚の調査（camera-scale・lighting-post・ground-alpha）、アイデア 18 項目の状態（ideas.md）、入／切の比較（ab-L22.md） |
 | `docs/world-art/goal-f1_field.md` | ゲームの第 1 層「ひだまりの草原」を遊びの形のまま第 3 世代で作り直した記録（L25） |
 | `docs/world-art/goal-mihon2.md` | 見本②の再現のループの記録（L01〜L22）・評価表・差分一覧・不足している参照 |
+| `docs/world-art/prop-blockout.md` | 板と金具の小物を見本から作る手順（試行中。スキル `prop-blockout`、札の雛形 `templates/atlas-paint-card.md`） |
 | `.claude/skills/world-art/SKILL.md` | 作業の手順の要約（スキル） |
 | `docs/world-art/observations.md` | 参考画像の ID・観察・計測・未解決の問い |
 | `docs/world-art/hypotheses.md` | 仮説と競合仮説、先行研究（`docs/ro-look-method.md`）の検証状態 |
