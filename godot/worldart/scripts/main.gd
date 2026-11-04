@@ -33,6 +33,7 @@ var mask_viewport: SubViewport
 var mask_camera: Camera3D
 var mask_root: Node3D
 var mask_material_cache: Dictionary = {}
+var mask_mesh_cache: Dictionary = {}   # 拡散マスク用に複製したメッシュ（元のメッシュ×地面扱い）
 var blur_h_material: ShaderMaterial
 var blur_v_material: ShaderMaterial
 var tuning: Variant = preload("res://scripts/tuning.gd").new()
@@ -427,6 +428,7 @@ func _sync_aux_cameras() -> void:
 
 func _rebuild_mask_scene() -> void:
 	mask_material_cache.clear()
+	mask_mesh_cache.clear()
 	for child in mask_root.get_children():
 		mask_root.remove_child(child)
 		child.free()
@@ -453,12 +455,17 @@ func _rebuild_mask_scene() -> void:
 			copy.name = src_multi.name
 			copy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			var multi := src_multi.multimesh.duplicate() as MultiMesh
-			var mesh := multi.mesh.duplicate() as Mesh
 			var include_ground := bool(source.get_meta("wa_diff_ground", false)) or String(source.name) == "Terrain"
-			for surface in mesh.get_surface_count():
-				var source_material := mesh.surface_get_material(surface)
-				if source_material == null: source_material = src_multi.material_override
-				mesh.surface_set_material(surface, _mask_material(source_material, include_ground))
+			# 区画に分けた置き物は同じメッシュを共有するので、マスク用の複製も 1 つを使い回す
+			var mask_key := "%d|%s" % [multi.mesh.get_instance_id(), str(include_ground)]
+			var mesh: Mesh = mask_mesh_cache.get(mask_key)
+			if mesh == null:
+				mesh = multi.mesh.duplicate() as Mesh
+				for surface in mesh.get_surface_count():
+					var source_material := mesh.surface_get_material(surface)
+					if source_material == null: source_material = src_multi.material_override
+					mesh.surface_set_material(surface, _mask_material(source_material, include_ground))
+				mask_mesh_cache[mask_key] = mesh
 			multi.mesh = mesh
 			copy.multimesh = multi
 			mask_root.add_child(copy)
