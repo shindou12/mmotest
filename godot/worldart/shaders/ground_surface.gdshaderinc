@@ -78,6 +78,14 @@ vec3 wa_ground_col(vec4 splat, out float gw) {
 	return wa_ground_col2(splat, gw, g);
 }
 
+// 草の縁までの符号つき距離（m。草の内側が正）に、0.5〜1.5m のまだらを足したもの。g は CPU の絵の G（格子のノイズ）
+float wa_edge_sd(sampler2D edge_tex, vec3 st, vec2 wp, float mottle) {
+	vec2 ed = texture(edge_tex, (wp - st.xy) / st.z).rg;
+	float n1 = mix(ed.g, texture(t_noise, wp / 1.3 + 0.31).r, 0.5);
+	float n2 = texture(t_noise, wp / 0.6 + 0.77).r;
+	return (ed.r - 0.5) * 6.0 + ((n1 - 0.5) * 1.3 + (n2 - 0.5) * 0.7) * mottle * 2.0;
+}
+
 // 空の光（半球光）。skyvis の焼きで弱める。n は世界の法線
 vec3 wa_ground_emission(vec3 albedo, vec3 n) {
 	vec3 e = wa_hemi(albedo, n);

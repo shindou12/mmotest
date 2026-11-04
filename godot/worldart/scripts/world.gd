@@ -21,8 +21,8 @@ var shell_materials: Array[ShaderMaterial] = []   # 草のシェル（ground_she
 ## 草のシェルの層数（--gshell=<層数>、0 で切って草の房に戻す）。高さと間隔は world.js の GSH・GSD
 var gshell := _arg_gshell()
 ## 草が短くなる幅 (m) と境のまだらの強さ (0..1)
-var gshell_edge_width := clampf(_arg_float("gshell_edge", 2.0), 0.25, 3.0)
-var gshell_mottle := clampf(_arg_float("gshell_mottle", 0.9), 0.0, 1.0)
+var gshell_edge_width := clampf(_arg_float("gshell_edge", 1.25), 0.25, 3.0)
+var gshell_mottle := clampf(_arg_float("gshell_mottle", 0.8), 0.0, 1.0)
 const GSHELL_HEIGHT := 0.18
 const GSHELL_SPACING := 0.045
 const GSHELL_CHUNK := 8.0   # シェルを分ける正方形の一辺（m）。視錐台の外を切るため
@@ -733,16 +733,17 @@ func _build_splat() -> void:
 	splat_tex = ImageTexture.create_from_image(img)
 	RenderingServer.global_shader_parameter_set("wa_splat_st", Vector3(float(tm["x0"]), float(tm["z0"]), (R - 1) * cell))
 	if gshell > 0:
-		var sigma_pixels := gshell_edge_width / (1.28 * cell)
-		edge_weights = _blur_grass_weights(edge_weights, R, sigma_pixels)
+		# 草の縁までの符号つき距離（m。草の内側が正、土・砂・岩の側が負。R 画素に ±GEDGE_RANGE で入れる）。細い道でも幅が崩れない
+		edge_weights = _blur_grass_weights(edge_weights, R, 1.0)   # 画素の階段を少しならす
+		edge_weights = _grass_signed_distance(edge_weights, R, cell)
 		var edge_img := Image.create(R, R, false, Image.FORMAT_RGBA8)
 		for z in R:
 			for x in R:
 				var index := z * R + x
-				var value := Vector2(edge_weights[index], edge_mottles[index])
+				var value := Vector2(clampf(0.5 + edge_weights[index] / (2.0 * GEDGE_RANGE), 0.0, 1.0), edge_mottles[index])
 				edge_img.set_pixel(x, z, Color(value.x, value.y, 0.0, 1.0))
 		grass_edge_tex = ImageTexture.create_from_image(edge_img)
-		grass_edge_st = Vector3(float(tm["x0"]), float(tm["z0"]), (R - 1) * cell)
+		grass_edge_st = Vector3(float(tm["x0"]) - 0.5 * cell, float(tm["z0"]) - 0.5 * cell, R * cell)   # 画素 i の中心が x0 + i*cell（半画素ずらして引く）
 		ground_material.set_shader_parameter("t_grass_edge", grass_edge_tex)
 		ground_material.set_shader_parameter("grass_edge_st", grass_edge_st)
 		ground_material.set_shader_parameter("edge_tint", 1.0)
@@ -750,6 +751,57 @@ func _build_splat() -> void:
 			sm.set_shader_parameter("t_grass_edge", grass_edge_tex)
 			sm.set_shader_parameter("grass_edge_st", grass_edge_st)
 			sm.set_shader_parameter("shell_edge_mottle", gshell_mottle)
+			sm.set_shader_parameter("edge_w", gshell_edge_width)
+		ground_material.set_shader_parameter("edge_w", gshell_edge_width)
+		ground_material.set_shader_parameter("shell_edge_mottle", gshell_mottle)
+
+
+const GEDGE_RANGE := 3.0
+
+
+## 草の重み（0.5 を境）から、境までの符号つき距離（m）の絵を作る（2 回なぞる近似の距離変換）
+static func _grass_signed_distance(weights: PackedFloat32Array, resolution: int, cell: float) -> PackedFloat32Array:
+	var n := resolution * resolution
+	var inf := 1.0e6
+	var d_in := PackedFloat32Array()   # 草のセルから非草のセルまで
+	var d_out := PackedFloat32Array()   # 非草のセルから草のセルまで
+	d_in.resize(n)
+	d_out.resize(n)
+	for i in n:
+		var grass := weights[i] > 0.5
+		d_in[i] = inf if grass else 0.0
+		d_out[i] = 0.0 if grass else inf
+	d_in = _chamfer(d_in, resolution)
+	d_out = _chamfer(d_out, resolution)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		out[i] = (minf(d_in[i], 50.0) - 0.5) * cell if weights[i] > 0.5 else -(minf(d_out[i], 50.0) - 0.5) * cell
+	return out
+
+
+static func _chamfer(f: PackedFloat32Array, resolution: int) -> PackedFloat32Array:
+	for z in resolution:
+		for x in resolution:
+			var i := z * resolution + x
+			var v := f[i]
+			if x > 0: v = minf(v, f[i - 1] + 1.0)
+			if z > 0:
+				v = minf(v, f[i - resolution] + 1.0)
+				if x > 0: v = minf(v, f[i - resolution - 1] + 1.4142)
+				if x < resolution - 1: v = minf(v, f[i - resolution + 1] + 1.4142)
+			f[i] = v
+	for z in range(resolution - 1, -1, -1):
+		for x in range(resolution - 1, -1, -1):
+			var i := z * resolution + x
+			var v := f[i]
+			if x < resolution - 1: v = minf(v, f[i + 1] + 1.0)
+			if z < resolution - 1:
+				v = minf(v, f[i + resolution] + 1.0)
+				if x < resolution - 1: v = minf(v, f[i + resolution + 1] + 1.4142)
+				if x > 0: v = minf(v, f[i + resolution - 1] + 1.4142)
+			f[i] = v
+	return f
 
 
 static func _grass_smoothstep(edge0: float, edge1: float, value: float) -> float:
