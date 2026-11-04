@@ -1,0 +1,10 @@
+Use case: stylized-concept
+Asset type: game foliage UV atlas texture, square 1024 × 1024
+Primary request: Paint Image 1 into a polished hand-painted leaf atlas, preserving its UV layout and all twelve leaf silhouettes. Keep the full image square and aligned with Image 1: do not crop, rotate, shift, resize tiles, change gaps, or reshape any leaf.
+Input images: Image 1 is the edit target and exact layout/color guide. Image 2 is only a paint-style reference; do not copy its tree, clusters, scene, composition, or background.
+Subject: Twelve individual leaves arranged as 4 rows × 3 columns. Each row is a tier of the foliage clump, each leaf points upward and has its base at the bottom. The top row is the brightest yellow-green, row 2 yellow-green, row 3 medium green, bottom row deep green. Preserve this row brightness order and each leaf's row color. Within every leaf, keep the existing gradient flow: darker at its base, gradually brighter toward the tip. Make the three leaves in each row slightly distinct with subtle variations in central rib curvature and soft color mottling.
+Scene/backdrop: Preserve the solid dark green background outside all leaves exactly as shown in Image 1. Keep the tiny dark green square at the upper right in the same position and size.
+Style/medium: Hand-painted game texture, plump softly rounded leaves with a sense of thickness, smooth soft blending, broad opaque flat-brush color planes, restrained painterly variation. Use Image 2 only for this painted treatment.
+Materials/textures: Place a slightly lighter green rim just inside each leaf edge. Each leaf gets exactly one thin, faint, lighter central rib; no fine branching veins. Prioritize large readable color planes because each leaf will appear at 20–40 pixels in game.
+Composition/framing: Preserve the exact positions, bounds, gaps, and orientation of all 12 leaves in Image 1; keep the surrounding atlas empty and dark green.
+Constraints: No words, no new objects, no cast shadows, no decoration outside the leaves, no full tree or foliage clump illustration. No extra leaves, stems, flowers, branches, outlines, or border. Keep the upper-right square intact.
