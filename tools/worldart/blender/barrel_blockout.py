@@ -52,7 +52,7 @@ def arguments():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
-    parser.add_argument("--stage", type=int, default=1, choices=(1, 2))
+    parser.add_argument("--stage", type=int, default=1, choices=(1, 2, 3))
     return parser.parse_args(argv)
 
 
@@ -119,7 +119,57 @@ RIM_HEIGHT_JITTER = 0.008
 BAND_TILT = 0.005        # たがのわずかな傾き
 
 
-def build_barrel_stage2(seed=7):
+RIVETS_PER_BAND = 8
+RIVET_RADIUS = 0.038     # 見本の鋲の直径は約 8cm（ゲームの画面で約 6 画素）
+RIVET_HEIGHT = 0.017
+RIVET_SIDES = 6
+RIM_CHIPS = {2: (0.012, 0.006), 7: (0.009, 0.004)}  # 板の番号: (下げる高さ, 削る厚み)
+
+
+def add_rivet(bm, center, normal):
+    """たがの面に乗せる低い丸頭。裏は見えないので閉じない。"""
+    normal = normal.normalized()
+    up = Vector((0.0, 0.0, 1.0))
+    tangent = up.cross(normal).normalized()
+    bitangent = normal.cross(tangent).normalized()
+    base = []
+    shoulder = []
+    for side in range(RIVET_SIDES):
+        angle = 2.0 * math.pi * side / RIVET_SIDES
+        direction = tangent * math.cos(angle) + bitangent * math.sin(angle)
+        base.append(bm.verts.new(center - normal * 0.004 + direction * RIVET_RADIUS))
+        shoulder.append(bm.verts.new(center + normal * RIVET_HEIGHT * 0.72 + direction * RIVET_RADIUS * 0.68))
+    tip = bm.verts.new(center + normal * RIVET_HEIGHT)
+    faces = []
+    for side in range(RIVET_SIDES):
+        next_side = (side + 1) % RIVET_SIDES
+        faces.append(bm.faces.new((base[side], base[next_side], shoulder[next_side], shoulder[side])))
+        faces.append(bm.faces.new((shoulder[side], shoulder[next_side], tip)))
+    for face in faces:
+        face.smooth = True
+    return len(faces)
+
+
+def add_rivets(bm, rng, tilts):
+    """上下のたがに鋲を並べる。行 4-5 が下のたが、行 11-12 が上のたが。"""
+    triangles = 0
+    for rows, tilt in (((4, 5), tilts[0]), ((11, 12), tilts[1])):
+        (r0, z0), (r1, z1) = PROFILE[rows[0]], PROFILE[rows[1]]
+        radius, height = (r0 + r1) * 0.5, (z0 + z1) * 0.5
+        slope = Vector((z1 - z0, 0.0, -(r1 - r0))).normalized()
+        offset = rng.uniform(0.0, 0.7)
+        for index in range(RIVETS_PER_BAND):
+            angle = offset + 2.0 * math.pi * index / RIVETS_PER_BAND + rng.uniform(-0.04, 0.04)
+            cos_a, sin_a = math.cos(angle), math.sin(angle)
+            center = Vector((radius * cos_a, radius * sin_a,
+                             height + tilt[1] * math.sin(angle + tilt[0])))
+            normal = Vector((slope.x * cos_a, slope.x * sin_a, slope.z))
+            add_rivet(bm, center, normal)
+            triangles += RIVET_SIDES * 3
+    return triangles
+
+
+def build_barrel_stage2(seed=7, details=False):
     """板 12 枚の胴に分ける。各板は境が谷、中央が山。縁は板の頭ごとに高さが違う。"""
     rng = random.Random(seed)
     weights = [1.0 + rng.uniform(-STAVE_WIDTH_JITTER, STAVE_WIDTH_JITTER) for _ in range(STAVES)]
@@ -161,6 +211,9 @@ def build_barrel_stage2(seed=7):
                     r += stave_offset[stave]
             if kind == "rim" and column_kind == "mid":
                 z += stave_top[stave]
+                if details and stave in RIM_CHIPS:
+                    z -= RIM_CHIPS[stave][0]
+                    r -= RIM_CHIPS[stave][1]
             # 3 と 6、10 と 13 の行は段差の相手なので、たがと同じ高さに傾ける。
             if tilt is not None and row in (3, 4, 5, 6, 10, 11, 12, 13):
                 z += tilt[1] * math.sin(column_angle + tilt[0])
@@ -192,9 +245,11 @@ def build_barrel_stage2(seed=7):
                 edge = bm.edges.get((rings[row][side], rings[row + 1][side]))
                 if edge is not None:
                     edge.smooth = False
+    non_manifold = sum(1 for edge in bm.edges if not edge.is_manifold)
+    if details:
+        add_rivets(bm, rng, tilts)
     bm.to_mesh(mesh)
     triangles = sum(len(face.verts) - 2 for face in bm.faces)
-    non_manifold = sum(1 for edge in bm.edges if not edge.is_manifold)
     bm.free()
     obj = bpy.data.objects.new("barrel_blockout", mesh)
     bpy.context.collection.objects.link(obj)
@@ -264,7 +319,8 @@ def main():
     out = os.path.abspath(args.out)
     os.makedirs(out, exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    obj, triangles, non_manifold = build_barrel_stage2() if args.stage == 2 else build_barrel()
+    obj, triangles, non_manifold = (build_barrel() if args.stage == 1 else
+                                    build_barrel_stage2(details=args.stage == 3))
     scene, camera = setup_scene()
 
     bpy.ops.object.select_all(action="DESELECT")
