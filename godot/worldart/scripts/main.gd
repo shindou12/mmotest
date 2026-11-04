@@ -448,7 +448,7 @@ func _rebuild_mask_scene() -> void:
 				copy.set_surface_override_material(surface, _mask_material(src_mesh.get_active_material(surface), include_ground))
 		elif source is MultiMeshInstance3D:
 			var src_multi := source as MultiMeshInstance3D
-			if src_multi.multimesh == null or src_multi.multimesh.mesh == null: continue
+			if src_multi.multimesh == null or src_multi.multimesh.mesh == null or src_multi.has_meta("wa_shell"): continue   # 草のシェルは土台の地面で足りる
 			var copy := MultiMeshInstance3D.new()
 			copy.name = src_multi.name
 			copy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
