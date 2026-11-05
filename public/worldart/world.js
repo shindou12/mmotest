@@ -153,6 +153,39 @@ if (COOKIE_ON) {
     'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]',
     '#ifdef USE_COOKIE\n\t\tdirectLight.color *= cookieLight();\n\t\t#endif\n\t\tdirectLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]');
 }
+// ---------------------------------------------------------------- スタイライズの試し（M-0178。すべて省略時は無効）
+//   shtint=r,g,b   影の中に残す太陽の光の色（落ちる影と、光の向きの陰の両方）。例 0.16,0.24,0.3
+//   shpen=0.6 shpenc=r,g,b  影の縁（半影と明暗の境）に色を足す
+//   ramp=1 rampt=0.3 rampw=0.08  明暗の境を段に寄せる（やわらかい段）
+//   rim=0.5 rimp=3  輪郭の光（太陽の側の縁を明るく）
+const csv = (k) => (q.get(k) || '').split(',').map(Number);
+const STY = {
+  tint: q.has('shtint') ? csv('shtint') : null,
+  pen: num('shpen', 0), penC: q.has('shpenc') ? csv('shpenc') : [1.0, 0.85, 0.45],
+  ramp: flag('ramp', false), rampT: num('rampt', 0.3), rampW: num('rampw', 0.08),
+  rim: num('rim', 0), rimP: num('rimp', 3),
+};
+{
+  const f = (v) => Number(v).toFixed(4);
+  const v3 = (a) => `vec3(${a.map(f).join(', ')})`;
+  const C = THREE.ShaderChunk;
+  const tint = STY.tint ? v3(STY.tint) : 'vec3(0.0)';
+  // 光の向きの陰と落ちる影を、どちらも「影の色」へ寄せる。境には色を足す
+  C.lights_lambert_pars_fragment = C.lights_lambert_pars_fragment.replace('vec3 irradiance = dotNL * directLight.color;', `
+    float styNL = dotNL;
+    ${STY.ramp ? `styNL = smoothstep(${f(STY.rampT - STY.rampW)}, ${f(STY.rampT + STY.rampW)}, dotNL);` : ''}
+    vec3 irradiance = ${STY.tint ? `mix(${tint}, vec3(1.0), styNL)` : 'vec3(styNL)'} * directLight.color;
+    ${STY.pen > 0 ? `irradiance *= mix(vec3(1.0), ${v3(STY.penC)}, ${f(STY.pen)} * 4.0 * styNL * (1.0 - styNL));` : ''}
+    ${STY.rim > 0 ? `irradiance += directLight.color * ${f(STY.rim)} * pow(1.0 - saturate(dot(geometryNormal, geometryViewDir)), ${f(STY.rimP)}) * saturate(dot(geometryNormal, directLight.direction) + 0.35);` : ''}`);
+  if (STY.tint || STY.pen > 0) {
+    // 落ちる影: 影の割合 s を取り出し、消すのではなく影の色へ寄せる。半影（s が 0〜1 の間）に色を足す
+    C.lights_fragment_begin = C.lights_fragment_begin.replace(
+      'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;',
+      `{ float styS = ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;
+        directLight.color *= ${STY.tint ? `mix(${tint}, vec3(1.0), styS)` : 'vec3(styS)'};
+        ${STY.pen > 0 ? `directLight.color *= mix(vec3(1.0), ${v3(STY.penC)}, ${f(STY.pen)} * 4.0 * styS * (1.0 - styS));` : ''} }`);
+  }
+}
 function fitShadow() {
   // 影の範囲: 画面に映る地面を覆う
   let half = camState.dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * 1.9 + 8;
@@ -168,7 +201,7 @@ fitShadow();
 const texLoader = new THREE.TextureLoader();
 const tex = (name, srgb = true) => {
   const paintedGround = !flag('notex', false) && spec.ground?.texDir && ['ground_grass', 'rock_crack', 'rock_face'].includes(name);
-  const dir = paintedGround ? spec.ground.texDir : 'tex';
+  const dir = q.get('tdir') || (paintedGround ? spec.ground.texDir : 'tex');   // tdir: 絵のフォルダごと差し替える（M-0178 の焼き込みの試し）
   const t = texLoader.load(`${BASE}${dir}/${name}.png`);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
@@ -1117,7 +1150,53 @@ const dof = new ShaderPass({
       gl_FragColor = c;
     }`,
 });
-if (flag('post')) { composer.addPass(grade); if (diffAmt > 0 || diffDebug) composer.addPass(diffusion); if (flag('dof') && !diffDebug) composer.addPass(dof); }
+// 絵筆のぼかし（Kuwahara、M-0178）: kuw=半径 px。4 つの区画のうち色のばらつきが一番小さい区画の平均を使い、縁を保って面をまとめる
+const KUW = Math.round(num('kuw', 0));
+const kuwPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2(1 / (innerWidth * renderer.getPixelRatio()), 1 / (innerHeight * renderer.getPixelRatio())) } },
+  vertexShader: VS,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uTexel; varying vec2 vUv;
+    void main(){
+      vec3 m[4]; vec3 s[4];
+      for (int k = 0; k < 4; k++) { m[k] = vec3(0.0); s[k] = vec3(0.0); }
+      const int R = ${Math.max(1, KUW)};
+      for (int j = -R; j <= R; j++) for (int i = -R; i <= R; i++) {
+        vec3 c = texture2D(tDiffuse, vUv + vec2(float(i), float(j)) * uTexel).rgb;
+        if (i <= 0 && j <= 0) { m[0] += c; s[0] += c * c; }
+        if (i >= 0 && j <= 0) { m[1] += c; s[1] += c * c; }
+        if (i <= 0 && j >= 0) { m[2] += c; s[2] += c * c; }
+        if (i >= 0 && j >= 0) { m[3] += c; s[3] += c * c; }
+      }
+      float n = float((R + 1) * (R + 1)); float best = 1e9; vec3 outc = vec3(0.0);
+      for (int k = 0; k < 4; k++) {
+        vec3 mean = m[k] / n; vec3 v = abs(s[k] / n - mean * mean);
+        float sv = v.r + v.g + v.b;
+        if (sv < best) { best = sv; outc = mean; }
+      }
+      gl_FragColor = vec4(outc, 1.0);
+    }`,
+});
+// 明るさごとの色（グラデーションマップ、M-0178）: gmap=混ぜる量。表は RO3 の 4 枚の画面の色の付いた画素（彩度 0.2 超、UI の隅を除く）から、
+// 明るさごとの色の比の中央値を測った
+const GMAP = num('gmap', 0);
+const GMAP_TABLE = [[0.016, 0.022, 0.008], [0.106, 0.137, 0.06], [0.218, 0.273, 0.125], [0.339, 0.406, 0.191], [0.457, 0.539, 0.245],
+  [0.598, 0.665, 0.303], [0.774, 0.779, 0.381], [0.998, 0.878, 0.479], [1.027, 1.04, 0.565]]
+  .map((c) => { const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return new THREE.Vector3(c[0] / l, c[1] / l, c[2] / l); });
+const gmapPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTab: { value: GMAP_TABLE }, uAmt: { value: GMAP } },
+  vertexShader: VS,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 uTab[9]; uniform float uAmt; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      float x = clamp(l, 0.0, 1.0) * 8.0; int i = int(min(floor(x), 7.0)); float t = x - float(i);
+      vec3 ratio = vec3(0.0);
+      for (int k = 0; k < 8; k++) if (k == i) ratio = mix(uTab[k], uTab[k + 1], t);
+      c.rgb = mix(c.rgb, clamp(ratio * l, 0.0, 1.0), uAmt);
+      gl_FragColor = c;
+    }`,
+});
+if (flag('post')) { composer.addPass(grade); if (KUW > 0) composer.addPass(kuwPass); if (GMAP > 0) composer.addPass(gmapPass); if (diffAmt > 0 || diffDebug) composer.addPass(diffusion); if (flag('dof') && !diffDebug) composer.addPass(dof); }
 
 // ビューの照明の上書き（見本のカットシーンなど、カメラ演出が違う見本に合わせる）
 const LIGHT0 = { sun: sun.intensity, hemi: hemi.intensity, exposure: renderer.toneMappingExposure, sat: grade.uniforms.uSat.value };
