@@ -1,0 +1,19 @@
+生成プロンプト（image_generation）
+
+Use case: stylized-concept
+Asset type: 1024x1024 game foliage sprite sheet for background keying
+Primary request: Create one clean hand-painted illustration of four small leafy sprigs. Each sprig has 7–11 five-lobed star-shaped leaves. Each leaf is a small maple-like star with five thick, short, broad fingers, not long thin spikes. The leaf interiors are mostly flat color with only a slight darkening toward the base. Show separation between overlapping leaves with restrained dark overlap shadows.
+Input images: Image 1 and Image 2 are references only for the five-lobed leaf shape and simple painted leaf shading. Do not reproduce anything else from either screenshot: no tree, scene, ground, UI, text, or camera composition.
+Scene/backdrop: The entire canvas is one perfectly uniform, solid pure magenta (#FF00FF), with no variation, shadow, gradient, noise, border, or divider. Leaves contain no magenta, pink, or purple.
+Subject: Exactly four separate leafy sprigs, each with a thin modest twig optionally visible. Bright yellow-green leaves sit in front; deep blue-green leaves sit behind. Use only two or three green tones total.
+Composition/framing: An invisible 2-column by 2-row grid of equal cells, one sprig centered in each cell. Keep every sprig well inside its cell with generous magenta space around it; nothing touches the canvas edge and sprigs do not touch each other. Each twig begins near the lower center of its cell and the leaves fan upward and outward. Each leaf is about one quarter of its cell's width. Vary the number, size, rotation, and placement of leaves across all four sprigs. Overlap leaves by about half so each sprig has a broken, jagged leafy silhouette rather than a solid oval.
+Style/medium: Simple, polished, hand-painted game illustration; flat leaf faces, subtle base shading only, and small soft dark-green shadows only where leaves overlap.
+Avoid: Thick brush marks, a thick central midrib, fine detailed veins, outlined edges, filter-like or photographic texture, 3D shine, extra objects or foliage, background shadows, text, watermark, cell lines, panel borders, or colored background variation. Keep the four canvas corners the exact same pure #FF00FF as the rest of the background.
+
+背景補正プロンプト（image_generation）
+
+Edit the provided image for use as a clean keyed game-art sprite sheet. Preserve the four leafy sprigs exactly: keep their count, locations, silhouette, leaf shapes, colors, shading, stems, and overall composition unchanged. Change only the background: make every background pixel perfectly uniform, flat, exact pure magenta RGB (255, 0, 255), including all four corners, with no color variation, gradient, noise, shadow, or edge tint. Do not add or remove anything. Keep the canvas square and output at 1024x1024 pixels.
+
+出力後処理
+
+生成結果は 1254x1254 で、背景の色も指定値から揺れていたため、背景色に近い領域を #FF00FF に統一してから 1024x1024 に縮小し、外周 2 px も同色にそろえた。
