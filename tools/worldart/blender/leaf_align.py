@@ -29,6 +29,7 @@ args.add_argument("--apex", type=float, default=0.9, help="塊の半径に対す
 args.add_argument("--keep-small", action="store_true")
 args.add_argument("--leaf-faces", type=int, default=7, help="葉 1 枚の面の数（板なら 2）")
 args.add_argument("--up", type=float, default=0.0, help="面の向きを上へ寄せる量。絵の房の板は横を向くと棒に見える")
+args.add_argument("--uv-grid", type=int, default=1, help="絵を N x N に分けて、板ごとに 1 枠を選ぶ（板の UV が 0〜1 のとき）")
 args = args.parse_args(sys.argv[sys.argv.index("--") + 1:])
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -144,6 +145,15 @@ for loop in range(loop_count):
     normal = vertex_normal.get(int(loop_verts[loop]))
     if normal is not None:
         loop_normals[loop] = normal
+
+if args.uv_grid > 1:
+    new_uvs = uvs.copy()
+    for polygons in large:
+        column, row = rng.integers(0, args.uv_grid, 2)
+        for polygon in polygons:
+            for loop in polygon.loop_indices:
+                new_uvs[loop] = (uvs[loop] + (column, row)) / args.uv_grid
+    mesh.uv_layers.active.data.foreach_set("uv", new_uvs.ravel())
 
 mesh.vertices.foreach_set("co", new_positions.ravel())
 mesh.normals_split_custom_set(loop_normals.tolist())

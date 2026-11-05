@@ -26,10 +26,16 @@ args.add_argument("--jitter", type=float, default=14.0, help="先端の向きの
 args.add_argument("--flat", type=float, default=0.72, help="塊の高さ/幅")
 args.add_argument("--radius", type=float, default=1.15, help="元の板の広がりに対する塊の半径の倍率")
 args.add_argument("--under", type=float, default=0.22, help="塊の下半分に置く葉の割合")
+args.add_argument("--size-var", type=float, default=0.0, help="葉の大きさのばらつき（±の割合）")
+args.add_argument("--lift-var", type=float, default=0.0, help="瓦の反りのばらつき（±度）")
+args.add_argument("--wobble", type=float, default=0.0, help="面の傾きのばらつき（度）")
+args.add_argument("--bump", type=float, default=0.0, help="塊の表面の凹凸（半径に対する±の割合）")
+args.add_argument("--shade", type=float, nargs=2, default=(0.44, 0.2), help="頂点色の基準と幅")
+args.add_argument("--tones", default="6,0,7,1,2,3,4,5", help="絵の 8 枠を暗い順に並べた番号")
 args = args.parse_args(sys.argv[sys.argv.index("--") + 1:])
 
-# 絵の並びの暗い順（M-0169 の 8 枚）
-TONE_ORDER = (6, 0, 7, 1, 2, 3, 4, 5)
+# 絵の並びの暗い順（既定は M-0169 の 8 枚）
+TONE_ORDER = tuple(int(i) for i in args.tones.split(","))
 ROOM = 4  # 絵の列数
 ROWS = 2
 
@@ -96,8 +102,14 @@ for clump, number in enumerate(counts):
             z = rng.uniform(0.0, 1.0)
         ring = math.sqrt(max(0.0, 1 - z * z))
         direction = np.array([ring * math.cos(phi), ring * math.sin(phi), z])
-        position = center + direction * radius * np.array([1, 1, args.flat])
-        surface = direction / np.linalg.norm(direction)
+        bump = 1 + rng.uniform(-args.bump, args.bump)
+        position = center + direction * radius * bump * np.array([1, 1, args.flat])
+        surface = direction + rng.normal(0, math.radians(args.wobble), 3) if args.wobble else direction
+        surface = surface / np.linalg.norm(surface)
+        lift = math.radians(args.lift + rng.uniform(-args.lift_var, args.lift_var))
+        scale = 1 + rng.uniform(-args.size_var, args.size_var)
+        half_w = args.leaf * scale / 2
+        height = args.leaf * args.aspect * scale
         tip = position - apex
         tip = tip - surface * tip.dot(surface)
         if np.linalg.norm(tip) < 1e-4:
@@ -124,7 +136,7 @@ for clump, number in enumerate(counts):
         faces.append((base, base + 1, base + 2, base + 3))
         face_uvs.append(((u0, v0), (u1, v0), (u1, v1), (u0, v1)))
         # 頂点色は絵に掛かる。今の木の葉は 0.55 前後なので合わせる（1.0 近いと白く飛ぶ）
-        shade = 0.44 + 0.2 * (z * 0.5 + 0.5)
+        shade = args.shade[0] + args.shade[1] * (z * 0.5 + 0.5)
         face_colors.append(shade)
         normals = []
         for corner in corners:
