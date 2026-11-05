@@ -117,6 +117,42 @@ sun.shadow.mapSize.set(4096, 4096);
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
 sun.shadow.radius = num('srad', spec.shadowRadius ?? 2); sun.shadow.blurSamples = 16;
 scene.add(hemi, sun, sun.target);
+// 光の模様（light cookie）: 太陽の光を世界座標の大きな模様で遮る。カメラに付いて動いても崩れず、影を落とす物が要らない。
+//   cookie=遮る強さ（0 で無効） cookiew=模様の大きさ m cookiet=影の割合の目安 cookies=縁のやわらかさ cookiem=all|ground
+const COOKIE = Object.assign({ amount: 0, wave: 14, threshold: 0.5, soft: 0.1, mode: 'all' }, spec.lightCookie || {});
+COOKIE.amount = num('cookie', COOKIE.amount); COOKIE.wave = num('cookiew', COOKIE.wave);
+COOKIE.threshold = num('cookiet', COOKIE.threshold); COOKIE.soft = num('cookies', COOKIE.soft);
+COOKIE.mode = q.get('cookiem') || COOKIE.mode;
+const COOKIE_ON = COOKIE.amount > 0;
+const COOKIE_GROUND_ONLY = COOKIE_ON && COOKIE.mode === 'ground';
+if (COOKIE_ON) {
+  const f = (v) => Number(v).toFixed(5);
+  const az = THREE.MathUtils.degToRad(num('sunAz', S.azimuth)), el = THREE.MathUtils.degToRad(num('sunEl', S.elevation));
+  const slope = [Math.sin(az) / Math.tan(el), Math.cos(az) / Math.tan(el)];   // 高さの分だけ光の向きへ戻して地面の模様を引く
+  const C = THREE.ShaderChunk;
+  C.shadowmap_pars_vertex = '#ifdef USE_SHADOWMAP\nvarying vec3 vCookieW;\n#endif\n' + C.shadowmap_pars_vertex;
+  C.shadowmap_vertex += '\n#ifdef USE_SHADOWMAP\nvCookieW = worldPosition.xyz;\n#endif\n';
+  C.shadowmap_pars_fragment = `#ifdef USE_SHADOWMAP
+    varying vec3 vCookieW;
+    ${COOKIE_GROUND_ONLY ? '' : '#define USE_COOKIE 1'}
+    float cookieHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float cookieNoise(vec2 p) {
+      vec2 i = floor(p), u = fract(p); u = u * u * (3.0 - 2.0 * u);
+      return mix(mix(cookieHash(i), cookieHash(i + vec2(1, 0)), u.x), mix(cookieHash(i + vec2(0, 1)), cookieHash(i + vec2(1, 1)), u.x), u.y);
+    }
+    float cookieLight() {
+      vec2 p = (vCookieW.xz - vec2(${f(slope[0])}, ${f(slope[1])}) * vCookieW.y) / ${f(COOKIE.wave)};
+      p += 0.45 * vec2(cookieNoise(p * 1.7 + 3.1), cookieNoise(p * 1.7 + 7.7));
+      float n = 0.62 * cookieNoise(p) + 0.28 * cookieNoise(p * 2.3 + 11.0) + 0.10 * cookieNoise(p * 5.1 + 23.0);
+      float shade = smoothstep(${f(COOKIE.threshold - COOKIE.soft)}, ${f(COOKIE.threshold + COOKIE.soft)}, n);
+      return 1.0 - ${f(COOKIE.amount)} * shade;
+    }
+    #endif
+  ` + C.shadowmap_pars_fragment;
+  C.lights_fragment_begin = C.lights_fragment_begin.replace(
+    'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]',
+    '#ifdef USE_COOKIE\n\t\tdirectLight.color *= cookieLight();\n\t\t#endif\n\t\tdirectLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]');
+}
 function fitShadow() {
   // 影の範囲: 画面に映る地面を覆う
   let half = camState.dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * 1.9 + 8;
@@ -700,6 +736,7 @@ terrain.scene.traverse((o) => {
   } else {
     o.userData.diffMaskGround = true;
     o.material = groundMaterial(); o.receiveShadow = true;
+    if (COOKIE_GROUND_ONLY) o.material.defines = { ...(o.material.defines || {}), USE_COOKIE: 1 };
   }
 });
 scene.add(terrain.scene);
@@ -722,11 +759,16 @@ await Promise.all(assetNames.map(async (name) => {
     const mat = fixMaterial(o, name, loadName);
     const im = new THREE.InstancedMesh(o.geometry, mat, items.length);
     im.userData.diffMaskIgnore = shadowOnly;
-    items.forEach(([x, y, z, r, s], i) => {
+    const instanceShade = new THREE.Color();
+    const hasShade = items.some((row) => row[5] !== undefined);
+    items.forEach(([x, y, z, r, s, shade], i) => {
       dummy.position.set(x, y, z); dummy.rotation.set(0, r, 0); dummy.scale.setScalar(s); dummy.updateMatrix();
       im.setMatrixAt(i, dummy.matrix.clone().multiply(o.matrixWorld));
+      // 配置の 6 番目: その物全体の明るさ（森の奥を暗くするなど、画面の明暗の配分に使う）。1 つでもあれば全体に入れる
+      if (hasShade) im.setColorAt(i, instanceShade.setScalar(shade ?? 1));
     });
     const isGrass = name.startsWith('grass');
+    if (COOKIE_GROUND_ONLY && isGrass) mat.defines = { ...(mat.defines || {}), USE_COOKIE: 1 };
     im.castShadow = !isGrass; im.receiveShadow = !/leaf|frond/.test(mat.name) || LEAF.receive;
     if (/leaf|frond|grass/.test(mat.name)) {
       const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: mat.alphaTest || 0.5 });
