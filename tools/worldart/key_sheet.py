@@ -7,7 +7,7 @@
 import argparse
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 args = argparse.ArgumentParser()
 args.add_argument("mode", choices=("sheet", "leaves"))
@@ -30,6 +30,14 @@ def key_out(path):
     partial = (alpha > 0) & (alpha < 1)
     pixels[partial] = np.clip((pixels[partial] - KEY * (1 - alpha[partial, None]))
                               / np.maximum(alpha[partial, None], 0.25), 0, 255)
+    # 透明の所に背景色が残ると、縮小のときに縁へにじむ。近くの葉の色で埋める
+    solid = alpha > 0.9
+    weight = Image.fromarray((solid * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(14))
+    weight = np.maximum(np.asarray(weight, dtype=np.float32), 1e-3)[..., None]
+    spread = np.dstack([np.asarray(Image.fromarray((pixels[..., c] * solid).astype(np.uint8))
+                                   .filter(ImageFilter.GaussianBlur(14)), dtype=np.float32) for c in range(3)])
+    filled = np.clip(spread / weight * 255, 0, 255)
+    pixels = np.where(solid[..., None], pixels, filled)
     return np.dstack((pixels, alpha * 255)).astype(np.uint8)
 
 
