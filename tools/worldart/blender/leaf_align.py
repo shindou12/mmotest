@@ -27,6 +27,8 @@ args.add_argument("--lift", type=float, default=16.0, help="瓦の反り（度�
 args.add_argument("--wobble", type=float, default=6.0, help="面の傾きのばらつき（度）")
 args.add_argument("--apex", type=float, default=0.9, help="塊の半径に対する、基準の点の高さ")
 args.add_argument("--keep-small", action="store_true")
+args.add_argument("--leaf-faces", type=int, default=7, help="葉 1 枚の面の数（板なら 2）")
+args.add_argument("--up", type=float, default=0.0, help="面の向きを上へ寄せる量。絵の房の板は横を向くと棒に見える")
 args = args.parse_args(sys.argv[sys.argv.index("--") + 1:])
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -70,7 +72,7 @@ pieces = {}
 for polygon in leaf_polygons:
     pieces.setdefault(find(polygon.vertices[0]), []).append(polygon)
 pieces = list(pieces.values())
-large = [p for p in pieces if len(p) == 7]
+large = [p for p in pieces if len(p) == args.leaf_faces]
 small = [p for p in pieces if len(p) == 3]
 print("INFO large", len(large), "small", len(small))
 
@@ -118,6 +120,7 @@ for index, (verts, center, old_normal, old_tip) in enumerate(info_large):
     clump = labels[index]
     surface = unit(center - centers[clump] + rng.normal(0, math.radians(args.wobble), 3) * radii[clump])
     tip = center - apexes[clump]
+    surface = unit(surface + np.array([0.0, 0.0, args.up]))
     tip = tip - surface * tip.dot(surface)
     if np.linalg.norm(tip) < 1e-4:
         tip = np.cross(surface, [1.0, 0.0, 0.0])
@@ -166,6 +169,7 @@ bpy.ops.export_scene.gltf(
     export_texcoords=True,
     export_materials="EXPORT",
     export_image_format="AUTO",
+    export_vertex_color="ACTIVE",
     export_apply=False,
 )
 print("WROTE", args.out)

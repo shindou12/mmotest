@@ -37,6 +37,7 @@ bpy.ops.export_scene.gltf(
     export_texcoords=True,
     export_materials="EXPORT",
     export_image_format="AUTO",
+    export_vertex_color="ACTIVE",
     export_apply=False,
 )
 print("WROTE", args.out)
