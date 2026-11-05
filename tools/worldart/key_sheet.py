@@ -17,6 +17,8 @@ args.add_argument("--key", default="255,0,255")
 args.add_argument("--size", type=int, default=1024)
 args.add_argument("--near", type=float, default=70.0, help="これより背景に近い色は透明")
 args.add_argument("--far", type=float, default=120.0, help="これより遠い色は不透明")
+args.add_argument("--tint", default="1,1,1", help="色の倍率 R,G,B。地図の foliage.tint を打ち消すのに使う")
+args.add_argument("--contrast", type=float, default=1.0, help="葉の中の明暗の強さ")
 args = args.parse_args()
 
 KEY = np.array([float(c) for c in args.key.split(",")], dtype=np.float32)
@@ -38,6 +40,9 @@ def key_out(path):
                                    .filter(ImageFilter.GaussianBlur(14)), dtype=np.float32) for c in range(3)])
     filled = np.clip(spread / weight * 255, 0, 255)
     pixels = np.where(solid[..., None], pixels, filled)
+    mean = pixels[solid].mean(axis=0)
+    pixels = mean + (pixels - mean) * args.contrast
+    pixels = np.clip(pixels * np.array([float(c) for c in args.tint.split(",")], dtype=np.float32), 0, 255)
     return np.dstack((pixels, alpha * 255)).astype(np.uint8)
 
 
