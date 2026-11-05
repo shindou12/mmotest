@@ -15,3 +15,8 @@ imozuru（https://github.com/MaryCache/imozuru, commit 14635fb）は `~/.claude/
 研究の参考に使う見本で、外部へ公開しない。
 - T01: YouTube のサムネイル（`i.ytimg.com/vi/3NeAoBqD3MM/maxresdefault.jpg`、「Ragnarok Online 3 HD Open-world Gameplay & Latest Trailer」、プロンテラ南門）
 - T02〜T04: 4Gamer の記事の画像（トレーラーのキャプチャ、`www.4gamer.net/games/854/G085427/20250731033/SS/031.jpg`・`032.jpg`・`030.jpg`、ギルドリーグの戦場）
+
+## 画面の見え方の研究（M-0175）
+- 手描き風の環境の手法: [Turning a 2D illustration into a 3D environment](https://80.lv/articles/turning-a-2d-illustration-into-a-3d-environment-with-a-hand-painted-look)、[Forest Waypoint in UE4](https://80.lv/articles/forest-waypoint-in-ue4-creating-stylized-landscape-and-materials)、[Stylized Pacific Northwest forest](https://80.lv/articles/take-a-walk-in-a-stylized-pacific-northwest-forest-visualized-in-3d)
+- RO3 の開発元と紹介: [mmos.com](https://mmos.com/news/raagnarok-online-3-revealed-in-first-gameplay-trailer)、[4Gamer の G-STAR 2025 の記事](https://www.4gamer.net/games/854/G085427/20251114027/)
+- Samsara Saga の紹介（第三者の掲載）: [Discord の掲載](https://discordhunt.com/en/servers/989587246111944755)
