@@ -79,5 +79,5 @@ void light() {
 	d += wa_leaf_trans * pow(clamp(dot(VIEW, -LIGHT), 0.0, 1.0), 2.0);   // 日を背にした葉の透け（world.js uTrans）
 	// 影を受けない葉（第 2 世代 foliage.receiveShadow false。草の房はいつも受ける）: 平行光だけなので影の項を 1 にする
 	float att = (!is_grass && wa_leaf_recv < 0.5) ? 1.0 : ATTENUATION;
-	DIFFUSE_LIGHT += LIGHT_COLOR * att * d / PI;
+	DIFFUSE_LIGHT += wa_lambert_sun(LIGHT_COLOR, att, d);
 }

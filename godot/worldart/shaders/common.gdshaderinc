@@ -8,10 +8,35 @@ global uniform vec3 wa_hemi_sky;
 global uniform vec3 wa_hemi_ground;
 global uniform float wa_hemi_int;
 global uniform float wa_albedo_sat;
+global uniform vec3 wa_shtint;
+global uniform float wa_shpen;
+global uniform vec3 wa_shpenc;
+global uniform float wa_ramp;
+global uniform float wa_rampt;
+global uniform float wa_rampw;
+global uniform float wa_gcomb;
+global uniform float wa_gpatch;
+global uniform float wa_gpatchc;
 
 vec3 wa_desat(vec3 c, float s) { float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return mix(vec3(l), c, s); }
 vec3 wa_hemi(vec3 albedo, vec3 n_world) {
 	return albedo * mix(wa_hemi_ground, wa_hemi_sky, 0.5 + 0.5 * n_world.y) * wa_hemi_int / PI;
+}
+
+// world.js の lights_lambert_pars_fragment（明暗の段）と lights_fragment_begin（影色・半影色）を移植。
+vec3 wa_lambert_sun(vec3 light_color, float shadow_factor, float dot_nl) {
+	float sty_nl = dot_nl;
+	if (wa_ramp > 0.5) {
+		sty_nl = smoothstep(wa_rampt - wa_rampw, wa_rampt + wa_rampw, dot_nl);
+	}
+	float sty_s = clamp(shadow_factor, 0.0, 1.0);
+	vec3 irradiance = mix(wa_shtint, vec3(1.0), sty_s);
+	float shadow_band = wa_shpen * 4.0 * sty_s * (1.0 - sty_s);
+	float nl = clamp(sty_nl, 0.0, 1.0);
+	float nl_band = wa_shpen * 4.0 * nl * (1.0 - nl);
+	irradiance *= mix(vec3(1.0), wa_shpenc, shadow_band);
+	irradiance *= mix(vec3(1.0), wa_shpenc, nl_band);
+	return light_color * irradiance * sty_nl / PI;
 }
 
 // 手前の物を点描で抜く（world.js の occChunk と同じ式）: カメラと注目点（人物）を結ぶ線の近く（半径 wa_occ_r）にある物を 4×4 のディザで消す。

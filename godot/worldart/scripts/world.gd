@@ -20,6 +20,9 @@ var ground_material: ShaderMaterial
 var shell_materials: Array[ShaderMaterial] = []   # 草のシェル（ground_shell.gdshader）。[近い区画, 遠い区画]。地面と同じ絵の引数を持つ
 ## 草のシェルの層数（--gshell=<層数>、0 で切って草の房に戻す）。高さと間隔は world.js の GSH・GSD
 var gshell := _arg_gshell()
+var gedge := 0.0
+var gwide := 0.0
+var path_edge_enabled := false
 ## 草が短くなる幅 (m) と境のまだらの強さ (0..1)
 var gshell_edge_width := clampf(_arg_float("gshell_edge", 1.25), 0.25, 3.0)
 var gshell_mottle := clampf(_arg_float("gshell_mottle", 0.8), 0.0, 1.0)
@@ -464,7 +467,26 @@ func _set_globals() -> void:
 	var G: Dictionary = spec.get("ground", {})
 	var F: Dictionary = spec.get("foliage", {})
 	var S: Dictionary = spec.get("sky", {})
+	var style: Dictionary = spec.get("style", {})
 	var rs := RenderingServer
+	gedge = maxf(0.0, float(style.get("gedge", 0.0)))
+	gwide = maxf(0.0, float(style.get("gwide", 0.0)))
+	path_edge_enabled = gedge > 0.0 and gwide > 0.0
+	var gshell_arg := false
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--gshell="):
+			gshell_arg = true
+			break
+	gshell = _arg_gshell() if gshell_arg else maxi(0, int(style.get("gshell", _arg_gshell())))
+	rs.global_shader_parameter_set("wa_shtint", _v3(style.get("shtint", [0.0, 0.0, 0.0])))
+	rs.global_shader_parameter_set("wa_shpen", float(style.get("shpen", 0.0)))
+	rs.global_shader_parameter_set("wa_shpenc", _v3(style.get("shpenc", [1.0, 0.85, 0.45])))
+	rs.global_shader_parameter_set("wa_ramp", 1.0 if bool(style.get("ramp", false)) else 0.0)
+	rs.global_shader_parameter_set("wa_rampt", float(style.get("rampt", 0.3)))
+	rs.global_shader_parameter_set("wa_rampw", float(style.get("rampw", 0.08)))
+	rs.global_shader_parameter_set("wa_gcomb", float(style.get("gcomb", 0.0)))
+	rs.global_shader_parameter_set("wa_gpatch", float(style.get("gpatch", 0.0)))
+	rs.global_shader_parameter_set("wa_gpatchc", float(style.get("gpatchc", 0.0)))
 	rs.global_shader_parameter_set("wa_hemi_sky", _lin(S.get("light", S.get("color", "#cfe0ee"))))
 	rs.global_shader_parameter_set("wa_hemi_ground", _lin(S.get("ground", "#4a5a2a")))
 	rs.global_shader_parameter_set("wa_hemi_int", float(S.get("intensity", 0.6)))
@@ -528,11 +550,15 @@ func _build_light() -> void:
 	add_child(env)
 
 
-## world.js の VSM 半径の差を Godot の既定 blur 1.5 から 0.25 倍で反映する。
+## world.js の VSM 半径を Godot の shadow_blur に移す。style なしの地図は従来の既定値を保つ。
 func set_shadow_radius(radius: float) -> void:
 	if sun != null and is_instance_valid(sun):
-		var default_radius := float(spec.get("shadowRadius", 2.0))
-		sun.shadow_blur = clampf(1.5 + (radius - default_radius) * 0.25, 0.0, 7.0)
+		var style: Variant = spec.get("style", {})
+		if style is Dictionary and not style.is_empty():
+			sun.shadow_blur = clampf(1.5 + (radius - 6.0) * 0.25, 0.0, 7.0)
+		else:
+			var default_radius := float(spec.get("shadowRadius", 2.0))
+			sun.shadow_blur = clampf(1.5 + (radius - default_radius) * 0.25, 0.0, 7.0)
 
 
 ## skyvis がある地図だけ、空の間接光を焼いた可視率で弱める。
@@ -576,6 +602,8 @@ func _build_terrain() -> void:
 			shell_materials.append(sm)
 	var sms: Array = [m] + shell_materials   # 地面とシェルで同じ絵の引数を入れる
 	for mat in sms:
+		mat.set_shader_parameter("gedge", gedge)
+		mat.set_shader_parameter("gwide", gwide)
 		for k in [["t_grass", "ground_grass"], ["t_dirt", "ground_dirt"], ["t_alt", alt], ["t_rock", rk], ["t_noise", "noise_soft"]]:
 			mat.set_shader_parameter(k[0], _tex(k[1]))
 	var skyvis_path := "res://data/%s/skyvis.png" % map_name
@@ -709,7 +737,7 @@ func _build_splat() -> void:
 	var img := Image.create(R, R, false, Image.FORMAT_RGBA8)
 	var edge_weights := PackedFloat32Array()
 	var edge_mottles := PackedFloat32Array()
-	if gshell > 0:
+	if gshell > 0 or path_edge_enabled:
 		edge_weights.resize(R * R)
 		edge_mottles.resize(R * R)
 		for z in R:
@@ -726,7 +754,7 @@ func _build_splat() -> void:
 		var iz := int(round((p.z - float(tm["z0"])) / cell))
 		if ix >= 0 and iz >= 0 and ix < R and iz < R:
 			img.set_pixel(ix, iz, Color(C[i].r, C[i].g, C[i].b, 1.0))
-			if gshell > 0:
+			if gshell > 0 or path_edge_enabled:
 				var color := C[i]
 				var dirt := _grass_smoothstep(0.4, 0.6, color.r)
 				var alt := _grass_smoothstep(0.4, 0.6, color.g)
@@ -734,7 +762,7 @@ func _build_splat() -> void:
 				edge_weights[iz * R + ix] = (1.0 - dirt) * (1.0 - alt) * (1.0 - rock)
 	splat_tex = ImageTexture.create_from_image(img)
 	RenderingServer.global_shader_parameter_set("wa_splat_st", Vector3(float(tm["x0"]), float(tm["z0"]), (R - 1) * cell))
-	if gshell > 0:
+	if gshell > 0 or path_edge_enabled:
 		# 草の縁までの符号つき距離（m。草の内側が正、土・砂・岩の側が負。R 画素に ±GEDGE_RANGE で入れる）。細い道でも幅が崩れない
 		edge_weights = _blur_grass_weights(edge_weights, R, 1.0)   # 画素の階段を少しならす
 		edge_weights = _grass_signed_distance(edge_weights, R, cell)
@@ -748,7 +776,7 @@ func _build_splat() -> void:
 		grass_edge_st = Vector3(float(tm["x0"]) - 0.5 * cell, float(tm["z0"]) - 0.5 * cell, R * cell)   # 画素 i の中心が x0 + i*cell（半画素ずらして引く）
 		ground_material.set_shader_parameter("t_grass_edge", grass_edge_tex)
 		ground_material.set_shader_parameter("grass_edge_st", grass_edge_st)
-		ground_material.set_shader_parameter("edge_tint", 1.0)
+		ground_material.set_shader_parameter("edge_tint", 0.0 if path_edge_enabled else 1.0)
 		for sm in shell_materials:
 			sm.set_shader_parameter("t_grass_edge", grass_edge_tex)
 			sm.set_shader_parameter("grass_edge_st", grass_edge_st)
