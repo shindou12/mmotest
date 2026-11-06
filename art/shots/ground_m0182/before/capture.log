@@ -1,0 +1,199 @@
+Godot Engine v4.3.stable.official.77dcf97d8 - https://godotengine.org
+Vulkan 1.4.341 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4070 SUPER
+
+USER ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:1873)
+--Main Shader--
+    1 | 
+    2 | shader_type spatial;
+    3 | render_mode diffuse_lambert, specular_disabled, ambient_light_disabled, cull_disabled;
+    4 | #include "res://shaders/common.gdshaderinc"
+    5 | 
+    6 | uniform sampler2D t_noise : filter_linear_mipmap, repeat_enable;
+    7 | uniform sampler2D t_sand : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+    8 | uniform float u_wshadow = 0.0;
+    9 | global uniform vec3 wa_alt_tint;
+   10 | global uniform float wa_alt_scale;
+   11 | varying vec3 v_w;
+   12 | #include "res://shaders/water_w1.gdshaderinc"
+   13 | 
+   14 | 
+   15 | void vertex() {
+   16 |  v_w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+   17 | }
+   18 | 
+   19 | void fragment() {
+   20 |  vec3 water;
+E  21->  vec3 reflection;
+   22 |  float alpha;
+   23 |  wa_water_w1(v_w, CAMERA_POSITION_WORLD, TIME, water, reflection, alpha);
+   24 |  alpha = clamp(alpha, 0.0, 1.0);
+   25 |  
+   26 |  vec3 bottom = texture(t_sand, v_w.xz / wa_alt_scale).rgb * wa_alt_tint;
+   27 |  bottom = wa_desat(bottom, wa_albedo_sat);
+   28 |  vec3 bottom_lit = wa_hemi(bottom, vec3(0.0, 1.0, 0.0)) + bottom * wa_sun_col * max(wa_sun_dir.y, 0.0) / PI;
+   29 |  ALBEDO = water * alpha;
+   30 |  EMISSION = wa_hemi(water, vec3(0.0, 1.0, 0.0)) * alpha + reflection * alpha + bottom_lit * (1.0 - alpha);
+   31 | }
+   32 | 
+   33 | void light() {
+   34 |  float att = u_wshadow > 0.5 ? ATTENUATION : 1.0;
+   35 |  DIFFUSE_LIGHT += wa_sun_col * att * max(wa_sun_dir.y, 0.0) / PI;
+   36 | }
+   37 | 
+--res://shaders/common.gdshaderinc--
+    1 | 
+    2 | 
+    3 | 
+    4 | 
+    5 | 
+    6 | 
+    7 | global uniform vec3 wa_hemi_sky;
+    8 | global uniform vec3 wa_hemi_ground;
+    9 | global uniform float wa_hemi_int;
+   10 | global uniform float wa_albedo_sat;
+   11 | global uniform vec3 wa_shtint;
+   12 | global uniform float wa_shpen;
+   13 | global uniform vec3 wa_shpenc;
+   14 | global uniform float wa_ramp;
+   15 | global uniform float wa_rampt;
+   16 | global uniform float wa_rampw;
+   17 | global uniform float wa_gcomb;
+   18 | global uniform float wa_gpatch;
+   19 | global uniform float wa_gpatchc;
+   20 | 
+   21 | vec3 wa_desat(vec3 c, float s) { float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); return mix(vec3(l), c, s); }
+   22 | vec3 wa_hemi(vec3 albedo, vec3 n_world) {
+   23 |  return albedo * mix(wa_hemi_ground, wa_hemi_sky, 0.5 + 0.5 * n_world.y) * wa_hemi_int / PI;
+   24 | }
+   25 | 
+   26 | 
+   27 | vec3 wa_lambert_sun(vec3 light_color, float shadow_factor, float dot_nl) {
+   28 |  float sty_nl = dot_nl;
+   29 |  if (wa_ramp > 0.5) {
+   30 |  sty_nl = smoothstep(wa_rampt - wa_rampw, wa_rampt + wa_rampw, dot_nl);
+   31 |  }
+   32 |  float sty_s = clamp(shadow_factor, 0.0, 1.0);
+   33 |  vec3 irradiance = mix(wa_shtint, vec3(1.0), sty_s);
+   34 |  float shadow_band = wa_shpen * 4.0 * sty_s * (1.0 - sty_s);
+   35 |  float nl = clamp(sty_nl, 0.0, 1.0);
+   36 |  float nl_band = wa_shpen * 4.0 * nl * (1.0 - nl);
+   37 |  irradiance *= mix(vec3(1.0), wa_shpenc, shadow_band);
+   38 |  irradiance *= mix(vec3(1.0), wa_shpenc, nl_band);
+   39 |  return light_color * irradiance * sty_nl / PI;
+   40 | }
+   41 | 
+   42 | 
+   43 | 
+   44 | global uniform vec3 wa_occ_cam;
+   45 | global uniform vec3 wa_occ_tgt;
+   46 | global uniform float wa_occ_r;
+   47 | bool wa_occluded(vec3 w, vec2 fc, vec3 cam_now) {
+   48 |  if (wa_occ_r <= 0.0 || distance(cam_now, wa_occ_cam) > 0.5) return false;
+   49 |  vec3 ab = wa_occ_tgt - wa_occ_cam; float L = length(ab); vec3 d = ab / L;
+   50 |  float t = dot(w - wa_occ_cam, d);
+   51 |  if (t > 0.0 && t < L - 1.0) {
+   52 |  float r = length(w - (wa_occ_cam + d * t));
+   53 |  float k = 1.0 - smoothstep(wa_occ_r * 0.6, wa_occ_r, r);
+   54 |  vec2 q = mod(floor(fc), 4.0);
+   55 |  float bay = mod(q.x * 4.0 + q.y * 7.0 + q.x * q.y * 3.0, 16.0) / 16.0;
+   56 |  return k * 1.2 > bay + 0.02;
+   57 |  }
+   58 |  return false;
+   59 | }
+   60 | 
+--res://shaders/water_w1.gdshaderinc--
+    1 | 
+    2 | 
+    3 | 
+    4 | 
+    5 | 
+    6 | 
+    7 | 
+    8 | 
+    9 | 
+   10 | uniform sampler2D t_wh : filter_linear, repeat_disable; 
+   11 | uniform vec4 u_wt; 
+   12 | uniform vec3 u_whr; 
+   13 | uniform vec3 u_wshallow; 
+   14 | uniform vec3 u_wdeep;
+   15 | uniform vec4 u_wwd = vec4(2.6, 1.6, 0.28, 0.0); 
+   16 | uniform vec3 u_wsky;
+   17 | uniform float u_wrefl = 1.0;
+   18 | uniform vec2 u_wsg = vec2(0.32, 2.0);
+   19 | uniform float u_wtime = -1.0; 
+   20 | global uniform vec3 wa_sun_col; 
+   21 | global uniform vec3 wa_sun_dir; 
+   22 | 
+   23 | float wWave(vec2 p, float t) {
+   24 |  p *= vec2(0.8, 1.15);
+   25 |  return texture(t_noise, p * 0.13 + t * vec2(0.012, 0.006)).r + 0.6 * texture(t_noise, mat2(vec2(0.8, -0.6), vec2(0.6, 0.8)) * p * 0.29 - t * vec2(0.007, 0.016)).r;
+   26 | }
+   27 | vec2 wHash(vec2 p) {
+   28 |  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+   29 |  return fract(sin(p) * 43758.5453);
+   30 | }
+   31 | float wCell(vec2 p, float t) {
+   32 |  vec2 i = floor(p), f = fract(p);
+   33 |  float d1 = 8.0, d2 = 8.0;
+   34 |  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+   35 |  vec2 g = vec2(float(x), float(y));
+   36 |  vec2 o = wHash(i + g);
+   37 |  o = 0.5 + 0.38 * sin(t + 6.2831 * o);
+   38 |  float d = length(g + o - f);
+   39 |  if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+   40 |  }
+   41 |  return d2 - d1;
+   42 | }
+   43 | 
+   44 | void wa_water_w1(vec3 P, vec3 cam, float uTime, out vec3 lit, out float alpha) {
+   45 |  vec2 huv = vec2((P.x - u_wt.x) / u_wt.z, (P.z - u_wt.y) / u_wt.z); 
+   46 |  vec4 hs = texture(t_wh, huv);
+   47 |  float th = mix(u_whr.x, u_whr.y, hs.r);
+   48 |  float depth = u_whr.z - th;
+   49 |  float sdist = hs.g * u_wt.w;
+   50 |  float nz = texture(t_noise, P.xz / 11.0 + uTime * 0.008).r;
+   51 |  float nz2 = texture(t_noise, P.xz * vec2(0.09, 0.22) - uTime * vec2(0.004, 0.012)).r;
+   52 |  float dd = depth + (nz - 0.5) * 0.5;
+   53 |  vec3 wc = mix(u_wshallow, u_wdeep, max(smoothstep(u_wwd.y * 0.5, u_wwd.x, dd), smoothstep(2.5, 7.0, sdist + (nz - 0.5) * 1.5)));
+   54 |  vec2 sq = P.xz * vec2(1.0, 1.05) * u_wsg.x;
+   55 |  float surf = texture(t_noise, sq + uTime * vec2(0.010, 0.004)).r * 0.6 + texture(t_noise, mat2(vec2(0.87, -0.5), vec2(0.5, 0.87)) * sq * 1.7 - uTime * vec2(0.006, 0.011)).r * 0.4;
+   56 |  float deepish = smoothstep(0.6, 2.5, max(dd, sdist * 0.6));
+   57 |  wc *= 1.0 + (surf - 0.5) * u_wsg.y * 0.45 * deepish;
+   58 |  float crest = smoothstep(0.60, 0.78, texture(t_noise, sq * vec2(1.6, 2.6) + vec2(uTime * 0.02, 0.0)).r * 0.55 + surf * 0.45);
+   59 |  wc += vec3(0.20, 0.27, 0.28) * crest * deepish;
+   60 |  float reach = u_wwd.y;
+   61 |  float ph = fract(uTime * 0.08);
+   62 |  float front = reach * (0.3 + 0.7 * (1.0 - ph));
+   63 |  float fd = sdist + (nz2 - 0.5) * 0.5;
+   64 |  float line = smoothstep(0.16, 0.0, abs(fd - front)) * smoothstep(0.0, 0.15, ph) * (0.6 + 0.4 * nz);
+   65 |  float front2 = front * 0.45;
+   66 |  line = max(line, 0.6 * smoothstep(0.12, 0.0, abs(fd - front2)) * (1.0 - ph));
+   67 |  vec2 cp = P.xz * 2.0 + (vec2(nz, nz2) - 0.5) * 1.6;
+   68 |  float cw = wCell(cp, uTime * 0.3);
+   69 |  float inside = smoothstep(front + 0.1, front - 0.3, fd);
+   70 |  float lace = smoothstep(0.06, 0.012, cw) * inside * smoothstep(reach * 0.85, 0.0, fd) * (0.5 + 0.5 * smoothstep(0.3, 0.6, nz2));
+   71 |  float band = smoothstep(u_wwd.z, 0.0, sdist) * (0.6 + 0.4 * smoothstep(0.2, 0.05, cw));
+   72 |  float edge = clamp(max(max(line * 0.6, lace * 0.45), band * 0.7), 0.0, 1.0);
+   73 |  wc = mix(wc, vec3(0.82, 0.90, 0.80), edge * 0.75);
+   74 |  
+   75 |  vec2 e = vec2(0.12, 0.0);
+   76 |  float hx = wWave(P.xz + e.xy, uTime) - wWave(P.xz - e.xy, uTime);
+   77 |  float hz = wWave(P.xz + e.yx, uTime) - wWave(P.xz - e.yx, uTime);
+   78 |  vec3 wn = normalize(vec3(-hx * 3.2, 1.0, -hz * 3.2));
+   79 |  vec3 wv = normalize(cam - P);
+   80 |  float open = smoothstep(0.4, 2.0, max(dd, sdist * 0.5)) * (1.0 - edge);
+   81 |  float fres = pow(1.0 - max(dot(wn, wv), 0.0), 4.0) * open;
+   82 |  
+   83 |  vec3 sun = wc * wa_sun_col * max(wa_sun_dir.y, 0.0) / PI;
+   84 |  lit = sun + wa_hemi(wc, vec3(0.0, 1.0, 0.0)) + u_wsky * fres * 0.12 * u_wrefl;
+   85 |  alpha = clamp(mix(0.62, 0.97, max(smoothstep(0.05, 1.4, depth), smoothstep(1.0, 5.0, sdist))) + edge * 0.25, 0.0, 1.0);
+   86 | }
+   87 | 
+USER SHADER ERROR: Too many arguments for "wa_water_w1(vec3, vec3, float, vec3, float)" call. Expected at most 5 but received 6.
+   at: (null) (:21)
+USER ERROR: Shader compilation failed.
+   at: set_code (servers/rendering/renderer_rd/forward_clustered/scene_shader_forward_clustered.cpp:146)
+[gshell] 層 16 / 区画 650 / 三角 304519（×層で 4872304）
+SHOT C:\Users\shind\mmotest-wt\M-0182\art\shots\ground_m0182\before/F01.png
+SHOT C:\Users\shind\mmotest-wt\M-0182\art\shots\ground_m0182\before/F02.png

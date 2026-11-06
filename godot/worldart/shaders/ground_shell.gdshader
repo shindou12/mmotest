@@ -14,6 +14,15 @@ uniform float edge_w = 1.25;   // 草が短くなる幅（m）
 uniform float gedge = 0.0;
 uniform float gwide = 0.0;
 varying flat float v_h;
+// 0.65m の値ノイズで草の房を作り、端だけ刃ごとの揺れを足す
+float shellEdgeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float shellEdgeClump(vec2 p) {
+	vec2 cell = floor(p), f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = shellEdgeHash(cell), b = shellEdgeHash(cell + vec2(1.0, 0.0));
+	float c = shellEdgeHash(cell + vec2(0.0, 1.0)), d = shellEdgeHash(cell + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 void vertex() {
 	v_w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;   // 色は持ち上げる前の位置で引く（土台と同じ絵になる）
 	v_wn = normalize(NORMAL);
@@ -50,11 +59,14 @@ void fragment() {
 	vec3 col = wa_ground_col2(COLOR, te, gw, grass, shell_gw);
 	if (te >= 0.0) {
 		float seed3 = fract(seed * 57.3 + seed2 * 91.7);
-		if (seed3 > pow(1.0 - te, 1.4) * 1.08) discard;   // 高さでなく草の本数を減らす
-		float edge_height = mix(1.0, 0.5, te);
+		float keep_threshold = 1.0 - pow(1.0 - te, 1.4) * 1.08;
+		float clump_jitter = (seed3 - 0.5) * 0.15 * (1.0 - smoothstep(0.85, 1.0, te));
+		if (shellEdgeClump(wp / 0.65) < keep_threshold + clump_jitter) discard;   // 房の縁だけ刃ごとに少し崩す
+		float edge_height = mix(1.0, 0.25, te);
 		if (shell_gw * edge_height * height_var < v_h) discard;
-		col = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
-		col *= mix(0.72, 1.0, v_h);
+		vec3 edge_grass = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+		col = mix(edge_grass, col, smoothstep(0.0, 1.0, te));   // 刃の色を足元の黄ばんだ草・土へ寄せる
+		col *= mix(mix(0.72, 1.0, v_h), mix(0.92, 1.0, v_h), te);   // 道の側では根元を暗くしすぎない
 	} else {
 		if (gw * height_var < v_h && ek >= 1.0) discard;   // 内側は今まで通り
 		col = mix(grass, col, smoothstep(0.0, 1.0, gw));   // 土の上へかぶさる縁は草の色

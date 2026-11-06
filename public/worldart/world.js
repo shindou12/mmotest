@@ -345,6 +345,15 @@ vWN = normalize(mat3(modelMatrix) * normal);
         uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
+        // 0.65m の値ノイズで草の房を作り、端だけ刃ごとの揺れを足す
+        float shellEdgeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float shellEdgeClump(vec2 p) {
+          vec2 cell = floor(p), f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          float a = shellEdgeHash(cell), b = shellEdgeHash(cell + vec2(1.0, 0.0));
+          float c = shellEdgeHash(cell + vec2(0.0, 1.0)), d = shellEdgeHash(cell + vec2(1.0, 1.0));
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
 `)
       .replace('#include <map_fragment>', `
         vec2 wp = vW.xz;
@@ -404,12 +413,15 @@ vWN = normalize(mat3(modelMatrix) * normal);
           float gwE = gwS;
           if (uEdge > 0.0) {   // 道の縁: 草を道へ向けて間引き、背を低くする（高さで消すと縁が線になる。数で減らす）
             float seed3 = fract(seed * 57.3 + seed2 * 91.7);
-            if (seed3 > pow(1.0 - te, 1.4) * 1.08) discard;
-            gwE = (1.0 - wa) * (1.0 - wr) * mix(1.0, 0.5, te);
-            col = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+            float keepThreshold = 1.0 - pow(1.0 - te, 1.4) * 1.08;
+            float clumpJitter = (seed3 - 0.5) * 0.15 * (1.0 - smoothstep(0.85, 1.0, te));
+            if (shellEdgeClump(wp / 0.65) < keepThreshold + clumpJitter) discard;
+            gwE = (1.0 - wa) * (1.0 - wr) * mix(1.0, 0.25, te);
+            vec3 edgeGrass = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+            col = mix(edgeGrass, col, smoothstep(0.0, 1.0, te));
           }
           if (distance(local, center) > radius || gwE * heightVar < uShellH) discard;
-          col *= mix(0.72, 1.0, uShellH);
+          col *= mix(mix(0.72, 1.0, uShellH), mix(0.92, 1.0, uShellH), te);
           col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, uShellH));
           contact *= 1.0 - 0.5 * uShellH;
         }
