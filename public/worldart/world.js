@@ -117,6 +117,77 @@ sun.shadow.mapSize.set(4096, 4096);
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
 sun.shadow.radius = num('srad', spec.shadowRadius ?? 2); sun.shadow.blurSamples = 16;
 scene.add(hemi, sun, sun.target);
+// 光の模様（light cookie）: 太陽の光を世界座標の大きな模様で遮る。カメラに付いて動いても崩れず、影を落とす物が要らない。
+//   cookie=遮る強さ（0 で無効） cookiew=模様の大きさ m cookiet=影の割合の目安 cookies=縁のやわらかさ cookiem=all|ground
+const COOKIE = Object.assign({ amount: 0, wave: 14, threshold: 0.5, soft: 0.1, mode: 'all' }, spec.lightCookie || {});
+COOKIE.amount = num('cookie', COOKIE.amount); COOKIE.wave = num('cookiew', COOKIE.wave);
+COOKIE.threshold = num('cookiet', COOKIE.threshold); COOKIE.soft = num('cookies', COOKIE.soft);
+COOKIE.mode = q.get('cookiem') || COOKIE.mode;
+const COOKIE_ON = COOKIE.amount > 0;
+const COOKIE_GROUND_ONLY = COOKIE_ON && COOKIE.mode === 'ground';
+if (COOKIE_ON) {
+  const f = (v) => Number(v).toFixed(5);
+  const az = THREE.MathUtils.degToRad(num('sunAz', S.azimuth)), el = THREE.MathUtils.degToRad(num('sunEl', S.elevation));
+  const slope = [Math.sin(az) / Math.tan(el), Math.cos(az) / Math.tan(el)];   // 高さの分だけ光の向きへ戻して地面の模様を引く
+  const C = THREE.ShaderChunk;
+  C.shadowmap_pars_vertex = '#ifdef USE_SHADOWMAP\nvarying vec3 vCookieW;\n#endif\n' + C.shadowmap_pars_vertex;
+  C.shadowmap_vertex += '\n#ifdef USE_SHADOWMAP\nvCookieW = worldPosition.xyz;\n#endif\n';
+  C.shadowmap_pars_fragment = `#ifdef USE_SHADOWMAP
+    varying vec3 vCookieW;
+    ${COOKIE_GROUND_ONLY ? '' : '#define USE_COOKIE 1'}
+    float cookieHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float cookieNoise(vec2 p) {
+      vec2 i = floor(p), u = fract(p); u = u * u * (3.0 - 2.0 * u);
+      return mix(mix(cookieHash(i), cookieHash(i + vec2(1, 0)), u.x), mix(cookieHash(i + vec2(0, 1)), cookieHash(i + vec2(1, 1)), u.x), u.y);
+    }
+    float cookieLight() {
+      vec2 p = (vCookieW.xz - vec2(${f(slope[0])}, ${f(slope[1])}) * vCookieW.y) / ${f(COOKIE.wave)};
+      p += 0.45 * vec2(cookieNoise(p * 1.7 + 3.1), cookieNoise(p * 1.7 + 7.7));
+      float n = 0.62 * cookieNoise(p) + 0.28 * cookieNoise(p * 2.3 + 11.0) + 0.10 * cookieNoise(p * 5.1 + 23.0);
+      float shade = smoothstep(${f(COOKIE.threshold - COOKIE.soft)}, ${f(COOKIE.threshold + COOKIE.soft)}, n);
+      return 1.0 - ${f(COOKIE.amount)} * shade;
+    }
+    #endif
+  ` + C.shadowmap_pars_fragment;
+  C.lights_fragment_begin = C.lights_fragment_begin.replace(
+    'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]',
+    '#ifdef USE_COOKIE\n\t\tdirectLight.color *= cookieLight();\n\t\t#endif\n\t\tdirectLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ]');
+}
+// ---------------------------------------------------------------- スタイライズの試し（M-0178。すべて省略時は無効）
+//   shtint=r,g,b   影の中に残す太陽の光の色（落ちる影と、光の向きの陰の両方）。例 0.16,0.24,0.3
+//   shpen=0.6 shpenc=r,g,b  影の縁（半影と明暗の境）に色を足す
+//   ramp=1 rampt=0.3 rampw=0.08  明暗の境を段に寄せる（やわらかい段）
+//   rim=0.5 rimp=3  輪郭の光（太陽の側の縁を明るく）
+const csv = (k) => (q.get(k) || '').split(',').map(Number);
+// 地図の JSON の style で既定にできる（採用した地図だけ、2026-11-06）。URL の値が優先、shtint=0 で切
+const SS = spec.style || {};
+const STY = {
+  tint: q.get('shtint') === '0' ? null : q.has('shtint') ? csv('shtint') : (SS.shtint || null),
+  pen: num('shpen', SS.shpen ?? 0), penC: q.has('shpenc') ? csv('shpenc') : (SS.shpenc || [1.0, 0.85, 0.45]),
+  ramp: flag('ramp', !!SS.ramp), rampT: num('rampt', 0.3), rampW: num('rampw', 0.08),
+  rim: num('rim', 0), rimP: num('rimp', 3),
+};
+{
+  const f = (v) => Number(v).toFixed(4);
+  const v3 = (a) => `vec3(${a.map(f).join(', ')})`;
+  const C = THREE.ShaderChunk;
+  const tint = STY.tint ? v3(STY.tint) : 'vec3(0.0)';
+  // 光の向きの陰と落ちる影を、どちらも「影の色」へ寄せる。境には色を足す
+  C.lights_lambert_pars_fragment = C.lights_lambert_pars_fragment.replace('vec3 irradiance = dotNL * directLight.color;', `
+    float styNL = dotNL;
+    ${STY.ramp ? `styNL = smoothstep(${f(STY.rampT - STY.rampW)}, ${f(STY.rampT + STY.rampW)}, dotNL);` : ''}
+    vec3 irradiance = ${STY.tint ? `mix(${tint}, vec3(1.0), styNL)` : 'vec3(styNL)'} * directLight.color;
+    ${STY.pen > 0 ? `irradiance *= mix(vec3(1.0), ${v3(STY.penC)}, ${f(STY.pen)} * 4.0 * styNL * (1.0 - styNL));` : ''}
+    ${STY.rim > 0 ? `irradiance += directLight.color * ${f(STY.rim)} * pow(1.0 - saturate(dot(geometryNormal, geometryViewDir)), ${f(STY.rimP)}) * saturate(dot(geometryNormal, directLight.direction) + 0.35);` : ''}`);
+  if (STY.tint || STY.pen > 0) {
+    // 落ちる影: 影の割合 s を取り出し、消すのではなく影の色へ寄せる。半影（s が 0〜1 の間）に色を足す
+    C.lights_fragment_begin = C.lights_fragment_begin.replace(
+      'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;',
+      `{ float styS = ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;
+        directLight.color *= ${STY.tint ? `mix(${tint}, vec3(1.0), styS)` : 'vec3(styS)'};
+        ${STY.pen > 0 ? `directLight.color *= mix(vec3(1.0), ${v3(STY.penC)}, ${f(STY.pen)} * 4.0 * styS * (1.0 - styS));` : ''} }`);
+  }
+}
 function fitShadow() {
   // 影の範囲: 画面に映る地面を覆う
   let half = camState.dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * 1.9 + 8;
@@ -132,7 +203,7 @@ fitShadow();
 const texLoader = new THREE.TextureLoader();
 const tex = (name, srgb = true) => {
   const paintedGround = !flag('notex', false) && spec.ground?.texDir && ['ground_grass', 'rock_crack', 'rock_face'].includes(name);
-  const dir = paintedGround ? spec.ground.texDir : 'tex';
+  const dir = q.get('tdir') || (paintedGround ? spec.ground.texDir : 'tex');   // tdir: 絵のフォルダごと差し替える（M-0178 の焼き込みの試し）
   const t = texLoader.load(`${BASE}${dir}/${name}.png`);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
@@ -146,7 +217,7 @@ const GROUND = spec.ground || {};
 const GROUND_SOFT = THREE.MathUtils.clamp(num('gsoft', 0), 0, 1);
 const GROUND_DRY = THREE.MathUtils.clamp(num('gdry', 0), 0, 1);
 const GROUND_EDGE_ON = GROUND_SOFT > 0 || GROUND_DRY > 0;
-const GROUND_WIDE = Math.max(0, num('gwide', 0));
+const GROUND_WIDE = Math.max(0, num('gwide', spec.style?.gwide ?? 0));
 const GROUND_WIDE_ON = GROUND_WIDE > 0;
 // B01 の道際（x=560〜604、y=380〜459）の平均色。sRGB で #989B49
 const GROUND_EDGE_UNIFORMS = { uGSoft: { value: GROUND_SOFT }, uGDry: { value: GROUND_DRY }, uDryGrass: { value: new THREE.Color(0x989b49) } };
@@ -202,10 +273,47 @@ if (GROUND_BAKE > 0) {
   } catch {}
 }
 const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
-function groundMaterial() {
+// ---------------------------------------------------------------- 地面の草のシェルと地面の試し（M-0179）
+// gshell=16 層数（0 で切）、gsh 高さ m、gsd 1 本の間隔 m（Godot の ground_shell.gdshader と同じ考え方）
+// gpatch=4 数 m の明暗の斑の大きさ m、gpatchc 斑の強さ（色と草の高さを一緒に変える。Ghost of Tsushima の塊の考え方）
+// gcomb=0.12 草がなびく量 m（上の層ほど向きの場へずらし、上から見て筋にする）
+// gcontact=0.5 物の根元の暗さ（配置から地面の暗さの絵を作る）、gcr 半径の倍率
+// gacc=1.7 草の房は際立たせる所（道の縁・物の根元）だけに残し、この倍率で大きくする。gaccr はそれ以外に残す割合
+const GSHELL = Math.max(0, Math.floor(num('gshell', SS.gshell ?? 0)));
+const GSH = num('gsh', SS.gsh ?? 0.18), GSD = num('gsd', SS.gsd ?? 0.045);
+const GPATCH = num('gpatch', SS.gpatch ?? 0), GPATCHC = num('gpatchc', SS.gpatchc ?? 0.5);
+const GCOMB = num('gcomb', SS.gcomb ?? 0);
+const GCONTACT = num('gcontact', 0), GCR = num('gcr', 1);
+const GACC = num('gacc', 0), GACCR = num('gaccr', 0.02);
+// gedge=0.5 草のシェルを道へまだらにかぶせる量。gdirt=r,g,b 土の色に掛ける（道と草の明るさの差を縮める）
+const GEDGE = num('gedge', SS.gedge ?? 0);
+const GDIRT = q.has('gdirt') ? q.get('gdirt').split(',').map(Number) : [1, 1, 1];
+let contactTex = null;
+if (GCONTACT > 0 && placed.terrain) {
+  const N = 1024, T0 = placed.terrain, cv = document.createElement('canvas');
+  cv.width = cv.height = N;
+  const cx = cv.getContext('2d');
+  cx.fillStyle = '#000'; cx.fillRect(0, 0, N, N); cx.globalCompositeOperation = 'lighter';
+  for (const [name, rows] of Object.entries(placed.assets)) {
+    if (/grass|flower|clover|lavender|@shadow/.test(name)) continue;
+    const base = /maple|fir|palm|broad|tree/.test(name) ? 2.2 : /fence/.test(name) ? 0.6 : 1.1;
+    for (const [x, , z, , sc] of rows) {
+      const px = (x - T0.x0) / T0.size * N, pz = (z - T0.z0) / T0.size * N, r = Math.max(2, base * sc * GCR / T0.size * N);
+      const g = cx.createRadialGradient(px, pz, 0, px, pz, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(0.5, 'rgba(255,255,255,0.3)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(px, pz, r, 0, 6.2832); cx.fill();
+    }
+  }
+  contactTex = new THREE.CanvasTexture(cv); contactTex.flipY = false; contactTex.minFilter = THREE.LinearFilter;
+}
+function groundMaterial(shell = null) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
-  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}`;
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}${shell ? ':shell-m0179' : ''}:g179-${GPATCH > 0}-${!!contactTex}`;
+  if (shell) m.defines = { SHELL: 1 };
   m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uShellH: shell ? shell.h : { value: 0 }, uShellHeight: { value: GSH }, uShellSpacing: { value: GSD }, uComb: { value: GCOMB },
+      uPatch: { value: GPATCH }, uPatchC: { value: GPATCHC }, tContact: { value: contactTex }, uContact: { value: contactTex ? GCONTACT : 0 },
+      uCO: { value: new THREE.Vector2(placed.terrain?.x0 ?? 0, placed.terrain?.z0 ?? 0) }, uCS: { value: placed.terrain?.size ?? 1 }, tNoiseV: { value: T.noise }, uEdge: { value: GEDGE }, uDirtMul: { value: new THREE.Vector3(...GDIRT) } });
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
       uAltTint: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) },
@@ -220,9 +328,20 @@ function groundMaterial() {
     if (GROUND_WIDE_ON) Object.assign(sh.uniforms, { tSplat: GB.tSplat, uST: GB.uST, uGWide: { value: GROUND_WIDE } });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vSplat = color;
+vW = (modelMatrix * vec4(position,1.0)).xyz;
+vWN = normalize(mat3(modelMatrix) * normal);
+#ifdef SHELL
+  transformed += normal * uShellHeight * uShellH;
+  vec2 combDir = texture2D(tNoiseV, vW.xz / 11.0).rg * 2.0 - 1.0 + vec2(0.55, 0.35);   // なびく向きの場（全体に一方向へ寄せる）
+  transformed.xz += normalize(combDir) * uComb * uShellH * uShellH;
+#endif`)
+      .replace('#include <common>', '#include <common>\nuniform float uShellH, uShellHeight, uComb; uniform sampler2D tNoiseV;')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n#ifdef SHELL\nobjectNormal = vec3(0.0, 1.0, 0.0);\n#endif');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
+        uniform float uShellH, uShellHeight, uShellSpacing, uPatch, uPatchC, uContact, uCS, uEdge; uniform vec2 uCO; uniform sampler2D tContact; uniform vec3 uDirtMul;
         uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
@@ -240,7 +359,7 @@ function groundMaterial() {
         vec3 nz3 = texture2D(tNoise, wp / 28.0).rgb;
         float lush = smoothstep(0.42 - uLushBias, 0.6 - uLushBias, nz3.r * 0.55 + nz3.g * 0.3 + nz3.b * 0.15);
         grass *= mix(vec3(1.0), uLushTint, lush * uLushAmt);
-        vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
+        vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint * uDirtMul;
         vec3 alt = texture2D(tAlt, wp / uAltScale).rgb * uAltTint;
         vec3 rock = texture2D(tRock, vW.zy / uRockScale).rgb * an.x + texture2D(tRock, vW.xy / uRockScale).rgb * an.z + texture2D(tRock, vW.xz / uRockScale).rgb * an.y;
         // 岩の細部のコントラストを弱める（L27 仮説 D「直線を残さない」）: 粗いミップ（bias 4）の大きな明暗へ uRockSoft だけ寄せ、割れ目の線を浅くする
@@ -259,9 +378,43 @@ function groundMaterial() {
         }
         float wr = smoothstep(0.35, 0.65, rk + n * 0.6);
         vec3 col = mix(grass, dirt, wd);
+        float te = 0.0;
+        if (uEdge > 0.0) {   // 道の縁の帯（M-0179 の D 第 3 版）: 草 → 黄ばんでまばらな草 → 土を、道の重み（頂点色 R）で広く移す
+          te = smoothstep(0.5 - 0.35 * uEdge, 0.5 + 0.35 * uEdge, ${GROUND_WIDE_ON ? 'wideWeight + wideEdgeNoise' : 'vSplat.r + n * 0.5'});   // gwide のときはぼかした道の重み（帯が広くなる）
+          col = mix(mix(grass, grass * vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.6, te)), dirt, smoothstep(0.35, 1.0, te));
+        }
         ${GROUND_EDGE_ON ? 'col = mix(col, uDryGrass, dryBand * uGDry);' : ''}
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);
+        float gwS = (1.0 - wd) * (1.0 - wa) * (1.0 - wr);
+        float patchF = 0.5;
+        if (uPatch > 0.0) {   // 数 m の明暗の斑: 明るい黄緑で背が高い ↔ 深い青緑で背が低い
+          vec3 pz = texture2D(tNoise, wp / uPatch).rgb, pz2 = texture2D(tNoise, wp / (uPatch * 2.7) + 0.31).rgb;
+          patchF = smoothstep(0.4, 0.6, pz.r * 0.6 + pz2.g * 0.4);
+          col = mix(col, col * mix(vec3(0.62, 0.8, 0.86), vec3(1.12, 1.08, 0.86), patchF), gwS * uPatchC);
+        }
+        float contact = uContact > 0.0 ? texture2D(tContact, (wp - uCO) / uCS).r : 0.0;
+        #ifdef SHELL
+        {
+          vec2 cell = floor(wp / uShellSpacing), local = fract(wp / uShellSpacing);
+          float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453), seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
+          vec2 center = vec2(0.18 + seed * 0.64, 0.18 + seed2 * 0.64);
+          float radius = 0.46 * (1.0 - 0.78 * uShellH);
+          float heightVar = mix(0.5, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
+          float gwE = gwS;
+          if (uEdge > 0.0) {   // 道の縁: 草を道へ向けて間引き、背を低くする（高さで消すと縁が線になる。数で減らす）
+            float seed3 = fract(seed * 57.3 + seed2 * 91.7);
+            if (seed3 > pow(1.0 - te, 1.4) * 1.08) discard;
+            gwE = (1.0 - wa) * (1.0 - wr) * mix(1.0, 0.5, te);
+            col = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+          }
+          if (distance(local, center) > radius || gwE * heightVar < uShellH) discard;
+          col *= mix(0.72, 1.0, uShellH);
+          col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, uShellH));
+          contact *= 1.0 - 0.5 * uShellH;
+        }
+        #endif
+        col *= 1.0 - uContact * contact;
         if (uWater.y > 1.5) {
           float hw = vW.y - uWater.x;
           float wet = smoothstep(0.16, 0.0, hw) * smoothstep(-0.12, 0.02, hw);   // 水の上の水際（≈0.5m の帯）だけ明るく
@@ -692,6 +845,7 @@ const gltf = new GLTFLoader();
 const load = (url) => new Promise((res, rej) => gltf.load(url, res, undefined, rej));
 
 const terrain = await load(`${BASE}maps/${MAP}/terrain.glb`);
+const shellBases = [];
 terrain.scene.traverse((o) => {
   if (!o.isMesh) return;
   if (o.name.startsWith('water') || o.material.name === 'water') {
@@ -700,12 +854,43 @@ terrain.scene.traverse((o) => {
   } else {
     o.userData.diffMaskGround = true;
     o.material = groundMaterial(); o.receiveShadow = true;
+    if (COOKIE_GROUND_ONLY) o.material.defines = { ...(o.material.defines || {}), USE_COOKIE: 1 };
+    if (GSHELL > 0) shellBases.push(o);
   }
 });
+for (const o of shellBases) for (let i = 1; i <= GSHELL; i++) {   // 草のシェル: 地面を層ごとに持ち上げて重ねる
+  const layer = new THREE.Mesh(o.geometry, groundMaterial({ h: { value: i / GSHELL } }));
+  layer.position.copy(o.position); layer.quaternion.copy(o.quaternion); layer.scale.copy(o.scale);
+  layer.castShadow = false; layer.receiveShadow = true; layer.renderOrder = i; layer.userData.diffMaskGround = true;
+  o.parent.add(layer);
+}
 scene.add(terrain.scene);
 if ((GBLEND || GROUND_WIDE_ON) && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // アイデア01 と gwide: 地面の頂点色を絵に
 
-const SKIP = new Set(flag('grass') ? [] : ['grass_a']);
+// シェルの草があるときは草の房をすべて出さない（gacc のときは際立つ所だけ残す）。grass=1 で戻す
+const SKIP = new Set(flag('grass', !(GSHELL > 0) || GACC > 0) ? [] : GSHELL > 0 ? Object.keys(placed.assets).filter((a) => /^grass/.test(a)) : ['grass_a']);
+// 際立たせる所だけの大きな房（M-0179）: 道の縁（頂点色 R が途中）と物の根元の近くだけ残し、大きくする
+let accentGrass = (items) => items;
+if (GACC > 0) {
+  const edge = new Map();
+  terrain.scene.traverse((o) => {
+    if (!o.isMesh || !o.geometry.attributes.color) return;
+    const p = o.geometry.attributes.position, c = o.geometry.attributes.color;
+    for (let i = 0; i < p.count; i++) edge.set(`${Math.round(p.getX(i) / 0.5)},${Math.round(p.getZ(i) / 0.5)}`, c.getX(i));
+  });
+  const near = new Set();
+  for (const [name, rows] of Object.entries(placed.assets)) {
+    if (/grass|flower|clover|@shadow/.test(name)) continue;
+    const rad = /maple|fir/.test(name) ? 1.2 : 1.6;
+    for (const [x, , z] of rows) for (let dx = -rad; dx <= rad; dx += 0.5) for (let dz = -rad; dz <= rad; dz += 0.5) near.add(`${Math.round((x + dx) / 0.5)},${Math.round((z + dz) / 0.5)}`);
+  }
+  let k = 0;
+  accentGrass = (items) => items.filter(([x, , z]) => {
+    const key = `${Math.round(x / 0.5)},${Math.round(z / 0.5)}`, r = edge.get(key) ?? 0;
+    const keep = (r > 0.12 && r < 0.6) || near.has(key);
+    return ((k++ * 0.618034) % 1) < (keep ? 0.55 : GACCR);
+  }).map(([x, y, z, r, s, ...rest]) => [x, y, z, r, s * GACC, ...rest]);
+}
 const assetNames = Object.keys(placed.assets).filter((a) => !SKIP.has(a));
 const assetSwap = new Map((q.get('aswap') || '').split(',').map((pair) => pair.split(':')).filter(([from, to]) => from && to));
 const dummy = new THREE.Object3D();
@@ -714,7 +899,8 @@ await Promise.all(assetNames.map(async (name) => {
   const sourceName = name.replace('@shadow', '');
   const loadName = assetSwap.get(sourceName) || sourceName;
   const g = await load(`${BASE}${q.get('adir') || 'assets'}/${loadName}.glb`);
-  const items = placed.assets[name];
+  let items = placed.assets[name];
+  if (GACC > 0 && /^grass/.test(sourceName)) items = accentGrass(items);
   g.scene.updateMatrixWorld(true);
   g.scene.traverse((o) => {
     if (!o.isMesh) return;
@@ -722,11 +908,16 @@ await Promise.all(assetNames.map(async (name) => {
     const mat = fixMaterial(o, name, loadName);
     const im = new THREE.InstancedMesh(o.geometry, mat, items.length);
     im.userData.diffMaskIgnore = shadowOnly;
-    items.forEach(([x, y, z, r, s], i) => {
+    const instanceShade = new THREE.Color();
+    const hasShade = items.some((row) => row[5] !== undefined);
+    items.forEach(([x, y, z, r, s, shade], i) => {
       dummy.position.set(x, y, z); dummy.rotation.set(0, r, 0); dummy.scale.setScalar(s); dummy.updateMatrix();
       im.setMatrixAt(i, dummy.matrix.clone().multiply(o.matrixWorld));
+      // 配置の 6 番目: その物全体の明るさ（森の奥を暗くするなど、画面の明暗の配分に使う）。1 つでもあれば全体に入れる
+      if (hasShade) im.setColorAt(i, instanceShade.setScalar(shade ?? 1));
     });
     const isGrass = name.startsWith('grass');
+    if (COOKIE_GROUND_ONLY && isGrass) mat.defines = { ...(mat.defines || {}), USE_COOKIE: 1 };
     im.castShadow = !isGrass; im.receiveShadow = !/leaf|frond/.test(mat.name) || LEAF.receive;
     if (/leaf|frond|grass/.test(mat.name)) {
       const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: mat.alphaTest || 0.5 });
@@ -1075,7 +1266,53 @@ const dof = new ShaderPass({
       gl_FragColor = c;
     }`,
 });
-if (flag('post')) { composer.addPass(grade); if (diffAmt > 0 || diffDebug) composer.addPass(diffusion); if (flag('dof') && !diffDebug) composer.addPass(dof); }
+// 絵筆のぼかし（Kuwahara、M-0178）: kuw=半径 px。4 つの区画のうち色のばらつきが一番小さい区画の平均を使い、縁を保って面をまとめる
+const KUW = Math.round(num('kuw', 0));
+const kuwPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2(1 / (innerWidth * renderer.getPixelRatio()), 1 / (innerHeight * renderer.getPixelRatio())) } },
+  vertexShader: VS,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uTexel; varying vec2 vUv;
+    void main(){
+      vec3 m[4]; vec3 s[4];
+      for (int k = 0; k < 4; k++) { m[k] = vec3(0.0); s[k] = vec3(0.0); }
+      const int R = ${Math.max(1, KUW)};
+      for (int j = -R; j <= R; j++) for (int i = -R; i <= R; i++) {
+        vec3 c = texture2D(tDiffuse, vUv + vec2(float(i), float(j)) * uTexel).rgb;
+        if (i <= 0 && j <= 0) { m[0] += c; s[0] += c * c; }
+        if (i >= 0 && j <= 0) { m[1] += c; s[1] += c * c; }
+        if (i <= 0 && j >= 0) { m[2] += c; s[2] += c * c; }
+        if (i >= 0 && j >= 0) { m[3] += c; s[3] += c * c; }
+      }
+      float n = float((R + 1) * (R + 1)); float best = 1e9; vec3 outc = vec3(0.0);
+      for (int k = 0; k < 4; k++) {
+        vec3 mean = m[k] / n; vec3 v = abs(s[k] / n - mean * mean);
+        float sv = v.r + v.g + v.b;
+        if (sv < best) { best = sv; outc = mean; }
+      }
+      gl_FragColor = vec4(outc, 1.0);
+    }`,
+});
+// 明るさごとの色（グラデーションマップ、M-0178）: gmap=混ぜる量。表は RO3 の 4 枚の画面の色の付いた画素（彩度 0.2 超、UI の隅を除く）から、
+// 明るさごとの色の比の中央値を測った
+const GMAP = num('gmap', 0);
+const GMAP_TABLE = [[0.016, 0.022, 0.008], [0.106, 0.137, 0.06], [0.218, 0.273, 0.125], [0.339, 0.406, 0.191], [0.457, 0.539, 0.245],
+  [0.598, 0.665, 0.303], [0.774, 0.779, 0.381], [0.998, 0.878, 0.479], [1.027, 1.04, 0.565]]
+  .map((c) => { const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; return new THREE.Vector3(c[0] / l, c[1] / l, c[2] / l); });
+const gmapPass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTab: { value: GMAP_TABLE }, uAmt: { value: GMAP } },
+  vertexShader: VS,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 uTab[9]; uniform float uAmt; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      float x = clamp(l, 0.0, 1.0) * 8.0; int i = int(min(floor(x), 7.0)); float t = x - float(i);
+      vec3 ratio = vec3(0.0);
+      for (int k = 0; k < 8; k++) if (k == i) ratio = mix(uTab[k], uTab[k + 1], t);
+      c.rgb = mix(c.rgb, clamp(ratio * l, 0.0, 1.0), uAmt);
+      gl_FragColor = c;
+    }`,
+});
+if (flag('post')) { composer.addPass(grade); if (KUW > 0) composer.addPass(kuwPass); if (GMAP > 0) composer.addPass(gmapPass); if (diffAmt > 0 || diffDebug) composer.addPass(diffusion); if (flag('dof') && !diffDebug) composer.addPass(dof); }
 
 // ビューの照明の上書き（見本のカットシーンなど、カメラ演出が違う見本に合わせる）
 const LIGHT0 = { sun: sun.intensity, hemi: hemi.intensity, exposure: renderer.toneMappingExposure, sat: grade.uniforms.uSat.value };

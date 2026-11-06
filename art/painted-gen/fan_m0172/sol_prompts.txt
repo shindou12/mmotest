@@ -1,0 +1,75 @@
+M-0172 指示文と生成記録
+使用: 組み込み image_gen.imagegen（API キー・従量課金のCLIは未使用）
+入力画像（全生成で2枚とも渡した）:
+- art/painted-gen/fan_m0172/ref_tree.png: 葉のふくらみと段の重なりの参考
+- art/painted-gen/fan_m0172/ref_leaf.png: 葉の面と緑色の参考
+既存の painted.png は比較のため閲覧しただけで、生成入力には渡していない。
+
+===== clumps 生成1 不採用 =====
+Use case: stylized-concept.
+Create ONE new original 1024x1024 opaque PNG foliage asset sheet.
+Input image 1 (ref_tree.png): reference ONLY for plump broad leaves and overlapping tiers.
+Input image 2 (ref_leaf.png): reference ONLY for fullness, foliage palette and leaf planes.
+Learn the feeling, do not copy the images or their radial arrangements. No tree, wood, pots or scenery.
+
+COMPOSITION: Exactly FOUR separated leaf clumps in an invisible 2-column by 2-row grid. Each fits comfortably inside its own quadrant with at least 48px empty space to every quadrant boundary. Each clump comprises 6–12 individually readable large ROUND PLUMP broad leaves overlapping in irregular tiers. View as upright foliage from the side/front, never an overhead flower or rosette. No central hub, no radial symmetry. Leaf tips aim mostly up, left and right; their bases gather near the bottom middle. Asymmetric overlapping stacks flow to one side. Four clearly different silhouettes and leaf counts: about 6, 8, 10, 12 leaves respectively in reading order; vary round lobed/oval shapes and curvature. Not spear leaves. Upper leaves light yellow-green, lower and occluded leaves deep green.
+
+PAINT: It must convincingly look painted by a person's hand with opaque gouache or acrylic. Construct each leaf from only 3–4 LARGE DISTINCT color masses. Broad loaded flat-brush placements, visible rounded brush starts and lifted tapered ends, some slightly mixed joins. Paint strokes bend around the swollen leaf surface, with locally changing direction AND width. Leave quiet solid opaque regions between a few broad deliberate marks. Imperfect slightly wavering brushed silhouette, rounded tips, no straight clipped edges. The brush marks themselves create the planes and volume. Think a few confident thumb-width paint strokes per leaf, not thousands of hairs. Matte paint.
+
+BACKGROUND IS A TECHNICAL REQUIREMENT: every background pixel uniformly pure solid RGB(255,0,255), hex #FF00FF, including all corners, gutters and gaps. Opaque magenta flat fill, no paper grain or texture on background, no shadows, no gradients. No magenta/pink within leaves.
+AVOID: repeated fine parallel scratches or streaks across the leaves; all-over fibrous texture; digital texture/filter overlays; hairlike dry-brush noise; airbrushed blending; smooth vector contours; 3D render shading; fine leaf vein lines; thick obvious central vein; outlines; cast shadows; grid lines; frames; text; any object other than leaves.
+
+保存元:
+C:\Users\shind\.codex\generated_images\01a1ab25-d970-7d51-b98f-afed7de3c4e0\exec-319fdee1-060d-4a39-83ae-ddcafa22013d.png
+
+===== clumps 生成2 採用 =====
+Create an original 1024x1024 square leaf asset sheet, opaque.
+The two supplied images are visual references ONLY: ref_tree.png for rounded plump leaf volume and tiers; ref_leaf.png for green planes. Invent new upright silhouettes; do NOT copy radial clusters or the reference's rendering.
+
+Four isolated clumps, exactly 2 columns x 2 rows, no visible grid. Very generous magenta gutters. Each clump inside its quadrant, with 50px minimum clearance on all sides. Clumps made of 6 to 12 BIG BROAD ROUND leaves, seen front-on upright, gathered at the BOTTOM. Leaf APICES face UP and out to the LEFT/RIGHT; their narrow bases point DOWN to bottom middle. Layer leaves like overlapping broad round paddles or rounded shingles raised upward. No leaves facing down. Asymmetric off-center overlap, without flower center, rosette, hub or radial symmetry. Four different clumps: six chunky leaves leaning left, eight unequal rounded leaves leaning right, ten squat broad leaves in staggered tiers, twelve rounded leaves with an irregular tall silhouette. Light yellow-green upper surfaces and deeply green lower/occluded leaves.
+
+MEDIUM IS THE PRIORITY: a visibly handmade opaque GOUACHE color study made with a soft wet round or filbert brush, paint in FEW BIG PATCHES. Each leaf has only 3–4 clearly separated paint colors, in irregular chunky flowing regions, each region at least 20–50 pixels broad. Wet loaded brush makes mostly SOLID paint coverage, fat rounded starts and a few soft lifted ends. Some hand-mixed imperfect joins. Large curved brush placements follow fullness, vary widths and local directions. Uneven hand-painted slightly wobbly outlines, rounded tips. Quiet untextured areas of opaque paint are essential. Brushwork comes from uneven shapes of broad COLOR PATCHES, NOT from bristle marks or line texture. No bristle grain. No fine streaks even curved ones. No texture overlay. Do not cover each patch with parallel hair lines. No leaf veins, no midrib. No airbrush, no gradients on leaves, no 3D lighting, no vector perfection.
+
+Background is perfectly flat digital chroma key MAGENTA #FF00FF / RGB 255 0 255, fully uniform and exact across every background pixel, including corners, gutters and spaces between leaves. Absolutely no grain, mottling, shadows, gradient or canvas texture in the background. No pink/magenta in leaves. No objects except leaves, no stems, no text, no borders, no shadows.
+
+保存元:
+C:\Users\shind\.codex\generated_images\01a1ab25-d970-7d51-b98f-afed7de3c4e0\exec-2ac4fe8f-4f32-4e58-a097-24890165970b.png
+
+===== leaves 生成1 不採用 =====
+Use case: stylized-concept. Create one ORIGINAL opaque 1024x1024 PNG asset sheet.
+Both supplied images are REFERENCE ONLY, not edit targets: ref_tree.png suggests plump round leaves; ref_leaf.png suggests their fullness and green palette. Learn these features but don't copy any arrangements or rendering.
+
+COMPOSITION: Exactly EIGHT separate individual broad round leaves, in an invisible FOUR COLUMNS by TWO ROWS grid, one leaf per cell. Each leaf tip UP and narrow base DOWN. Entire leaf inside its cell with at least 28px padding on each side, ample clear gaps; no touching. Leaves large and full, plump rounded oval/obovate, softly rounded small apex, no needles or pointed lance shapes. Each slightly different asymmetric outline, some leaning or gently bent. No stems. The eight brightness levels must strictly descend in reading order, across the top row left to right THEN across the bottom row left to right. Level 1 pale luminous yellow-green, 2 clear light yellow-green, 3 chartreuse green, 4 fresh medium green, 5 grassy green, 6 rich leaf green, 7 dark woodland green, 8 deepest green. Distinguish all eight as individual successive steps.
+
+HAND-PAINTED GOUACHE / ACRYLIC MEDIUM: a person has placed a FEW LARGE opaque loaded brush marks on each leaf. Only 3–4 clearly distinct irregular color areas per leaf, some partially mixed edges. Big shaped patches, broad wet filbert brush strokes with rounded starts and lifted ends, bending with the swollen leaf. Different brush direction and width in different areas, a small number of expressive curved marks and broad quiet solid painted passages. Each leaf's color-patch layout differs slightly, no repeated horizontal striped template. Slightly wavering irregular brushed contours. Volume comes from opaque hand-mixed color masses. Matte confident handmade painting, without simulated texture overlays. Keep paint almost solid: no bristle lines or microscopic streaks.
+
+TECHNICAL BACKGROUND: ALL background pixels must be exactly #FF00FF RGB(255,0,255), uniformly solid, including all four corners, gaps and gutters. Flat digital magenta fill, no paper texture, no noise, no shadow, no gradient. No magenta or pink paint in leaves.
+AVOID: fine parallel strokes across the whole leaf; scratchy/fibrous filter texture; bristle grain; fine leaf veins; prominent central vein/midrib; airbrush blending; smooth vector silhouettes; 3D rendering. NO flowers, clumps, branches, stems, objects, lettering, numbers, borders, visible grid, cast shadows. Only the 8 individual leaves.
+
+保存元:
+C:\Users\shind\.codex\generated_images\01a1ab25-d970-7d51-b98f-afed7de3c4e0\exec-2532e3d5-9dd8-4535-99c2-9704ecab5e54.png
+
+===== leaves 生成2 採用 =====
+Paint an original 1024 x 1024 square asset sheet: exactly EIGHT plump round green leaves, isolated, four columns and two rows. Leaf tip up, base down. Refer to the two supplied tree/leaf reference images ONLY for the broad rounded full leaf forms and green color family; do not copy. Each leaf is asymmetric and has its own outline, twist and color-patch arrangement. Leave a full 35px margin around EVERY leaf inside its own grid cell; no borders or visible grid.
+
+A handmade opaque gouache study, painted with a VERY SOFT WET FILBERT BRUSH. Few big uneven shaped patches of solid matte paint, 3 or 4 colors per leaf. Large rounded loaded paint dabs, curved sideways brush placements, short scooping strokes and lifted ends, varying directions and widths. Paint patches at least 25 pixels wide. Quiet opaque almost textureless paint INSIDE each patch, visible brushwork ONLY in irregular soft-edged starts/stops and joins. No fine brush hairs, NO bristle streaks even curved ones. No all-over surface grain. NO repeated wavy stripe template. Distribute differently shaped color patches organically following each leaf's swelling form, with a few partly mixed overlaps. Slightly unsteady hand-brushed outline, no perfect vector contour. No airbrush, no smooth gradients. No leaf veins or midrib.
+
+Strict successive brightness order, top row left to right then bottom row left to right: 1 very light yellow-green, 2 light yellow-green, 3 lime green, 4 middle fresh green, 5 medium grass green, 6 rich green, 7 dark green, 8 deepest forest green. Each step darker than the previous.
+
+Perfectly UNIFORM FLAT PURE MAGENTA background, exact RGB(255,0,255), #FF00FF. NO texture, NO grain, NO noise, NO light variation anywhere on the magenta. No magenta/pink on leaves. Opaque image, not transparent. Leaves only. No stems, extra objects, text, numbers, frames, shadows, 3D or filters.
+
+保存元:
+C:\Users\shind\.codex\generated_images\01a1ab25-d970-7d51-b98f-afed7de3c4e0\exec-736d27ce-2b9b-428e-b387-26f237df9432.png
+
+===== 自己確認 =====
+描き直し: 房1回（生成2回）、単葉1回（生成2回）。
+房の初回: 細い筆毛の筋が多く、上側に放射状の中心も見えるため不採用。
+単葉の初回: 細い筋が面を覆うため不採用。
+採用候補: 大きな色面の境目と筆の入り・抜きが見え、全面を覆う細い筋を抑えた点を良いと判断。
+単葉の平均輝度（背景を除外したsRGB加重平均、読み順）: 219.05, 196.77, 184.20, 160.10, 146.36, 120.15, 104.49, 84.65。8段階で単調減少。
+生成器の出力サイズ: 両方1254x1254（指定1024x1024とは不一致）。
+生成器の背景四隅（左上、右上、左下、右下）:
+房: (246,14,243), (248,14,242), (240,33,236), (244,29,239)
+単葉: (244,15,241), (248,17,242), (239,34,236), (242,29,239)
+縮小と背景色補正についてユーザーに確認中。
+

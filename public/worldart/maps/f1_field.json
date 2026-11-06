@@ -29,7 +29,7 @@
  "tone": "linear",
  "albedoSat": 0.9,
  "shadowMap": "vsm",
- "shadowRadius": 6,
+ "shadowRadius": 40,
  "foliage": {
   "wrap": 0.5,
   "trans": 0.0,
@@ -45,7 +45,7 @@
  },
  "post": {
   "msaa": 4,
-  "exposure": 1.25,
+  "exposure": 1.15,
   "sat": 0.92,
   "contrast": 1.0,
   "lift": [
@@ -5329,5 +5329,20 @@
    "dist": 300,
    "fov": 32
   }
+ },
+ "style": {
+  "shtint": [
+   0.05,
+   0.09,
+   0.13
+  ],
+  "shpen": 0.6,
+  "ramp": true,
+  "gshell": 16,
+  "gcomb": 0.3,
+  "gpatch": 5,
+  "gpatchc": 0.9,
+  "gedge": 1,
+  "gwide": 2
  }
 }

@@ -1,0 +1,14 @@
+﻿Use case: style-transfer
+Asset type: 1024x1024 painted game asset, centered leaf cluster on a solid background
+Primary request: Refine the current painted draft into a clearly hand-painted illustration, preserving the guide's exact leaf arrangement and silhouette.
+Input images: Image 1 is the authoritative composition guide: preserve its leaf positions, sizes, outlines, and overlaps. Image 2 is only a brushwork and paint-style reference; do not copy its leaf arrangement or colors. Image 3 is the current paint pass to refine for color brightness and brush texture; do not use it to redefine the guide's geometry.
+Scene/backdrop: Outside the leaves, use one perfectly flat, uniform dark green matching the guide. No vignette, halo, gradient, texture, or shadow in the background.
+Subject: A radial cluster of rounded leaves in two overlapping tiers: 10 darker outer leaves and 7 brighter inner leaves, all radiating from the center.
+Style/medium: Clearly hand-painted. Use visible broad brush marks, flat-brush color planes, and lightly scuffed boundaries. Each leaf has 3–4 distinct color planes, not photographic shading or smooth uniform gradients. Keep the center-near root darker and the tip brighter. Paint one bright central vein with a single brushstroke on each leaf; no fine secondary veins. Use deep green only at roots and overlaps to separate leaves. Mix slight warm yellow into bright planes and slight blue-green into dark planes. Follow the directional, rough brush texture of Image 2.
+Composition/framing: Match Image 1 exactly. Keep every leaf's position, size, outline, overlap, and the four outermost tip positions. Do not expand, shrink, rotate, or reshape the cluster.
+Lighting/mood: Brush-painted color planes only; no cast shadows.
+Color palette: Green leaves with subtle warm yellow highlights and cool blue-green shadows; flat dark green background.
+Materials/textures: Broad visible brushwork, dry-brushed/scuffed color boundaries, hand-painted pigment variation.
+Text (verbatim): none.
+Constraints: Output exactly 1024x1024. Compared with Image 3, raise the average brightness of the leaf surfaces by about 15 luminance levels: brighten broad midtone planes and highlights, while keeping only the central roots and narrow overlap areas deep green. Keep the outer tier darker than the inner tier. Preserve the guide's 10 darker outer leaves and 7 brighter inner leaves and all exact geometry. Keep the background a single uniform dark green. No border.
+Avoid: photorealism, airbrushed shading, smooth gradients, large dark areas across leaf surfaces, fine leaf-vein networks, text, frame, extra objects, decorations outside leaves, cast shadows, background vignette or halo, changing leaf shapes or placement.
