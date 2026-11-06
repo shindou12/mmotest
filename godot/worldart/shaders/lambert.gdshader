@@ -13,4 +13,4 @@ void fragment() {
 	ALBEDO = wa_desat(c, wa_albedo_sat);
 	EMISSION = wa_hemi(ALBEDO, normalize(v_wn));
 }
-void light() { DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * clamp(dot(NORMAL, LIGHT), 0.0, 1.0) / PI; }
+void light() { DIFFUSE_LIGHT += wa_lambert_sun(LIGHT_COLOR, ATTENUATION, clamp(dot(NORMAL, LIGHT), 0.0, 1.0)); }

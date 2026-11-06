@@ -39,6 +39,15 @@ vec3 wa_water_adjust(vec3 col) {
 	}
 	return col;
 }
+
+// world.js の groundMaterial()（M-0179）と同じ二つの大きさのノイズで、草地の斑を作る。
+float wa_ground_patch_field(vec2 wp) {
+	if (wa_gpatch <= 0.0) return 0.5;
+	vec3 pz = texture(t_noise, wp / wa_gpatch).rgb;
+	vec3 pz2 = texture(t_noise, wp / (wa_gpatch * 2.7) + 0.31).rgb;
+	return smoothstep(0.4, 0.6, pz.r * 0.6 + pz2.g * 0.4);
+}
+
 // 地面の色。gw は草が生える重み（土・砂・岩肌のどれでもない割合）。シェルが使う
 vec3 wa_ground_col2(vec4 splat, out float gw, out vec3 grass_col) {
 	vec2 wp = v_w.xz;
@@ -65,11 +74,16 @@ vec3 wa_ground_col2(vec4 splat, out float gw, out vec3 grass_col) {
 	}
 	float wr = smoothstep(0.35, 0.65, rk + n * 0.6);
 	gw = (1.0 - wd) * (1.0 - wa) * (1.0 - wr);
+	float patch_f = wa_ground_patch_field(wp);
+	vec3 patch_tint = mix(vec3(0.62, 0.8, 0.86), vec3(1.12, 1.08, 0.86), patch_f);
 	vec3 col = mix(grass, dirt, wd);
 	col = mix(col, alt, wa);
 	col = mix(col, rock * wa_rock_tint, wr);
+	if (wa_gpatch > 0.0 && wa_gpatchc > 0.0) {
+		col = mix(col, col * patch_tint, gw * wa_gpatchc);
+	}
 	col = wa_water_adjust(col);
-	grass_col = wa_water_adjust(grass);
+	grass_col = wa_water_adjust(grass * mix(vec3(1.0), patch_tint, wa_gpatchc));
 	return col;
 }
 

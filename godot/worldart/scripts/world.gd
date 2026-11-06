@@ -464,7 +464,23 @@ func _set_globals() -> void:
 	var G: Dictionary = spec.get("ground", {})
 	var F: Dictionary = spec.get("foliage", {})
 	var S: Dictionary = spec.get("sky", {})
+	var style: Dictionary = spec.get("style", {})
 	var rs := RenderingServer
+	var gshell_arg := false
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--gshell="):
+			gshell_arg = true
+			break
+	gshell = _arg_gshell() if gshell_arg else maxi(0, int(style.get("gshell", _arg_gshell())))
+	rs.global_shader_parameter_set("wa_shtint", _v3(style.get("shtint", [0.0, 0.0, 0.0])))
+	rs.global_shader_parameter_set("wa_shpen", float(style.get("shpen", 0.0)))
+	rs.global_shader_parameter_set("wa_shpenc", _v3(style.get("shpenc", [1.0, 0.85, 0.45])))
+	rs.global_shader_parameter_set("wa_ramp", 1.0 if bool(style.get("ramp", false)) else 0.0)
+	rs.global_shader_parameter_set("wa_rampt", float(style.get("rampt", 0.3)))
+	rs.global_shader_parameter_set("wa_rampw", float(style.get("rampw", 0.08)))
+	rs.global_shader_parameter_set("wa_gcomb", float(style.get("gcomb", 0.0)))
+	rs.global_shader_parameter_set("wa_gpatch", float(style.get("gpatch", 0.0)))
+	rs.global_shader_parameter_set("wa_gpatchc", float(style.get("gpatchc", 0.0)))
 	rs.global_shader_parameter_set("wa_hemi_sky", _lin(S.get("light", S.get("color", "#cfe0ee"))))
 	rs.global_shader_parameter_set("wa_hemi_ground", _lin(S.get("ground", "#4a5a2a")))
 	rs.global_shader_parameter_set("wa_hemi_int", float(S.get("intensity", 0.6)))
@@ -528,11 +544,15 @@ func _build_light() -> void:
 	add_child(env)
 
 
-## world.js の VSM 半径の差を Godot の既定 blur 1.5 から 0.25 倍で反映する。
+## world.js の VSM 半径を Godot の shadow_blur に移す。style なしの地図は従来の既定値を保つ。
 func set_shadow_radius(radius: float) -> void:
 	if sun != null and is_instance_valid(sun):
-		var default_radius := float(spec.get("shadowRadius", 2.0))
-		sun.shadow_blur = clampf(1.5 + (radius - default_radius) * 0.25, 0.0, 7.0)
+		var style: Variant = spec.get("style", {})
+		if style is Dictionary and not style.is_empty():
+			sun.shadow_blur = clampf(1.5 + (radius - 6.0) * 0.25, 0.0, 7.0)
+		else:
+			var default_radius := float(spec.get("shadowRadius", 2.0))
+			sun.shadow_blur = clampf(1.5 + (radius - default_radius) * 0.25, 0.0, 7.0)
 
 
 ## skyvis がある地図だけ、空の間接光を焼いた可視率で弱める。
