@@ -271,10 +271,47 @@ if (GROUND_BAKE > 0) {
   } catch {}
 }
 const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
-function groundMaterial() {
+// ---------------------------------------------------------------- 地面の草のシェルと地面の試し（M-0179）
+// gshell=16 層数（0 で切）、gsh 高さ m、gsd 1 本の間隔 m（Godot の ground_shell.gdshader と同じ考え方）
+// gpatch=4 数 m の明暗の斑の大きさ m、gpatchc 斑の強さ（色と草の高さを一緒に変える。Ghost of Tsushima の塊の考え方）
+// gcomb=0.12 草がなびく量 m（上の層ほど向きの場へずらし、上から見て筋にする）
+// gcontact=0.5 物の根元の暗さ（配置から地面の暗さの絵を作る）、gcr 半径の倍率
+// gacc=1.7 草の房は際立たせる所（道の縁・物の根元）だけに残し、この倍率で大きくする。gaccr はそれ以外に残す割合
+const GSHELL = Math.max(0, Math.floor(num('gshell', 0)));
+const GSH = num('gsh', 0.18), GSD = num('gsd', 0.045);
+const GPATCH = num('gpatch', 0), GPATCHC = num('gpatchc', 0.5);
+const GCOMB = num('gcomb', 0);
+const GCONTACT = num('gcontact', 0), GCR = num('gcr', 1);
+const GACC = num('gacc', 0), GACCR = num('gaccr', 0.02);
+// gedge=0.5 草のシェルを道へまだらにかぶせる量。gdirt=r,g,b 土の色に掛ける（道と草の明るさの差を縮める）
+const GEDGE = num('gedge', 0);
+const GDIRT = q.has('gdirt') ? q.get('gdirt').split(',').map(Number) : [1, 1, 1];
+let contactTex = null;
+if (GCONTACT > 0 && placed.terrain) {
+  const N = 1024, T0 = placed.terrain, cv = document.createElement('canvas');
+  cv.width = cv.height = N;
+  const cx = cv.getContext('2d');
+  cx.fillStyle = '#000'; cx.fillRect(0, 0, N, N); cx.globalCompositeOperation = 'lighter';
+  for (const [name, rows] of Object.entries(placed.assets)) {
+    if (/grass|flower|clover|lavender|@shadow/.test(name)) continue;
+    const base = /maple|fir|palm|broad|tree/.test(name) ? 2.2 : /fence/.test(name) ? 0.6 : 1.1;
+    for (const [x, , z, , sc] of rows) {
+      const px = (x - T0.x0) / T0.size * N, pz = (z - T0.z0) / T0.size * N, r = Math.max(2, base * sc * GCR / T0.size * N);
+      const g = cx.createRadialGradient(px, pz, 0, px, pz, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(0.5, 'rgba(255,255,255,0.3)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.arc(px, pz, r, 0, 6.2832); cx.fill();
+    }
+  }
+  contactTex = new THREE.CanvasTexture(cv); contactTex.flipY = false; contactTex.minFilter = THREE.LinearFilter;
+}
+function groundMaterial(shell = null) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
-  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}`;
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}${shell ? ':shell-m0179' : ''}:g179-${GPATCH > 0}-${!!contactTex}`;
+  if (shell) m.defines = { SHELL: 1 };
   m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uShellH: shell ? shell.h : { value: 0 }, uShellHeight: { value: GSH }, uShellSpacing: { value: GSD }, uComb: { value: GCOMB },
+      uPatch: { value: GPATCH }, uPatchC: { value: GPATCHC }, tContact: { value: contactTex }, uContact: { value: contactTex ? GCONTACT : 0 },
+      uCO: { value: new THREE.Vector2(placed.terrain?.x0 ?? 0, placed.terrain?.z0 ?? 0) }, uCS: { value: placed.terrain?.size ?? 1 }, tNoiseV: { value: T.noise }, uEdge: { value: GEDGE }, uDirtMul: { value: new THREE.Vector3(...GDIRT) } });
     Object.assign(sh.uniforms, {
       tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
       uAltTint: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) },
@@ -289,9 +326,20 @@ function groundMaterial() {
     if (GROUND_WIDE_ON) Object.assign(sh.uniforms, { tSplat: GB.tSplat, uST: GB.uST, uGWide: { value: GROUND_WIDE } });
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 color;\nvarying vec4 vSplat;\nvarying vec3 vW;\nvarying vec3 vWN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = color;\nvW = (modelMatrix * vec4(position,1.0)).xyz;\nvWN = normalize(mat3(modelMatrix) * normal);');
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vSplat = color;
+vW = (modelMatrix * vec4(position,1.0)).xyz;
+vWN = normalize(mat3(modelMatrix) * normal);
+#ifdef SHELL
+  transformed += normal * uShellHeight * uShellH;
+  vec2 combDir = texture2D(tNoiseV, vW.xz / 11.0).rg * 2.0 - 1.0 + vec2(0.55, 0.35);   // なびく向きの場（全体に一方向へ寄せる）
+  transformed.xz += normalize(combDir) * uComb * uShellH * uShellH;
+#endif`)
+      .replace('#include <common>', '#include <common>\nuniform float uShellH, uShellHeight, uComb; uniform sampler2D tNoiseV;')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n#ifdef SHELL\nobjectNormal = vec3(0.0, 1.0, 0.0);\n#endif');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
+        uniform float uShellH, uShellHeight, uShellSpacing, uPatch, uPatchC, uContact, uCS, uEdge; uniform vec2 uCO; uniform sampler2D tContact; uniform vec3 uDirtMul;
         uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
@@ -309,7 +357,7 @@ function groundMaterial() {
         vec3 nz3 = texture2D(tNoise, wp / 28.0).rgb;
         float lush = smoothstep(0.42 - uLushBias, 0.6 - uLushBias, nz3.r * 0.55 + nz3.g * 0.3 + nz3.b * 0.15);
         grass *= mix(vec3(1.0), uLushTint, lush * uLushAmt);
-        vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint;
+        vec3 dirt = texture2D(tDirt, wp / 6.0).rgb * uDirtTint * uDirtMul;
         vec3 alt = texture2D(tAlt, wp / uAltScale).rgb * uAltTint;
         vec3 rock = texture2D(tRock, vW.zy / uRockScale).rgb * an.x + texture2D(tRock, vW.xy / uRockScale).rgb * an.z + texture2D(tRock, vW.xz / uRockScale).rgb * an.y;
         // 岩の細部のコントラストを弱める（L27 仮説 D「直線を残さない」）: 粗いミップ（bias 4）の大きな明暗へ uRockSoft だけ寄せ、割れ目の線を浅くする
@@ -331,6 +379,34 @@ function groundMaterial() {
         ${GROUND_EDGE_ON ? 'col = mix(col, uDryGrass, dryBand * uGDry);' : ''}
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);
+        float gwS = (1.0 - wd) * (1.0 - wa) * (1.0 - wr);
+        float patchF = 0.5;
+        if (uPatch > 0.0) {   // 数 m の明暗の斑: 明るい黄緑で背が高い ↔ 深い青緑で背が低い
+          vec3 pz = texture2D(tNoise, wp / uPatch).rgb, pz2 = texture2D(tNoise, wp / (uPatch * 2.7) + 0.31).rgb;
+          patchF = smoothstep(0.4, 0.6, pz.r * 0.6 + pz2.g * 0.4);
+          col = mix(col, col * mix(vec3(0.62, 0.8, 0.86), vec3(1.12, 1.08, 0.86), patchF), gwS * uPatchC);
+        }
+        float contact = uContact > 0.0 ? texture2D(tContact, (wp - uCO) / uCS).r : 0.0;
+        #ifdef SHELL
+        {
+          vec2 cell = floor(wp / uShellSpacing), local = fract(wp / uShellSpacing);
+          float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453), seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
+          vec2 center = vec2(0.18 + seed * 0.64, 0.18 + seed2 * 0.64);
+          float radius = 0.46 * (1.0 - 0.78 * uShellH);
+          float heightVar = mix(0.5, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
+          float gwE = gwS;
+          if (uEdge > 0.0) {   // 道の縁: 草をまだらに道へかぶせる（縁ほど短く、まばら）
+            float em = smoothstep(0.3, 0.7, texture2D(tNoise, wp / 1.1).r * 0.7 + seed * 0.3);
+            gwE = clamp(gwS + uEdge * em * (1.0 - wa) * (1.0 - wr) * (1.0 - smoothstep(0.45, 0.9, wd)), 0.0, 1.0);
+            col = mix(grass * vec3(1.06, 1.02, 0.8), col, smoothstep(0.0, 0.6, gwS));   // 道の上の草は草の色（少しオリーブ）
+          }
+          if (distance(local, center) > radius || gwE * heightVar < uShellH) discard;
+          col *= mix(0.72, 1.0, uShellH);
+          col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, uShellH));
+          contact *= 1.0 - 0.5 * uShellH;
+        }
+        #endif
+        col *= 1.0 - uContact * contact;
         if (uWater.y > 1.5) {
           float hw = vW.y - uWater.x;
           float wet = smoothstep(0.16, 0.0, hw) * smoothstep(-0.12, 0.02, hw);   // 水の上の水際（≈0.5m の帯）だけ明るく
@@ -761,6 +837,7 @@ const gltf = new GLTFLoader();
 const load = (url) => new Promise((res, rej) => gltf.load(url, res, undefined, rej));
 
 const terrain = await load(`${BASE}maps/${MAP}/terrain.glb`);
+const shellBases = [];
 terrain.scene.traverse((o) => {
   if (!o.isMesh) return;
   if (o.name.startsWith('water') || o.material.name === 'water') {
@@ -770,12 +847,41 @@ terrain.scene.traverse((o) => {
     o.userData.diffMaskGround = true;
     o.material = groundMaterial(); o.receiveShadow = true;
     if (COOKIE_GROUND_ONLY) o.material.defines = { ...(o.material.defines || {}), USE_COOKIE: 1 };
+    if (GSHELL > 0) shellBases.push(o);
   }
 });
+for (const o of shellBases) for (let i = 1; i <= GSHELL; i++) {   // 草のシェル: 地面を層ごとに持ち上げて重ねる
+  const layer = new THREE.Mesh(o.geometry, groundMaterial({ h: { value: i / GSHELL } }));
+  layer.position.copy(o.position); layer.quaternion.copy(o.quaternion); layer.scale.copy(o.scale);
+  layer.castShadow = false; layer.receiveShadow = true; layer.renderOrder = i; layer.userData.diffMaskGround = true;
+  o.parent.add(layer);
+}
 scene.add(terrain.scene);
 if ((GBLEND || GROUND_WIDE_ON) && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // アイデア01 と gwide: 地面の頂点色を絵に
 
-const SKIP = new Set(flag('grass') ? [] : ['grass_a']);
+const SKIP = new Set(flag('grass') ? [] : GSHELL > 0 && !GACC ? Object.keys(placed.assets).filter((a) => /^grass/.test(a)) : ['grass_a']);   // シェルだけのときは草の房をすべて出さない
+// 際立たせる所だけの大きな房（M-0179）: 道の縁（頂点色 R が途中）と物の根元の近くだけ残し、大きくする
+let accentGrass = (items) => items;
+if (GACC > 0) {
+  const edge = new Map();
+  terrain.scene.traverse((o) => {
+    if (!o.isMesh || !o.geometry.attributes.color) return;
+    const p = o.geometry.attributes.position, c = o.geometry.attributes.color;
+    for (let i = 0; i < p.count; i++) edge.set(`${Math.round(p.getX(i) / 0.5)},${Math.round(p.getZ(i) / 0.5)}`, c.getX(i));
+  });
+  const near = new Set();
+  for (const [name, rows] of Object.entries(placed.assets)) {
+    if (/grass|flower|clover|@shadow/.test(name)) continue;
+    const rad = /maple|fir/.test(name) ? 1.2 : 1.6;
+    for (const [x, , z] of rows) for (let dx = -rad; dx <= rad; dx += 0.5) for (let dz = -rad; dz <= rad; dz += 0.5) near.add(`${Math.round((x + dx) / 0.5)},${Math.round((z + dz) / 0.5)}`);
+  }
+  let k = 0;
+  accentGrass = (items) => items.filter(([x, , z]) => {
+    const key = `${Math.round(x / 0.5)},${Math.round(z / 0.5)}`, r = edge.get(key) ?? 0;
+    const keep = (r > 0.12 && r < 0.6) || near.has(key);
+    return ((k++ * 0.618034) % 1) < (keep ? 0.55 : GACCR);
+  }).map(([x, y, z, r, s, ...rest]) => [x, y, z, r, s * GACC, ...rest]);
+}
 const assetNames = Object.keys(placed.assets).filter((a) => !SKIP.has(a));
 const assetSwap = new Map((q.get('aswap') || '').split(',').map((pair) => pair.split(':')).filter(([from, to]) => from && to));
 const dummy = new THREE.Object3D();
@@ -784,7 +890,8 @@ await Promise.all(assetNames.map(async (name) => {
   const sourceName = name.replace('@shadow', '');
   const loadName = assetSwap.get(sourceName) || sourceName;
   const g = await load(`${BASE}${q.get('adir') || 'assets'}/${loadName}.glb`);
-  const items = placed.assets[name];
+  let items = placed.assets[name];
+  if (GACC > 0 && /^grass/.test(sourceName)) items = accentGrass(items);
   g.scene.updateMatrixWorld(true);
   g.scene.traverse((o) => {
     if (!o.isMesh) return;
