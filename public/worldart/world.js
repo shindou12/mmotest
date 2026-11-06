@@ -209,6 +209,9 @@ const tex = (name, srgb = true) => {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   return t;
 };
+const grassStrokes = texLoader.load(`${BASE}tex/grass_strokes.png`);
+grassStrokes.wrapS = grassStrokes.wrapT = THREE.RepeatWrapping;
+grassStrokes.colorSpace = THREE.NoColorSpace;
 const T = { flag: tex('ground_flagstone'), noise: tex('noise_soft', false), crack: tex('rock_crack'), face: tex('rock_face'), grass: tex('ground_grass'), dirt: tex('ground_dirt'), sand: tex('ground_sand'), cobble: tex('ground_cobble'), rock: tex('rock') };
 
 // ---------------------------------------------------------------- 地面の材質
@@ -308,14 +311,14 @@ if (GCONTACT > 0 && placed.terrain) {
 }
 function groundMaterial(shell = null) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
-  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}${shell ? ':shell-m0179' : ''}:g179-${GPATCH > 0}-${!!contactTex}`;
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}${shell ? ':shell-m0183-strokes' : ''}:g179-${GPATCH > 0}-${!!contactTex}`;
   if (shell) m.defines = { SHELL: 1 };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { uShellH: shell ? shell.h : { value: 0 }, uShellHeight: { value: GSH }, uShellSpacing: { value: GSD }, uComb: { value: GCOMB },
       uPatch: { value: GPATCH }, uPatchC: { value: GPATCHC }, tContact: { value: contactTex }, uContact: { value: contactTex ? GCONTACT : 0 },
       uCO: { value: new THREE.Vector2(placed.terrain?.x0 ?? 0, placed.terrain?.z0 ?? 0) }, uCS: { value: placed.terrain?.size ?? 1 }, tNoiseV: { value: T.noise }, uEdge: { value: GEDGE }, uDirtMul: { value: new THREE.Vector3(...GDIRT) } });
     Object.assign(sh.uniforms, {
-      tGrass: { value: T.grass }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
+      tGrass: { value: T.grass }, tGrassStrokes: { value: grassStrokes }, tNoise: { value: T.noise }, tDirt: { value: T.dirt }, tAlt: { value: altTex }, tRock: { value: rockTex }, uRockScale: { value: rockScale }, uRockPix: { value: GROUND.rockPix ? 1 : 0 }, uRockSoft: { value: num('rsoft', GROUND.rockSoft ?? 0) }, uRockTint: { value: new THREE.Color(...(GROUND.rockTint || [1, 1, 1])) },
       uAltTint: { value: new THREE.Color(...(GROUND.altTint || [1, 1, 1])) },
       uLushTint: { value: new THREE.Color(...(GROUND.lushTint || [1, 1, 1])) }, uLushAmt: { value: num('lush', GROUND.lushAmt ?? 0) }, uLushBias: { value: num('lushBias', GROUND.lushBias ?? 0) },
       uGrassTint: { value: new THREE.Color(...(q.has('gtint') ? q.get('gtint').split(',').map(Number) : (GROUND.grassTint || [1, 1, 1]))) },
@@ -342,7 +345,7 @@ vWN = normalize(mat3(modelMatrix) * normal);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform float uShellH, uShellHeight, uShellSpacing, uPatch, uPatchC, uContact, uCS, uEdge; uniform vec2 uCO; uniform sampler2D tContact; uniform vec3 uDirtMul;
-        uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
+        uniform sampler2D tGrass, tGrassStrokes, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
         // 0.65m の値ノイズで草の房を作り、端だけ刃ごとの揺れを足す
@@ -405,11 +408,16 @@ vWN = normalize(mat3(modelMatrix) * normal);
         float contact = uContact > 0.0 ? texture2D(tContact, (wp - uCO) / uCS).r : 0.0;
         #ifdef SHELL
         {
-          vec2 cell = floor(wp / uShellSpacing), local = fract(wp / uShellSpacing);
+          vec2 cell = floor(wp / uShellSpacing);
           float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453), seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
-          vec2 center = vec2(0.18 + seed * 0.64, 0.18 + seed2 * 0.64);
-          float radius = 0.46 * (1.0 - 0.78 * uShellH);
           float heightVar = mix(0.5, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
+          vec2 combDir = normalize(texture2D(tNoise, wp / 11.0).rg * 2.0 - 1.0 + vec2(0.55, 0.35));
+          vec2 combAcross = vec2(-combDir.y, combDir.x);
+          vec2 strokeUV = vec2(dot(wp, combAcross), dot(wp, combDir)) / 1.8;
+          strokeUV += (texture2D(tNoise, wp / 3.7).rg * 2.0 - 1.0) * 0.045;
+          float strokeHeight = max(texture2D(tGrassStrokes, strokeUV).r,
+            texture2D(tGrassStrokes, strokeUV * 0.73 + vec2(0.37, 0.61)).r * 0.55);
+          if (strokeHeight * heightVar < uShellH) discard;
           float gwE = gwS;
           if (uEdge > 0.0) {   // 道の縁: 草を道へ向けて間引き、背を低くする（高さで消すと縁が線になる。数で減らす）
             float seed3 = fract(seed * 57.3 + seed2 * 91.7);
@@ -420,9 +428,9 @@ vWN = normalize(mat3(modelMatrix) * normal);
             vec3 edgeGrass = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
             col = mix(edgeGrass, col, smoothstep(0.0, 1.0, te));
           }
-          if (distance(local, center) > radius || gwE * heightVar < uShellH) discard;
-          col *= mix(mix(0.72, 1.0, uShellH), mix(0.92, 1.0, uShellH), te);
-          col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, uShellH));
+          if (gwE * heightVar < uShellH) discard;
+          col *= mix(mix(0.85, 1.0, uShellH), mix(0.95, 1.0, uShellH), te);
+          col = mix(col, col * vec3(1.04, 1.02, 0.95), smoothstep(0.6, 1.0, uShellH));
           contact *= 1.0 - 0.5 * uShellH;
         }
         #endif

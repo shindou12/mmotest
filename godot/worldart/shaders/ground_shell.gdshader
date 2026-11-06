@@ -1,5 +1,5 @@
 // 草のシェル（world.js の groundMaterial の shell 版、rulebook 8.3 / review-L29 8）。地面を層ごとに法線方向へ持ち上げて重ねる。
-// 層 i（0 始まりのインスタンス番号）の h = (i+1)/層数。色は土台と同じ式で、草の重みと小さな円で抜く。
+// 層 i（0 始まりのインスタンス番号）の h = (i+1)/層数。色は土台と同じ式で、高さテクスチャで刃を抜く。
 // 頂点は区画の中心からの位置で持つ（world.gd が焼く）。MODEL_MATRIX は区画の中心への平行移動だけ
 shader_type spatial;
 render_mode diffuse_lambert, specular_disabled, ambient_light_disabled;
@@ -7,6 +7,7 @@ render_mode diffuse_lambert, specular_disabled, ambient_light_disabled;
 uniform float shell_layers = 16.0;
 uniform float shell_height = 0.18;   // 草の高さ（m）
 uniform float shell_spacing = 0.045;   // 草 1 本の間隔（m）
+uniform sampler2D t_grass_strokes : filter_linear_mipmap, repeat_enable;
 uniform sampler2D t_grass_edge : filter_linear, repeat_disable;   // R=ぼかした草の重み（1 草 0 土・砂）G=まだらの種
 uniform vec3 grass_edge_st = vec3(0.0, 0.0, 1.0);   // x0, z0, 一辺
 uniform float shell_edge_mottle = 0.8;
@@ -37,15 +38,18 @@ void vertex() {
 void fragment() {
 	vec2 wp = v_w.xz;
 	vec2 cell = floor(wp / shell_spacing);
-	vec2 local = fract(wp / shell_spacing);
 	float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
 	float seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
-	vec2 center = vec2(0.18 + seed * 0.64, 0.18 + seed2 * 0.64);
-	float radius = 0.46 * (1.0 - 0.78 * v_h);
 	float patch_f = wa_ground_patch_field(wp);
 	float patch_height = mix(1.0 - 0.45 * wa_gpatchc, 1.0 + 0.1 * wa_gpatchc, patch_f);
 	float height_var = mix(0.5, 1.0, texture(t_noise, wp / 2.0).r) * patch_height;
-	if (distance(local, center) > radius || height_var < v_h) discard;   // gw <= 1 なので、重い色の式の前に先に抜く
+	vec2 comb_dir = normalize(texture(t_noise, wp / 11.0).rg * 2.0 - 1.0 + vec2(0.55, 0.35));
+	vec2 comb_across = vec2(-comb_dir.y, comb_dir.x);
+	vec2 stroke_uv = vec2(dot(wp, comb_across), dot(wp, comb_dir)) / 1.8;
+	stroke_uv += (texture(t_noise, wp / 3.7).rg * 2.0 - 1.0) * 0.045;
+	float stroke_height = max(texture(t_grass_strokes, stroke_uv).r,
+		texture(t_grass_strokes, stroke_uv * 0.73 + vec2(0.37, 0.61)).r * 0.55);
+	if (stroke_height * height_var < v_h) discard;   // Acerola の shell texturing と同じ高さマップの閾値化
 	// 草と土の境: 縁までの符号つき距離 sd（m。草の内側が正）で、草を縁へ向けて edge_w かけて短くし、まだらに崩す
 	float edge_mottle = shell_edge_mottle * (gedge > 0.0 && gwide > 0.0 ? 0.35 : 1.0);
 	float sd = wa_edge_sd(t_grass_edge, grass_edge_st, wp, edge_mottle);
@@ -66,13 +70,13 @@ void fragment() {
 		if (shell_gw * edge_height * height_var < v_h) discard;
 		vec3 edge_grass = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
 		col = mix(edge_grass, col, smoothstep(0.0, 1.0, te));   // 刃の色を足元の黄ばんだ草・土へ寄せる
-		col *= mix(mix(0.72, 1.0, v_h), mix(0.92, 1.0, v_h), te);   // 道の側では根元を暗くしすぎない
+		col *= mix(mix(0.85, 1.0, v_h), mix(0.95, 1.0, v_h), te);   // 根元の暗さを弱め、道の側はさらに浅くする
 	} else {
 		if (gw * height_var < v_h && ek >= 1.0) discard;   // 内側は今まで通り
 		col = mix(grass, col, smoothstep(0.0, 1.0, gw));   // 土の上へかぶさる縁は草の色
-		col *= mix(mix(0.72, 1.0, v_h), 1.0, smoothstep(0.0, 0.6, edge));   // 縁は根元を暗くしない
+		col *= mix(mix(0.85, 1.0, v_h), 1.0, smoothstep(0.0, 0.6, edge));   // 縁は根元を暗くしない
 	}
-	col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, v_h));
+	col = mix(col, col * vec3(1.04, 1.02, 0.95), smoothstep(0.6, 1.0, v_h));
 	if (te < 0.0) col = mix(col, col * vec3(1.14, 0.98, 0.52), edge);   // gedge 無効時は M-0006 の黄・オリーブ寄りを保つ
 	ALBEDO = wa_desat(col, wa_albedo_sat);
 	EMISSION = wa_ground_emission(ALBEDO, vec3(0.0, 1.0, 0.0));
