@@ -11,6 +11,8 @@ uniform sampler2D t_grass_edge : filter_linear, repeat_disable;   // R=ぼかし
 uniform vec3 grass_edge_st = vec3(0.0, 0.0, 1.0);   // x0, z0, 一辺
 uniform float shell_edge_mottle = 0.8;
 uniform float edge_w = 1.25;   // 草が短くなる幅（m）
+uniform float gedge = 0.0;
+uniform float gwide = 0.0;
 varying flat float v_h;
 void vertex() {
 	v_w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;   // 色は持ち上げる前の位置で引く（土台と同じ絵になる）
@@ -36,18 +38,30 @@ void fragment() {
 	float height_var = mix(0.5, 1.0, texture(t_noise, wp / 2.0).r) * patch_height;
 	if (distance(local, center) > radius || height_var < v_h) discard;   // gw <= 1 なので、重い色の式の前に先に抜く
 	// 草と土の境: 縁までの符号つき距離 sd（m。草の内側が正）で、草を縁へ向けて edge_w かけて短くし、まだらに崩す
-	float sd = wa_edge_sd(t_grass_edge, grass_edge_st, wp, shell_edge_mottle);
+	float edge_mottle = shell_edge_mottle * (gedge > 0.0 && gwide > 0.0 ? 0.35 : 1.0);
+	float sd = wa_edge_sd(t_grass_edge, grass_edge_st, wp, edge_mottle);
+	float te = wa_ground_path_te(sd, gedge, gwide);
 	float ek = smoothstep(-0.25, edge_w, sd);
 	float edge = 1.0 - ek;
-	if (ek < v_h || fract(seed * 57.3 + seed2 * 91.7) > mix(0.35, 1.0, ek)) discard;   // 縁では短く、まばらに
+	if (te < 0.0 && (ek < v_h || fract(seed * 57.3 + seed2 * 91.7) > mix(0.35, 1.0, ek))) discard;   // gedge 無効時は M-0006 の縁を保つ
 	float gw;
 	vec3 grass;
-	vec3 col = wa_ground_col2(COLOR, gw, grass);
-	if (gw * height_var < v_h && ek >= 1.0) discard;   // 内側は今まで通り
-	col = mix(grass, col, smoothstep(0.0, 1.0, gw));   // 土の上へかぶさる縁は草の色
-	col *= mix(mix(0.72, 1.0, v_h), 1.0, smoothstep(0.0, 0.6, edge));   // 縁は根元を暗くしない
+	float shell_gw;
+	vec3 col = wa_ground_col2(COLOR, te, gw, grass, shell_gw);
+	if (te >= 0.0) {
+		float seed3 = fract(seed * 57.3 + seed2 * 91.7);
+		if (seed3 > pow(1.0 - te, 1.4) * 1.08) discard;   // 高さでなく草の本数を減らす
+		float edge_height = mix(1.0, 0.5, te);
+		if (shell_gw * edge_height * height_var < v_h) discard;
+		col = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+		col *= mix(0.72, 1.0, v_h);
+	} else {
+		if (gw * height_var < v_h && ek >= 1.0) discard;   // 内側は今まで通り
+		col = mix(grass, col, smoothstep(0.0, 1.0, gw));   // 土の上へかぶさる縁は草の色
+		col *= mix(mix(0.72, 1.0, v_h), 1.0, smoothstep(0.0, 0.6, edge));   // 縁は根元を暗くしない
+	}
 	col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, v_h));
-	col = mix(col, col * vec3(1.14, 0.98, 0.52), edge);   // 縁は少し黄・オリーブ寄り（暗くしない）
+	if (te < 0.0) col = mix(col, col * vec3(1.14, 0.98, 0.52), edge);   // gedge 無効時は M-0006 の黄・オリーブ寄りを保つ
 	ALBEDO = wa_desat(col, wa_albedo_sat);
 	EMISSION = wa_ground_emission(ALBEDO, vec3(0.0, 1.0, 0.0));
 }

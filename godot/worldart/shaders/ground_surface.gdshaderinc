@@ -49,7 +49,13 @@ float wa_ground_patch_field(vec2 wp) {
 }
 
 // 地面の色。gw は草が生える重み（土・砂・岩肌のどれでもない割合）。シェルが使う
-vec3 wa_ground_col2(vec4 splat, out float gw, out vec3 grass_col) {
+float wa_ground_path_te(float sd, float edge_amount, float edge_width) {
+	if (edge_amount <= 0.0 || edge_width <= 0.0) return -1.0;
+	float half_width = max(edge_amount * edge_width * 0.5, 0.05);
+	return 1.0 - smoothstep(-half_width, half_width, sd);   // 草側 0、道側 1
+}
+
+vec3 wa_ground_col2(vec4 splat, float te, out float gw, out vec3 grass_col, out float shell_gw) {
 	vec2 wp = v_w.xz;
 	vec3 an = abs(normalize(v_wn)); an = an * an; an /= (an.x + an.y + an.z);
 	vec3 g1 = texture(t_grass, v_w.zy / 7.0).rgb * an.x + texture(t_grass, v_w.xy / 7.0).rgb * an.z + texture(t_grass, wp / 7.0).rgb * an.y;
@@ -74,9 +80,13 @@ vec3 wa_ground_col2(vec4 splat, out float gw, out vec3 grass_col) {
 	}
 	float wr = smoothstep(0.35, 0.65, rk + n * 0.6);
 	gw = (1.0 - wd) * (1.0 - wa) * (1.0 - wr);
+	shell_gw = (1.0 - wa) * (1.0 - wr);   // gedge 有効時は道の重みを te で扱う
 	float patch_f = wa_ground_patch_field(wp);
 	vec3 patch_tint = mix(vec3(0.62, 0.8, 0.86), vec3(1.12, 1.08, 0.86), patch_f);
 	vec3 col = mix(grass, dirt, wd);
+	if (te >= 0.0) {
+		col = mix(mix(grass, grass * vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.6, te)), dirt, smoothstep(0.35, 1.0, te));
+	}
 	col = mix(col, alt, wa);
 	col = mix(col, rock * wa_rock_tint, wr);
 	if (wa_gpatch > 0.0 && wa_gpatchc > 0.0) {
@@ -87,9 +97,10 @@ vec3 wa_ground_col2(vec4 splat, out float gw, out vec3 grass_col) {
 	return col;
 }
 
-vec3 wa_ground_col(vec4 splat, out float gw) {
+vec3 wa_ground_col(vec4 splat, float te, out float gw) {
 	vec3 g;
-	return wa_ground_col2(splat, gw, g);
+	float shell_gw;
+	return wa_ground_col2(splat, te, gw, g, shell_gw);
 }
 
 // 草の縁までの符号つき距離（m。草の内側が正）に、0.5〜1.5m のまだらを足したもの。g は CPU の絵の G（格子のノイズ）
