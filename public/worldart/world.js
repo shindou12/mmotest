@@ -159,10 +159,12 @@ if (COOKIE_ON) {
 //   ramp=1 rampt=0.3 rampw=0.08  明暗の境を段に寄せる（やわらかい段）
 //   rim=0.5 rimp=3  輪郭の光（太陽の側の縁を明るく）
 const csv = (k) => (q.get(k) || '').split(',').map(Number);
+// 地図の JSON の style で既定にできる（採用した地図だけ、2026-11-06）。URL の値が優先、shtint=0 で切
+const SS = spec.style || {};
 const STY = {
-  tint: q.has('shtint') ? csv('shtint') : null,
-  pen: num('shpen', 0), penC: q.has('shpenc') ? csv('shpenc') : [1.0, 0.85, 0.45],
-  ramp: flag('ramp', false), rampT: num('rampt', 0.3), rampW: num('rampw', 0.08),
+  tint: q.get('shtint') === '0' ? null : q.has('shtint') ? csv('shtint') : (SS.shtint || null),
+  pen: num('shpen', SS.shpen ?? 0), penC: q.has('shpenc') ? csv('shpenc') : (SS.shpenc || [1.0, 0.85, 0.45]),
+  ramp: flag('ramp', !!SS.ramp), rampT: num('rampt', 0.3), rampW: num('rampw', 0.08),
   rim: num('rim', 0), rimP: num('rimp', 3),
 };
 {
@@ -277,10 +279,10 @@ const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
 // gcomb=0.12 草がなびく量 m（上の層ほど向きの場へずらし、上から見て筋にする）
 // gcontact=0.5 物の根元の暗さ（配置から地面の暗さの絵を作る）、gcr 半径の倍率
 // gacc=1.7 草の房は際立たせる所（道の縁・物の根元）だけに残し、この倍率で大きくする。gaccr はそれ以外に残す割合
-const GSHELL = Math.max(0, Math.floor(num('gshell', 0)));
-const GSH = num('gsh', 0.18), GSD = num('gsd', 0.045);
-const GPATCH = num('gpatch', 0), GPATCHC = num('gpatchc', 0.5);
-const GCOMB = num('gcomb', 0);
+const GSHELL = Math.max(0, Math.floor(num('gshell', SS.gshell ?? 0)));
+const GSH = num('gsh', SS.gsh ?? 0.18), GSD = num('gsd', SS.gsd ?? 0.045);
+const GPATCH = num('gpatch', SS.gpatch ?? 0), GPATCHC = num('gpatchc', SS.gpatchc ?? 0.5);
+const GCOMB = num('gcomb', SS.gcomb ?? 0);
 const GCONTACT = num('gcontact', 0), GCR = num('gcr', 1);
 const GACC = num('gacc', 0), GACCR = num('gaccr', 0.02);
 // gedge=0.5 草のシェルを道へまだらにかぶせる量。gdirt=r,g,b 土の色に掛ける（道と草の明るさの差を縮める）
@@ -859,7 +861,8 @@ for (const o of shellBases) for (let i = 1; i <= GSHELL; i++) {   // 草のシ�
 scene.add(terrain.scene);
 if ((GBLEND || GROUND_WIDE_ON) && placed.terrain) buildSplat(terrain.scene, placed.terrain);   // アイデア01 と gwide: 地面の頂点色を絵に
 
-const SKIP = new Set(flag('grass') ? [] : GSHELL > 0 && !GACC ? Object.keys(placed.assets).filter((a) => /^grass/.test(a)) : ['grass_a']);   // シェルだけのときは草の房をすべて出さない
+// シェルの草があるときは草の房をすべて出さない（gacc のときは際立つ所だけ残す）。grass=1 で戻す
+const SKIP = new Set(flag('grass', !(GSHELL > 0) || GACC > 0) ? [] : GSHELL > 0 ? Object.keys(placed.assets).filter((a) => /^grass/.test(a)) : ['grass_a']);
 // 際立たせる所だけの大きな房（M-0179）: 道の縁（頂点色 R が途中）と物の根元の近くだけ残し、大きくする
 let accentGrass = (items) => items;
 if (GACC > 0) {
