@@ -217,7 +217,7 @@ const GROUND = spec.ground || {};
 const GROUND_SOFT = THREE.MathUtils.clamp(num('gsoft', 0), 0, 1);
 const GROUND_DRY = THREE.MathUtils.clamp(num('gdry', 0), 0, 1);
 const GROUND_EDGE_ON = GROUND_SOFT > 0 || GROUND_DRY > 0;
-const GROUND_WIDE = Math.max(0, num('gwide', 0));
+const GROUND_WIDE = Math.max(0, num('gwide', spec.style?.gwide ?? 0));
 const GROUND_WIDE_ON = GROUND_WIDE > 0;
 // B01 の道際（x=560〜604、y=380〜459）の平均色。sRGB で #989B49
 const GROUND_EDGE_UNIFORMS = { uGSoft: { value: GROUND_SOFT }, uGDry: { value: GROUND_DRY }, uDryGrass: { value: new THREE.Color(0x989b49) } };
@@ -286,7 +286,7 @@ const GCOMB = num('gcomb', SS.gcomb ?? 0);
 const GCONTACT = num('gcontact', 0), GCR = num('gcr', 1);
 const GACC = num('gacc', 0), GACCR = num('gaccr', 0.02);
 // gedge=0.5 草のシェルを道へまだらにかぶせる量。gdirt=r,g,b 土の色に掛ける（道と草の明るさの差を縮める）
-const GEDGE = num('gedge', 0);
+const GEDGE = num('gedge', SS.gedge ?? 0);
 const GDIRT = q.has('gdirt') ? q.get('gdirt').split(',').map(Number) : [1, 1, 1];
 let contactTex = null;
 if (GCONTACT > 0 && placed.terrain) {
@@ -378,6 +378,11 @@ vWN = normalize(mat3(modelMatrix) * normal);
         }
         float wr = smoothstep(0.35, 0.65, rk + n * 0.6);
         vec3 col = mix(grass, dirt, wd);
+        float te = 0.0;
+        if (uEdge > 0.0) {   // 道の縁の帯（M-0179 の D 第 3 版）: 草 → 黄ばんでまばらな草 → 土を、道の重み（頂点色 R）で広く移す
+          te = smoothstep(0.5 - 0.35 * uEdge, 0.5 + 0.35 * uEdge, ${GROUND_WIDE_ON ? 'wideWeight + wideEdgeNoise' : 'vSplat.r + n * 0.5'});   // gwide のときはぼかした道の重み（帯が広くなる）
+          col = mix(mix(grass, grass * vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.6, te)), dirt, smoothstep(0.35, 1.0, te));
+        }
         ${GROUND_EDGE_ON ? 'col = mix(col, uDryGrass, dryBand * uGDry);' : ''}
         col = mix(col, alt, wa);
         col = mix(col, rock * uRockTint, wr);
@@ -397,10 +402,11 @@ vWN = normalize(mat3(modelMatrix) * normal);
           float radius = 0.46 * (1.0 - 0.78 * uShellH);
           float heightVar = mix(0.5, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
           float gwE = gwS;
-          if (uEdge > 0.0) {   // 道の縁: 草をまだらに道へかぶせる（縁ほど短く、まばら）
-            float em = smoothstep(0.3, 0.7, texture2D(tNoise, wp / 1.1).r * 0.7 + seed * 0.3);
-            gwE = clamp(gwS + uEdge * em * (1.0 - wa) * (1.0 - wr) * (1.0 - smoothstep(0.45, 0.9, wd)), 0.0, 1.0);
-            col = mix(grass * vec3(1.06, 1.02, 0.8), col, smoothstep(0.0, 0.6, gwS));   // 道の上の草は草の色（少しオリーブ）
+          if (uEdge > 0.0) {   // 道の縁: 草を道へ向けて間引き、背を低くする（高さで消すと縁が線になる。数で減らす）
+            float seed3 = fract(seed * 57.3 + seed2 * 91.7);
+            if (seed3 > pow(1.0 - te, 1.4) * 1.08) discard;
+            gwE = (1.0 - wa) * (1.0 - wr) * mix(1.0, 0.5, te);
+            col = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
           }
           if (distance(local, center) > radius || gwE * heightVar < uShellH) discard;
           col *= mix(0.72, 1.0, uShellH);

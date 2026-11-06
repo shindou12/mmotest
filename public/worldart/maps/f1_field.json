@@ -5341,6 +5341,8 @@
   "gshell": 16,
   "gcomb": 0.3,
   "gpatch": 5,
-  "gpatchc": 0.9
+  "gpatchc": 0.9,
+  "gedge": 1,
+  "gwide": 2
  }
 }
