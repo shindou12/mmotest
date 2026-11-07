@@ -26,7 +26,7 @@ var path_edge_enabled := false
 ## 草が短くなる幅 (m) と境のまだらの強さ (0..1)
 var gshell_edge_width := clampf(_arg_float("gshell_edge", 1.25), 0.25, 3.0)
 var gshell_mottle := clampf(_arg_float("gshell_mottle", 0.8), 0.0, 1.0)
-const GSHELL_HEIGHT := 0.18
+const GSHELL_HEIGHT := 0.28
 const GSHELL_SPACING := 0.045
 const GSHELL_CHUNK := 8.0   # シェルを分ける正方形の一辺（m）。視錐台の外を切るため
 ## 置き物（木・岩など）を分ける正方形の一辺（m）。--achunk=<m>、0 で分けずに種類ごと 1 つ（M-0161）

@@ -3721,7 +3721,7 @@
   "shpen": 0.6,
   "ramp": true,
   "gshell": 16,
-  "gcomb": 0.3,
+  "gcomb": 0,
   "gpatch": 5,
   "gpatchc": 0.9,
   "gedge": 1,

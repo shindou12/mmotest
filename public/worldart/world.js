@@ -280,7 +280,7 @@ const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
 // gcontact=0.5 物の根元の暗さ（配置から地面の暗さの絵を作る）、gcr 半径の倍率
 // gacc=1.7 草の房は際立たせる所（道の縁・物の根元）だけに残し、この倍率で大きくする。gaccr はそれ以外に残す割合
 const GSHELL = Math.max(0, Math.floor(num('gshell', SS.gshell ?? 0)));
-const GSH = num('gsh', SS.gsh ?? 0.18), GSD = num('gsd', SS.gsd ?? 0.045);
+const GSH = num('gsh', SS.gsh ?? 0.28), GSD = num('gsd', SS.gsd ?? 0.045);
 const GPATCH = num('gpatch', SS.gpatch ?? 0), GPATCHC = num('gpatchc', SS.gpatchc ?? 0.5);
 const GCOMB = num('gcomb', SS.gcomb ?? 0);
 const GCONTACT = num('gcontact', 0), GCR = num('gcr', 1);
@@ -412,8 +412,8 @@ vWN = normalize(mat3(modelMatrix) * normal);
           bq.x += mod(floor(bq.y / bsz.y), 2.0) * 0.5 * bsz.x;
           vec2 cell = floor(bq / bsz), bl = fract(bq / bsz);
           float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453), seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
-          float heightVar = mix(0.5, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
-          vec2 bd = (bl - vec2(0.3 + seed * 0.4, 0.42 + seed2 * 0.16)) / vec2(0.5 * (1.0 - 0.8 * uShellH), 0.56 * (1.0 - 0.45 * uShellH));
+          float heightVar = mix(0.7, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
+          vec2 bd = (bl - vec2(0.3 + seed * 0.4, 0.42 + seed2 * 0.16)) / vec2(0.52 * (1.0 - 0.6 * uShellH), 0.56 * (1.0 - 0.4 * uShellH));
           if (dot(bd, bd) > 1.0 || heightVar < uShellH) discard;
           float gwE = gwS;
           if (uEdge > 0.0) {   // 道の縁: 草を道へ向けて間引き、背を低くする（高さで消すと縁が線になる。数で減らす）
