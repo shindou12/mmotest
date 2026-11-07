@@ -606,8 +606,6 @@ func _build_terrain() -> void:
 		mat.set_shader_parameter("gwide", gwide)
 		for k in [["t_grass", "ground_grass"], ["t_dirt", "ground_dirt"], ["t_alt", alt], ["t_rock", rk], ["t_noise", "noise_soft"]]:
 			mat.set_shader_parameter(k[0], _tex(k[1]))
-	for mat in shell_materials:
-		mat.set_shader_parameter("t_grass_strokes", _tex("grass_strokes"))
 	var skyvis_path := "res://data/%s/skyvis.png" % map_name
 	if FileAccess.file_exists(skyvis_path) and placed.has("terrain"):
 		var tm: Dictionary = placed["terrain"]

@@ -7,7 +7,6 @@ render_mode diffuse_lambert, specular_disabled, ambient_light_disabled;
 uniform float shell_layers = 16.0;
 uniform float shell_height = 0.18;   // 草の高さ（m）
 uniform float shell_spacing = 0.045;   // 草 1 本の間隔（m）
-uniform sampler2D t_grass_strokes : filter_linear_mipmap, repeat_enable;
 uniform sampler2D t_grass_edge : filter_linear, repeat_disable;   // R=ぼかした草の重み（1 草 0 土・砂）G=まだらの種
 uniform vec3 grass_edge_st = vec3(0.0, 0.0, 1.0);   // x0, z0, 一辺
 uniform float shell_edge_mottle = 0.8;
@@ -37,19 +36,20 @@ void vertex() {
 }
 void fragment() {
 	vec2 wp = v_w.xz;
-	vec2 cell = floor(wp / shell_spacing);
+	// 草 1 本を、なびく向きに 3 倍長い楕円にする（丸い粒に見えないように）。格子もその向きにそろえ、列ごとに半分ずらす
+	const vec2 BLADE_DIR = vec2(0.8436, 0.5369);   // normalize(0.55, 0.35)
+	vec2 bq = vec2(dot(wp, vec2(-BLADE_DIR.y, BLADE_DIR.x)), dot(wp, BLADE_DIR));
+	vec2 bsz = vec2(shell_spacing, shell_spacing * 3.0);
+	bq.x += mod(floor(bq.y / bsz.y), 2.0) * 0.5 * bsz.x;
+	vec2 cell = floor(bq / bsz);
+	vec2 local = fract(bq / bsz);
 	float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
 	float seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
+	vec2 bd = (local - vec2(0.3 + seed * 0.4, 0.42 + seed2 * 0.16)) / vec2(0.5 * (1.0 - 0.8 * v_h), 0.56 * (1.0 - 0.45 * v_h));
 	float patch_f = wa_ground_patch_field(wp);
 	float patch_height = mix(1.0 - 0.45 * wa_gpatchc, 1.0 + 0.1 * wa_gpatchc, patch_f);
 	float height_var = mix(0.5, 1.0, texture(t_noise, wp / 2.0).r) * patch_height;
-	vec2 comb_dir = normalize(texture(t_noise, wp / 11.0).rg * 2.0 - 1.0 + vec2(0.55, 0.35));
-	vec2 comb_across = vec2(-comb_dir.y, comb_dir.x);
-	vec2 stroke_uv = vec2(dot(wp, comb_across), dot(wp, comb_dir)) / 1.8;
-	stroke_uv += (texture(t_noise, wp / 3.7).rg * 2.0 - 1.0) * 0.045;
-	float stroke_height = max(texture(t_grass_strokes, stroke_uv).r,
-		texture(t_grass_strokes, stroke_uv * 0.73 + vec2(0.37, 0.61)).r * 0.55);
-	if (stroke_height * height_var < v_h) discard;   // Acerola の shell texturing と同じ高さマップの閾値化
+	if (dot(bd, bd) > 1.0 || height_var < v_h) discard;
 	// 草と土の境: 縁までの符号つき距離 sd（m。草の内側が正）で、草を縁へ向けて edge_w かけて短くし、まだらに崩す
 	float edge_mottle = shell_edge_mottle * (gedge > 0.0 && gwide > 0.0 ? 0.35 : 1.0);
 	float sd = wa_edge_sd(t_grass_edge, grass_edge_st, wp, edge_mottle);
