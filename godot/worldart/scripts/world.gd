@@ -693,8 +693,8 @@ func _build_shells(mesh: Mesh, xf: Transform3D, rock_pix: bool) -> void:
 		am.custom_aabb = am.get_aabb().grow(GSHELL_HEIGHT)   # 持ち上げた分も含める
 		tris += ch["I"].size() / 3
 		var c: float = gshell_band[0]; var w1: float = gshell_band[1]; var w2: float = gshell_band[2]
-		# 段・カメラからの距離の範囲（begin, end。end 0 は果てまで）。全層は中央の帯、半分はその両側、1/4 はさらに外
-		for e in [[0, c - w1, c + w1], [1, c - w2, c - w1], [1, c + w1, c + w2], [2, 0.0, c - w2], [2, c + w2, 0.0]]:
+		# 段・カメラからの距離の範囲（begin, end。end 0 は果てまで）。近い所は全層、遠くへ半分・1/4（寄ったときに層が減って草が平らになっていた）
+		for e in [[0, 0.0, c + w1], [1, c + w1, c + w2], [2, c + w2, 0.0]]:
 			var layers := _shell_layers()[e[0]]
 			var mm := MultiMesh.new()
 			mm.transform_format = MultiMesh.TRANSFORM_3D
