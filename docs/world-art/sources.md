@@ -2,6 +2,11 @@
 
 外部の知見は「この作品の実際の作り方」ではない。画面が似たことから元作品の実装を断定しない。
 
+## 草刃の描画（M-0184）
+- [Grass Rendering Series 1: Theory](https://hexaquo.at/pages/grass-rendering-series-part-1-theory/) と [Part 2: Full Geometry Grass in Godot](https://hexaquo.at/pages/grass-rendering-series-part-2-full-geometry-grass-in-godot/): 短い草のシェルと背の高い草の刃形状を使い分ける。Godot 側の刃は複数段のテーパー形状にし、法線を上向きへ寄せ、根元を地面色へ混ぜる。
+- [2Retr0/GodotGrass](https://github.com/2Retr0/GodotGrass)（MIT）と [Procedural Grass in Ghost of Tsushima（GDC 2021）](https://gdcvault.com/play/1027214/Advanced-Graphics-Summit-Procedural-Grass): 草を刃ごとに配置し、細胞状の房で高さ・傾きなどを共有する構成の参考。ここでは seed 固定の Voronoi 房を使い、8m 区画の MultiMesh に配置した。
+- [Grass normals matching ground（Polycount）](https://polycount.com/discussion/comment/2725691): 草の法線を地面に近づけて、草が別の材質に見えにくくする考え方。ここでは根元を上向き、先端を上向き 70% に混ぜ、地面と同じ色・太陽・空光の関数を使う。
+
 | 問い | 出典 | 種類 | わかったこと | 当てた実験・結果 |
 |---|---|---|---|---|
 | RO3 のエンジン・描画方式は？ | [Ragnarok Online 2（Wikipedia）](https://en.wikipedia.org/wiki/Ragnarok_Online_2:_The_Gate_of_the_World)、[Gravity × UE3（Unreal Engine ブログ, 2013）](https://www.unrealengine.com/blog/gravity-launches-tower-of-ascension-using-unreal-engine-technology)、[Gravity Neocyon の 3D 新作（Massively OP）](https://massivelyop.com/?p=335495)、[RO3（ppe.pl）](https://www.ppe.pl/gry/ragnarok-online-3/20012) | 〔観察〕二次資料 | RO3 のエンジンは**未確認**（RO2 は UE2.5、Gravity の他作品に UE3・Unity）。 | 画面からの推定にとどめる方針を維持 |

@@ -321,7 +321,7 @@ except Exception:
 # 樹冠の中心の高さ（scale=1）。アセットの寸法から（assets_report.json の高さの約 0.65）
 CANOPY_H = {'maple2_s': 3.1, 'maple2_t': 3.6, 'maple2_a': 4.2, 'maple2_b': 4.8, 'maple2_c': 3.4, 'maple2_big': 5.8, 'tree_broad_a': 3.8, 'tree_broad_b': 4.4, 'pine_a': 3.5, 'pine_b': 4.3, 'bush_a': 0.6,
             'maple_a': 3.5, 'maple_b': 3.9, 'maple_c': 3.0, 'fir2_a': 3.3, 'fir2_b': 3.8, 'palm_a': 4.2, 'palm_b': 4.8, 'palm2_a': 2.9, 'palm2_b': 3.4, 'clover_a': 0.4, 'clover_b': 0.4}
-SMALL = {'grass_a', 'grass_tall_a', 'flowers_a', 'rock_c'}
+SMALL = {'grass_a', 'grass_tall_a', 'flowers_a', 'lavender', 'rock_c'}
 FOOT = []    # 区画のある地図: 細かい散らし物は、どれかのビューの足元の範囲の中だけに置く（数を抑える）
 for fr in SECTION_FRAMES:
     FOOT.append(np.array([s2w(fr, u, v)[[0, 2]] for u, v in ((-0.45, -0.7), (1.45, -0.7), (1.45, 1.6), (-0.45, 1.6))]))
@@ -463,7 +463,7 @@ def scatter():
         for x, z in jitter_grid(x0, x1, z0, z1, fl.get('spacing', 1.2)):
             if field_at(DIRT, x, z) > 0.3 or field_at(ALT, x, z) > 0.3 or not dry(x, z, 0.3): continue
             if float(N1(np.array(x * 1.3), np.array(z * 1.3), 5.0)) > 0.62 and RNG.random() < fl['prob']:
-                place(fl['asset'], x, z, scale=RNG.uniform(0.7, 1.2))
+                place(fl['asset'], x, z, scale=RNG.uniform(*fl.get('scale', [0.7, 1.2])))
     rule_rng('beachgrass')
     if 'beachgrass' in sc:
         # 砂の上の草: 崖の下（崖の線から near m 以内）に群れて生える
