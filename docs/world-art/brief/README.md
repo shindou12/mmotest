@@ -10,7 +10,7 @@
 |---|---|
 | `refs_main.jpg` | 見本の一覧。B01〜B04、R01〜R04、C01〜C05、D01〜D04、E04、G01〜G05、W01〜W05 |
 | `refs_trees_crops.jpg` | もみの見本 T01〜T04、実物のもみの写真 P01〜P05、B01〜B04 のゲーム部分の切り抜き |
-| `refs_ro3_web.jpg` | ウェブで集めた RO3 の画面（2026-11-10、`art/ref/ro3_web/`）。風景が主な 5 枚（林・砂地・ダンジョン） |
+| `refs_landscape.jpg` | 森・海岸などの一般的な風景だけを集めた見本（2026-11-10、`art/ref/landscape/`）。RO3、Samsara Saga、ほかのゲーム 1 枚 |
 | `now_godot.jpg` | 今の画面（Godot）。f1_field、f1_lake、新しい地図 tall_meadow |
 | `history.jpg` | これまでの試しの比較画像の縮小一覧。元の画像の場所は 4 章 |
 
@@ -59,7 +59,7 @@
 | W01〜W05 | — | 水 | `rules/water-w1.md` |
 | T01〜T04 | YouTube のサムネイル、4Gamer の記事の画像（出典は `sources.md`） | プロンテラ南門のもみ、ギルドリーグ | rulebook 8 の fir4 |
 | trees/real P01〜P05 | 実物のもみの写真 | もみの枝・樹形 | — |
-| `ro3_web/` F・D | 記事に載った公開画像（4Gamer、Game*Spark）。ユーザーにもらった見本とは別。人が多い画面・風景以外・YouTube のサムネイルは除いた。出典は `art/ref/ro3_web/README.md` | ポリン島の林と砂地、海底トンネル、ピラミッドの中 | — |
+| `landscape/` | 森・林・草地・砂地・海岸の一般的な風景だけを集めたフォルダ。RO3 は既存の見本の写しと、新しく足した N01〜N05（ユーザー提供・記事の画面）。Samsara Saga 1 枚、ほかのゲーム 1 枚。町・ダンジョン・人が多い画面・YouTube のサムネイルは除いた。出典は `art/ref/landscape/README.md` | — | — |
 | 一番初めの R06〜R18 | チャットの添付のみ（ファイルなし） | 町・海辺・砂地・洞窟 | `observations.md`（目視の記録だけ） |
 
 - **見本の数値:**
