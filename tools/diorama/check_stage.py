@@ -22,6 +22,8 @@ TILE = 256
 ATLAS_W = 2048
 ATLAS_H = 1024
 MARGIN = 4
+MAX_TRIANGLES = 300000
+MAX_GLB_BYTES = 15 * 1024 * 1024
 
 
 def fail(message):
@@ -54,16 +56,22 @@ def parse_glb(path):
 
 def read_vec2(document, binary, accessor_index):
     accessor = document["accessors"][accessor_index]
-    if accessor.get("componentType") != 5126 or accessor.get("type") != "VEC2":
-        fail("UV accessor の形式が float VEC2 ではありません")
+    component_type = accessor.get("componentType")
+    if accessor.get("type") != "VEC2" or component_type not in (5126, 5123):
+        fail("UV accessor の形式が float/ushort VEC2 ではありません")
+    if component_type == 5123 and not accessor.get("normalized", False):
+        fail("ushort UV accessor が normalized ではありません")
     view = document["bufferViews"][accessor["bufferView"]]
     base = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
-    stride = view.get("byteStride", 8)
+    component = "<ff" if component_type == 5126 else "<HH"
+    component_size = 4 if component_type == 5126 else 2
+    stride = view.get("byteStride", component_size * 2)
     count = accessor["count"]
     values = []
     for n in range(count):
         at = base + n * stride
-        values.append(struct.unpack_from("<ff", binary, at))
+        pair = struct.unpack_from(component, binary, at)
+        values.append(pair if component_type == 5126 else (pair[0] / 65535, pair[1] / 65535))
     return values
 
 
@@ -173,6 +181,28 @@ def walkability(data):
     return 0.0 if total == 0 else len(reached) / total * 100.0
 
 
+def changed_neighbor_ratio(data):
+    width, depth = data["size"]
+    land, changed = 0, 0
+    for k in range(depth):
+        for i in range(width):
+            n = k * width + i
+            height = data["height"][n]
+            if height < 0 or data["liquid"][n]:
+                continue
+            land += 1
+            for di, dk in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ni, nk = i + di, k + dk
+                if not (0 <= ni < width and 0 <= nk < depth):
+                    continue
+                neighbor = nk * width + ni
+                if (data["height"][neighbor] >= 0 and not data["liquid"][neighbor]
+                        and data["height"][neighbor] != height):
+                    changed += 1
+                    break
+    return 0.0 if not land else changed / land * 100.0
+
+
 def validate_stage_json(path, expected_id):
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("id") != expected_id:
@@ -251,11 +281,16 @@ def main():
         if not required.issubset(mesh_names) or not mesh_names.issubset({"terrain", "props", "glow", "water", "fall"}):
             fail("ステージのメッシュ名が不正です: {} {}".format(stage_id, sorted(mesh_names)))
         triangles, color_min, color_avg = validate_uvs(document, binary, glb_path)
-        if triangles > 800000:
-            fail("三角形が 80 万を超えています: {} {}".format(stage_id, triangles))
+        if triangles > MAX_TRIANGLES:
+            fail("三角形が 30 万を超えています: {} {}".format(stage_id, triangles))
+        if glb_path.stat().st_size > MAX_GLB_BYTES:
+            fail("GLB が 15 MiB を超えています: {} {} bytes".format(stage_id, glb_path.stat().st_size))
         if color_min < 0.35:
             fail("COLOR_0 の最小値が 0.35 未満です: {} {:.4f}".format(stage_id, color_min))
-        stage_results.append((stage_id, triangles, pct, color_min, color_avg))
+        changed_pct = changed_neighbor_ratio(data)
+        if stage_id == "meadow" and changed_pct > 12.0:
+            fail("meadow の隣と高さが違う地面が 12% を超えています: {:.2f}%".format(changed_pct))
+        stage_results.append((stage_id, triangles, glb_path.stat().st_size, pct, changed_pct, color_min, color_avg))
 
     hero_path = diorama_root / "models" / "hero.glb"
     if not hero_path.exists():
@@ -268,11 +303,11 @@ def main():
         fail("人物の部品名が不足しています: meshes={} nodes={}".format(sorted(hero_names), sorted(node_names)))
     hero_triangles, _, _ = validate_uvs(hero, binary, hero_path)
 
-    for stage_id, triangles, pct, color_min, color_avg in stage_results:
-        print("{}: triangles={} walkable={:.1f}% COLOR_0 min={:.4f} avg={:.4f} OK".format(
-            stage_id, triangles, pct, color_min, color_avg))
+    for stage_id, triangles, glb_bytes, pct, changed_pct, color_min, color_avg in stage_results:
+        print("{}: triangles={} GLB={:.2f}MiB walkable={:.1f}% changedTop={:.2f}% COLOR_0 min={:.4f} avg={:.4f} OK".format(
+            stage_id, triangles, glb_bytes / (1024 * 1024), pct, changed_pct, color_min, color_avg))
     print("hero.glb: 7 parts, triangles={} UV + COLOR_0 OK".format(hero_triangles))
-    print("OK: 5 stages, 72x72 arrays, materials, mesh names, atlas UVs, COLOR_0 >= 0.35")
+    print("OK: 5 stages, 72x72 arrays, triangles <= 300000, GLB <= 15 MiB, materials, mesh names, atlas UVs, COLOR_0 >= 0.35")
 
 
 if __name__ == "__main__":

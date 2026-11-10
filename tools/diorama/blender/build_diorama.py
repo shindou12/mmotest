@@ -3,12 +3,12 @@ import argparse
 import json
 import math
 import random
+import struct
 import sys
 from array import array
 from pathlib import Path
 
 import bpy
-import bmesh
 from mathutils import Vector
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -16,7 +16,7 @@ W = D = 72
 COUNT = W * D
 TILE = 256
 ATLAS_W, ATLAS_H, MARGIN = 2048, 1024, 4
-BEVEL, BEVEL_SEGMENTS = 0.09, 2
+BEVEL, BEVEL_SEGMENTS = 0.045, 1
 STAGE_IDS = ["meadow", "canyon", "snow", "volcano", "skyisles"]
 NAMES = {"meadow": "草原と滝の川", "canyon": "砂漠の峡谷", "snow": "雪山と氷の川",
          "volcano": "火山と溶岩の川", "skyisles": "浮島"}
@@ -53,6 +53,8 @@ SWATCH["snow_top"] = [(1, 1, 1), (.94, .97, 1.00), (1.00, 1.03, 1.06), (.91, .93
 SWATCH["ice"] = [(1, 1, 1), (.92, .97, 1.04), (1.02, 1.04, 1.06), (.91, .94, 1.00)]
 SWATCH["turf_top"] = [(1, 1, 1), (.93, .97, .93), (1.04, 1.03, .94), (.91, .94, .91)]
 SWATCH["leaves"] = [(1.00, 1.00, 1.00), (1.04, 1.07, .94), (.94, 1.02, .92), (1.08, 1.04, .91)]
+PURPLE_SWATCH = [(.85, .45, .95), (.93, .50, 1.0), (.80, .42, .92), (.90, .55, 1.0)]
+PINK_SWATCH = [(1.0, .48, .78), (.98, .58, .86), (.92, .40, .72), (1.0, .66, .90)]
 
 
 def idx(i, k):
@@ -106,10 +108,11 @@ def new_stage(config, seed):
         "blocked": [0] * COUNT, "liquid": [0] * COUNT, "spawn": [36, 36],
         "water_level": 4.0, "light": config["light"], "ambience": config["ambience"],
         "particles": config["particles"], "params": config.get("params", {}),
-        "props": [], "glow": [], "water": [],
+        "props": [], "glow": [], "water": [], "water_shades": {}, "tree_colors": {},
         "lava": [], "falls": [], "bridges": set(), "tints": {}, "flow": {},
-        "island_bottoms": {}, "bridge_cells": set(),
-        "counts": {"trees": 0, "small_props": 0, "landmarks": 0, "ramps": 0, "bridges": 0},
+        "island_bottoms": {}, "bridge_cells": set(), "ramp_cells": set(),
+        "counts": {"trees": 0, "conifers": 0, "small_props": 0, "landmarks": 0,
+                   "ramps": 0, "bridges": 0},
     }
 
 
@@ -124,21 +127,26 @@ def set_cell(s, i, k, h, material=None, liquid=None):
         s["liquid"][n] = liquid
 
 
-def add_box(boxes, i, k, ground, tile, size, offset=(0, 0, 0), rotation=0.0):
-    boxes.append({"center": (i + .5 + offset[0], -(k + .5) + offset[1], ground + offset[2]),
-                  "size": tuple(size), "tile": tile, "rotation": rotation})
+def add_box(boxes, i, k, ground, tile, size, offset=(0, 0, 0), rotation=0.0, color=None):
+    box = {"center": (i + .5 + offset[0], -(k + .5) + offset[1], ground + offset[2]),
+           "size": tuple(size), "tile": tile, "rotation": rotation}
+    if color is not None:
+        box["color"] = tuple(color)
+    boxes.append(box)
 
 
-def voxel(boxes, i, k, ground, dx, dk, level, tile, size=.88, zsize=None, rotation=0.0):
+def voxel(boxes, i, k, ground, dx, dk, level, tile, size=.88, zsize=None, rotation=0.0, color=None):
     sz = size if zsize is None else zsize
     add_box(boxes, i, k, ground, tile, (size, size, sz),
-            (dx, -dk, level + sz * .5), rotation)
+            (dx, -dk, level + sz * .5), rotation, color)
 
 
-def face(verts, tile, group=None):
+def face(verts, tile, group=None, color=None):
     result = {"verts": [tuple(v) for v in verts], "tile": tile}
     if group is not None:
         result["group"] = group
+    if color is not None:
+        result["color"] = tuple(color)
     return result
 
 
@@ -153,12 +161,111 @@ def box_faces(box, group=None):
         points.append((cx + x * c - y * s, cy + x * s + y * c, cz + z))
     orders = ((0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4),
               (3, 7, 6, 2), (0, 4, 7, 3), (1, 2, 6, 5))
-    return [face([points[n] for n in order], box["tile"], group) for order in orders]
+    return [face([points[n] for n in order], box["tile"], group, box.get("color")) for order in orders]
 
 
-def top_face(faces, i, k, z, tile):
+def face_grid_key(spec):
+    points = spec["verts"]
+    spans = [max(p[a] for p in points) - min(p[a] for p in points) for a in range(3)]
+    axis = next((a for a, span in enumerate(spans) if span < 1e-5), None)
+    if axis is None:
+        return None
+    u_axis, v_axis = ((1, 2), (0, 2), (0, 1))[axis]
+    if abs(spans[u_axis] - 1) > 1e-5 or abs(spans[v_axis] - 1) > 1e-5:
+        return None
+    a, b, c = points[0], points[1], points[2]
+    ab = [b[n] - a[n] for n in range(3)]
+    ac = [c[n] - a[n] for n in range(3)]
+    normal = (ab[1] * ac[2] - ab[2] * ac[1],
+              ab[2] * ac[0] - ab[0] * ac[2],
+              ab[0] * ac[1] - ab[1] * ac[0])
+    sign = 1 if normal[axis] > 0 else -1
+    color = spec.get("color")
+    color_key = tuple(round(float(v), 5) for v in color) if color is not None else None
+    plane = round(sum(p[axis] for p in points) / len(points), 5)
+    u0 = int(round(min(p[u_axis] for p in points)))
+    v0 = int(round(min(p[v_axis] for p in points)))
+    return (axis, sign, plane, spec["tile"], color_key), (u_axis, v_axis, u0, v0)
+
+
+def face_from_grid_rect(key, axes, u0, u1, v0, v1):
+    axis, sign, plane, tile, color_key = key
+    u_axis, v_axis = axes
+    def point(u, v):
+        coords = [0.0, 0.0, 0.0]
+        coords[axis], coords[u_axis], coords[v_axis] = plane, u, v
+        return tuple(coords)
+    corners = [point(u0, v0), point(u1, v0), point(u1, v1), point(u0, v1)]
+    base_sign = (1, -1, 1)[axis]
+    if sign != base_sign:
+        corners = [corners[0], corners[3], corners[2], corners[1]]
+    color = tuple(color_key) if color_key is not None else None
+    return face(corners, tile, color=color)
+
+
+def merge_unit_faces(specs):
+    masks, other = {}, []
+    for spec in specs:
+        parsed = face_grid_key(spec)
+        if parsed is None:
+            other.append(spec)
+            continue
+        key, cell = parsed
+        axes = (cell[0], cell[1])
+        u0, v0 = cell[2], cell[3]
+        masks.setdefault(key, {"axes": axes, "cells": {}})["cells"][(u0, v0)] = spec
+    merged = list(other)
+    for key, entry in sorted(masks.items(), key=lambda item: repr(item[0])):
+        cells = set(entry["cells"])
+        axes = entry["axes"]
+        while cells:
+            u0, v0 = min(cells, key=lambda p: (p[1], p[0]))
+            u1 = u0 + 1
+            while (u1, v0) in cells:
+                u1 += 1
+            v1 = v0 + 1
+            while all((u, v1) in cells for u in range(u0, u1)):
+                v1 += 1
+            merged.append(face_from_grid_rect(key, axes, u0, u1, v0, v1))
+            for v in range(v0, v1):
+                for u in range(u0, u1):
+                    cells.remove((u, v))
+    return merged
+
+
+def box_face_specs(boxes):
+    unit = {}
+    is_unit = []
+    for box in boxes:
+        cx, cy, cz = box["center"]
+        sx, sy, sz = box["size"]
+        aligned = (abs(sx - 1) < 1e-5 and abs(sy - 1) < 1e-5 and abs(sz - 1) < 1e-5
+                   and abs(box.get("rotation", 0)) < 1e-5)
+        if aligned:
+            cell = (round(cx - .5), round(-cy - .5), round(cz - .5))
+            unit.setdefault(cell, []).append(box)
+        is_unit.append(aligned)
+    occupied = set(unit)
+    directions = ((2, -1), (2, 1), (1, -1), (1, 1), (0, -1), (0, 1))
+    specs = []
+    for box, aligned in zip(boxes, is_unit):
+        faces = box_faces(box)
+        if not aligned:
+            specs.extend(faces)
+            continue
+        cx, cy, cz = box["center"]
+        cell = [round(cx - .5), round(-cy - .5), round(cz - .5)]
+        for spec, (axis, sign) in zip(faces, directions):
+            neighbor = cell[:]
+            neighbor[axis] += sign
+            if tuple(neighbor) not in occupied:
+                specs.append(spec)
+    return merge_unit_faces(specs)
+
+
+def top_face(faces, i, k, z, tile, color=None):
     faces.append(face([(i, -k - 1, z), (i + 1, -k - 1, z),
-                       (i + 1, -k, z), (i, -k, z)], tile))
+                       (i + 1, -k, z), (i, -k, z)], tile, color=color))
 
 
 def side_faces(faces, i, k, low, high, direction, tile_for_row):
@@ -172,7 +279,18 @@ def side_faces(faces, i, k, low, high, direction, tile_for_row):
             verts = [(i, -k - 1, z0), (i + 1, -k - 1, z0), (i + 1, -k - 1, z1), (i, -k - 1, z1)]
         else:
             verts = [(i + 1, -k, z0), (i, -k, z0), (i, -k, z1), (i + 1, -k, z1)]
-        faces.append(face(verts, tile_for_row(row)))
+        tile, color = tile_for_row(row)
+        faces.append(face(verts, tile, color=color))
+
+
+def side_center(i, k, row, direction):
+    if direction == "east":
+        return (i + 1, -k - .5, row + .5)
+    if direction == "west":
+        return (i, -k - .5, row + .5)
+    if direction == "south":
+        return (i + .5, -k - 1, row + .5)
+    return (i + .5, -k, row + .5)
 
 
 def add_fall(s, center_x, y, low, high, tile, width=7, axis="y"):
@@ -189,7 +307,7 @@ def boundaries(count, seed):
     values = []
     for n in range(1, count):
         base = round(D * n / count)
-        values.append([clamp(base + round(value_noise(i, n * 13, 7, seed) * 1.6), 1, D - 1)
+        values.append([clamp(base + round(value_noise(i, n * 13, 12, seed) * 1.2), 1, D - 1)
                        for i in range(W)])
     return values
 
@@ -203,19 +321,55 @@ def terraces(s, seed, levels, material):
     for k in range(D):
         for i in range(W):
             band = band_at(i, k, edges)
-            n = value_noise(i, k, 3.3, seed + 101) * .40 + hash_noise(i, k, seed + 149) * .34
-            set_cell(s, i, k, levels[band] + (1 if n > .28 else -1 if n < -.28 else 0), material)
+            set_cell(s, i, k, levels[band], material)
     for band, edge in enumerate(edges):
         drop = levels[band] - levels[band + 1]
-        for x in (12, 59):
-            for i in range(x - 1, x + 2):
+        for x in (12,):
+            for i in (x,):
                 b = edge[i]
                 start, end = b - 2, b + drop + 2
                 for k in range(max(0, start), min(D, end + 1)):
                     t = clamp((k - start) / max(1, end - start), 0, 1)
                     set_cell(s, i, k, round(lerp(levels[band], levels[band + 1], t)), material)
+                    s["ramp_cells"].add((i, k))
             s["counts"]["ramps"] += 1
     return edges
+
+
+def smooth_small_relief(s, iterations=2):
+    for _ in range(iterations):
+        source = s["heights"][:]
+        changed = source[:]
+        for k in range(1, D - 1):
+            for i in range(1, W - 1):
+                n = idx(i, k)
+                if source[n] < 0 or s["liquid"][n] or (i, k) in s["bridges"] or (i, k) in s["ramp_cells"]:
+                    continue
+                nearby = [source[idx(i + di, k + dk)] for dk in (-1, 0, 1) for di in (-1, 0, 1)
+                          if (di or dk) and source[idx(i + di, k + dk)] >= 0]
+                if len(nearby) < 5 or max(nearby) - min(nearby) > 2:
+                    continue
+                median = sorted(nearby)[len(nearby) // 2]
+                if abs(source[n] - median) == 1 and sum(value == median for value in nearby) >= 5:
+                    changed[n] = median
+        s["heights"] = changed
+
+
+def changed_neighbor_ratio(s):
+    land, changed = 0, 0
+    for k in range(D):
+        for i in range(W):
+            h = s["heights"][idx(i, k)]
+            if h < 0 or s["liquid"][idx(i, k)]:
+                continue
+            land += 1
+            if any(inside(i + di, k + dk)
+                   and s["heights"][idx(i + di, k + dk)] >= 0
+                   and not s["liquid"][idx(i + di, k + dk)]
+                   and s["heights"][idx(i + di, k + dk)] != h
+                   for di, dk in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                changed += 1
+    return 0 if not land else changed / land * 100
 
 
 def river_center(k, seed, center=36, amplitude=5.6, phase=0):
@@ -233,6 +387,7 @@ def carve_flow(s, seed, kind, center_fn, width=7, material="sand", k_start=0, k_
             if old < 0:
                 continue
             set_cell(s, i, k, max(0, old - 1), "lava" if kind == 2 else "ice" if kind == 3 else material, kind)
+            s["water_shades"][idx(i, k)] = .60 if abs(i - round(cx)) <= 1 else .92
 
 
 def carve_path_flow(s, points, kind, material, width=3):
@@ -283,7 +438,7 @@ def path_center(points, k):
 
 
 def river_bridges(s, center_fn, ks, width=7, surface="wood", tile="planks"):
-    half = width // 2 + 1
+    half = width // 2
     for k in ks:
         c = int(round(center_fn(k)))
         left, right = c - half - 1, c + half + 1
@@ -322,20 +477,23 @@ def spawn_pad(s, i, k, material):
 
 
 def meadow(s, seed):
-    levels = [27, 22, 18, 13, 8, 3]
+    levels = [27, 19, 11, 3]
     edges = terraces(s, seed, levels, "grass")
     center = lambda k: river_center(k, seed, 36, 5.4, .4)
-    carve_flow(s, seed, 1, center, int(s["params"].get("riverWidth", 7)), "sand")
+    carve_flow(s, seed, 1, center, int(s["params"].get("riverWidth", 9)), "sand")
     river_islands(s, seed)
-    river_bridges(s, center, (8, 36, 57))
+    river_bridges(s, center, (8, 36, 57), int(s["params"].get("riverWidth", 9)))
     s["water_level"] = 4.0
-    for k in range(24, 43):
-        for i in range(9, 28):
-            if inside(i, k) and math.hypot(i + .5 - 18, k + .5 - 33) + value_noise(i, k, 3.0, seed + 571) * 1.8 < 8:
-                n = idx(i, k)
-                if s["liquid"][n] == 0:
-                    set_cell(s, i, k, s["heights"][n], "turf", 0)
-                    s["tints"][n] = "purple"
+    patches = ((18, 33, 8.5), (55, 18, 9.5))
+    s["purple_patches"] = patches
+    for patch_index, (cx, ck, radius) in enumerate(patches):
+        for k in range(max(0, int(ck - radius - 2)), min(D, int(ck + radius + 3))):
+            for i in range(max(0, int(cx - radius - 2)), min(W, int(cx + radius + 3))):
+                if math.hypot(i + .5 - cx, k + .5 - ck) + value_noise(i, k, 5, seed + 571 + patch_index) * .7 < radius:
+                    n = idx(i, k)
+                    if s["liquid"][n] == 0:
+                        set_cell(s, i, k, s["heights"][n], "turf", 0)
+                        s["tints"][n] = "purple"
     spawn_pad(s, int(round(center(54) + 7)), 54, "grass")
     return center, edges
 
@@ -348,21 +506,28 @@ def canyon(s, seed):
     floor_half = sum(s["params"].get("canyonWidth", [4, 6])) / 4
     for k in range(D):
         for i in range(W):
-            d = abs(i + .5 - center(k)) + value_noise(i, k, 4.5, seed + 613) * .8
-            r = value_noise(i, k, 3, seed + 617)
+            d = abs(i + .5 - center(k))
             if d < floor_half:
-                h, mat = floor_height + int(r > .52), "sand"
+                h, mat = floor_height, "sand"
             elif d < floor_half + 4:
-                h, mat = floor_height + 3 + int(r > .42), "sandstone"
+                h, mat = floor_height + 3, "sandstone"
             elif d < floor_half + 10:
-                h, mat = floor_height + 7 + int(r > .38), "sandstone"
+                h, mat = floor_height + 7, "sandstone"
             elif d < floor_half + 17:
-                h, mat = floor_height + 12 + int(r > .48), "redrock"
+                h, mat = floor_height + 12, "redrock"
             elif d < floor_half + 24:
-                h, mat = floor_height + 17 + int(r > .48), "redrock"
+                h, mat = floor_height + 17, "redrock"
             else:
-                h, mat = clamp(26 + round(value_noise(i, k, 6, seed + 619) * 2), 24, 28), "sand"
+                h, mat = 26, "sand"
             set_cell(s, i, k, h, mat)
+    red_islands = ((15, 16, 6), (57, 18, 7), (16, 53, 7), (57, 53, 6))
+    for cx, ck, radius in red_islands:
+        for k in range(max(0, ck - radius - 1), min(D, ck + radius + 2)):
+            for i in range(max(0, cx - radius - 1), min(W, cx + radius + 2)):
+                n = idx(i, k)
+                d = math.hypot(i + .5 - cx, k + .5 - ck)
+                if d < radius and s["heights"][n] >= floor_height + 14:
+                    set_cell(s, i, k, s["heights"][n], "redrock", 0)
     branches = [((0, 13), (12, 17), (23, 23), (round(center(29)), 29)),
                 ((71, 57), (59, 53), (49, 47), (round(center(42)), 42))]
     for k in range(D):
@@ -486,6 +651,8 @@ def volcano(s, seed):
                 set_cell(s, i, k, 26 + int(value_noise(i, k, 2.1, seed + 823) > 0), "basalt", 0)
             elif d < radius + 4.5:
                 set_cell(s, i, k, max(s["heights"][n], 21), "ash" if int(d) % 2 else "basalt", 0)
+            elif value_noise(i, k, 8, seed + 825) > .34:
+                set_cell(s, i, k, s["heights"][n], "ash", 0)
     paths = [
         [(cx, ck + 3), (cx + 2, ck + 12), (cx - 2, 48), (cx + 2, 57), (cx - 1, 66), (cx, 71)],
         [(cx - 2, ck + 3), (cx - 8, ck + 10), (31, 44), (22, 53), (14, 63), (6, 71)],
@@ -532,13 +699,20 @@ def skyisles(s, seed):
                 edge_distance = d + edge_noise
                 if edge_distance > radius:
                     continue
-                rough = value_noise(i, k, 3.3, seed + 925 + number) * .35 + hash_noise(i, k, seed + 927 + number) * .35
+                rough = value_noise(i, k, 10, seed + 925 + number)
                 h = base + (2 if d < radius * .36 else 1 if d < radius * .70 else 0)
                 h += 1 if rough > .22 else -1 if rough < -.22 else 0
                 h = max(base, h)
                 set_cell(s, i, k, h, "turf", 0)
                 cone_depth = max(1, min(depth, math.ceil((radius - d) / radius * depth)))
                 s["island_bottoms"][idx(i, k)] = base - cone_depth
+    s["purple_patches"] = ((40, 34, 5.5),)
+    for cx, ck, radius in s["purple_patches"]:
+        for k in range(max(0, int(ck - radius - 1)), min(D, int(ck + radius + 2))):
+            for i in range(max(0, int(cx - radius - 1)), min(W, int(cx + radius + 2))):
+                n = idx(i, k)
+                if s["heights"][n] >= 0 and math.hypot(i + .5 - cx, k + .5 - ck) < radius:
+                    s["tints"][n] = "purple"
     joined = {0}
     while len(joined) < len(islands):
         best = None
@@ -655,11 +829,35 @@ def prop_ao(occupancy, center, vertex, normal):
 
 def palette_id(tile, x, y, z, seed, side, normal):
     if side:
+        if tile == "stone":
+            return (math.floor(z) + seed) % 3
         u = -y if abs(normal.x) > abs(normal.y) else x
         field = value_noise(u, z, 2.7, seed + 401) * .76 + hash_noise(round(u), math.floor(z), seed + 433) * .24
         return int(clamp(math.floor((field + 1) * 1.5), 0, 2))
     field = value_noise(x, y, 3.2, seed + 503) * .68 + hash_noise(round(x), round(y), seed + 541) * .32
     return int(clamp(math.floor((field + 1) * 2), 0, 3))
+
+
+def terrain_color(s, tile, center, seed, side=False, cell=None, dark_side=False):
+    x, y, z = center
+    if cell is None:
+        cell = (int(clamp(math.floor(x), 0, W - 1)), int(clamp(math.floor(-y), 0, D - 1)))
+    normal = Vector((0, 0, -1 if side else 1))
+    variant = palette_id(tile, x, y, z, seed, side, normal)
+    tint = s.get("tints", {}).get(idx(*cell))
+    if tint == "purple" and tile in ("turf_top", "turf_side"):
+        rgb = PURPLE_SWATCH[variant % len(PURPLE_SWATCH)]
+    elif tint == "pink":
+        rgb = PINK_SWATCH[variant % len(PINK_SWATCH)]
+    else:
+        rgb = SWATCH.get(tile, NEUTRAL)[variant % len(SWATCH.get(tile, NEUTRAL))]
+    if tint == "sulfur" and tile in ("ash", "basalt"):
+        rgb = (rgb[0] * 1.04, rgb[1] * 1.02, rgb[2] * .72)
+    if s["id"] == "volcano" and tile == "basalt" and not side:
+        rgb = tuple(value * 1.35 for value in rgb)
+    if dark_side:
+        rgb = tuple(value * .8 for value in rgb)
+    return tuple(round(float(value), 5) for value in rgb)
 
 
 def make_material(tile):
@@ -708,9 +906,9 @@ def assign_uvs(mesh, tiles):
             layer.data[loop].uv = (u / ATLAS_W, 1 - v / ATLAS_H)
 
 
-def assign_colors(mesh, seed, s, kind, occupancy=None):
+def assign_colors(mesh, seed, s, kind, occupancy=None, face_colors=None):
     layer = mesh.color_attributes.get("Color") or mesh.color_attributes.new(
-        name="Color", type="FLOAT_COLOR", domain="CORNER")
+        name="Color", type="BYTE_COLOR", domain="CORNER")
     mesh.color_attributes.active_color_index = list(mesh.color_attributes).index(layer)
     for poly in mesh.polygons:
         c, normal = poly.center, poly.normal
@@ -719,12 +917,28 @@ def assign_colors(mesh, seed, s, kind, occupancy=None):
         tile = mesh.materials[poly.material_index].name
         variant = palette_id(tile, c.x, c.y, c.z, seed, not top, normal)
         palette = SWATCH.get(tile, NEUTRAL)
-        rgb = palette[variant % len(palette)]
+        rgb = face_colors[poly.index] if face_colors and poly.index < len(face_colors) else None
+        has_face_color = rgb is not None
+        if rgb is None:
+            rgb = palette[variant % len(palette)]
         tint = s.get("tints", {}).get(idx(*cell))
-        if tint == "purple" and tile in ("turf_top", "turf_side"):
-            rgb = (rgb[0] * 1.04, rgb[1] * .70, rgb[2] * 1.04)
-        elif tint == "sulfur" and tile in ("ash", "basalt"):
+        if not has_face_color and tint == "pink":
+            rgb = PINK_SWATCH[variant % len(PINK_SWATCH)]
+        elif not has_face_color and tint == "purple" and tile in ("turf_top", "turf_side"):
+            rgb = PURPLE_SWATCH[variant % len(PURPLE_SWATCH)]
+        elif not has_face_color and tint == "sulfur" and tile in ("ash", "basalt"):
             rgb = (rgb[0] * 1.04, rgb[1] * 1.02, rgb[2] * .72)
+        if has_face_color and tile in ("leaves", "pine"):
+            rgb = tuple(value * (1.08 if top else .96) for value in rgb)
+        if kind == "fall":
+            if tile == "water":
+                rgb = (.78, .96, 1.0)
+            elif tile == "ice":
+                rgb = (.86, .98, 1.0)
+            elif tile == "lava":
+                rgb = (1.0, .64, .28)
+        if kind == "water":
+            rgb = tuple(value * s.get("water_shades", {}).get(idx(*cell), 1.0) for value in rgb)
         for loop in poly.loop_indices:
             vertex = mesh.vertices[mesh.loops[loop].vertex_index].co
             if kind == "terrain":
@@ -733,7 +947,11 @@ def assign_colors(mesh, seed, s, kind, occupancy=None):
                 ao = prop_ao(occupancy, c, vertex, normal)
             else:
                 ao = 1.0
-            color = tuple(max(.351, min(1.12, rgb[n] * ao)) for n in range(3))
+            if tile in ("leaves", "pine"):
+                ao = max(.72, ao)
+            elif kind == "glow":
+                ao = max(.84, ao)
+            color = tuple(max(.40, min(1.0, rgb[n] * ao)) for n in range(3))
             layer.data[loop].color = (*color, 1.0)
 
 
@@ -745,7 +963,7 @@ def make_object(name, specs, seed, s, kind, bevel=True, mesh_name=None, occupanc
     if missing:
         raise ValueError("未定義のアトラスマス: " + ", ".join(sorted(missing)))
     mesh = bpy.data.meshes.new(mesh_name or name)
-    vertices, faces, material_ids, lookup = [], [], [], {}
+    vertices, faces, material_ids, face_colors, lookup = [], [], [], [], {}
     for spec in specs:
         poly = []
         for co in spec["verts"]:
@@ -758,22 +976,33 @@ def make_object(name, specs, seed, s, kind, bevel=True, mesh_name=None, occupanc
         if len(set(poly)) >= 3:
             faces.append(poly)
             material_ids.append(tiles.index(spec["tile"]))
+            face_colors.append(spec.get("color"))
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
     for tile in tiles:
         mesh.materials.append(make_material(tile))
     for poly, mid in zip(mesh.polygons, material_ids):
         poly.material_index = mid
-    bm = bmesh.new()
-    bm.from_mesh(mesh)
-    if bm.verts:
-        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=2e-5)
-        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bm.to_mesh(mesh)
-    bm.free()
+    color_by_face = {}
+    for spec in specs:
+        if spec.get("color") is None:
+            continue
+        signature = (spec["tile"], tuple(sorted(tuple(round(float(v), 5) for v in point)
+                                                 for point in spec["verts"])))
+        color_by_face[signature] = spec["color"]
+    repaired = mesh.validate(verbose=False, clean_customdata=False)
     mesh.update()
+    face_colors = []
+    for poly in mesh.polygons:
+        tile = tiles[poly.material_index]
+        signature = (tile, tuple(sorted(tuple(round(float(v), 5) for v in mesh.vertices[n].co)
+                                        for n in poly.vertices)))
+        face_colors.append(color_by_face.get(signature))
+    if repaired:
+        print("[mesh] {} の不正な頂点・面を除去しました".format(name))
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(obj)
+    assign_colors(obj.data, seed, s, kind, occupancy, face_colors)
     if bevel and mesh.edges:
         mod = obj.modifiers.new("Soft voxel corners", "BEVEL")
         mod.width, mod.segments = BEVEL, BEVEL_SEGMENTS
@@ -786,29 +1015,33 @@ def make_object(name, specs, seed, s, kind, bevel=True, mesh_name=None, occupanc
     if s["id"] == "skyisles" and kind == "terrain":
         obj.data.validate(verbose=False)
         obj.data.update()
-    # ベベル適用後の全ポリゴンにUVとCOLOR_0を付け、生成面を未着色にしない。
+    # ベベル前に付けた COLOR_0 は角の面へ補間し、UV は追加面も含めて付ける。
     assign_uvs(obj.data, tiles)
-    assign_colors(obj.data, seed, s, kind, occupancy)
     return obj
 
 
-def side_tile(s, logical, row, top):
-    depth = top - row
+def side_tile(s, logical, row, top, low):
+    depth = top - low
     sid = s["id"]
     if logical == "wood":
         return "planks"
+    top_tile = TOP_TILE.get(logical, "rock")
+    if depth <= 2:
+        return top_tile
     if sid == "meadow":
-        return "grass_side" if depth == 1 else "dirt" if depth <= 3 else "stone"
+        if row == low:
+            return "dirt"
+        return top_tile if row == top - 1 else "stone"
     if sid == "canyon":
-        return "sandstone_side" if depth % 2 else "redrock"
+        return top_tile if row == top - 1 else "sandstone_side" if row % 2 else "redrock"
     if sid == "snow":
-        return "snow_side" if depth == 1 else "snow_top" if depth <= 3 else "stone"
+        return "snow_top" if row == top - 1 else "stone"
     if sid == "volcano":
-        return "basalt" if depth <= 2 else "ash" if row % 2 else "obsidian"
-    return "turf_side" if depth == 1 else "cloudstone"
+        return top_tile if row == top - 1 else "ash" if row % 2 else "basalt"
+    return top_tile if row == top - 1 else "cloudstone"
 
 
-def terrain_faces(s, base):
+def terrain_faces(s, base, seed):
     faces = []
     sky = s["id"] == "skyisles"
     if sky:
@@ -822,38 +1055,56 @@ def terrain_faces(s, base):
                 logical = s["surface_names"][n]
                 bottom = s["island_bottoms"].get(n, h - 1)
                 columns[(i, k)] = (h, bottom, logical)
-                top_face(faces, i, k, h, TOP_TILE.get(logical, "rock"))
+                tile = TOP_TILE.get(logical, "rock")
+                center = (i + .5, -(k + .5), h)
+                top_face(faces, i, k, h, tile, terrain_color(s, tile, center, seed, cell=(i, k)))
+                bottom_center = (i + .5, -(k + .5), bottom)
+                bottom_color = terrain_color(s, "cloudstone", bottom_center, seed, True, (i, k))
                 faces.append(face([(i, -k - 1, bottom), (i, -k, bottom),
-                                   (i + 1, -k, bottom), (i + 1, -k - 1, bottom)], "cloudstone"))
+                                   (i + 1, -k, bottom), (i + 1, -k - 1, bottom)], "cloudstone", color=bottom_color))
         for (i, k), (h, bottom, logical) in columns.items():
             for direction, di, dk in (("east", 1, 0), ("west", -1, 0), ("south", 0, 1), ("north", 0, -1)):
                 neighbor = columns.get((i + di, k + dk))
                 if neighbor is None:
-                    side_faces(faces, i, k, bottom, h, direction,
-                               lambda row, logical=logical, h=h: side_tile(s, logical, row, h))
+                    low = bottom
+                    def edge_tile(row, logical=logical, h=h, low=low, i=i, k=k):
+                        tile = side_tile(s, logical, row, h, low)
+                        center = side_center(i, k, row, direction)
+                        return tile, terrain_color(s, tile, center, seed, True, (i, k))
+                    side_faces(faces, i, k, low, h, direction, edge_tile)
                     continue
                 neighbor_h, neighbor_bottom, _ = neighbor
                 high_start = max(bottom, neighbor_h)
                 if h > high_start:
-                    side_faces(faces, i, k, high_start, h, direction,
-                               lambda row, logical=logical, h=h: side_tile(s, logical, row, h))
+                    low = high_start
+                    def high_tile(row, logical=logical, h=h, low=low, i=i, k=k):
+                        tile = side_tile(s, logical, row, h, low)
+                        center = side_center(i, k, row, direction)
+                        dark = (h - low <= 2)
+                        return tile, terrain_color(s, tile, center, seed, True, (i, k), dark)
+                    side_faces(faces, i, k, low, h, direction, high_tile)
                 low_end = min(h, neighbor_bottom)
                 if low_end > bottom:
-                    side_faces(faces, i, k, bottom, low_end, direction, lambda _row: "cloudstone")
+                    side_faces(faces, i, k, bottom, low_end, direction,
+                               lambda row, i=i, k=k, direction=direction: (
+                                   "cloudstone", terrain_color(s, "cloudstone", side_center(i, k, row, direction),
+                                                                seed, True, (i, k))))
         unique = {}
         for spec in faces:
             key = tuple(sorted(tuple(round(float(value), 5) for value in vertex) for vertex in spec["verts"]))
             previous = unique.get(key)
             if previous is None or (previous["tile"] == "cloudstone" and spec["tile"] != "cloudstone"):
                 unique[key] = spec
-        return list(unique.values())
+        return merge_unit_faces(list(unique.values()))
     for k in range(D):
         for i in range(W):
             n, h = idx(i, k), s["heights"][idx(i, k)]
             if h < 0:
                 continue
             logical = s["surface_names"][n]
-            top_face(faces, i, k, h, TOP_TILE.get(logical, "rock"))
+            tile = TOP_TILE.get(logical, "rock")
+            center = (i + .5, -(k + .5), h)
+            top_face(faces, i, k, h, tile, terrain_color(s, tile, center, seed, cell=(i, k)))
             for direction, di, dk in (("east", 1, 0), ("west", -1, 0), ("south", 0, 1), ("north", 0, -1)):
                 ni, nk = i + di, k + dk
                 low = s["heights"][idx(ni, nk)] if inside(ni, nk) else -1
@@ -862,10 +1113,13 @@ def terrain_faces(s, base):
                 if sky:
                     low = max(low, s["island_bottoms"].get(n, h - 1))
                 if h > low:
-                    side_faces(faces, i, k, low, h, direction,
-                               lambda row, logical=logical, h=h: side_tile(s, logical, row, h))
+                    def tile_for_row(row, logical=logical, h=h, low=low, i=i, k=k, direction=direction):
+                        tile = side_tile(s, logical, row, h, low)
+                        center = side_center(i, k, row, direction)
+                        return tile, terrain_color(s, tile, center, seed, True, (i, k), h - low <= 2)
+                    side_faces(faces, i, k, low, h, direction, tile_for_row)
     faces.append(face([(0, 0, base), (W, 0, base), (W, -D, base), (0, -D, base)], "stone"))
-    return faces
+    return merge_unit_faces(faces)
 
 
 def liquid_faces(s):
@@ -984,6 +1238,7 @@ def prop_cells(s, spawn_dist=5):
     return [(i, k) for k in range(3, D - 3) for i in range(3, W - 3)
             if s["heights"][idx(i, k)] >= 0 and s["blocked"][idx(i, k)] == 0
             and s["liquid"][idx(i, k)] == 0 and (i, k) not in s["bridges"]
+            and (i, k) not in s["ramp_cells"]
             and math.hypot(i - si, k - sk) >= spawn_dist]
 
 
@@ -1000,29 +1255,48 @@ def add_tree(s, i, k, rng, kind):
     if kind == "broadleaf":
         trunk = rng.randint(2, 3)
         for z in range(trunk):
-            voxel(s["props"], i, k, ground, 0, 0, z, "bark", .82)
-        layers, maxr = rng.randint(4, 6), rng.choice((2, 3))
-        for z in range(layers):
-            radius = max(1, maxr - int(abs(z - (layers - 1) / 2) * .55))
+            voxel(s["props"], i, k, ground, 0, 0, z, "bark", .84, .84)
+        radius = rng.choice((2, 3))
+        base_color = (1.05, 1.0, .62)
+        for z in range(radius * 2 + 1):
+            vertical = z - radius
+            layer_radius = max(0, int(math.floor(math.sqrt(max(0, radius * radius - vertical * vertical * .8)))))
+            low_shade = .92 if z == 0 or z == radius * 2 else 1.0
             for dx in range(-radius, radius + 1):
                 for dk in range(-radius, radius + 1):
-                    if dx * dx + dk * dk <= radius * radius + 1.2 + hash_noise(i + dx * 7, k + dk * 11, s["seed"] + z * 17) * .8:
-                        voxel(s["props"], i, k, ground, dx, dk, trunk + z - 1, "leaves", .86)
+                    if dx * dx + dk * dk <= layer_radius * layer_radius + .2:
+                        variation = rng.choice((.92, .97, 1.03, 1.08))
+                        color = tuple(value * variation * low_shade for value in base_color)
+                        voxel(s["props"], i, k, ground, dx, dk, trunk + z, "leaves", 1.0, 1.0,
+                              color=color)
     elif kind == "conifer":
-        trunk = rng.randint(2, 4)
+        trunk = rng.randint(2, 3)
         for z in range(trunk):
-            voxel(s["props"], i, k, ground, 0, 0, z, "bark", .80)
-        tiers = rng.randint(4, 6)
-        for tier in range(tiers):
-            radius = 2 if tier < tiers - 2 else 1
-            level = trunk + tier - 1
+            voxel(s["props"], i, k, ground, 0, 0, z, "bark", .84, .84)
+        total_height = rng.randint(8, 12)
+        foliage_height = total_height - trunk
+        tiers = min(rng.randint(4, 6), foliage_height)
+        tier_heights = [foliage_height // tiers + (1 if tier < foliage_height % tiers else 0)
+                        for tier in range(tiers)]
+        tile = "pine" if s["id"] == "snow" else "leaves"
+        base_color = (1.0, 1.0, .82) if s["id"] == "snow" else (.62, .86, .62)
+        level = trunk
+        for tier, tier_height in enumerate(tier_heights):
+            radius = 2 if tier == 0 else 1 if tier in (1, 2) else 0
+            tier_shade = .92 if tier == 0 else 1.0
             for dx in range(-radius, radius + 1):
                 for dk in range(-radius, radius + 1):
-                    if (radius == 2 and abs(dx) == 2 and abs(dk) == 2) or (radius == 1 and abs(dx) == abs(dk) == 1):
+                    if radius == 2 and abs(dx) == 2 and abs(dk) == 2:
                         continue
-                    voxel(s["props"], i, k, ground, dx, dk, level, "pine", .84)
+                    variation = rng.choice((.92, .97, 1.03, 1.08))
+                    color = tuple(value * variation * tier_shade for value in base_color)
+                    for row in range(tier_height):
+                        voxel(s["props"], i, k, ground, dx, dk, level + row, tile, 1.0, 1.0,
+                              color=color)
             if s["id"] == "snow":
-                voxel(s["props"], i, k, ground, 0, 0, level + .84, "snow_top", .90, .12)
+                voxel(s["props"], i, k, ground, 0, 0, level + tier_height - 1,
+                      "snow_top", .90, .14)
+            level += tier_height
     elif kind == "cactus":
         trunk = rng.randint(5, 7)
         for z in range(trunk):
@@ -1049,6 +1323,8 @@ def add_tree(s, i, k, rng, kind):
                 for dx in (side, side * 2):
                     voxel(s["props"], i, k, ground, dx, 0, trunk - 2, "deadwood", .74)
     s["counts"]["trees"] += 1
+    if kind == "conifer":
+        s["counts"]["conifers"] += 1
 
 
 def trees(s, seed):
@@ -1098,19 +1374,20 @@ def choose_props(s, count, seed, spacing=6):
 
 
 def mushroom(s, i, k, rng, glow=False):
-    ground, stem = s["heights"][idx(i, k)], rng.randint(3, 4)
+    ground, stem = s["heights"][idx(i, k)], rng.randint(2, 3)
     for z in range(stem):
-        voxel(s["props"], i, k, ground, 0, 0, z, "mush_stem", .78, .82)
+        voxel(s["props"], i, k, ground, 0, 0, z, "mush_stem", .72, .90,
+              color=(.96, .90, .74))
     boxes = s["glow"] if glow else s["props"]
-    r = rng.choice((1, 2))
-    for dx in range(-r, r + 1):
-        for dk in range(-r, r + 1):
-            if r == 2 and abs(dx) == 2 and abs(dk) == 2:
-                continue
-            add_box(boxes, i, k, ground, "mush_cap", (.90, .90, .62), (dx, -dk, stem - .58))
-    if r == 1:
-        for dx, dk in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            add_box(boxes, i, k, ground, "mush_cap", (.84, .84, .48), (dx, -dk, stem - .24))
+    radius = rng.choice((1, 2))
+    for layer in range(2):
+        layer_radius = radius if layer == 0 else max(0, radius - 1)
+        for dx in range(-layer_radius, layer_radius + 1):
+            for dk in range(-layer_radius, layer_radius + 1):
+                if dx * dx + dk * dk > layer_radius * layer_radius + .2:
+                    continue
+                voxel(boxes, i, k, ground, dx, dk, stem + layer - 1, "mush_cap", 1.0, 1.0,
+                      color=(1.0, .58, .22) if not glow else (1.0, .58, .82))
 
 
 def crystal_cluster(s, i, k, rng, black=False):
@@ -1120,16 +1397,60 @@ def crystal_cluster(s, i, k, rng, black=False):
         height = rng.randint(2, 5)
         tile = "obsidian" if black else "crystal"
         for level in range(height):
-            voxel(s["props"], i, k, ground, dx, dk, level, tile, .78 if level < height - 1 else .60)
-        voxel(s["glow"], i, k, ground, dx, dk, height - 1, "crystal", .55, .42)
+            voxel(s["props"], i, k, ground, dx, dk, level, tile, .84 if level < height - 1 else .70)
+        voxel(s["glow"], i, k, ground, dx, dk, height, "crystal", .62, .32,
+              color=(1.0, .50, .82))
 
 
 def rock_cluster(s, i, k, rng, tile="rock"):
     ground = s["heights"][idx(i, k)]
-    for _ in range(rng.randint(5, 9)):
+    for _ in range(rng.randint(3, 6)):
         dx, dk = rng.choice(((-1, 0), (1, 0), (0, -1), (0, 1), (0, 0)))
-        voxel(s["props"], i, k, ground, dx, dk, rng.randint(0, 2), tile, rng.uniform(.72, .96),
-              rng.uniform(.55, .95))
+        voxel(s["props"], i, k, ground, dx, dk, rng.randint(0, 1), tile, rng.uniform(.82, 1.0),
+              rng.uniform(.60, .95), color=(.86, .88, .90))
+
+
+def stump(s, i, k):
+    ground = s["heights"][idx(i, k)]
+    for z in range(2):
+        voxel(s["props"], i, k, ground, 0, 0, z, "bark", .86, .86)
+    voxel(s["props"], i, k, ground, 0, 0, 2, "planks", .90, .12,
+          color=(.94, .82, .60))
+
+
+def purple_pillars(s, seed):
+    patches = s.get("purple_patches", ())
+    if not patches:
+        return
+    rng = random.Random(seed + 1181)
+    for cx, ck, radius in patches:
+        cells = [(i, k) for k in range(max(0, int(ck - radius + 2)), min(D, int(ck + radius - 1)))
+                 for i in range(max(0, int(cx - radius + 2)), min(W, int(cx + radius - 1)))
+                 if s["tints"].get(idx(i, k)) == "purple" and s["liquid"][idx(i, k)] == 0
+                 and not s["blocked"][idx(i, k)]
+                 and math.hypot(i + .5 - cx, k + .5 - ck) < radius - 2]
+        rng.shuffle(cells)
+        target = rng.randint(4, 7)
+        chosen = []
+        for cell in cells:
+            if all(math.hypot(cell[0] - x, cell[1] - z) >= 2.5 for x, z in chosen):
+                chosen.append(cell)
+                if len(chosen) == target:
+                    break
+        body_tile = "obsidian" if s["id"] == "meadow" else "crystal"
+        for i, k in chosen:
+            ground = s["heights"][idx(i, k)]
+            height = rng.randint(2, 6)
+            s["blocked"][idx(i, k)] = 1
+            for level in range(height):
+                voxel(s["props"], i, k, ground, 0, 0, level, body_tile, 1.0, 1.0)
+            voxel(s["glow"], i, k, ground, 0, 0, height, "crystal", .74, .30,
+                  color=(1.0, .48, .78))
+            for dx, dk in ((-1, 0), (1, 0), (0, -1), (0, 1), (-2, 0), (2, 0)):
+                if inside(i + dx, k + dk):
+                    add_box(s["glow"], i, k, ground, "crystal", (.22, .22, .20),
+                            (dx, -dk, .14), color=(1.0, .50, .82))
+            s["counts"]["special_crystals"] = s["counts"].get("special_crystals", 0) + 1
 
 
 def landmark(s, i, k, kind, rng):
@@ -1167,6 +1488,8 @@ def landmark(s, i, k, kind, rng):
         for z in range(height):
             voxel(s["props"], i, k, ground, 0, 0, z, "obsidian", .88)
         voxel(s["glow"], i, k, ground, 0, 0, height - 1, "lava", .50, .35)
+    elif kind == "stump":
+        stump(s, i, k)
     elif kind == "vent":
         for dx, dk in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
             voxel(s["props"], i, k, ground, dx, dk, 0, "ash", .72)
@@ -1190,7 +1513,7 @@ def landmarks(s, seed):
         k = 32
         cells.append((int(round(center(k))), k))
     elif s["id"] == "meadow":
-        cells.extend(choose_props(s, 4, seed + 1107, 8))
+        cells.extend(choose_props(s, 3, seed + 1107, 8))
         patch_cells = [
             (i, k) for k in range(D) for i in range(W)
             if s["tints"].get(idx(i, k)) == "purple" and s["liquid"][idx(i, k)] == 0
@@ -1199,7 +1522,7 @@ def landmarks(s, seed):
         for cell in patch_cells:
             if all(math.hypot(cell[0] - x, cell[1] - k) >= 4 for x, k in cells):
                 cells.append(cell)
-                if len(cells) == 6:
+                if len(cells) == 5:
                     break
     for cell in choose_props(s, 16, seed + 1109, 7):
         if all(math.hypot(cell[0] - x, cell[1] - k) >= 6 for x, k in cells):
@@ -1213,7 +1536,7 @@ def landmarks(s, seed):
                 if len(cells) == 8:
                     break
     sets = {
-        "meadow": ["mushroom"] * 4 + ["black_crystal"] * 2 + ["log", "rock"],
+        "meadow": ["mushroom"] * 3 + ["black_crystal"] * 2 + ["log", "rock", "stump"],
         "canyon": ["tower"] * 3 + ["arch", "rock", "rock", "log", "palm"],
         "snow": ["ice"] * 3 + ["snow_rock"] * 3 + ["crystal", "rock"],
         "volcano": ["obsidian"] * 3 + ["log"] * 2 + ["vent"] * 2 + ["rock"],
@@ -1228,21 +1551,30 @@ def small_prop(s, i, k, rng, n):
     kind = n % 4
     tuft = {"meadow": "grass_top", "canyon": "cactus", "snow": "snow_top",
             "volcano": "basalt", "skyisles": "turf_top"}[s["id"]]
-    pebble = {"meadow": "rock", "canyon": "redrock", "snow": "stone",
-              "volcano": "obsidian", "skyisles": "cloudstone"}[s["id"]]
+    pebble = "rock"
     flower = "ash" if s["id"] == "volcano" else "flowers"
     if kind == 0:
-        for angle in (0, .85):
-            add_box(s["props"], i, k, h, tuft, (.10, .10, .30),
-                    (rng.uniform(-.12, .12), rng.uniform(-.12, .12), .14), angle)
+        for angle in (0, .85, 1.6)[:rng.randint(2, 3)]:
+            add_box(s["props"], i, k, h, tuft, (.30, .60, .45),
+                    (rng.uniform(-.12, .12), rng.uniform(-.12, .12), .225), angle,
+                    color=(.82, 1.0, .56))
     elif kind == 1:
-        add_box(s["props"], i, k, h, pebble, (rng.uniform(.26, .42), .28, .20), (0, 0, .08), rng.random() * math.tau)
+        zsize = rng.uniform(.20, .28)
+        width = rng.uniform(.40, .50)
+        add_box(s["props"], i, k, h, pebble, (width, rng.uniform(.40, .48), zsize),
+                (0, 0, zsize * .5), rng.random() * math.tau, color=(.86, .88, .90))
     elif kind == 2:
-        add_box(s["props"], i, k, h, flower, (.08, .08, .26), (0, 0, .12))
-        add_box(s["props"], i, k, h, flower, (.28, .28, .12), (0, 0, .28), rng.random() * math.tau)
+        petal_color = (1.0, .96, .60) if n % 2 else (1.0, 1.0, .92)
+        add_box(s["props"], i, k, h, flower, (.14, .14, .28), (0, 0, .14),
+                color=(.72, .92, .54))
+        add_box(s["props"], i, k, h, flower, (.44, .44, .12), (0, 0, .06),
+                rng.random() * math.tau, color=petal_color)
     else:
-        add_box(s["props"], i, k, h, "mush_stem", (.14, .14, .20), (0, 0, .10))
-        add_box(s["props"], i, k, h, "mush_cap", (.34, .34, .18), (0, 0, .26))
+        petal_color = (1.0, 1.0, .92) if n % 2 else (1.0, .94, .54)
+        add_box(s["props"], i, k, h, flower, (.14, .14, .30), (0, 0, .15),
+                color=(.74, .94, .54))
+        add_box(s["props"], i, k, h, flower, (.46, .46, .12), (0, 0, .06),
+                rng.random() * math.tau, color=petal_color)
     s["counts"]["small_props"] += 1
 
 
@@ -1258,6 +1590,7 @@ def small_props(s, seed, count=420):
 
 def make_props(s, seed):
     landmarks(s, seed)
+    purple_pillars(s, seed)
     trees(s, seed)
     small_props(s, seed, int(s["params"].get("smallCount", 420)))
 
@@ -1281,12 +1614,9 @@ def triangles(objects):
 
 
 def make_stage_objects(s, seed, base):
-    terrain = terrain_faces(s, base)
-    props, glow = [], []
-    for n, box in enumerate(s["props"]):
-        props.extend(box_faces(box, ("props", n)))
-    for n, box in enumerate(s["glow"]):
-        glow.extend(box_faces(box, ("glow", n)))
+    terrain = terrain_faces(s, base, seed)
+    props = box_face_specs(s["props"])
+    glow = box_face_specs(s["glow"])
     water, lava = liquid_faces(s)
     glow.extend(lava)
     prop_occ, glow_occ = voxel_occupancy(s["props"]), voxel_occupancy(s["glow"])
@@ -1294,8 +1624,8 @@ def make_stage_objects(s, seed, base):
     objects = []
     specs = [
         ("terrain", "terrain", terrain, "terrain", True, None),
-        ("props", "props", props, "props", True, prop_occ),
-        ("glow", "glow", glow, "glow", True, glow_occ),
+        ("props", "props", props, "props", False, prop_occ),
+        ("glow", "glow", glow, "glow", False, glow_occ),
         ("water_surface", "water", water, "water", False, None),
         (fall_node, "fall", s["falls"], "fall", False, None),
     ]
@@ -1317,6 +1647,124 @@ def export_glb(objects, path):
                               export_apply=True, export_yup=True, export_vertex_color="ACTIVE",
                               export_all_vertex_colors=True)
     bpy.ops.object.select_all(action="DESELECT")
+    compact_glb_uvs(path)
+
+
+def compact_glb_uvs(path):
+    raw = path.read_bytes()
+    _, _, total = struct.unpack_from("<4sII", raw, 0)
+    if total != len(raw):
+        raise RuntimeError("{} の GLB サイズが一致しません".format(path))
+    offset, document, binary = 12, None, None
+    while offset < len(raw):
+        length, chunk_type = struct.unpack_from("<II", raw, offset)
+        offset += 8
+        chunk = raw[offset:offset + length]
+        offset += length
+        if chunk_type == 0x4E4F534A:
+            document = json.loads(chunk.decode("utf-8").rstrip(" \t\r\n\0"))
+        elif chunk_type == 0x004E4942:
+            binary = bytearray(chunk)
+    if document is None or binary is None:
+        raise RuntimeError("{} に JSON または BIN チャンクがありません".format(path))
+    uv_accessors = {primitive.get("attributes", {}).get("TEXCOORD_0")
+                    for mesh in document.get("meshes", [])
+                    for primitive in mesh.get("primitives", [])}
+    uv_bounds = {}
+    for mesh in document.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            accessor_index = primitive.get("attributes", {}).get("TEXCOORD_0")
+            material_index = primitive.get("material")
+            if accessor_index is None or material_index is None:
+                continue
+            tile = document["materials"][material_index].get("name", "")
+            if tile not in ATLAS:
+                continue
+            col, row = ATLAS[tile]
+            bounds = ((col * TILE + MARGIN) / ATLAS_W,
+                      ((col + 1) * TILE - MARGIN) / ATLAS_W,
+                      (row * TILE + MARGIN) / ATLAS_H,
+                      ((row + 1) * TILE - MARGIN) / ATLAS_H)
+            uv_bounds.setdefault(accessor_index, bounds)
+    for accessor_index in sorted(index for index in uv_accessors if index is not None):
+        accessor = document["accessors"][accessor_index]
+        if accessor.get("componentType") != 5126 or accessor.get("type") != "VEC2":
+            continue
+        view = document["bufferViews"][accessor["bufferView"]]
+        base = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+        stride = view.get("byteStride", 8)
+        packed = bytearray()
+        u_min, u_max, v_min, v_max = uv_bounds.get(accessor_index, (0.0, 1.0, 0.0, 1.0))
+        guard = 2 / 65535
+        for n in range(accessor["count"]):
+            u, v = struct.unpack_from("<ff", binary, base + n * stride)
+            packed.extend(struct.pack("<HH", int(round(clamp(u, u_min + guard, u_max - guard) * 65535)),
+                                      int(round(clamp(v, v_min + guard, v_max - guard) * 65535))))
+        while len(binary) % 4:
+            binary.append(0)
+        view_index = len(document["bufferViews"])
+        document["bufferViews"].append({"buffer": 0, "byteOffset": len(binary),
+                                        "byteLength": len(packed), "target": 34962})
+        binary.extend(packed)
+        accessor["bufferView"] = view_index
+        accessor.pop("byteOffset", None)
+        accessor["componentType"] = 5123
+        accessor["normalized"] = True
+        accessor.pop("min", None)
+        accessor.pop("max", None)
+    referenced_views = {accessor["bufferView"] for accessor in document.get("accessors", [])
+                        if "bufferView" in accessor}
+    for accessor in document.get("accessors", []):
+        sparse = accessor.get("sparse", {})
+        for entry in (sparse.get("indices", {}), sparse.get("values", {})):
+            if "bufferView" in entry:
+                referenced_views.add(entry["bufferView"])
+    referenced_views.update(image.get("bufferView") for image in document.get("images", [])
+                            if "bufferView" in image)
+    compact = bytearray()
+    remap = {}
+    compact_views = []
+    for old_index in sorted(referenced_views):
+        view = document["bufferViews"][old_index]
+        while len(compact) % 4:
+            compact.append(0)
+        offset = view.get("byteOffset", 0)
+        length = view["byteLength"]
+        new_view = dict(view)
+        new_view["byteOffset"] = len(compact)
+        compact.extend(binary[offset:offset + length])
+        remap[old_index] = len(compact_views)
+        compact_views.append(new_view)
+
+    def remap_view_refs(value):
+        if isinstance(value, dict):
+            for key, item in list(value.items()):
+                if key == "bufferView" and isinstance(item, int):
+                    value[key] = remap[item]
+                elif key == "bufferViews" and isinstance(item, list):
+                    value[key] = [remap[index] for index in item]
+                else:
+                    remap_view_refs(item)
+        elif isinstance(value, list):
+            for item in value:
+                remap_view_refs(item)
+
+    for key, value in document.items():
+        if key != "bufferViews":
+            remap_view_refs(value)
+    document["bufferViews"] = compact_views
+    binary = compact
+    document["buffers"][0]["byteLength"] = len(binary)
+    json_chunk = json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    json_chunk += b" " * ((-len(json_chunk)) % 4)
+    binary.extend(b"\0" * ((-len(binary)) % 4))
+    total_length = 12 + 8 + len(json_chunk) + 8 + len(binary)
+    output = bytearray(struct.pack("<4sII", b"glTF", 2, total_length))
+    output.extend(struct.pack("<II", len(json_chunk), 0x4E4F534A))
+    output.extend(json_chunk)
+    output.extend(struct.pack("<II", len(binary), 0x004E4942))
+    output.extend(binary)
+    path.write_bytes(output)
 
 
 def preview_materials(atlas_path):
@@ -1395,7 +1843,10 @@ def render_stage(s, shots):
     prop_top = max([b["center"][2] + b["size"][2] / 2 for b in s["props"] + s["glow"]] or heights)
     focus_z = (min(heights) + prop_top) / 2
     full = shots / (s["id"] + ".png")
-    camera = setup_render(bpy.context.scene, full, (36, -36, focus_z), 110, (78, -104, 185))
+    yaw, pitch, distance = math.radians(14), math.radians(52), 120
+    full_offset = (math.sin(yaw) * distance, -math.cos(yaw) * distance,
+                   math.tan(pitch) * distance)
+    camera = setup_render(bpy.context.scene, full, (36, -36, focus_z), 110, full_offset)
     bpy.context.scene.render.filepath = str(full)
     bpy.ops.render.render(write_still=True)
     i, k = s["spawn"]
@@ -1524,8 +1975,14 @@ def generate(config, out, shots, seed, preview):
     else:
         skyisles(s, seed)
         center, kind = None, 1
+    smooth_small_relief(s)
     if sid in ("meadow", "volcano"):
         waterfall_faces(s, kind)
+    fall_heights = [max(vertex[2] for vertex in spec["verts"]) - min(vertex[2] for vertex in spec["verts"])
+                    for spec in s["falls"]]
+    tall_falls = [height for height in fall_heights if 4 - 1e-5 <= height <= 8 + 1e-5]
+    if sid == "meadow" and not 3 <= len(tall_falls) <= 4:
+        raise RuntimeError("meadow の滝が 4～8 段で 3～4 本ではありません: {}".format(fall_heights))
     repairs, reached, total = repair_walkability(s)
     ratio = len(reached) / total if total else 0
     if ratio < .65:
@@ -1543,19 +2000,26 @@ def generate(config, out, shots, seed, preview):
     base = min(heights) - (1 if sid == "skyisles" else 7)
     objects = make_stage_objects(s, seed, base)
     tri = triangles(objects)
-    if tri > 800000:
-        raise RuntimeError("{} 三角形が80万を超えました: {}".format(sid, tri))
+    if tri > 300000:
+        raise RuntimeError("{} 三角形が30万を超えました: {}".format(sid, tri))
     color_min, color_avg = color_stats(objects)
     if color_min < .35:
         raise RuntimeError("{} COLOR_0 が0.35未満: {:.4f}".format(sid, color_min))
     export_glb(objects, out / (sid + ".glb"))
+    glb_bytes = (out / (sid + ".glb")).stat().st_size
+    if glb_bytes > 15 * 1024 * 1024:
+        raise RuntimeError("{} GLB が15MBを超えました: {} bytes".format(sid, glb_bytes))
     output_json(s, out)
     if s["counts"]["trees"] < 60 or s["counts"]["small_props"] < 300 or s["counts"]["landmarks"] < 6:
         raise RuntimeError("{} 物の数が足りません: {}".format(sid, s["counts"]))
-    print("[{}] triangles={} walkable={:.1f}% height={}..{} trees={} small_props={} landmarks={} ramps={} bridges={} COLOR_0 min={:.3f} avg={:.3f}".format(
-        sid, tri, ratio * 100, min(heights), max(heights), s["counts"]["trees"],
-        s["counts"]["small_props"], s["counts"]["landmarks"], s["counts"]["ramps"],
-        s["counts"]["bridges"], color_min, color_avg))
+    changed_pct = changed_neighbor_ratio(s)
+    conifer_pct = 100 * s["counts"]["conifers"] / max(1, s["counts"]["trees"])
+    if sid == "meadow" and changed_pct > 12:
+        raise RuntimeError("meadow 上面の高さが隣と違うマスが12%を超えました: {:.1f}%".format(changed_pct))
+    print("{:<9} {:>8} {:>8.2f} {:>8.1f}% {:>5}/{:<5} {:>5.1f}% {:>6} {:>4} {:>5} {:>7.3f} {:>7.3f} {:>8.2f}%".format(
+        sid, tri, glb_bytes / (1024 * 1024), ratio * 100, s["counts"]["trees"], s["counts"]["conifers"],
+        conifer_pct, s["counts"]["small_props"], s["counts"]["landmarks"], len(s["falls"]),
+        color_min, color_avg, changed_pct))
     if preview:
         preview_materials(ROOT / "public" / "diorama" / "tex" / "atlas.png")
         render_stage(s, shots)
@@ -1572,6 +2036,7 @@ def main():
     out, shots = Path(args.out).resolve(), ROOT / "art" / "shots" / "diorama" / "gen"
     out.mkdir(parents=True, exist_ok=True)
     shots.mkdir(parents=True, exist_ok=True)
+    print("stage     triangles  GLB_MB walkable trees/conifers conifer% small landmarks falls COLORmin COLORavg changedTop")
     for sid in selected:
         with (ROOT / "tools" / "diorama" / "stages" / (sid + ".json")).open("r", encoding="utf-8") as stream:
             config = json.load(stream)

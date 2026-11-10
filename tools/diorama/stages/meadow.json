@@ -13,5 +13,5 @@
     "bgTop": "#8fc7f5", "bgBottom": "#e9f3fb", "fog": "#dfeefa", "fogDensity": 0.006,
     "bloom": 0.35, "exposure": 1.0
   },
-  "params": { "treeCount": [76, 84], "smallCount": 420, "shelves": 6, "riverWidth": 7 }
+  "params": { "treeCount": [76, 84], "smallCount": 420, "shelves": 5, "riverWidth": 9 }
 }
