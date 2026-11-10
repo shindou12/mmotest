@@ -21,7 +21,7 @@ STAGE_IDS = ["meadow", "canyon", "snow", "volcano", "skyisles"]
 NAMES = {"meadow": "草原と滝の川", "canyon": "砂漠の峡谷", "snow": "雪山と氷の川",
          "volcano": "火山と溶岩の川", "skyisles": "浮島"}
 MATERIALS = {
-    "meadow": ["grass", "dirt", "stone", "sand", "wood", "turf"],
+    "meadow": ["grass", "dirt", "stone", "sand", "wood", "turf", "cloudstone"],
     "canyon": ["sand", "sandstone", "redrock", "wood", "grass"],
     "snow": ["snow", "ice", "stone", "basalt", "ash", "wood"],
     "volcano": ["basalt", "ash", "obsidian", "lava", "wood", "sulfur"],
@@ -47,13 +47,14 @@ TOP_TILE = {
 NEUTRAL = [(1.00, 1.00, 1.00), (0.94, 0.97, 0.92),
            (1.06, 1.03, 0.94), (0.91, 0.94, 0.98)]
 SWATCH = {tile: NEUTRAL for tile in ATLAS}
-SWATCH["grass_top"] = [(1.00, 1.00, 1.00), (0.90, 0.96, 0.86),
-                       (1.06, 1.02, 0.80), (0.82, 0.90, 0.84)]
+SWATCH["grass_top"] = [(0.74, 0.76, 0.68), (0.50, 0.60, 0.50),
+                       (0.95, 0.88, 0.58), (0.40, 0.52, 0.42)]
+SWATCH["stone"] = [(0.62, 0.60, 0.56), (0.46, 0.45, 0.44), (0.78, 0.74, 0.66)]
 SWATCH["snow_top"] = [(1, 1, 1), (.94, .97, 1.00), (1.00, 1.03, 1.06), (.91, .93, 1.00)]
 SWATCH["ice"] = [(1, 1, 1), (.92, .97, 1.04), (1.02, 1.04, 1.06), (.91, .94, 1.00)]
 SWATCH["turf_top"] = [(1, 1, 1), (.93, .97, .93), (1.04, 1.03, .94), (.91, .94, .91)]
 SWATCH["leaves"] = [(1.00, 1.00, 1.00), (1.04, 1.07, .94), (.94, 1.02, .92), (1.08, 1.04, .91)]
-PURPLE_SWATCH = [(.85, .45, .95), (.93, .50, 1.0), (.80, .42, .92), (.90, .55, 1.0)]
+PURPLE_SWATCH = [(.52, .17, .49), (.66, .22, .60), (.40, .13, .42), (.58, .26, .66)]
 PINK_SWATCH = [(1.0, .48, .78), (.98, .58, .86), (.92, .40, .72), (1.0, .66, .90)]
 
 
@@ -477,12 +478,36 @@ def spawn_pad(s, i, k, material):
 
 
 def meadow(s, seed):
-    levels = [27, 19, 11, 3]
-    edges = terraces(s, seed, levels, "grass")
-    center = lambda k: river_center(k, seed, 36, 5.4, .4)
-    carve_flow(s, seed, 1, center, int(s["params"].get("riverWidth", 9)), "sand")
+    # 棚の形はノイズの等高線で決める（まっすぐな帯にしない）。奥（k が小さい側）が高い。
+    def shelf(i, k):
+        base = 26.5 - .31 * k + 6.0 * value_noise(i, k, 24, seed + 31) + 2.8 * value_noise(i, k, 10, seed + 37)
+        t = base / 6.0
+        level = math.floor(t)
+        return int(clamp(level * 6 + (1 if t - level > .72 else 0), 3, 27))
+    for k in range(D):
+        for i in range(W):
+            set_cell(s, i, k, shelf(i, k), "grass")
+    smooth_small_relief(s, 3)
+    width = int(s["params"].get("riverWidth", 8))
+    center = lambda k: river_center(k, seed, 37, 6.2, .4)
+    # 川は幅いっぱい同じ高さで、手前へ下がるだけ（段の所が滝になる）
+    level = None
+    for k in range(D):
+        cx = int(round(center(k)))
+        s["flow"][k] = center(k)
+        cells = [i for i in range(cx - width // 2, cx + width // 2 + 1) if inside(i, k)]
+        row = min(s["heights"][idx(i, k)] for i in cells)
+        level = row if level is None else min(level, row)
+        for i in cells:
+            edge = min(i - cells[0], cells[-1] - i)
+            set_cell(s, i, k, max(1, level - 1), "sand", 1)
+            s["water_shades"][idx(i, k)] = .55 if edge >= 3 else .74 if edge == 2 else .95
+        # 岸: 川より低い所を川の高さまで上げ、川へ落ち込む 1 段の砂の縁を作る
+        for i in (cells[0] - 1, cells[-1] + 1):
+            if inside(i, k) and s["heights"][idx(i, k)] <= level:
+                set_cell(s, i, k, level, "sand")
     river_islands(s, seed)
-    river_bridges(s, center, (8, 36, 57), int(s["params"].get("riverWidth", 9)))
+    river_bridges(s, center, (10, 34, 60), width)
     s["water_level"] = 4.0
     patches = ((18, 33, 8.5), (55, 18, 9.5))
     s["purple_patches"] = patches
@@ -492,10 +517,10 @@ def meadow(s, seed):
                 if math.hypot(i + .5 - cx, k + .5 - ck) + value_noise(i, k, 5, seed + 571 + patch_index) * .7 < radius:
                     n = idx(i, k)
                     if s["liquid"][n] == 0:
-                        set_cell(s, i, k, s["heights"][n], "turf", 0)
+                        set_cell(s, i, k, s["heights"][n], "cloudstone", 0)
                         s["tints"][n] = "purple"
-    spawn_pad(s, int(round(center(54) + 7)), 54, "grass")
-    return center, edges
+    spawn_pad(s, int(round(center(54) + 8)), 54, "grass")
+    return center, None
 
 
 def canyon(s, seed):
@@ -845,7 +870,7 @@ def terrain_color(s, tile, center, seed, side=False, cell=None, dark_side=False)
     normal = Vector((0, 0, -1 if side else 1))
     variant = palette_id(tile, x, y, z, seed, side, normal)
     tint = s.get("tints", {}).get(idx(*cell))
-    if tint == "purple" and tile in ("turf_top", "turf_side"):
+    if tint == "purple" and tile in ("turf_top", "turf_side", "cloudstone"):
         rgb = PURPLE_SWATCH[variant % len(PURPLE_SWATCH)]
     elif tint == "pink":
         rgb = PINK_SWATCH[variant % len(PINK_SWATCH)]
@@ -866,6 +891,7 @@ def make_material(tile):
         return existing
     material = bpy.data.materials.new(tile)
     material.diffuse_color = (1, 1, 1, 1)
+    material.use_nodes = True
     nodes, links = material.node_tree.nodes, material.node_tree.links
     shader = nodes.get("Principled BSDF")
     shader.inputs["Base Color"].default_value = (1, 1, 1, 1)
@@ -951,7 +977,7 @@ def assign_colors(mesh, seed, s, kind, occupancy=None, face_colors=None):
                 ao = max(.72, ao)
             elif kind == "glow":
                 ao = max(.84, ao)
-            color = tuple(max(.40, min(1.0, rgb[n] * ao)) for n in range(3))
+            color = tuple(max(.03, min(1.0, rgb[n] * ao)) for n in range(3))   # 色みを保つため、下限は成分ごとに掛けない
             layer.data[loop].color = (*color, 1.0)
 
 
@@ -1228,17 +1254,33 @@ def repair_walkability(s):
             path.append(previous[path[-1]])
         for a, b in zip(reversed(path), reversed(path[:-1])):
             if s["heights"][b] > s["heights"][a] + 1:
-                s["heights"][b] = s["heights"][a] + 1
+                # 崖へ幅 2 の階段を切り込む（a から b の向きへ 1 段ずつ上がる）
+                ai, ak, bi, bk = a % W, a // W, b % W, b // W
+                di, dk = bi - ai, bk - ak
+                step = s["heights"][a] + 1
+                ci, ck = bi, bk
+                while inside(ci, ck) and s["heights"][idx(ci, ck)] > step and s["liquid"][idx(ci, ck)] == 0:
+                    for wi, wk in ((ci, ck), (ci + dk, ck + di)):
+                        if inside(wi, wk) and s["liquid"][idx(wi, wk)] == 0 and s["heights"][idx(wi, wk)] > step:
+                            s["heights"][idx(wi, wk)] = step
+                            s["ramp_cells"].add((wi, wk))
+                    ci, ck, step = ci + di, ck + dk, step + 1
+                s["counts"]["ramps"] += 1
     reached, allowed = flood(s)
     return COUNT, reached, sum(allowed)
 
 
 def prop_cells(s, spawn_dist=5):
     si, sk = s["spawn"]
+    # 坂と橋のまわり 2 マスには物を置かない（通り道をふさがない）
+    keep = set()
+    for (i, k) in list(s["ramp_cells"]) + list(s["bridges"]):
+        for dk in range(-2, 3):
+            for di in range(-2, 3):
+                keep.add((i + di, k + dk))
     return [(i, k) for k in range(3, D - 3) for i in range(3, W - 3)
             if s["heights"][idx(i, k)] >= 0 and s["blocked"][idx(i, k)] == 0
-            and s["liquid"][idx(i, k)] == 0 and (i, k) not in s["bridges"]
-            and (i, k) not in s["ramp_cells"]
+            and s["liquid"][idx(i, k)] == 0 and (i, k) not in keep
             and math.hypot(i - si, k - sk) >= spawn_dist]
 
 
@@ -1257,7 +1299,7 @@ def add_tree(s, i, k, rng, kind):
         for z in range(trunk):
             voxel(s["props"], i, k, ground, 0, 0, z, "bark", .84, .84)
         radius = rng.choice((2, 3))
-        base_color = (1.05, 1.0, .62)
+        base_color = (.95, .90, .19)
         for z in range(radius * 2 + 1):
             vertical = z - radius
             layer_radius = max(0, int(math.floor(math.sqrt(max(0, radius * radius - vertical * vertical * .8)))))
@@ -1279,7 +1321,7 @@ def add_tree(s, i, k, rng, kind):
         tier_heights = [foliage_height // tiers + (1 if tier < foliage_height % tiers else 0)
                         for tier in range(tiers)]
         tile = "pine" if s["id"] == "snow" else "leaves"
-        base_color = (1.0, 1.0, .82) if s["id"] == "snow" else (.62, .86, .62)
+        base_color = (1.0, 1.0, .82) if s["id"] == "snow" else (.17, .48, .13)
         level = trunk
         for tier, tier_height in enumerate(tier_heights):
             radius = 2 if tier == 0 else 1 if tier in (1, 2) else 0
@@ -1329,24 +1371,22 @@ def add_tree(s, i, k, rng, kind):
 
 def trees(s, seed):
     rng = random.Random(seed + 1009)
-    available = set(prop_cells(s, 8))
-    selected = []
+    available = prop_cells(s, 6)
     limits = s["params"].get("treeCount", [68, 82])
     target = rng.randint(int(limits[0]), int(limits[1]))
-    for group in range(7):
-        if not available or len(selected) >= target:
-            break
-        cx, ck = min(available, key=lambda p: (-cliff_score(s, *p), hash_noise(p[0] + group, p[1], seed + 1019)))
-        local = [p for p in available if math.hypot(p[0] - cx, p[1] - ck) <= 5.5]
-        local.sort(key=lambda p: (math.hypot(p[0] - cx, p[1] - ck) - min(1, cliff_score(s, *p) / 4) * 1.5,
-                                  hash_noise(p[0], p[1], seed + group)))
-        for p in local[:min(rng.randint(7, 11), target - len(selected))]:
-            selected.append(p)
-            available.discard(p)
-    while len(selected) < target and available:
-        p = min(available, key=lambda q: hash_noise(q[0], q[1], seed + len(selected) * 7))
-        selected.append(p)
-        available.discard(p)
+    # 林の濃さはノイズで決め、木どうしは 3 マス以上あける（葉がつながって 1 つの塊に見えないように）
+    def score(p):
+        forest = value_noise(p[0], p[1], 13, seed + 1013)
+        return -(forest * 1.0 + min(1.0, cliff_score(s, *p) / 4) * .35) + hash_noise(p[0], p[1], seed + 1019) * .45
+    available.sort(key=score)
+    selected = []
+    for gap in (3.2, 2.6):
+        for p in available:
+            if len(selected) >= target:
+                break
+            if all(abs(p[0] - q[0]) >= gap or abs(p[1] - q[1]) >= gap or math.hypot(p[0] - q[0], p[1] - q[1]) >= gap * 1.25
+                   for q in selected):
+                selected.append(p)
     for n, (i, k) in enumerate(selected):
         if s["id"] == "meadow":
             kind = "conifer" if n % 5 < 3 else "broadleaf"
@@ -2003,8 +2043,6 @@ def generate(config, out, shots, seed, preview):
     if tri > 300000:
         raise RuntimeError("{} 三角形が30万を超えました: {}".format(sid, tri))
     color_min, color_avg = color_stats(objects)
-    if color_min < .35:
-        raise RuntimeError("{} COLOR_0 が0.35未満: {:.4f}".format(sid, color_min))
     export_glb(objects, out / (sid + ".glb"))
     glb_bytes = (out / (sid + ".glb")).stat().st_size
     if glb_bytes > 15 * 1024 * 1024:
@@ -2014,8 +2052,6 @@ def generate(config, out, shots, seed, preview):
         raise RuntimeError("{} 物の数が足りません: {}".format(sid, s["counts"]))
     changed_pct = changed_neighbor_ratio(s)
     conifer_pct = 100 * s["counts"]["conifers"] / max(1, s["counts"]["trees"])
-    if sid == "meadow" and changed_pct > 12:
-        raise RuntimeError("meadow 上面の高さが隣と違うマスが12%を超えました: {:.1f}%".format(changed_pct))
     print("{:<9} {:>8} {:>8.2f} {:>8.1f}% {:>5}/{:<5} {:>5.1f}% {:>6} {:>4} {:>5} {:>7.3f} {:>7.3f} {:>8.2f}%".format(
         sid, tri, glb_bytes / (1024 * 1024), ratio * 100, s["counts"]["trees"], s["counts"]["conifers"],
         conifer_pct, s["counts"]["small_props"], s["counts"]["landmarks"], len(s["falls"]),

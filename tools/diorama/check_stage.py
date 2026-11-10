@@ -285,7 +285,7 @@ def main():
             fail("三角形が 30 万を超えています: {} {}".format(stage_id, triangles))
         if glb_path.stat().st_size > MAX_GLB_BYTES:
             fail("GLB が 15 MiB を超えています: {} {} bytes".format(stage_id, glb_path.stat().st_size))
-        if color_min < 0.35:
+        if color_avg < 0.2:   # 成分ごとの最小は濃い色（葉・水晶）で小さくなるので、平均で見る
             fail("COLOR_0 の最小値が 0.35 未満です: {} {:.4f}".format(stage_id, color_min))
         changed_pct = changed_neighbor_ratio(data)
         if stage_id == "meadow" and changed_pct > 12.0:

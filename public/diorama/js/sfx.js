@@ -1,5 +1,7 @@
 // 効果音は WebAudio の発振器とフィルターだけで作る。
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const MASTER_GAIN = 0.8;
+const AUDIO_GAIN = 4.8;
 const AMBIENCE = {
   meadow: { low: 420, high: 1500, gain: 0.026, mod: 130, rate: 0.08, note: 'bird', delay: 4200 },
   desert: { low: 180, high: 1050, gain: 0.018, mod: 70, rate: 0.035 },
@@ -71,7 +73,7 @@ export class DioramaSfx {
     }
     const now = this.context.currentTime;
     this.master.gain.cancelScheduledValues(now);
-    this.master.gain.setTargetAtTime(this.enabled ? 0.38 : 0, now, 0.04);
+    this.master.gain.setTargetAtTime(this.enabled ? MASTER_GAIN : 0, now, 0.04);
     if (this.enabled) {
       this.context.resume().catch(() => {});
       this.changeAmbience(this.ambienceKind);
@@ -90,7 +92,7 @@ export class DioramaSfx {
     if (!AudioCtx) return;
     this.context = new AudioCtx({ latencyHint: 'interactive' });
     this.master = this.context.createGain();
-    this.master.gain.value = this.enabled ? 0.38 : 0;
+    this.master.gain.value = this.enabled ? MASTER_GAIN : 0;
     this.master.connect(this.context.destination);
     this.noise = this._makeNoise();
     this.convolver = this.context.createConvolver();
@@ -196,7 +198,7 @@ export class DioramaSfx {
     noise.buffer = this.noise;
     noise.loop = true;
     const noiseGain = this.context.createGain();
-    noiseGain.gain.value = profile.gain;
+    noiseGain.gain.value = profile.gain * AUDIO_GAIN;
     noise.connect(filter);
     filter.connect(noiseGain);
     noiseGain.connect(bus);
@@ -209,7 +211,7 @@ export class DioramaSfx {
     lowTone.type = 'sine';
     lowTone.frequency.value = Math.max(34, profile.low * 0.55);
     const toneGain = this.context.createGain();
-    toneGain.gain.value = profile.gain * 0.2;
+    toneGain.gain.value = profile.gain * 0.2 * AUDIO_GAIN;
     lowTone.connect(lowFilter);
     lowFilter.connect(toneGain);
     toneGain.connect(bus);
@@ -254,7 +256,7 @@ export class DioramaSfx {
     lowpass.type = 'lowpass';
     lowpass.frequency.value = Math.min(1500, frequency * 2.3);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(volume, now + Math.min(0.018, duration * 0.2));
+    gain.gain.linearRampToValueAtTime(volume * AUDIO_GAIN, now + Math.min(0.018, duration * 0.2));
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     osc.connect(lowpass);
     lowpass.connect(gain);
@@ -274,7 +276,7 @@ export class DioramaSfx {
     filter.type = 'bandpass';
     filter.frequency.value = frequency;
     filter.Q.value = 0.8;
-    gain.gain.setValueAtTime(Math.max(0.0001, volume), now);
+    gain.gain.setValueAtTime(Math.max(0.0001, volume * AUDIO_GAIN), now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     source.connect(filter);
     filter.connect(gain);
@@ -289,7 +291,7 @@ export class DioramaSfx {
     this._ensureContext();
     if (!this.context) return;
     if (water || String(material).toLowerCase().includes('water')) {
-      this._noiseTap(510 + this.random() * 180, 0.1, 0.025 + this.random() * 0.008);
+      this._noiseTap(510 + this.random() * 180, 0.1, 0.22 + this.random() * 0.025);
       return;
     }
     const profile = surfaceProfile(material);

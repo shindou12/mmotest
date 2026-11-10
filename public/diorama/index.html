@@ -14,7 +14,11 @@
     #root { position: relative; width: 100%; height: 100%; overflow: hidden; }
     #world { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
     #world canvas { display: block; width: 100%; height: 100%; }
-    #stage-fade { position: absolute; inset: 0; z-index: 2; background: #080b10; opacity: 1; pointer-events: none; transition: opacity 200ms ease; }
+    #stage-fade { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: #080b10; opacity: 1; pointer-events: none; transition: opacity 200ms ease; }
+    #loading-bar { width: min(140px, 20vw); height: 2px; overflow: hidden; background: rgba(218,245,239,.18); }
+    #loading-bar span { display: block; width: 100%; height: 100%; background: #bdece2; transform: scaleX(0); transform-origin: left center; transition: transform 120ms linear; }
+    #loading-bar[data-indeterminate="true"] span { width: 34%; transform: none; animation: loading-sweep 1s ease-in-out infinite alternate; }
+    @keyframes loading-sweep { from { margin-left: 0; } to { margin-left: 66%; } }
     #hud { position: absolute; z-index: 3; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 6px; max-width: calc(100% - 20px); padding: 6px; border: 1px solid rgba(255,255,255,.17); border-radius: 11px; background: rgba(15,24,27,.82); box-shadow: 0 8px 28px rgba(0,0,0,.3); backdrop-filter: blur(10px); }
     #stage-buttons { display: flex; align-items: center; gap: 4px; }
     #stage-buttons button, #sound-toggle { height: 36px; border: 0; border-radius: 7px; color: #dce4e2; background: rgba(255,255,255,.07); font: inherit; }
@@ -33,7 +37,7 @@
 <body>
   <main id="root">
     <section id="world" aria-label="箱庭">
-      <div id="stage-fade"></div>
+      <div id="stage-fade" aria-hidden="true"><div id="loading-bar"><span></span></div></div>
     </section>
     <nav id="hud" aria-label="ステージ">
       <div id="stage-buttons" role="group" aria-label="ステージ">

@@ -33,6 +33,9 @@ const q = new URLSearchParams(location.search);
 const root = document.getElementById('root');
 const worldElement = document.getElementById('world');
 const fadeElement = document.getElementById('stage-fade');
+const loadingBar = document.getElementById('loading-bar');
+const loadingFill = loadingBar.querySelector('span');
+const hudElement = document.getElementById('hud');
 const stageButtons = document.getElementById('stage-buttons');
 const soundButton = document.getElementById('sound-toggle');
 const sfx = new DioramaSfx();
@@ -53,7 +56,7 @@ worldElement.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#1d2b2b');
 const camera = new THREE.PerspectiveCamera(24, window.innerWidth / window.innerHeight, 0.15, 900);
-const FAR_PITCH = THREE.MathUtils.degToRad(52);
+const FAR_PITCH = THREE.MathUtils.degToRad(46);
 const NEAR_PITCH = THREE.MathUtils.degToRad(36);
 const CAMERA_NEAR_DISTANCE = 18;
 const yaw = THREE.MathUtils.degToRad(14);   // 見本と同じ、ほぼ正面からの見下ろし
@@ -84,6 +87,10 @@ sunLight.shadow.normalBias = 0.018;
 sunLight.shadow.radius = 2;
 scene.add(sunLight);
 scene.add(sunLight.target);
+const fillLight = new THREE.DirectionalLight('#61b8a7', 0.9);
+fillLight.castShadow = false;
+scene.add(fillLight);
+scene.add(fillLight.target);
 
 const composer = new EffectComposer(renderer);
 composer.setPixelRatio(renderer.getPixelRatio());
@@ -108,7 +115,7 @@ const edgeBlurPass = new ShaderPass({
 });
 composer.addPass(edgeBlurPass);
 const finishPass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.45 }, uSaturation: { value: 1.03 } },
+  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.45 }, uSaturation: { value: 0.9 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uVignette; uniform float uSaturation; varying vec2 vUv;
     void main(){ vec4 c=texture2D(tDiffuse,vUv); float l=dot(c.rgb,vec3(0.2126,0.7152,0.0722));
@@ -136,6 +143,7 @@ let avatarBaseRotations = new Map();
 let avatarBasePositions = new Map();
 let shadowDisc = null;
 let markerRing = null;
+let markerTriangle = null;
 let particleField = null;
 let walkState = null;
 let requestedStage = null;
@@ -146,6 +154,7 @@ let frameInfo = { calls: 0, triangles: 0 };
 let fx = { bloom: 0.35, blur: 0.18 };
 let farShadowExtent = 32;
 let cameraFarTargetY = 0;
+let cameraFarShiftY = 0;
 let lastFlowUpdate = 0;
 const heldKeys = new Set();
 const pointerDrag = { active: false, pointerId: -1, x: 0, y: 0, moveX: 0, moveY: 0 };
@@ -235,21 +244,58 @@ function normalizeStage(raw, id) {
   return stage;
 }
 
+function setLoadingProgress(value = null) {
+  if (value === null || !Number.isFinite(value)) {
+    loadingBar.dataset.indeterminate = 'true';
+    loadingFill.style.transform = 'none';
+    return;
+  }
+  delete loadingBar.dataset.indeterminate;
+  loadingFill.style.transform = `scaleX(${clamp(value, 0, 1)})`;
+}
+
+async function readResponseBytes(response, start, end) {
+  const total = Number(response.headers.get('content-length')) || 0;
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    const buffer = await response.arrayBuffer();
+    setLoadingProgress(end);
+    return buffer;
+  }
+  const chunks = [];
+  let loaded = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.byteLength;
+    const fraction = total > 0 ? loaded / total : Math.min(0.94, Math.log1p(loaded) / 18);
+    setLoadingProgress(start + (end - start) * fraction);
+  }
+  const bytes = new Uint8Array(loaded);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  setLoadingProgress(end);
+  return bytes.buffer;
+}
+
 async function readStage(id) {
   if (id === 'demo') return { stage: stageForDemo('demo'), model: null, atlas: null };
   try {
+    setLoadingProgress(0.04);
     const response = await fetch(`./stages/${encodeURIComponent(id)}.json`);
     if (!response.ok) return { stage: stageForDemo(id), model: null, atlas: null };
     const stage = normalizeStage(await response.json(), id);
     if (!stage) return { stage: stageForDemo(id), model: null, atlas: null };
-    const [modelResponse, atlasResponse] = await Promise.all([
-      fetch(`./stages/${encodeURIComponent(id)}.glb`).catch(() => null),
-      fetch('./tex/atlas.png').catch(() => null),
-    ]);
     let model = null;
     let atlas = null;
-    if (modelResponse?.ok) model = await parseGlb(await modelResponse.arrayBuffer());
+    setLoadingProgress(0.06);
+    const modelResponse = await fetch(`./stages/${encodeURIComponent(id)}.glb`).catch(() => null);
+    if (modelResponse?.ok) model = await parseGlb(await readResponseBytes(modelResponse, 0.06, 0.92));
+    setLoadingProgress(0.93);
+    const atlasResponse = await fetch('./tex/atlas.png').catch(() => null);
     if (atlasResponse?.ok) atlas = await readAtlas(atlasResponse);
+    setLoadingProgress(0.99);
     return { stage, model, atlas };
   } catch {
     return { stage: stageForDemo(id), model: null, atlas: null };
@@ -260,6 +306,7 @@ async function readAtlas(response) {
   try {
     const bitmap = await createImageBitmap(await response.blob());
     const texture = new THREE.CanvasTexture(bitmap);
+    texture.userData.dioramaOwnedTexture = true;
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.flipY = false;
     texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
@@ -281,50 +328,118 @@ async function readHero() {
   try {
     const response = await fetch('./models/hero.glb');
     if (!response.ok) return null;
-    return await parseGlb(await response.arrayBuffer(), new URL('./models/', location.href).href);
+    return await parseGlb(await readResponseBytes(response, 0.93, 0.98), new URL('./models/', location.href).href);
   } catch {
     return null;
   }
 }
 
-function createWaterMaterial(baseColor = '#2bb8a8', foamColor = '#effff4', emissive = false, gridWater = false) {
+function waterVertexColorRange(geometry) {
+  const color = geometry.getAttribute('color');
+  if (!color?.count) return null;
+  const stride = Math.max(1, Math.floor(color.count / 4096));
+  let minimum = Infinity;
+  let maximum = -Infinity;
+  for (let index = 0; index < color.count; index += stride) {
+    const brightness = color.getX(index) * 0.2126 + color.getY(index) * 0.7152 + color.getZ(index) * 0.0722;
+    minimum = Math.min(minimum, brightness);
+    maximum = Math.max(maximum, brightness);
+  }
+  return maximum - minimum > 0.08 ? [minimum, maximum] : null;
+}
+
+function addWaterBoundaryAttributes(objects, stage) {
+  const [width, depth] = stage.size;
+  const attributes = new Map();
+  for (const { object, kind } of objects) {
+    const geometry = object.geometry;
+    const positions = geometry.attributes.position;
+    if (!positions?.count) continue;
+    object.updateWorldMatrix(true, false);
+    const values = [];
+    let hasBoundary = false;
+    for (let index = 0; index < positions.count; index++) {
+      const point = new THREE.Vector3(positions.getX(index), positions.getY(index), positions.getZ(index)).applyMatrix4(object.matrixWorld);
+      const gridI = Math.round(point.x);
+      const gridK = Math.round(point.z);
+      let wet = false;
+      let dry = false;
+      if (Math.abs(point.x - gridI) < 0.08 && Math.abs(point.z - gridK) < 0.08) {
+        for (const [cellI, cellK] of [[gridI - 1, gridK - 1], [gridI, gridK - 1], [gridI - 1, gridK], [gridI, gridK]]) {
+          const inside = cellI >= 0 && cellK >= 0 && cellI < width && cellK < depth;
+          const liquid = inside ? Number(stage.liquid[cellK * width + cellI] || 0) : 0;
+          if (liquid === kind) wet = true;
+          else dry = true;
+        }
+      }
+      const boundary = wet && dry ? 1 : 0;
+      values.push(boundary);
+      if (boundary) hasBoundary = true;
+    }
+    geometry.setAttribute('shoreEdge', new THREE.Float32BufferAttribute(values, 1));
+    attributes.set(object, hasBoundary);
+  }
+  return attributes;
+}
+
+function createWaterMaterial(baseColor = '#3fc4b2', foamColor = '#effff4', emissive = false, gridWater = false, deepColor = '#1f7f86', useVertexColors = false, colorShoreRange = null, meshShore = false) {
   const material = new THREE.ShaderMaterial({
     transparent: false,
     depthWrite: true,
     toneMapped: false,
     uniforms: {
       uTime: { value: 0 },
-      uBase: { value: new THREE.Color(baseColor) },
+      uShallow: { value: new THREE.Color(baseColor) },
+      uDeep: { value: new THREE.Color(deepColor) },
       uFoam: { value: new THREE.Color(foamColor) },
       uEmissive: { value: emissive ? 1 : 0 },
       uGridWater: { value: gridWater ? 1 : 0 },
+      uUseVertexColors: { value: useVertexColors ? 1 : 0 },
+      uColorShore: { value: colorShoreRange ? 1 : 0 },
+      uColorRange: { value: new THREE.Vector2(...(colorShoreRange || [0, 1])) },
+      uMeshShore: { value: meshShore ? 1 : 0 },
     },
-    vertexShader: `attribute vec4 shoreEdges; varying vec2 vUv; varying vec3 vWorld; varying vec4 vShore;
-      void main(){ vUv=uv; vShore=shoreEdges; vec4 world=modelMatrix*vec4(position,1.0); vWorld=world.xyz;
+    vertexShader: `${gridWater ? 'attribute vec4 shoreEdges;' : 'attribute float shoreEdge;'}${useVertexColors ? 'attribute vec3 color;' : ''}
+      varying vec2 vUv; varying vec3 vWorld; varying vec4 vShore; varying vec3 vColor; varying float vShoreEdge;
+      void main(){ vUv=uv; vShore=${gridWater ? 'shoreEdges' : 'vec4(0.0)'}; vShoreEdge=${gridWater ? '0.0' : 'shoreEdge'}; vColor=${useVertexColors ? 'color' : 'vec3(1.0)'}; vec4 world=modelMatrix*vec4(position,1.0); vWorld=world.xyz;
         gl_Position=projectionMatrix*viewMatrix*world; }`,
-    fragmentShader: `uniform float uTime; uniform vec3 uBase; uniform vec3 uFoam; uniform float uEmissive; uniform float uGridWater;
-      varying vec2 vUv; varying vec3 vWorld; varying vec4 vShore;
+    fragmentShader: `uniform float uTime; uniform vec3 uShallow; uniform vec3 uDeep; uniform vec3 uFoam; uniform float uEmissive; uniform float uGridWater; uniform float uUseVertexColors; uniform float uColorShore; uniform float uMeshShore; uniform vec2 uColorRange;
+      varying vec2 vUv; varying vec3 vWorld; varying vec4 vShore; varying vec3 vColor; varying float vShoreEdge;
       float hash21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       float noise21(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         return mix(mix(hash21(i),hash21(i+vec2(1.0,0.0)),f.x),mix(hash21(i+vec2(0.0,1.0)),hash21(i+vec2(1.0,1.0)),f.x),f.y); }
       void main(){
-        float depth=noise21(vWorld.xz*0.13+vec2(uTime*0.008,-uTime*0.005));
-        float darkPatch=smoothstep(0.30,0.78,depth);
-        vec3 color=mix(uBase*0.38,uBase,0.38+darkPatch*0.62);
-        float wavePhase=dot(vWorld.xz,vec2(0.42,0.31))-uTime*0.34+noise21(vWorld.xz*0.24)*0.14;
-        float waveLine=1.0-smoothstep(0.018,0.052,abs(fract(wavePhase)-0.5));
-        float waveSegment=smoothstep(0.74,0.96,sin(vWorld.x*0.39+depth*5.0+uTime*0.07)*0.5+0.5);
-        float glint=waveLine*waveSegment;
-        color=mix(color,uFoam*1.45,glint*0.82);
-        float shoreDistance=1.0;
+        float depth=noise21(vWorld.xz*0.12+vec2(uTime*0.006,-uTime*0.004));
+        float shallows=smoothstep(0.42,0.76,depth);
+        vec3 color=mix(uDeep,uShallow,shallows)*mix(vec3(1.0),vColor,uUseVertexColors);
+        vec2 waveCoord=vec2(dot(vWorld.xz,vec2(0.305,0.952)),dot(vWorld.xz,vec2(0.952,-0.305)))*0.2;
+        waveCoord.x+=uTime*0.02;
+        vec2 waveCell=floor(waveCoord), waveLocal=fract(waveCoord);
+        float waveLine=1.0-smoothstep(0.025,0.06,abs(waveLocal.y-(0.43+hash21(waveCell)*0.14)));
+        float waveStart=0.08+hash21(waveCell+vec2(4.0,17.0))*0.28;
+        float waveLength=0.16+hash21(waveCell+vec2(31.0,8.0))*0.16;
+        float waveSegment=smoothstep(waveStart,waveStart+0.035,waveLocal.x)*(1.0-smoothstep(waveStart+waveLength,waveStart+waveLength+0.04,waveLocal.x));
+        float glint=waveLine*waveSegment*step(0.78,hash21(waveCell+vec2(19.0,3.0)));
+        color=mix(color,uFoam*1.2,glint*0.6);
+        float shore=0.0;
         if(uGridWater>0.5){
+          float shoreDistance=1.0;
           if(vShore.x>0.5) shoreDistance=min(shoreDistance,vUv.x);
           if(vShore.y>0.5) shoreDistance=min(shoreDistance,1.0-vUv.x);
           if(vShore.z>0.5) shoreDistance=min(shoreDistance,vUv.y);
           if(vShore.w>0.5) shoreDistance=min(shoreDistance,1.0-vUv.y);
-        } else shoreDistance=min(min(vUv.x,1.0-vUv.x),min(vUv.y,1.0-vUv.y));
-        float shore=1.0-smoothstep(0.012,0.064,shoreDistance);
-        color=mix(color,uFoam,shore*0.92);
+          shore=1.0-smoothstep(0.006,0.04,shoreDistance);
+        } else if(uMeshShore>0.5){
+          shore=smoothstep(0.62,0.92,vShoreEdge);
+        } else if(uColorShore>0.5){
+          float brightness=dot(vColor,vec3(0.2126,0.7152,0.0722));
+          float colorRange=max(0.001,uColorRange.y-uColorRange.x);
+          float shoreLevel=clamp((brightness-uColorRange.x)/colorRange,0.0,1.0);
+          float shoreBand=smoothstep(0.86,0.98,shoreLevel);
+          float shoreGradient=smoothstep(0.003,0.03,fwidth(brightness));
+          shore=shoreBand*shoreGradient;
+        }
+        color=mix(color,uFoam,shore*0.86);
         if(uEmissive>0.5){ float pulse=0.86+0.14*sin(uTime*1.6+vWorld.x*0.5+vWorld.z*0.3); color*=1.05+pulse*0.8; }
         gl_FragColor=vec4(color,1.0);
       }`,
@@ -348,13 +463,23 @@ function createFallMaterial(stage) {
     },
     vertexShader: `varying vec2 vUv; varying vec3 vWorld; void main(){ vUv=uv; vec4 world=modelMatrix*vec4(position,1.0); vWorld=world.xyz; gl_Position=projectionMatrix*viewMatrix*world; }`,
     fragmentShader: `uniform float uTime; uniform vec3 uWater; uniform vec3 uFoam; varying vec2 vUv; varying vec3 vWorld;
-      void main(){ float streak=sin(vUv.x*30.0+sin(vUv.x*7.0+vUv.y*2.0)*1.7);
-        float moving=0.5+0.5*sin(vUv.y*44.0-uTime*2.2+vUv.x*4.0);
-        float white=smoothstep(0.45,0.92,streak*moving);
-        vec3 color=mix(uWater*0.55,uWater,0.55+0.35*streak);
-        color=mix(color,uFoam,white*0.8);
-        float endFoam=max(1.0-smoothstep(0.0,0.085,vUv.y),1.0-smoothstep(0.0,0.085,1.0-vUv.y));
-        color=mix(color,uFoam,endFoam*0.92);
+      float hash21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+      float noise21(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+        return mix(mix(hash21(i),hash21(i+vec2(1.0,0.0)),f.x),mix(hash21(i+vec2(0.0,1.0)),hash21(i+vec2(1.0,1.0)),f.x),f.y); }
+      void main(){
+        float widthNoise=noise21(vec2(floor(vUv.x*8.0),floor(vUv.y*3.0-uTime*0.16)));
+        float warpedX=vUv.x*9.0+(noise21(vec2(vUv.x*3.0,vUv.y*2.0-uTime*0.12))-0.5)*0.72;
+        float streakDistance=abs(fract(warpedX)-0.5);
+        float streakWidth=0.12+widthNoise*0.19;
+        float streak=1.0-smoothstep(streakWidth,streakWidth+0.12,streakDistance);
+        float moving=0.5+0.5*sin(vUv.y*21.0-uTime*2.0+noise21(vec2(vUv.x*6.0,vUv.y*4.0))*3.0);
+        float white=streak*smoothstep(0.32,0.83,moving);
+        vec3 color=mix(uWater*0.78,uWater,0.65+0.2*streak);
+        color=mix(color,uFoam,white*0.78);
+        float topFoam=1.0-smoothstep(0.0,0.055,vUv.y);
+        float bottomFoam=1.0-smoothstep(0.0,0.17,1.0-vUv.y);
+        float endFoam=max(topFoam,bottomFoam);
+        color=mix(color,uFoam,endFoam*0.96);
         gl_FragColor=vec4(color,1.0); }`,
   });
   fallMaterials.push(material);
@@ -382,11 +507,48 @@ function addLiquidSurfaces(stage, include = { water: true, lava: true }) {
   const makeGeometry = (cells, kind) => {
     if (!cells.length) return null;
     const cellSet = new Set(cells);
+    const shoreDepth = new Map();
+    const frontier = [];
+    for (const index of cells) {
+      const i = index % width;
+      const k = Math.floor(index / width);
+      const atShore = i === 0 || !cellSet.has(index - 1) || i + 1 >= width || !cellSet.has(index + 1)
+        || k === 0 || !cellSet.has(index - width) || k + 1 >= depth || !cellSet.has(index + width);
+      if (atShore) { shoreDepth.set(index, 0); frontier.push(index); }
+      else shoreDepth.set(index, Infinity);
+    }
+    for (let head = 0; head < frontier.length; head++) {
+      const index = frontier[head];
+      const nextDepth = shoreDepth.get(index) + 1;
+      const i = index % width;
+      const k = Math.floor(index / width);
+      const neighbors = [[i - 1, k], [i + 1, k], [i, k - 1], [i, k + 1]]
+        .filter(([neighborI, neighborK]) => neighborI >= 0 && neighborK >= 0 && neighborI < width && neighborK < depth)
+        .map(([neighborI, neighborK]) => neighborK * width + neighborI);
+      for (const neighbor of neighbors) {
+        if (!cellSet.has(neighbor) || nextDepth >= shoreDepth.get(neighbor)) continue;
+        shoreDepth.set(neighbor, nextDepth);
+        frontier.push(neighbor);
+      }
+    }
     const positions = [];
     const uvs = [];
     const shores = [];
+    const colors = [];
     const indices = [];
     const waterLevel = Number(stage.waterLevel);
+    const vertexTint = (vertexI, vertexK) => {
+      let total = 0;
+      let samples = 0;
+      for (const cellK of [vertexK - 1, vertexK]) for (const cellI of [vertexI - 1, vertexI]) {
+        const cellIndex = cellK * width + cellI;
+        if (cellI < 0 || cellK < 0 || cellI >= width || cellK >= depth || !cellSet.has(cellIndex)) continue;
+        total += shoreDepth.get(cellIndex) || 0;
+        samples++;
+      }
+      const depthFromShore = samples ? total / samples : 0;
+      return 0.8 + (1.08 - 0.8) * (1 - THREE.MathUtils.smoothstep(depthFromShore, 0, 4));
+    };
     for (const index of cells) {
       const i = index % width;
       const k = Math.floor(index / width);
@@ -395,6 +557,10 @@ function addLiquidSurfaces(stage, include = { water: true, lava: true }) {
       const base = positions.length / 3;
       positions.push(i, y, k, i + 1, y, k, i + 1, y, k + 1, i, y, k + 1);
       uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+      for (const [vertexI, vertexK] of [[i, k], [i + 1, k], [i + 1, k + 1], [i, k + 1]]) {
+        const tint = vertexTint(vertexI, vertexK);
+        colors.push(tint, tint, tint);
+      }
       const edges = [
         i === 0 || !cellSet.has(index - 1),
         i + 1 >= width || !cellSet.has(index + 1),
@@ -408,6 +574,7 @@ function addLiquidSurfaces(stage, include = { water: true, lava: true }) {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geometry.setAttribute('shoreEdges', new THREE.Float32BufferAttribute(shores, 4));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     return geometry;
@@ -416,8 +583,8 @@ function addLiquidSurfaces(stage, include = { water: true, lava: true }) {
     const geometry = makeGeometry(cells, kind);
     if (!geometry) continue;
     const material = kind === 2
-      ? createWaterMaterial(stage.id === 'volcano' ? '#ff6a28' : '#ff7a3e', '#ffe48a', true, true)
-      : createWaterMaterial('#2bb8a8', '#f1fff7', false, true);
+      ? createWaterMaterial(stage.id === 'volcano' ? '#ff6a28' : '#ff7a3e', '#ffe48a', true, true, '#a83b2c', true)
+      : createWaterMaterial('#3fc4b2', '#f1fff7', false, true, '#1f7f86', true);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = kind === 2 ? 'liquid-lava' : 'liquid-water';
     mesh.castShadow = false;
@@ -552,43 +719,84 @@ function buildFallbackScene(stage) {
 }
 
 function disposeObjectTree(object) {
+  const geometries = new Set();
+  const materials = new Set();
+  const textures = new Set();
   object.traverse((child) => {
-    if (child.geometry) child.geometry.dispose();
+    if (child.geometry) geometries.add(child.geometry);
+    for (const texture of child.userData?.dioramaOwnedTextures || []) textures.add(texture);
     if (child.material) {
       for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
-        if (material.map && (material.userData?.dioramaOwnedTexture || material.map.userData?.dioramaOwnedTexture)) material.map.dispose();
-        material.dispose();
+        if (!material) continue;
+        materials.add(material);
+        for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
       }
     }
   });
+  for (const geometry of geometries) geometry.dispose();
+  for (const material of materials) material.dispose();
+  for (const texture of textures) {
+    texture.image?.close?.();
+    texture.dispose();
+  }
 }
 
-function addGlowSparks(object, stage, color) {
+function addGlowSparks(object, stage) {
   const bounds = new THREE.Box3().setFromObject(object);
   const center = bounds.getCenter(new THREE.Vector3());
   const size = bounds.getSize(new THREE.Vector3());
   if (!Number.isFinite(center.x) || size.lengthSq() < 0.01) return;
-  const count = 12;
+  const count = 8;
   const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const fades = new Float32Array(count);
+  const origins = [];
+  const lifetimes = [];
+  const speeds = [];
+  const rises = [];
   let seed = (Number(stage.seed) || stage.id.length * 317) + object.id * 7919;
   const random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const peach = new THREE.Color('#ffc0dd');
+  const cyan = new THREE.Color('#a9efff');
   for (let index = 0; index < count; index++) {
     const angle = random() * Math.PI * 2;
-    const radius = Math.max(0.55, Math.max(size.x, size.z) * (0.65 + random() * 0.9));
-    positions[index * 3] = center.x + Math.cos(angle) * radius;
-    positions[index * 3 + 1] = center.y + random() * Math.max(0.9, size.y * 1.4);
-    positions[index * 3 + 2] = center.z + Math.sin(angle) * radius;
+    const radius = Math.max(0.18, Math.max(size.x, size.z) * (0.18 + random() * 0.45));
+    const origin = new THREE.Vector3(center.x + Math.cos(angle) * radius, bounds.max.y - random() * 0.18, center.z + Math.sin(angle) * radius);
+    const life = random();
+    origins.push(origin);
+    lifetimes.push(life);
+    speeds.push(0.14 + random() * 0.12);
+    rises.push(0.65 + random() * 0.75);
+    positions[index * 3] = origin.x;
+    positions[index * 3 + 1] = origin.y + life * rises[index];
+    positions[index * 3 + 2] = origin.z;
+    const tint = index % 2 === 0 ? peach : cyan;
+    colors[index * 3] = tint.r;
+    colors[index * 3 + 1] = tint.g;
+    colors[index * 3 + 2] = tint.b;
+    fades[index] = 1 - THREE.MathUtils.smoothstep(life, 0.78, 1);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute('aSparkFade', new THREE.BufferAttribute(fades, 1));
   const texture = makeParticleTexture();
   texture.userData.dioramaOwnedTexture = true;
-  const material = new THREE.PointsMaterial({ color, size: 0.22, map: texture, transparent: true, opacity: 0.72, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, toneMapped: false });
+  const material = new THREE.PointsMaterial({ color: '#ffffff', vertexColors: true, size: 0.2, map: texture, transparent: true, opacity: 0.72, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, toneMapped: false });
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aSparkFade;\nvarying float vSparkFade;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSparkFade = aSparkFade;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vSparkFade;')
+      .replace('#include <output_fragment>', 'diffuseColor.a *= vSparkFade;\n#include <output_fragment>');
+  };
+  material.customProgramCacheKey = () => 'diorama-glow-spark-v1';
   const points = new THREE.Points(geometry, material);
   points.frustumCulled = false;
   points.renderOrder = 1;
   activeStageGroup.add(points);
-  glowSparkSystems.push({ points, material, baseOpacity: material.opacity, phase: object.id * 0.37 });
+  glowSparkSystems.push({ points, geometry, material, baseOpacity: material.opacity, phase: object.id * 0.37, origins, lifetimes, speeds, rises });
 }
 
 function addFallFoam(object, stage) {
@@ -596,7 +804,7 @@ function addFallFoam(object, stage) {
   const center = bounds.getCenter(new THREE.Vector3());
   const size = bounds.getSize(new THREE.Vector3());
   if (!Number.isFinite(center.x) || size.lengthSq() < 0.01) return;
-  const count = 18;
+  const count = 10;
   const positions = new Float32Array(count * 3);
   const origins = [];
   let seed = (Number(stage.seed) || stage.id.length * 719) + object.id * 1049;
@@ -624,27 +832,46 @@ function prepareGlb(model, stage, atlas) {
   if (!model) return null;
   const rootObject = new THREE.Group();
   rootObject.add(model);
+  rootObject.userData.dioramaOwnedTextures = atlas ? [atlas] : [];
   rootObject.userData.hasWater = false;
   rootObject.userData.hasLava = false;
   const glowObjects = [];
   const fallObjects = [];
+  const sourceMaterials = new Set();
+  const sourceTextures = new Set();
+  const waterMeshes = [];
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    const meshName = `${object.name} ${object.parent?.name || ''}`.toLowerCase();
+    const isLava = /lava/i.test(meshName) || (stage.id === 'volcano' && /glow/i.test(meshName));
+    if (isLava) waterMeshes.push({ object, kind: 2 });
+    else if (/water/i.test(meshName) && stage.id !== 'snow') waterMeshes.push({ object, kind: 1 });
+  });
+  const meshShoreAttributes = addWaterBoundaryAttributes(waterMeshes, stage);
   model.traverse((object) => {
     if (!object.isMesh) return;
     object.castShadow = !/water/i.test(object.name);
     object.receiveShadow = true;
     object.frustumCulled = false;
     const materialNames = Array.isArray(object.material) ? object.material : [object.material];
+    for (const source of materialNames) {
+      if (!source) continue;
+      sourceMaterials.add(source);
+      for (const value of Object.values(source)) if (value?.isTexture) sourceTextures.add(value);
+    }
     const meshName = `${object.name} ${object.parent?.name || ''}`.toLowerCase();
     const isWater = /water/i.test(meshName);
     const isFall = /fall/i.test(meshName);
     const isGlow = /glow|lava|crystal|mushroom/i.test(meshName);
     const isLava = /lava/i.test(meshName) || (stage.id === 'volcano' && /glow/i.test(meshName));
+    const colorShoreRange = isWater || isLava ? waterVertexColorRange(object.geometry) : null;
+    const meshShore = meshShoreAttributes.get(object) || false;
     if (isWater) {
       rootObject.userData.hasWater = stage.id !== 'snow';
       if (stage.id === 'snow') {
         object.material = new THREE.MeshStandardMaterial({ name: 'ice', color: '#e7fbff', map: atlas || null, vertexColors: object.geometry.hasAttribute('color'), roughness: 0.2, metalness: 0, toneMapped: false });
       } else {
-        object.material = createWaterMaterial('#2bb8a8', '#effff7', false, false);
+        object.material = createWaterMaterial('#3fc4b2', '#effff7', false, false, '#1f7f86', object.geometry.hasAttribute('color'), colorShoreRange, meshShore);
       }
       object.castShadow = false;
       return;
@@ -658,7 +885,7 @@ function prepareGlb(model, stage, atlas) {
     }
     if (isLava) {
       rootObject.userData.hasLava = true;
-      object.material = createWaterMaterial('#ff6a28', '#ffe48a', true, false);
+      object.material = createWaterMaterial('#ff6a28', '#ffe48a', true, false, '#a83b2c', object.geometry.hasAttribute('color'), colorShoreRange, meshShore);
       object.castShadow = false;
       fallObjects.push(object);
       return;
@@ -695,6 +922,8 @@ function prepareGlb(model, stage, atlas) {
     });
     object.material = Array.isArray(object.material) ? converted : converted[0];
   });
+  for (const material of sourceMaterials) material.dispose();
+  for (const texture of sourceTextures) { texture.image?.close?.(); texture.dispose(); }
   rootObject.updateMatrixWorld(true);
   for (const object of fallObjects) {
     const bounds = new THREE.Box3().setFromObject(object);
@@ -705,7 +934,7 @@ function prepareGlb(model, stage, atlas) {
   for (const entry of glowMaterials) {
     if (entry.mesh && !glowObjects.includes(entry.mesh)) glowObjects.push(entry.mesh);
   }
-  for (const object of glowObjects) addGlowSparks(object, stage, stage.id === 'volcano' ? '#ffd06c' : stage.id === 'skyisles' ? '#a8f2ff' : '#fff0a2');
+  for (const object of glowObjects) addGlowSparks(object, stage);
   return rootObject;
 }
 
@@ -722,7 +951,10 @@ function buildStageGroup(pack) {
   if (preparedModel) {
     activeStageGroup.add(preparedModel);
     addLiquidSurfaces(pack.stage, { water: !preparedModel.userData.hasWater, lava: !preparedModel.userData.hasLava });
-  } else buildFallbackScene(pack.stage);
+  } else {
+    if (pack.atlas) { pack.atlas.image?.close?.(); pack.atlas.dispose(); }
+    buildFallbackScene(pack.stage);
+  }
   const [width, depth] = pack.stage.size;
   for (let index = 0; index < pack.stage.liquid.length; index++) {
     const kind = Number(pack.stage.liquid[index] || 0);
@@ -830,11 +1062,14 @@ function installAvatar(model) {
   shadowDisc.position.y = 0.015;
   shadowDisc.renderOrder = 3;
   scene.add(shadowDisc);
-  markerRing = new THREE.Mesh(new THREE.RingGeometry(0.82, 0.94, 48), new THREE.MeshBasicMaterial({ color: '#f4fff3', transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+  markerRing = new THREE.Mesh(new THREE.RingGeometry(1.02, 1.2, 48), new THREE.MeshBasicMaterial({ color: '#f4fff3', transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
   markerRing.rotation.x = -Math.PI / 2;
   markerRing.position.y = 0.035;
   markerRing.renderOrder = 2;
   scene.add(markerRing);
+  markerTriangle = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.22, 3), new THREE.MeshBasicMaterial({ color: '#f7fff9', transparent: true, opacity: 0.88, depthWrite: false, toneMapped: false }));
+  markerTriangle.renderOrder = 4;
+  scene.add(markerTriangle);
 }
 
 function replaceAvatar(model) {
@@ -850,9 +1085,14 @@ function replaceAvatar(model) {
     scene.remove(markerRing);
     disposeObjectTree(markerRing);
   }
+  if (markerTriangle) {
+    scene.remove(markerTriangle);
+    disposeObjectTree(markerTriangle);
+  }
   avatar = null;
   shadowDisc = null;
   markerRing = null;
+  markerTriangle = null;
   installAvatar(model);
 }
 
@@ -926,30 +1166,40 @@ function cameraDistanceForStage(stage) {
   const maxHeight = valid.length ? Math.max(...valid) : 1;
   const bottom = minHeight - 6;
   cameraFarTargetY = (bottom + maxHeight) * 0.5;
-  const horizontalHalf = (Math.abs(Math.sin(yaw)) * width + Math.abs(Math.cos(yaw)) * depth) * 0.5;
+  const depthHalf = (Math.abs(Math.sin(yaw)) * width + Math.abs(Math.cos(yaw)) * depth) * 0.5;
+  const rightHalf = (Math.abs(Math.cos(yaw)) * width + Math.abs(Math.sin(yaw)) * depth) * 0.5;
   const verticalHalf = (maxHeight - bottom) * 0.5;
   const pitchSin = Math.sin(FAR_PITCH);
   const pitchCos = Math.cos(FAR_PITCH);
   const halfFovTangent = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
-  const maxScreenRatio = (distance) => {
-    let maximum = 0;
-    for (const horizontal of [-horizontalHalf, horizontalHalf]) {
+  const aspect = Math.max(0.25, camera.aspect);
+  const maxScreenRatios = (distance) => {
+    let verticalMaximum = 0;
+    let horizontalMaximum = 0;
+    for (const horizontal of [-depthHalf, depthHalf]) {
       for (const vertical of [-verticalHalf, verticalHalf]) {
         const viewHeight = Math.abs(-horizontal * pitchSin + vertical * pitchCos);
         const viewDepth = distance - horizontal * pitchCos - vertical * pitchSin;
-        maximum = Math.max(maximum, viewHeight / (Math.max(1, viewDepth) * halfFovTangent));
+        const denominator = Math.max(1, viewDepth) * halfFovTangent;
+        verticalMaximum = Math.max(verticalMaximum, viewHeight / denominator);
+        horizontalMaximum = Math.max(horizontalMaximum, rightHalf / (denominator * aspect));
       }
     }
-    return maximum;
+    return { vertical: verticalMaximum, horizontal: horizontalMaximum };
   };
-  let low = Math.max(CAMERA_NEAR_DISTANCE + 1, horizontalHalf + verticalHalf + 1);
+  let low = Math.max(CAMERA_NEAR_DISTANCE + 1, depthHalf + verticalHalf + 1);
   let high = Math.max(64, low * 2);
-  while (maxScreenRatio(high) > 0.97) high *= 1.5;
+  const fits = (distance) => {
+    const ratio = maxScreenRatios(distance);
+    return ratio.vertical <= 0.928 && ratio.horizontal <= 0.94;
+  };
+  while (!fits(high)) high *= 1.5;
   for (let step = 0; step < 40; step++) {
     const middle = (low + high) * 0.5;
-    if (maxScreenRatio(middle) > 0.97) low = middle;
+    if (!fits(middle)) low = middle;
     else high = middle;
   }
+  cameraFarShiftY = high * halfFovTangent * 0.143 / Math.max(0.1, pitchCos);
   return high;
 }
 
@@ -979,8 +1229,12 @@ function setLight(stage) {
   const minHeight = valid.length ? Math.min(...valid) : 0;
   const centerY = (maxHeight + minHeight - 6) * 0.5;
   cameraFarTargetY = centerY;
-  sunDirection.set(-0.55, 0.82, -0.25).normalize();
+  sunDirection.set(-0.5, 0.8, 0.42).normalize();   // 左手前の上から（手前を向いた崖に日が当たる）
   const center = new THREE.Vector3(centerX, centerY, centerZ);
+  fillLight.color.set('#61b8a7');
+  fillLight.intensity = 0.9;
+  fillLight.target.position.copy(center);
+  fillLight.position.copy(center).addScaledVector(sunDirection, -Math.max(40, size * 1.2));
   hemiLight.color.set(light.skyColor || '#c6e6ff');
   hemiLight.groundColor.set(light.groundColor || '#635747');
   const scale = clamp(Number(light.sunPower ?? 3) / 3, 0.65, 1.15);
@@ -998,7 +1252,8 @@ function setLight(stage) {
   sunLight.shadow.mapSize.set(4096, 4096);
   scene.fog = null;
   scene.background.copy(backgroundColorFromLight(light, stage.id));
-  renderer.toneMappingExposure = Number(light.exposure ?? 1);
+  renderer.toneMappingExposure = Math.min(Number(light.exposure ?? 1), 0.9);
+  document.documentElement.dataset.dioramaExposure = renderer.toneMappingExposure.toFixed(3);
   fx.bloom = clamp(Number(light.bloom ?? 0.32), 0, 1);
   bloomPass.strength = fx.bloom;
   updateFx();
@@ -1021,7 +1276,7 @@ function updateCamera(dt = 0) {
   const width = activeStage.size[0];
   const depth = activeStage.size[1];
   const close = zoomBlend();
-  cameraCenter.set(width / 2, cameraFarTargetY, depth / 2);
+  cameraCenter.set(width / 2, cameraFarTargetY - cameraFarShiftY * (1 - close), depth / 2);
   const follow = new THREE.Vector3(walkState.x, walkState.y + walkState.jumpHeight + 0.95, walkState.z);
   cameraGoal.copy(cameraCenter).lerp(follow, close);
   if (!cameraLook.lengthSq() || !dt) cameraLook.copy(cameraGoal);
@@ -1037,9 +1292,13 @@ function updateCamera(dt = 0) {
   const shadowTarget = cameraCenter.clone().lerp(new THREE.Vector3(walkState.x, walkState.y * 0.35, walkState.z), close);
   sunLight.target.position.copy(shadowTarget);
   sunLight.position.copy(shadowTarget).addScaledVector(sunDirection, Math.max(40, Math.max(width, depth) * 1.2));
+  fillLight.target.position.copy(shadowTarget);
+  fillLight.position.copy(shadowTarget).addScaledVector(sunDirection, -Math.max(40, Math.max(width, depth) * 1.2));
   updateShadowExtent(THREE.MathUtils.lerp(farShadowExtent, Math.max(12, cameraDistance * 0.45), close));
   sunLight.target.updateMatrixWorld();
   sunLight.updateMatrixWorld();
+  fillLight.target.updateMatrixWorld();
+  fillLight.updateMatrixWorld();
   focusOffset.set(walkState.x, walkState.y + walkState.jumpHeight + 0.95, walkState.z).sub(camera.position);
   camera.getWorldDirection(focusDirection);
   bokehPass.uniforms.focus.value = Math.max(camera.near + 0.1, focusOffset.dot(focusDirection));
@@ -1090,7 +1349,13 @@ function updateFacingAndPose(timeSeconds) {
     const close = zoomBlend();
     markerRing.visible = close < 0.86;
     markerRing.position.set(walkState.x, walkState.y + 0.035, walkState.z);
-    markerRing.material.opacity = 0.82 * (1 - close / 0.86);
+    const pulse = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(timeSeconds * 0.75));
+    markerRing.material.opacity = 0.82 * pulse * (1 - close / 0.86);
+    if (markerTriangle) {
+      markerTriangle.visible = close < 0.86;
+      markerTriangle.position.set(walkState.x, walkState.y + walkState.jumpHeight + 2.04, walkState.z);
+      markerTriangle.material.opacity = 0.88 * (1 - close / 0.86);
+    }
   }
 }
 
@@ -1124,6 +1389,18 @@ function animateStage(dt, timeSeconds) {
     if (entry.mesh.userData.floatBaseY !== undefined) entry.mesh.position.y = entry.mesh.userData.floatBaseY + Math.sin(timeSeconds * 0.75 + entry.mesh.id) * 0.035;
   }
   for (const entry of glowSparkSystems) {
+    const position = entry.geometry.attributes.position;
+    const fade = entry.geometry.attributes.aSparkFade;
+    for (let index = 0; index < entry.origins.length; index++) {
+      const life = (entry.lifetimes[index] + dt * entry.speeds[index]) % 1;
+      entry.lifetimes[index] = life;
+      const origin = entry.origins[index];
+      const sway = Math.sin(timeSeconds * 0.65 + index * 1.9 + entry.phase) * 0.07;
+      position.setXYZ(index, origin.x + sway, origin.y + life * entry.rises[index], origin.z + Math.cos(timeSeconds * 0.57 + index * 1.4) * 0.06);
+      fade.setX(index, THREE.MathUtils.smoothstep(life, 0.02, 0.15) * (1 - THREE.MathUtils.smoothstep(life, 0.76, 1)));
+    }
+    position.needsUpdate = true;
+    fade.needsUpdate = true;
     entry.material.opacity = entry.baseOpacity * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(timeSeconds * 2.7 + entry.phase)));
   }
   for (const entry of foamSystems) {
@@ -1229,6 +1506,7 @@ async function changeStage(id) {
   if (stageId === activeStageId) return;
   switching = true;
   mode = 'switching';
+  setLoadingProgress(0);
   fadeElement.style.opacity = '1';
   sfx.stageSwitch();
   await sleep(200);
@@ -1242,11 +1520,13 @@ async function changeStage(id) {
     }
     installStage(pack);
     activeStageId = nextId;
-    if (requestedStage) nextId = requestedStage;
+    if (requestedStage) { setLoadingProgress(0); nextId = requestedStage; }
     else break;
   } while (true);
+  setLoadingProgress(1);
   await sleep(16);
   fadeElement.style.opacity = '0';
+  setLoadingProgress(0);
   await sleep(200);
   switching = false;
   mode = 'playing';
@@ -1254,12 +1534,18 @@ async function changeStage(id) {
 }
 
 function resize() {
+  const close = zoomBlend();
   camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
   camera.updateProjectionMatrix();
+  if (activeStage) {
+    baseCameraDistance = cameraDistanceForStage(activeStage);
+    cameraDistance = THREE.MathUtils.lerp(baseCameraDistance, CAMERA_NEAR_DISTANCE, close);
+  }
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setPixelRatio(renderer.getPixelRatio());
   composer.setSize(window.innerWidth, window.innerHeight);
   edgeBlurPass.uniforms.uTexel.value.set(1 / Math.max(1, window.innerWidth), 1 / Math.max(1, window.innerHeight));
+  updateCamera(0);
 }
 
 function teleport(i, k) {
@@ -1321,16 +1607,53 @@ window.__shotProbes = () => {
   }
   return { hero, far, size: activeStage.size, cameraDistance, pitch: THREE.MathUtils.radToDeg(THREE.MathUtils.lerp(FAR_PITCH, NEAR_PITCH, zoomBlend())) };
 };
+window.__viewMetrics = () => {
+  if (!activeStage) return null;
+  const [width, depth] = activeStage.size;
+  const valid = activeStage.height.filter((height) => height >= 0);
+  const minHeight = valid.length ? Math.min(...valid) - 6 : -6;
+  const maxHeight = valid.length ? Math.max(...valid) : 1;
+  const projected = [];
+  for (const x of [0, width]) for (const y of [minHeight, maxHeight]) for (const z of [0, depth]) {
+    const point = new THREE.Vector3(x, y, z).project(camera);
+    projected.push({ x: (point.x + 1) * 0.5 * window.innerWidth, y: (1 - point.y) * 0.5 * window.innerHeight });
+  }
+  const left = Math.min(...projected.map((point) => point.x));
+  const right = Math.max(...projected.map((point) => point.x));
+  const top = Math.min(...projected.map((point) => point.y));
+  const bottom = Math.max(...projected.map((point) => point.y));
+  const hud = hudElement.getBoundingClientRect();
+  const overlapsHudX = right > hud.left && left < hud.right;
+  const hudOverlap = overlapsHudX ? Math.max(0, Math.min(bottom, hud.bottom) - Math.max(top, hud.top)) : 0;
+  const fitsViewport = left >= 0 && right <= window.innerWidth && top >= 0 && bottom <= hud.top;
+  return {
+    top: Number(top.toFixed(1)), bottom: Number(bottom.toFixed(1)), heightRatio: (bottom - top) / window.innerHeight,
+    left: Number(left.toFixed(1)), right: Number(right.toFixed(1)), widthRatio: (right - left) / window.innerWidth,
+    hudTop: Number(hud.top.toFixed(1)), hudOverlap: Number(hudOverlap.toFixed(1)), overlapsHud: hudOverlap > 0, fitsViewport,
+  };
+};
 window.__lightingSamples = () => {
   const stats = { candidates: 0, visible: 0 };
-  if (!activeStage || !activeStageGroup || !camera) return { shadow: [], sun: [], stats };
+  if (!activeStage || !activeStageGroup || !camera) return { shadow: [], sun: [], leafShadow: [], leafSun: [], stats };
   const [width, depth] = activeStage.size;
   const horizontalLength = Math.hypot(sunDirection.x, sunDirection.z);
   const rayX = sunDirection.x / horizontalLength;
   const rayZ = sunDirection.z / horizontalLength;
   const lightSlope = sunDirection.y / horizontalLength;
   const stride = Math.max(1, Math.ceil(width * depth / 440));
-  const samples = { shadow: [], sun: [] };
+  const samples = { shadow: [], sun: [], leafShadow: [], leafSun: [] };
+  const lightBlocked = (x, z, height) => {
+    for (let distance = 0.8; distance < Math.max(width, depth) * 0.6; distance += 0.8) {
+      const sampleI = Math.floor(x + rayX * distance);
+      const sampleK = Math.floor(z + rayZ * distance);
+      if (sampleI < 0 || sampleK < 0 || sampleI >= width || sampleK >= depth) break;
+      const sampleIndex = sampleK * width + sampleI;
+      const terrainTop = Number(activeStage.height[sampleIndex]);
+      const propTop = activeStage.blocked?.[sampleIndex] ? terrainTop + 8 : terrainTop;
+      if (terrainTop >= 0 && Math.max(terrainTop, propTop) > height + distance * lightSlope - 0.35) return true;
+    }
+    return false;
+  };
   for (let index = 0; index < width * depth; index += stride) {
     const materialName = activeStage.materials[Number(activeStage.surface[index]) || 0] || 'grass';
     if (!/grass|turf/i.test(materialName) || Number(activeStage.height[index]) < 0) continue;
@@ -1341,21 +1664,45 @@ window.__lightingSamples = () => {
     const screen = new THREE.Vector3(i + 0.5, height + 0.04, k + 0.5).project(camera);
     if (screen.z <= -1 || screen.z >= 1 || Math.abs(screen.x) > 0.94 || Math.abs(screen.y) > 0.94) continue;
     stats.visible++;
-    let blockedByLight = false;
-    for (let distance = 0.8; distance < Math.max(width, depth) * 0.6; distance += 0.8) {
-      const sampleI = Math.floor(i + 0.5 + rayX * distance);
-      const sampleK = Math.floor(k + 0.5 + rayZ * distance);
-      if (sampleI < 0 || sampleK < 0 || sampleI >= width || sampleK >= depth) break;
-      const sampleIndex = sampleK * width + sampleI;
-      const terrainTop = Number(activeStage.height[sampleIndex]);
-      const propTop = activeStage.blocked?.[sampleIndex] ? terrainTop + 8 : terrainTop;
-      if (terrainTop >= 0 && Math.max(terrainTop, propTop) > height + distance * lightSlope - 0.35) { blockedByLight = true; break; }
-    }
     const screenPoint = { x: (screen.x + 1) * 0.5 * window.innerWidth, y: (1 - screen.y) * 0.5 * window.innerHeight, material: materialName, i, k };
-    const key = blockedByLight ? 'shadow' : 'sun';
+    const key = lightBlocked(i + 0.5, k + 0.5, height) ? 'shadow' : 'sun';
     if (samples[key].length < 32) samples[key].push(screenPoint);
     if (samples.shadow.length >= 32 && samples.sun.length >= 32) break;
   }
+  const leafMeshes = [];
+  activeStageGroup.traverse((object) => {
+    if (!object.isMesh || leafMeshes.length >= 160) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const labels = `${object.name} ${materials.map((material) => material?.name || '').join(' ')}`.toLowerCase();
+    const namedFoliage = /leaf|leaves|foliage|canopy|tree|grass|bush|plant/.test(labels);
+    const greenMaterial = materials.some((material) => {
+      if (!material?.color) return false;
+      const hsl = { h: 0, s: 0, l: 0 };
+      material.color.getHSL(hsl);
+      return hsl.h > 0.16 && hsl.h < 0.48 && hsl.s > 0.18;
+    });
+    if (namedFoliage || greenMaterial && /leaf|foliage|tree|grass|bush|plant/.test(labels)) leafMeshes.push(object);
+  });
+  for (const object of leafMeshes) {
+    const vertices = object.geometry.attributes.position;
+    if (!vertices?.count) continue;
+    object.updateWorldMatrix(true, false);
+    const sampleCount = Math.min(24, vertices.count);
+    for (let sample = 0; sample < sampleCount; sample++) {
+      if (samples.leafShadow.length >= 32 && samples.leafSun.length >= 32) break;
+      const vertexIndex = Math.floor((sample + 0.5) * vertices.count / sampleCount);
+      const point = new THREE.Vector3().fromBufferAttribute(vertices, vertexIndex).applyMatrix4(object.matrixWorld);
+      const screen = point.clone().project(camera);
+      if (screen.z <= -1 || screen.z >= 1 || Math.abs(screen.x) > 0.94 || Math.abs(screen.y) > 0.94) continue;
+      stats.leafVisible = (stats.leafVisible || 0) + 1;
+      const pointData = { x: (screen.x + 1) * 0.5 * window.innerWidth, y: (1 - screen.y) * 0.5 * window.innerHeight, material: object.name };
+      const key = lightBlocked(point.x, point.z, point.y) ? 'leafShadow' : 'leafSun';
+      if (samples[key].length < 32) samples[key].push(pointData);
+    }
+  }
+  stats.leafCandidates = leafMeshes.length;
+  stats.leafShadow = samples.leafShadow.length;
+  stats.leafSun = samples.leafSun.length;
   return { ...samples, stats };
 };
 window.__setFx = (values = {}) => {
@@ -1363,6 +1710,85 @@ window.__setFx = (values = {}) => {
   if (Number.isFinite(Number(values.blur))) fx.blur = clamp(Number(values.blur), 0, 1);
   updateFx();
   return { ...fx };
+};
+window.__memoryProbe = async () => {
+  if (!activeStage || !activeStageId) return null;
+  renderFrame(0);
+  const initialStage = activeStageId;
+  const baseline = renderer.info.memory.geometries;
+  const targets = ['meadow', 'canyon', 'snow'].filter((id) => id !== initialStage).slice(0, 2).concat(initialStage);
+  const samples = [{ stage: initialStage, geometries: baseline }];
+  for (const id of targets) {
+    await changeStage(id);
+    updateCamera(0);
+    renderFrame(0);
+    samples.push({ stage: id, geometries: renderer.info.memory.geometries });
+  }
+  const final = renderer.info.memory.geometries;
+  return { samples, baseline, final, delta: final - baseline, sameStageDoesNotGrow: final <= baseline };
+};
+window.__sfxProbe = async () => {
+  const originalAudioContext = window.AudioContext;
+  const originalWebkitAudioContext = window.webkitAudioContext;
+  const originalSetTimeout = window.setTimeout;
+  const sampleRate = 44100;
+  const duration = 1;
+  const signals = new Map();
+  const samples = {};
+  const actions = [
+    ['footstep-grass', (player) => player.footstep('grass')],
+    ['footstep-stone', (player) => player.footstep('stone')],
+    ['footstep-water', (player) => player.footstep('water', true)],
+    ['jump', (player) => player.jump()],
+    ['land', (player) => player.land(1, 'grass')],
+    ...['meadow', 'desert', 'snow', 'volcano', 'sky'].map((kind) => [`ambience-${kind}`, (player) => player.changeAmbience(kind)]),
+  ];
+  try {
+    window.setTimeout = (callback, milliseconds, ...args) => milliseconds > 1000 ? 0 : originalSetTimeout(callback, milliseconds, ...args);
+    for (let actionIndex = 0; actionIndex < actions.length; actionIndex++) {
+      const [name, play] = actions[actionIndex];
+      let offlineContext = null;
+      const makeOfflineContext = function () {
+        offlineContext = new OfflineAudioContext(1, sampleRate * duration, sampleRate);
+        return offlineContext;
+      };
+      window.AudioContext = makeOfflineContext;
+      window.webkitAudioContext = makeOfflineContext;
+      const player = new DioramaSfx();
+      let seed = 9137 + actionIndex * 101;
+      player.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      player._ensureContext();
+      play(player);
+      if (player.birdTimer) { originalSetTimeout(() => clearTimeout(player.birdTimer), 0); player.birdTimer = 0; }
+      const audio = await offlineContext.startRendering();
+      const signal = new Float32Array(audio.getChannelData(0));
+      signals.set(name, signal);
+      let sumSquares = 0;
+      let peak = 0;
+      for (const value of signal) { sumSquares += value * value; peak = Math.max(peak, Math.abs(value)); }
+      samples[name] = { rms: Math.sqrt(sumSquares / signal.length), max: peak };
+    }
+  } finally {
+    window.AudioContext = originalAudioContext;
+    window.webkitAudioContext = originalWebkitAudioContext;
+    window.setTimeout = originalSetTimeout;
+  }
+  const waveformDifference = (leftName, rightName) => {
+    const left = signals.get(leftName);
+    const right = signals.get(rightName);
+    if (!left || !right || left.length !== right.length) return null;
+    let sumSquares = 0;
+    for (let index = 0; index < left.length; index++) { const difference = left[index] - right[index]; sumSquares += difference * difference; }
+    return Math.sqrt(sumSquares / left.length);
+  };
+  const footsteps = {
+    grassStone: waveformDifference('footstep-grass', 'footstep-stone'),
+    grassWater: waveformDifference('footstep-grass', 'footstep-water'),
+    stoneWater: waveformDifference('footstep-stone', 'footstep-water'),
+  };
+  const withinLimits = Object.values(samples).every((sample) => sample.rms >= 0.005 && sample.max <= 0.9);
+  const footstepsDiffer = Object.values(footsteps).every((difference) => difference !== null && difference > 0.0001);
+  return { sampleRate, seconds: duration, samples, footsteps, withinLimits, footstepsDiffer };
 };
 
 root.addEventListener('change', (event) => {
@@ -1440,6 +1866,7 @@ window.addEventListener('resize', resize);
 async function start() {
   const queryStage = q.get('stage') || 'meadow';
   const initialId = STAGE_IDS.includes(queryStage) || queryStage === 'demo' ? queryStage : 'demo';
+  setLoadingProgress(0);
   const initialPack = await readStage(initialId);
   if (initialId !== 'demo') loadedHero = await readHero();
   installAvatar(loadedHero);
@@ -1457,6 +1884,7 @@ async function start() {
   updateCamera(0);
   paused = q.get('pause') === '1';
   updateFx();
+  setLoadingProgress(1);
   fadeElement.style.opacity = '0';
   renderFrame(0);
   if (paused) {
@@ -1465,8 +1893,21 @@ async function start() {
   }
   await sleep(210);
   mode = 'playing';
+  if (q.get('sfx') === '1') {
+    const samples = await window.__sfxProbe();
+    document.documentElement.dataset.dioramaSfx = JSON.stringify(samples);
+  }
+  if (q.get('memory') === '1') {
+    const memory = await window.__memoryProbe();
+    document.documentElement.dataset.dioramaMemory = JSON.stringify(memory);
+  }
+  updateCamera(0);
+  renderFrame(0);
+  document.documentElement.dataset.dioramaViewMetrics = JSON.stringify(window.__viewMetrics());
+  document.documentElement.dataset.dioramaLightingSamples = JSON.stringify(window.__lightingSamples());
   window.__ready = true;
   document.documentElement.dataset.dioramaReady = 'true';
+  setLoadingProgress(0);
   window.requestAnimationFrame(animate);
 }
 
