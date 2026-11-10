@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#18212a">
+  <link rel="icon" href="data:,">
+  <title>箱庭</title>
+  <script type="importmap">{ "imports": { "three": "../vendor/three/build/three.module.js", "three/addons/": "../vendor/three/examples/jsm/" } }</script>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, "Yu Gothic UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #18212a; }
+    #root { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    #world { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
+    #world canvas { display: block; width: 100%; height: 100%; }
+    #stage-fade { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: #080b10; opacity: 1; pointer-events: none; transition: opacity 200ms ease; }
+    #loading-bar { width: min(140px, 20vw); height: 2px; overflow: hidden; background: rgba(218,245,239,.18); }
+    #loading-bar span { display: block; width: 100%; height: 100%; background: #bdece2; transform: scaleX(0); transform-origin: left center; transition: transform 120ms linear; }
+    #loading-bar[data-indeterminate="true"] span { width: 34%; transform: none; animation: loading-sweep 1s ease-in-out infinite alternate; }
+    @keyframes loading-sweep { from { margin-left: 0; } to { margin-left: 66%; } }
+    #hud { position: absolute; z-index: 3; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 6px; max-width: calc(100% - 20px); padding: 6px; border: 1px solid rgba(255,255,255,.17); border-radius: 11px; background: rgba(15,24,27,.82); box-shadow: 0 8px 28px rgba(0,0,0,.3); backdrop-filter: blur(10px); }
+    #stage-buttons { display: flex; align-items: center; gap: 4px; }
+    #stage-buttons button, #sound-toggle { height: 36px; border: 0; border-radius: 7px; color: #dce4e2; background: rgba(255,255,255,.07); font: inherit; }
+    #stage-buttons button { padding: 0 10px; cursor: pointer; white-space: nowrap; font-size: 13px; }
+    #stage-buttons button[aria-pressed="true"] { color: #172220; background: #c7dfd2; box-shadow: 0 0 0 1px rgba(240,255,248,.3) inset; }
+    #sound-toggle { width: 40px; flex: 0 0 40px; cursor: pointer; font-size: 18px; }
+    #sound-toggle[aria-pressed="false"] { color: #a8b1ba; background: rgba(255,255,255,.04); }
+    @media (max-width: 520px) {
+      #hud { bottom: max(12px, env(safe-area-inset-bottom)); gap: 3px; padding: 4px; }
+      #stage-buttons { gap: 2px; }
+      #stage-buttons button { height: 34px; padding: 0 6px; font-size: 11px; }
+      #sound-toggle { width: 34px; flex-basis: 34px; height: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <main id="root">
+    <section id="world" aria-label="箱庭">
+      <div id="stage-fade" aria-hidden="true"><div id="loading-bar"><span></span></div></div>
+    </section>
+    <nav id="hud" aria-label="ステージ">
+      <div id="stage-buttons" role="group" aria-label="ステージ">
+        <button type="button" data-stage="meadow" aria-pressed="false">草原と湖</button>
+        <button type="button" data-stage="canyon" aria-pressed="false">砂漠の峡谷</button>
+        <button type="button" data-stage="snow" aria-pressed="false">雪山</button>
+        <button type="button" data-stage="volcano" aria-pressed="false">火山</button>
+        <button type="button" data-stage="skyisles" aria-pressed="false">浮島</button>
+      </div>
+      <button id="sound-toggle" type="button" aria-label="音" aria-pressed="true">♪</button>
+    </nav>
+  </main>
+  <script type="module" src="./js/world.js"></script>
+</body>
+</html>

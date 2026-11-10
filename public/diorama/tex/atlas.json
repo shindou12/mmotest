@@ -1,0 +1,135 @@
+{
+  "tile": 256,
+  "cols": 8,
+  "rows": 4,
+  "tiles": {
+    "grass_top": [
+      0,
+      0
+    ],
+    "grass_side": [
+      1,
+      0
+    ],
+    "dirt": [
+      2,
+      0
+    ],
+    "stone": [
+      3,
+      0
+    ],
+    "sand": [
+      4,
+      0
+    ],
+    "sandstone_side": [
+      5,
+      0
+    ],
+    "redrock": [
+      6,
+      0
+    ],
+    "cobble": [
+      7,
+      0
+    ],
+    "snow_top": [
+      0,
+      1
+    ],
+    "snow_side": [
+      1,
+      1
+    ],
+    "ice": [
+      2,
+      1
+    ],
+    "basalt": [
+      3,
+      1
+    ],
+    "ash": [
+      4,
+      1
+    ],
+    "lava": [
+      5,
+      1
+    ],
+    "obsidian": [
+      6,
+      1
+    ],
+    "planks": [
+      7,
+      1
+    ],
+    "turf_top": [
+      0,
+      2
+    ],
+    "turf_side": [
+      1,
+      2
+    ],
+    "cloudstone": [
+      2,
+      2
+    ],
+    "crystal": [
+      3,
+      2
+    ],
+    "bark": [
+      4,
+      2
+    ],
+    "leaves": [
+      5,
+      2
+    ],
+    "pine": [
+      6,
+      2
+    ],
+    "cactus": [
+      7,
+      2
+    ],
+    "mush_cap": [
+      0,
+      3
+    ],
+    "mush_stem": [
+      1,
+      3
+    ],
+    "deadwood": [
+      2,
+      3
+    ],
+    "flowers": [
+      3,
+      3
+    ],
+    "water": [
+      4,
+      3
+    ],
+    "pedestal": [
+      5,
+      3
+    ],
+    "rock": [
+      6,
+      3
+    ],
+    "spare": [
+      7,
+      3
+    ]
+  }
+}

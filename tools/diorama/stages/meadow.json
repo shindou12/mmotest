@@ -1,0 +1,17 @@
+{
+  "id": "meadow",
+  "name": "草原と湖",
+  "seed": 1,
+  "spawn": [56, 62],
+  "waterLevel": 4.2,
+  "materials": ["grass", "dirt", "stone", "sand", "wood", "obsidian"],
+  "ambience": "meadow",
+  "particles": "pollen",
+  "light": {
+    "sunDir": [0.5, 0.8, 0.3], "sunColor": "#fff1d6", "sunPower": 3.0,
+    "skyColor": "#bfe3ff", "groundColor": "#6b5a48", "hemiPower": 0.9,
+    "bgTop": "#8fc7f5", "bgBottom": "#e9f3fb", "fog": "#dfeefa", "fogDensity": 0.006,
+    "bloom": 0.35, "exposure": 1.0
+  },
+  "params": { "treeCount": [96, 104], "smallCount": 420, "shelves": 5, "riverWidth": 8 }
+}
