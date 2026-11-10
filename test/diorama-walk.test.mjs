@@ -25,6 +25,16 @@ test('1 段上りは通れて、地面の高さをなめらかに追う', () => 
   assert.ok(result.state.y > 0 && result.state.y < 1);
 });
 
+test('段の高さは 0.12 秒で滑らかに追う', () => {
+  const map = stage({ height: [0, 1, 1, 1] });
+  const state = createWalkState(map);
+  state.x = 0.95;
+  stepWalk(state, { x: 1, z: 0 }, 0.05, map);
+  assert.ok(state.y > 0 && state.y < 1);
+  stepWalk(state, { x: 1, z: 0 }, 0.07, map);
+  assert.equal(state.y, 1);
+});
+
 test('2 段上の崖はジャンプを押しても越えない', () => {
   const map = stage({ height: [0, 0, 2, 2] });
   const state = createWalkState(map);
@@ -54,9 +64,24 @@ test('低い地面へ下り、重力で落ちて着地する', () => {
   assert.equal(state.targetY, 0);
   assert.ok(state.y > 0);
   let landed = false;
-  for (let n = 0; n < 10; n++) landed ||= stepWalk(state, { x: 0, z: 0 }, 0.1, map).events.some((event) => event.type === 'land');
+  for (let n = 0; n < 10; n++) {
+    landed ||= stepWalk(state, { x: 0, z: 0 }, 0.1, map).events.some((event) => event.type === 'land' && event.fallHeight >= 2);
+  }
   assert.equal(state.y, 0);
   assert.ok(landed);
+});
+
+test('1 段下りは滑らかに降り、着地音を出さない', () => {
+  const map = stage({ height: [1, 0, 0, 0] });
+  const state = createWalkState(map);
+  state.x = 0.95;
+  const first = stepWalk(state, { x: 1, z: 0 }, 0.05, map);
+  assert.equal(state.targetY, 0);
+  assert.ok(state.y > 0 && state.y < 1);
+  assert.ok(!first.events.some((event) => event.type === 'land'));
+  const rest = stepWalk(state, { x: 0, z: 0 }, 0.08, map);
+  assert.equal(state.y, 0);
+  assert.ok(!rest.events.some((event) => event.type === 'land'));
 });
 
 test('blocked と空のマスには入らない', () => {
@@ -83,12 +108,27 @@ test('溶岩へ入ると spawn に戻る', () => {
   assert.ok(result.events.some((event) => event.type === 'lavaReturn'));
 });
 
+test('水へ入る音と水から出る音を分けて通知する', () => {
+  const map = stage({ size: [3, 1], liquid: [0, 1, 0], spawn: [0, 0] });
+  const state = createWalkState(map);
+  state.x = 0.95;
+  const entered = stepWalk(state, { x: 1, z: 0 }, 0.05, map);
+  assert.ok(entered.events.some((event) => event.type === 'waterEnter'));
+
+  state.x = 1.95;
+  const exited = stepWalk(state, { x: 1, z: 0 }, 0.05, map);
+  assert.ok(exited.events.some((event) => event.type === 'waterExit'));
+});
+
 test('材ごとの音設定を公開し、通常歩行は毎秒5.5マスで進む', () => {
   const settings = getSurfaceSoundSettings();
   for (const material of ['grass', 'dirt', 'sand', 'stone', 'snow', 'ice', 'wood', 'bark', 'water']) {
     assert.ok(settings[material], `${material} sound settings are missing`);
-    assert.ok(settings[material].freq > 0 && settings[material].high > 0);
+    assert.ok(settings[material].freq >= 60 && settings[material].freq <= 120, `${material} thump must stay in the 60–120 Hz range`);
+    assert.ok(settings[material].high > 0 && settings[material].scrape > 0 && settings[material].duration > 0);
   }
+  assert.ok(settings.sand.duration > settings.stone.duration);
+  assert.ok(settings.snow.high < settings.grass.high);
   assert.deepEqual(getSurfaceSoundProfile('bark'), settings.bark);
 
   const map = stage({ size: [20, 1] });

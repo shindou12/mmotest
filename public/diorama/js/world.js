@@ -57,8 +57,8 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#1d2b2b');
 const camera = new THREE.PerspectiveCamera(24, window.innerWidth / window.innerHeight, 0.15, 900);
 const FAR_PITCH = THREE.MathUtils.degToRad(46);
-const NEAR_PITCH = THREE.MathUtils.degToRad(36);
-const CAMERA_NEAR_DISTANCE = 18;
+const NEAR_PITCH = THREE.MathUtils.degToRad(38);
+const CAMERA_NEAR_DISTANCE = 26;
 const yaw = THREE.MathUtils.degToRad(14);   // 見本と同じ、ほぼ正面からの見下ろし
 const cameraForwardXZ = new THREE.Vector2(-Math.sin(yaw), -Math.cos(yaw));
 const cameraRightXZ = new THREE.Vector2(Math.cos(yaw), -Math.sin(yaw));
@@ -101,6 +101,14 @@ bloomPass.threshold = 0.9;
 bloomPass.highPassUniforms.luminosityThreshold.value = 0.9;
 composer.addPass(bloomPass);
 const bokehPass = new BokehPass(scene, camera, { focus: 24, aperture: 0.02, maxblur: 0.0048 });
+const focusEquation = 'float factor = ( focus + viewZ ); // viewZ is <= 0, so this is a difference equation';
+if (bokehPass.materialBokeh.fragmentShader.includes(focusEquation)) {
+  bokehPass.materialBokeh.fragmentShader = bokehPass.materialBokeh.fragmentShader.replace(
+    focusEquation,
+    'float focusDelta = ( focus + viewZ );\n\t\t\tfloat factor = sign( focusDelta ) * max( abs( focusDelta ) - 8.0, 0.0 );',
+  );
+  bokehPass.materialBokeh.needsUpdate = true;
+}
 composer.addPass(bokehPass);
 const edgeBlurPass = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2(1 / window.innerWidth, 1 / window.innerHeight) }, uBlur: { value: 0 } },
@@ -395,6 +403,7 @@ function createWaterMaterial(baseColor = '#3fc4b2', foamColor = '#effff4', emiss
       uEmissive: { value: emissive ? 1 : 0 },
       uGridWater: { value: gridWater ? 1 : 0 },
       uUseVertexColors: { value: useVertexColors ? 1 : 0 },
+      uVertexDepthMix: { value: q.has('watermix') ? clamp(Number(q.get('watermix')) || 0, 0, 0.65) : 0.08 },
       uColorShore: { value: colorShoreRange ? 1 : 0 },
       uColorRange: { value: new THREE.Vector2(...(colorShoreRange || [0, 1])) },
       uMeshShore: { value: meshShore ? 1 : 0 },
@@ -403,15 +412,22 @@ function createWaterMaterial(baseColor = '#3fc4b2', foamColor = '#effff4', emiss
       varying vec2 vUv; varying vec3 vWorld; varying vec4 vShore; varying vec3 vColor; varying float vShoreEdge;
       void main(){ vUv=uv; vShore=${gridWater ? 'shoreEdges' : 'vec4(0.0)'}; vShoreEdge=${gridWater ? '0.0' : 'shoreEdge'}; vColor=${useVertexColors ? 'color' : 'vec3(1.0)'}; vec4 world=modelMatrix*vec4(position,1.0); vWorld=world.xyz;
         gl_Position=projectionMatrix*viewMatrix*world; }`,
-    fragmentShader: `uniform float uTime; uniform vec3 uShallow; uniform vec3 uDeep; uniform vec3 uFoam; uniform float uEmissive; uniform float uGridWater; uniform float uUseVertexColors; uniform float uColorShore; uniform float uMeshShore; uniform vec2 uColorRange;
+    fragmentShader: `uniform float uTime; uniform vec3 uShallow; uniform vec3 uDeep; uniform vec3 uFoam; uniform float uEmissive; uniform float uGridWater; uniform float uUseVertexColors; uniform float uVertexDepthMix; uniform float uColorShore; uniform float uMeshShore; uniform vec2 uColorRange;
       varying vec2 vUv; varying vec3 vWorld; varying vec4 vShore; varying vec3 vColor; varying float vShoreEdge;
       float hash21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
       float noise21(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
         return mix(mix(hash21(i),hash21(i+vec2(1.0,0.0)),f.x),mix(hash21(i+vec2(0.0,1.0)),hash21(i+vec2(1.0,1.0)),f.x),f.y); }
       void main(){
-        float depth=noise21(vWorld.xz*0.12+vec2(uTime*0.006,-uTime*0.004));
-        float shallows=smoothstep(0.42,0.76,depth);
-        vec3 color=mix(uDeep,uShallow,shallows)*mix(vec3(1.0),vColor,uUseVertexColors);
+        float worldDepth=noise21(vWorld.xz*0.12+vec2(uTime*0.006,-uTime*0.004));
+        float depth=worldDepth;
+        if(uUseVertexColors>0.5){
+          float brightness=dot(vColor,vec3(0.2126,0.7152,0.0722));
+          float colorRange=max(0.08,uColorRange.y-uColorRange.x);
+          float vertexDepth=smoothstep(uColorRange.x+colorRange*0.16,uColorRange.x+colorRange*0.84,brightness);
+          depth=mix(worldDepth,vertexDepth,uVertexDepthMix);
+        }
+        float shallows=smoothstep(0.34,0.72,depth);
+        vec3 color=mix(uDeep,uShallow,shallows);
         vec2 waveCoord=vec2(dot(vWorld.xz,vec2(0.305,0.952)),dot(vWorld.xz,vec2(0.952,-0.305)))*0.2;
         waveCoord.x+=uTime*0.02;
         vec2 waveCell=floor(waveCoord), waveLocal=fract(waveCoord);
@@ -974,13 +990,92 @@ function findAvatarParts(rootObject) {
   return found;
 }
 
+function tintAvatarModel(model) {
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    const labels = [];
+    for (let parent = object; parent && parent !== model.parent; parent = parent.parent) labels.push(parent.name.toLowerCase());
+    const name = labels.join(' ');
+    let tint = null;
+    if (/hair|fringe|bang/.test(name)) tint = '#5a3a2a';
+    else if (/cape|cloak/.test(name)) tint = '#b8443c';
+    else if (/leg|trouser|pants/.test(name)) tint = '#3a3f55';
+    else if (/head|face|skin/.test(name)) tint = '#f0c8a0';
+    else if (/body|torso|arm|shirt/.test(name)) tint = '#3f6fb0';
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const adjusted = materials.map((source) => {
+      if (!source) return source;
+      const material = source.clone();
+      if (tint && material.color) material.color.set(tint);
+      if ('roughness' in material) material.roughness = 0.8;
+      material.toneMapped = false;
+      return material;
+    });
+    object.material = Array.isArray(object.material) ? adjusted : adjusted[0];
+  });
+}
+
+function addAvatarOutlines(rootObject) {
+  rootObject.updateWorldMatrix(true, true);
+  const targets = [];
+  rootObject.traverse((object) => {
+    if (object.isMesh && object.geometry?.attributes?.normal && !/eye|outline/i.test(object.name)) targets.push(object);
+  });
+  const outlineMaterial = new THREE.MeshBasicMaterial({ color: '#18201e', side: THREE.BackSide, depthWrite: false, toneMapped: false });
+  for (const source of targets) {
+    const geometry = source.geometry.clone();
+    const positions = geometry.getAttribute('position');
+    const normals = geometry.getAttribute('normal');
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(source.matrixWorld);
+    const inverseMatrix = new THREE.Matrix4().copy(source.matrixWorld).invert();
+    const inverseLinear = new THREE.Matrix3().setFromMatrix4(inverseMatrix);
+    const normal = new THREE.Vector3();
+    const worldNormal = new THREE.Vector3();
+    for (let index = 0; index < positions.count; index++) {
+      normal.fromBufferAttribute(normals, index).normalize();
+      worldNormal.copy(normal).applyMatrix3(normalMatrix).normalize().multiplyScalar(0.03).applyMatrix3(inverseLinear);
+      positions.setXYZ(index, positions.getX(index) + worldNormal.x, positions.getY(index) + worldNormal.y, positions.getZ(index) + worldNormal.z);
+    }
+    positions.needsUpdate = true;
+    geometry.computeBoundingSphere();
+    const shell = new THREE.Mesh(geometry, outlineMaterial);
+    shell.name = `${source.name}_outline`;
+    shell.frustumCulled = false;
+    shell.castShadow = false;
+    shell.receiveShadow = false;
+    shell.renderOrder = -1;
+    source.add(shell);
+  }
+}
+
+function makeShadowTexture() {
+  const size = 96;
+  const pixels = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const radius = Math.hypot((x + 0.5) / size * 2 - 1, (y + 0.5) / size * 2 - 1);
+      const edge = clamp(1 - radius, 0, 1);
+      const offset = (y * size + x) * 4;
+      pixels[offset] = 255;
+      pixels[offset + 1] = 255;
+      pixels[offset + 2] = 255;
+      pixels[offset + 3] = Math.round(255 * edge * edge * (3 - 2 * edge));
+    }
+  }
+  const texture = new THREE.DataTexture(pixels, size, size, THREE.RGBAFormat);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function makeDummyAvatar() {
   const group = new THREE.Group();
   const stone = new RoundedBoxGeometry(1, 1, 1, 2, 0.08);
-  const cloth = new THREE.MeshStandardMaterial({ color: '#d8aa75', roughness: 0.9, metalness: 0, flatShading: true, toneMapped: false });
-  const shirt = new THREE.MeshStandardMaterial({ color: '#477989', roughness: 0.9, metalness: 0, flatShading: true, toneMapped: false });
-  const trousers = new THREE.MeshStandardMaterial({ color: '#384955', roughness: 0.9, metalness: 0, flatShading: true, toneMapped: false });
-  const capeMaterial = new THREE.MeshStandardMaterial({ color: '#9e5550', roughness: 0.9, metalness: 0, flatShading: true, side: THREE.DoubleSide, toneMapped: false });
+  const cloth = new THREE.MeshStandardMaterial({ color: '#f0c8a0', roughness: 0.8, metalness: 0, flatShading: true, toneMapped: false });
+  const shirt = new THREE.MeshStandardMaterial({ color: '#3f6fb0', roughness: 0.8, metalness: 0, flatShading: true, toneMapped: false });
+  const trousers = new THREE.MeshStandardMaterial({ color: '#3a3f55', roughness: 0.8, metalness: 0, flatShading: true, toneMapped: false });
+  const capeMaterial = new THREE.MeshStandardMaterial({ color: '#b8443c', roughness: 0.8, metalness: 0, flatShading: true, side: THREE.DoubleSide, toneMapped: false });
   const body = new THREE.Group();
   body.name = 'body';
   body.position.y = 1.02;
@@ -997,6 +1092,7 @@ function makeDummyAvatar() {
   const eyeMaterial = new THREE.MeshBasicMaterial({ color: '#26333b', toneMapped: false });
   for (const side of [-1, 1]) {
     const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 5), eyeMaterial);
+    eye.name = 'eye';
     eye.position.set(side * 0.07, 0.045, 0.217);
     head.add(eye);
   }
@@ -1037,6 +1133,7 @@ function installAvatar(model) {
     const scale = 1.9 / Math.max(size.y, 0.1);
     model.scale.setScalar(scale);
     model.position.y = -bounds.min.y * scale;
+    tintAvatarModel(model);
     model.traverse((object) => {
       if (object.isMesh) {
         object.castShadow = true;
@@ -1056,10 +1153,12 @@ function installAvatar(model) {
     avatarBaseRotations.set(object, object.rotation.clone());
     avatarBasePositions.set(object, object.position.clone());
   }
+  addAvatarOutlines(avatar);
   scene.add(avatar);
-  shadowDisc = new THREE.Mesh(new THREE.CircleGeometry(0.5, 32), new THREE.MeshBasicMaterial({ color: '#101d1d', transparent: true, opacity: 0.24, depthWrite: false, toneMapped: false }));
+  shadowDisc = new THREE.Mesh(new THREE.CircleGeometry(0.85, 48), new THREE.MeshBasicMaterial({ color: '#101d1d', map: makeShadowTexture(), transparent: true, opacity: 0.46, depthWrite: false, toneMapped: false }));
   shadowDisc.rotation.x = -Math.PI / 2;
-  shadowDisc.position.y = 0.015;
+  shadowDisc.position.y = 0.018;
+  shadowDisc.scale.set(1.18, 0.82, 1);
   shadowDisc.renderOrder = 3;
   scene.add(shadowDisc);
   markerRing = new THREE.Mesh(new THREE.RingGeometry(1.02, 1.2, 48), new THREE.MeshBasicMaterial({ color: '#f4fff3', transparent: true, opacity: 0.8, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
@@ -1266,7 +1365,7 @@ function updateFx() {
   edgeBlurPass.uniforms.uBlur.value = fx.blur;
   const close = zoomBlend() > 0.025;
   bokehPass.enabled = close;
-  edgeBlurPass.enabled = !close;
+  edgeBlurPass.enabled = true;
   document.documentElement.dataset.dioramaBloom = fx.bloom.toFixed(3);
   document.documentElement.dataset.dioramaBlur = fx.blur.toFixed(3);
 }
@@ -1280,7 +1379,7 @@ function updateCamera(dt = 0) {
   const follow = new THREE.Vector3(walkState.x, walkState.y + walkState.jumpHeight + 0.95, walkState.z);
   cameraGoal.copy(cameraCenter).lerp(follow, close);
   if (!cameraLook.lengthSq() || !dt) cameraLook.copy(cameraGoal);
-  else cameraLook.lerp(cameraGoal, Math.min(1, dt * 4.2));
+  else cameraLook.lerp(cameraGoal, 1 - Math.exp(-dt / THREE.MathUtils.lerp(0.45, 0.25, close)));
   const pitch = THREE.MathUtils.lerp(FAR_PITCH, NEAR_PITCH, close);
   const horizontal = cameraDistance * Math.cos(pitch);
   camera.position.set(
@@ -1289,6 +1388,7 @@ function updateCamera(dt = 0) {
     cameraLook.z + Math.cos(yaw) * horizontal,
   );
   camera.lookAt(cameraLook);
+  sfx.setViewBlend(close);
   const shadowTarget = cameraCenter.clone().lerp(new THREE.Vector3(walkState.x, walkState.y * 0.35, walkState.z), close);
   sunLight.target.position.copy(shadowTarget);
   sunLight.position.copy(shadowTarget).addScaledVector(sunDirection, Math.max(40, Math.max(width, depth) * 1.2));
@@ -1340,10 +1440,10 @@ function updateFacingAndPose(timeSeconds) {
     }
   }
   if (shadowDisc) {
-    shadowDisc.position.set(walkState.x, walkState.y + 0.018, walkState.z);
+    shadowDisc.position.set(walkState.x, walkState.y + 0.021, walkState.z);
     const shrink = clamp(1 - walkState.jumpHeight * 0.1, 0.58, 1);
-    shadowDisc.scale.set(shrink, shrink, shrink);
-    shadowDisc.material.opacity = 0.24 * shrink;
+    shadowDisc.scale.set(1.18 * shrink, 0.82 * shrink, 1);
+    shadowDisc.material.opacity = 0.46 * shrink;
   }
   if (markerRing) {
     const close = zoomBlend();
@@ -1445,11 +1545,13 @@ function moveInput() {
 
 function playWalkEvents(events) {
   for (const event of events) {
-    if (event.type === 'footstep') sfx.footstep(event.material, event.water);
+    if (event.type === 'footstep') sfx.footstep(event.material, event.water, event.phase);
     else if (event.type === 'jump') sfx.jump();
     else if (event.type === 'land') sfx.land(event.fallHeight, event.material);
     else if (event.type === 'waterEnter') sfx.waterEnter();
+    else if (event.type === 'waterExit') sfx.waterExit();
     else if (event.type === 'lavaReturn') sfx.lavaReturn();
+    else if (event.type === 'voidReturn') sfx.fallReturn();
   }
 }
 
@@ -1508,6 +1610,7 @@ async function changeStage(id) {
   mode = 'switching';
   setLoadingProgress(0);
   fadeElement.style.opacity = '1';
+  sfx.unlock();
   sfx.stageSwitch();
   await sleep(200);
   let nextId = stageId;
@@ -1711,6 +1814,13 @@ window.__setFx = (values = {}) => {
   updateFx();
   return { ...fx };
 };
+window.__setWaterDepthMix = (value) => {
+  const mix = clamp(Number(value) || 0, 0, 0.65);
+  for (const material of waterMaterials) {
+    if (material.uniforms.uVertexDepthMix) material.uniforms.uVertexDepthMix.value = mix;
+  }
+  return mix;
+};
 window.__memoryProbe = async () => {
   if (!activeStage || !activeStageId) return null;
   renderFrame(0);
@@ -1736,12 +1846,38 @@ window.__sfxProbe = async () => {
   const signals = new Map();
   const samples = {};
   const actions = [
-    ['footstep-grass', (player) => player.footstep('grass')],
-    ['footstep-stone', (player) => player.footstep('stone')],
-    ['footstep-water', (player) => player.footstep('water', true)],
+    ['footstep-grass-left', (player) => player.footstep('grass', false, 0)],
+    ['footstep-grass-right', (player) => player.footstep('grass', false, 1)],
+    ['footstep-stone', (player) => player.footstep('stone', false, 0)],
+    ['footstep-sand', (player) => player.footstep('sand', false, 0)],
+    ['footstep-snow', (player) => player.footstep('snow', false, 0)],
+    ['footstep-wood', (player) => player.footstep('wood', false, 0)],
+    ['footstep-water', (player) => player.footstep('water', true, 0)],
     ['jump', (player) => player.jump()],
-    ['land', (player) => player.land(1, 'grass')],
+    ['land', (player) => player.land(2, 'grass')],
     ...['meadow', 'desert', 'snow', 'volcano', 'sky'].map((kind) => [`ambience-${kind}`, (player) => player.changeAmbience(kind)]),
+    ['ambience-meadow-far', (player) => { player.setViewBlend(0); player.changeAmbience('meadow'); }],
+    ...['bird-a', 'bird-b', 'sand-flow', 'distant-wind', 'bubble', 'crystal'].map((kind) => [`ambient-${kind}`, (player) => player.playNatureNote(kind)]),
+    ['flow-water-near', (player) => player.setFlowDistance(1, 'water')],
+    ['flow-lava-near', (player) => player.setFlowDistance(1, 'lava')],
+    ['stage-switch', (player) => player.stageSwitch()],
+    ['fall-return', (player) => player.fallReturn()],
+    ['lava-return', (player) => player.lavaReturn()],
+    ['water-enter', (player) => player.waterEnter()],
+    ['water-exit', (player) => player.waterExit()],
+    ['limiter-overlap', (player) => {
+      player.changeAmbience('meadow');
+      player.changeAmbience('snow');
+      player.setFlowDistance(1, 'water');
+      player.footstep('stone', false, 0);
+      player.footstep('sand', false, 1);
+      player.jump();
+      player.land(2, 'stone');
+      player.waterEnter();
+      player.waterExit();
+      player.fallReturn();
+      player.stageSwitch();
+    }],
   ];
   try {
     window.setTimeout = (callback, milliseconds, ...args) => milliseconds > 1000 ? 0 : originalSetTimeout(callback, milliseconds, ...args);
@@ -1755,11 +1891,12 @@ window.__sfxProbe = async () => {
       window.AudioContext = makeOfflineContext;
       window.webkitAudioContext = makeOfflineContext;
       const player = new DioramaSfx();
+      player.setViewBlend(1);
       let seed = 9137 + actionIndex * 101;
       player.random = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
       player._ensureContext();
       play(player);
-      if (player.birdTimer) { originalSetTimeout(() => clearTimeout(player.birdTimer), 0); player.birdTimer = 0; }
+      if (player.birdTimer) { clearTimeout(player.birdTimer); player.birdTimer = 0; }
       const audio = await offlineContext.startRendering();
       const signal = new Float32Array(audio.getChannelData(0));
       signals.set(name, signal);
@@ -1782,13 +1919,23 @@ window.__sfxProbe = async () => {
     return Math.sqrt(sumSquares / left.length);
   };
   const footsteps = {
-    grassStone: waveformDifference('footstep-grass', 'footstep-stone'),
-    grassWater: waveformDifference('footstep-grass', 'footstep-water'),
+    grassStone: waveformDifference('footstep-grass-left', 'footstep-stone'),
+    grassWater: waveformDifference('footstep-grass-left', 'footstep-water'),
     stoneWater: waveformDifference('footstep-stone', 'footstep-water'),
+    grassLeftRight: waveformDifference('footstep-grass-left', 'footstep-grass-right'),
   };
-  const withinLimits = Object.values(samples).every((sample) => sample.rms >= 0.005 && sample.max <= 0.9);
-  const footstepsDiffer = Object.values(footsteps).every((difference) => difference !== null && difference > 0.0001);
-  return { sampleRate, seconds: duration, samples, footsteps, withinLimits, footstepsDiffer };
+  const footstepNames = ['footstep-grass-left', 'footstep-grass-right', 'footstep-stone', 'footstep-sand', 'footstep-snow', 'footstep-wood', 'footstep-water'];
+  const environmentNames = ['ambience-meadow', 'ambience-desert', 'ambience-snow', 'ambience-volcano', 'ambience-sky', 'ambience-meadow-far'];
+  const footstepLevels = footstepNames.every((name) => samples[name].max >= 0.35 && samples[name].max <= 0.5);
+  const jumpLandLevels = ['jump', 'land'].every((name) => samples[name].max >= 0.4 && samples[name].max <= 0.6);
+  const ambienceLevels = environmentNames.every((name) => samples[name].rms >= 0.04 && samples[name].rms <= 0.07 && samples[name].max <= 0.25);
+  const limiterPeak = samples['limiter-overlap'].max;
+  const limiterSafe = limiterPeak <= 0.95;
+  const limits = { footstepLevels, jumpLandLevels, ambienceLevels, limiterSafe };
+  const withinLimits = Object.values(limits).every(Boolean);
+  const footstepsDiffer = footsteps.grassStone > 0.0001 && footsteps.grassWater > 0.0001
+    && footsteps.stoneWater > 0.0001 && footsteps.grassLeftRight > 0.0001;
+  return { sampleRate, seconds: duration, samples, footsteps, limits, limiterPeak, withinLimits, footstepsDiffer };
 };
 
 root.addEventListener('change', (event) => {

@@ -19,7 +19,7 @@ mkdirSync(dirname(out), { recursive: true });
 const shotUrl = new URL(url);
 const zoomMode = shotUrl.searchParams.get('zoom') === 'near' ? 'near' : 'far';
 
-function withFxQuery(bloom, blur, renderScale = 1, includeProbes = false) {
+function withFxQuery(bloom, blur, renderScale = 1, includeProbes = false, waterMix = null) {
   const parsed = new URL(url);
   parsed.searchParams.set('pause', '1');
   if (Number.isFinite(bloom)) parsed.searchParams.set('bloom', String(bloom));
@@ -31,6 +31,8 @@ function withFxQuery(bloom, blur, renderScale = 1, includeProbes = false) {
   else parsed.searchParams.delete('sfx');
   if (includeProbes && probeMemory) parsed.searchParams.set('memory', '1');
   else parsed.searchParams.delete('memory');
+  if (Number.isFinite(waterMix)) parsed.searchParams.set('watermix', String(waterMix));
+  else parsed.searchParams.delete('watermix');
   return parsed.toString();
 }
 
@@ -191,6 +193,10 @@ function blurRegionDeltas(lowImage, highImage, probes, width, height) {
   return {
     hero: pixelDelta(lowImage, highImage, regionAround(probes?.hero, width, height, 44) || { x: width * 0.4, y: height * 0.4, width: width * 0.2, height: height * 0.2 }),
     far: pixelDelta(lowImage, highImage, { x: width * 0.07, y: height * 0.04, width: width * 0.86, height: height * 0.42 }),
+    edge: pixelDeltaRegions(lowImage, highImage, [
+      { x: 0, y: 0, width, height: height * 0.12 },
+      { x: 0, y: height * 0.88, width, height: height * 0.12 },
+    ]),
   };
 }
 
@@ -253,7 +259,17 @@ async function takeWithPlaywright() {
       if (name === 'blurHigh') blurHighImage = image;
     }
     const blurRegions = blurRegionDeltas(blurLowImage, blurHighImage, probes, Number(width), Number(height));
-    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh, blurRegions, lighting, grass, viewMetrics, exposure, sfx, memory };
+    let waterDepthMix = null;
+    if (zoomMode === 'near') {
+      await page.evaluate(() => window.__setWaterDepthMix?.(0.05));
+      await page.evaluate(() => window.__renderOnce());
+      const lowMixImage = await page.screenshot({ type: 'png', timeout: 600000 });
+      await page.evaluate(() => window.__setWaterDepthMix?.(0.5));
+      await page.evaluate(() => window.__renderOnce());
+      const highMixImage = await page.screenshot({ type: 'png', timeout: 600000 });
+      waterDepthMix = pixelDelta(lowMixImage, highMixImage);
+    }
+    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh, blurRegions, lighting, grass, viewMetrics, exposure, sfx, memory, waterDepthMix };
   } finally {
     await browser.close();
   }
@@ -285,6 +301,7 @@ async function takeWithChrome() {
   let exposure = null;
   let sfx = null;
   let memory = null;
+  let waterDepthMix = null;
   try {
     const run = async (targetUrl, screenshotPath) => {
       const result = await execFileAsync(chromeExecutable, chromeArgs(targetUrl, screenshotPath, true, profile), {
@@ -338,7 +355,12 @@ async function takeWithChrome() {
       if (name === 'blurHigh') blurHighImage = capture.image;
     }
     blurRegions = blurRegionDeltas(blurLowImage, blurHighImage, probes, Number(width), Number(height));
-    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh, blurRegions, lighting, grass, viewMetrics, exposure, sfx, memory };
+    if (zoomMode === 'near') {
+      const lowMix = await run(withFxQuery(null, null, 1, false, 0.05), join(tempRoot, 'water-low.png'));
+      const highMix = await run(withFxQuery(null, null, 1, false, 0.5), join(tempRoot, 'water-high.png'));
+      waterDepthMix = pixelDelta(lowMix.image, highMix.image);
+    }
+    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh, blurRegions, lighting, grass, viewMetrics, exposure, sfx, memory, waterDepthMix };
   } finally {
     const tempBase = resolve(tmpdir()) + sep;
     const tempTarget = resolve(tempRoot);
@@ -362,7 +384,7 @@ console.log(`grass sunny max RGB=${result.grass?.maximum ?? 'n/a'} pixels=${resu
 if (zoomMode === 'far') {
   console.log(`blur far center Δmean=${result.blurRegions.center.mean.toFixed(3)} changed=${result.blurRegions.center.percent.toFixed(2)}% | edges Δmean=${result.blurRegions.edge.mean.toFixed(3)} changed=${result.blurRegions.edge.percent.toFixed(2)}%`);
 } else {
-  console.log(`blur near hero Δmean=${result.blurRegions.hero.mean.toFixed(3)} changed=${result.blurRegions.hero.percent.toFixed(2)}% | far Δmean=${result.blurRegions.far.mean.toFixed(3)} changed=${result.blurRegions.far.percent.toFixed(2)}%`);
+  console.log(`blur near hero Δmean=${result.blurRegions.hero.mean.toFixed(3)} changed=${result.blurRegions.hero.percent.toFixed(2)}% | far Δmean=${result.blurRegions.far.mean.toFixed(3)} changed=${result.blurRegions.far.percent.toFixed(2)}% | edges Δmean=${result.blurRegions.edge.mean.toFixed(3)} changed=${result.blurRegions.edge.percent.toFixed(2)}%`);
 }
 if (probeMemory) {
   const memory = result.memory;
@@ -370,15 +392,18 @@ if (probeMemory) {
 }
 if (probeSfx) {
   for (const [name, sample] of Object.entries(result.sfx?.samples || {})) console.log(`sfx ${name.padEnd(16)} RMS=${sample.rms.toFixed(6)} max=${sample.max.toFixed(6)}`);
-  console.log(`sfx footsteps ΔRMS grass/stone=${result.sfx?.footsteps?.grassStone?.toFixed(6) ?? 'n/a'} grass/water=${result.sfx?.footsteps?.grassWater?.toFixed(6) ?? 'n/a'} stone/water=${result.sfx?.footsteps?.stoneWater?.toFixed(6) ?? 'n/a'} limits=${result.sfx?.withinLimits ? 'pass' : 'fail'} distinct=${result.sfx?.footstepsDiffer ? 'pass' : 'fail'}`);
+  console.log(`sfx footsteps ΔRMS grass/stone=${result.sfx?.footsteps?.grassStone?.toFixed(6) ?? 'n/a'} grass/water=${result.sfx?.footsteps?.grassWater?.toFixed(6) ?? 'n/a'} stone/water=${result.sfx?.footsteps?.stoneWater?.toFixed(6) ?? 'n/a'} L/R=${result.sfx?.footsteps?.grassLeftRight?.toFixed(6) ?? 'n/a'}`);
+  console.log(`sfx limits footstep=${result.sfx?.limits?.footstepLevels ? 'pass' : 'fail'} jump/land=${result.sfx?.limits?.jumpLandLevels ? 'pass' : 'fail'} ambience=${result.sfx?.limits?.ambienceLevels ? 'pass' : 'fail'} limiter max=${result.sfx?.limiterPeak?.toFixed(6) ?? 'n/a'}/0.95=${result.sfx?.limits?.limiterSafe ? 'pass' : 'fail'} distinct=${result.sfx?.footstepsDiffer ? 'pass' : 'fail'}`);
 }
+if (result.waterDepthMix) console.log(`water vertex/noise mix Δmean=${result.waterDepthMix.mean.toFixed(6)} changed=${result.waterDepthMix.percent.toFixed(2)}%`);
 const invalidLighting = zoomMode === 'far' && (lighting?.ratio === null || lighting?.ratio === undefined || lighting.ratio < 0.45);
 const invalidBlur = zoomMode === 'far'
   ? result.blurRegions.center.mean > 0.12 || result.blurRegions.edge.mean <= 0
-  : result.blurRegions.far.mean <= 0;
+  : result.blurRegions.far.mean <= 0 || result.blurRegions.edge.mean <= 0;
 const standardAspect = Number(width) / Number(height) >= 1.2;
 const invalidFrame = zoomMode === 'far' && (!result.viewMetrics || !result.viewMetrics.fitsViewport || result.viewMetrics.overlapsHud || standardAspect && (result.viewMetrics.heightRatio < 0.88 || result.viewMetrics.heightRatio > 0.92));
 const invalidGrass = zoomMode === 'far' && (result.grass?.maximum === null || result.grass?.maximum === undefined || result.grass.maximum > 235);
 const invalidMemory = probeMemory && !result.memory?.sameStageDoesNotGrow;
 const invalidSfx = probeSfx && (!result.sfx?.withinLimits || !result.sfx?.footstepsDiffer);
-if (result.errors.length || result.variants.blurLow.mean <= 0 || result.variants.blurHigh.mean <= 0 || invalidLighting || invalidBlur || invalidFrame || invalidGrass || invalidMemory || invalidSfx) process.exitCode = 1;
+const invalidWater = zoomMode === 'near' && (!result.waterDepthMix || result.waterDepthMix.mean <= 0 || result.waterDepthMix.percent <= 0);
+if (result.errors.length || result.variants.blurLow.mean <= 0 || result.variants.blurHigh.mean <= 0 || invalidLighting || invalidBlur || invalidFrame || invalidGrass || invalidMemory || invalidSfx || invalidWater) process.exitCode = 1;

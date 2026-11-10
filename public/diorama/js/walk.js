@@ -1,5 +1,6 @@
 // 地形配列だけを使う歩行状態。描画・音声・ブラウザーには依存しない。
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const STEP_HEIGHT_SECONDS = 0.12;
 
 function tileIndex(stage, i, k) {
   const [width, depth] = stage.size || [0, 0];
@@ -47,6 +48,8 @@ export function createWalkState(stage) {
     k: tile.k,
     y: tile.height,
     targetY: tile.height,
+    heightStartY: tile.height,
+    heightTransitionElapsed: STEP_HEIGHT_SECONDS,
     jumpHeight: 0,
     jumpVelocity: 0,
     fallVelocity: 0,
@@ -78,6 +81,8 @@ function resetToSpawn(state, stage) {
   state.z = tile.k + 0.5;
   state.targetY = tile.height;
   state.y = tile.height;
+  state.heightStartY = tile.height;
+  state.heightTransitionElapsed = STEP_HEIGHT_SECONDS;
   state.fallVelocity = 0;
   state.jumpHeight = 0;
   state.jumpVelocity = 0;
@@ -119,8 +124,6 @@ export function stepWalk(state, input, dt, stage) {
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(moveX), Math.abs(moveZ)) / 0.12));
   let movedDistance = 0;
   let returned = false;
-  const beforeWater = fromTile.liquid === 1;
-
   const attempt = (axis, amount) => {
     if (!amount || returned) return;
     const nextX = state.x + (axis === 'x' ? amount : 0);
@@ -135,7 +138,11 @@ export function stepWalk(state, input, dt, stage) {
     const nextTile = tileAt(stage, nextI, nextK);
     if (!nextTile) {
       const index = tileIndex(stage, nextI, nextK);
-      if (index >= 0 && stage.height?.[index] < 0) events.push({ type: 'voidReturn' });
+      if (index >= 0 && stage.height?.[index] < 0) {
+        resetToSpawn(state, stage);
+        events.push({ type: 'voidReturn' });
+        returned = true;
+      }
       if (axis === 'x') state.velocityX = 0;
       else state.velocityZ = 0;
       return;
@@ -150,7 +157,11 @@ export function stepWalk(state, input, dt, stage) {
     state.z = nextZ;
     state.i = nextI;
     state.k = nextK;
-    state.fallFromY = state.targetY;
+    if (nextTile.height !== state.targetY) {
+      state.fallFromY = state.targetY;
+      state.heightStartY = state.y;
+      state.heightTransitionElapsed = 0;
+    }
     state.targetY = nextTile.height;
     if (nextTile.liquid === 2) {
       resetToSpawn(state, stage);
@@ -158,8 +169,10 @@ export function stepWalk(state, input, dt, stage) {
       returned = true;
       return;
     }
-    if (!beforeWater && nextTile.liquid === 1 && oldTile.liquid !== 1) {
+    if (oldTile.liquid !== 1 && nextTile.liquid === 1) {
       events.push({ type: 'waterEnter', material: nextTile.material });
+    } else if (oldTile.liquid === 1 && nextTile.liquid !== 1) {
+      events.push({ type: 'waterExit', material: nextTile.material });
     }
   };
 
@@ -178,22 +191,31 @@ export function stepWalk(state, input, dt, stage) {
   state.x = clamp(state.x, 0.001, Math.max(0.002, width - 0.001));
   state.z = clamp(state.z, 0.001, Math.max(0.002, depth - 0.001));
 
-  if (state.targetY > state.y) {
-    state.y += (state.targetY - state.y) * Math.min(1, delta * 8);
+  const fallHeight = Math.max(state.heightStartY, state.fallFromY) - state.targetY;
+  const oneStepDown = state.targetY < state.y && fallHeight < 2;
+  if (state.targetY > state.y || oneStepDown) {
+    state.heightTransitionElapsed = Math.min(STEP_HEIGHT_SECONDS, state.heightTransitionElapsed + delta);
+    const progress = clamp(state.heightTransitionElapsed / STEP_HEIGHT_SECONDS, 0, 1);
+    const eased = progress * progress * (3 - 2 * progress);
+    state.y = state.heightStartY + (state.targetY - state.heightStartY) * eased;
     state.fallVelocity = 0;
   } else if (state.targetY < state.y) {
     state.fallVelocity -= 18 * delta;
     const previousY = state.y;
     state.y = Math.max(state.targetY, state.y + state.fallVelocity * delta);
     if (state.y === state.targetY) {
-      if (state.jumpHeight <= 0.001) events.push({ type: 'land', fallHeight: Math.max(0, state.fallFromY - state.targetY), material: currentTile(stage, state).material });
+      if (state.jumpHeight <= 0.001 && fallHeight >= 2) events.push({ type: 'land', fallHeight, material: currentTile(stage, state).material });
       state.fallVelocity = 0;
+      state.heightStartY = state.targetY;
+      state.heightTransitionElapsed = STEP_HEIGHT_SECONDS;
     } else if (state.y > previousY) {
       state.y = previousY;
     }
   } else {
     state.y = state.targetY;
     state.fallVelocity = 0;
+    state.heightStartY = state.targetY;
+    state.heightTransitionElapsed = STEP_HEIGHT_SECONDS;
   }
 
   const wasJumping = state.jumpHeight > 0;
