@@ -1,0 +1,22 @@
+{
+  "id": "volcano",
+  "name": "火山",
+  "seed": 1,
+  "spawn": [24, 10],
+  "waterLevel": 8.5,
+  "materials": ["basalt", "ash", "lava", "obsidian", "wood"],
+  "ambience": "volcano",
+  "particles": "ember",
+  "light": {
+    "sunDir": [0.45, 0.25, 0.5], "sunColor": "#ff9b61", "sunPower": 1.2,
+    "skyColor": "#4c2834", "groundColor": "#281b25", "hemiPower": 0.42,
+    "bgTop": "#351f31", "bgBottom": "#8b4534", "fog": "#4f3032", "fogDensity": 0.009,
+    "bloom": 0.8, "exposure": 0.72
+  },
+  "params": {
+    "center": [24, 24],
+    "craterRadius": 3.2,
+    "mountainHeight": 14,
+    "rivers": [0.0, 1.57, 3.14, 4.71]
+  }
+}

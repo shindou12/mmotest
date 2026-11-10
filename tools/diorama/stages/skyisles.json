@@ -1,0 +1,23 @@
+{
+  "id": "skyisles",
+  "name": "浮島",
+  "seed": 1,
+  "spawn": [23, 8],
+  "waterLevel": 0.0,
+  "materials": ["turf", "cloudstone", "crystal", "wood"],
+  "ambience": "sky",
+  "particles": "spark",
+  "light": {
+    "sunDir": [0.42, 0.56, 0.72], "sunColor": "#ffd8f2", "sunPower": 2.2,
+    "skyColor": "#b7a5ed", "groundColor": "#554a78", "hemiPower": 0.8,
+    "bgTop": "#876cc7", "bgBottom": "#edc1dc", "fog": "#d5b9e2", "fogDensity": 0.006,
+    "bloom": 0.65, "exposure": 1.0
+  },
+  "params": {
+    "islands": [
+      [7, 8, 5.8, 6], [23, 8, 7.0, 10], [40, 9, 5.6, 8],
+      [12, 25, 6.3, 4], [31, 26, 7.7, 12], [20, 41, 6.4, 7], [41, 41, 5.4, 5]
+    ],
+    "undersideDepth": [7.0, 9.6]
+  }
+}

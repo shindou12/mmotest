@@ -1,0 +1,22 @@
+{
+  "id": "snow",
+  "name": "雪山",
+  "seed": 1,
+  "spawn": [7, 42],
+  "waterLevel": 3.0,
+  "materials": ["snow", "ice", "stone", "wood"],
+  "ambience": "snow",
+  "particles": "snow",
+  "light": {
+    "sunDir": [-0.35, 0.72, 0.48], "sunColor": "#d6e8ff", "sunPower": 2.8,
+    "skyColor": "#b8d4ef", "groundColor": "#536477", "hemiPower": 1.0,
+    "bgTop": "#91b8df", "bgBottom": "#e1effa", "fog": "#d2e2f0", "fogDensity": 0.007,
+    "bloom": 0.24, "exposure": 1.0
+  },
+  "params": {
+    "peaks": [[23, 18, 18, 0.62], [31, 29, 15, 0.55], [12, 25, 13, 0.48]],
+    "lakeCenter": [40, 11],
+    "lakeRadii": [4.7, 3.8],
+    "trail": [[7, 42], [20, 27], [23, 18]]
+  }
+}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#18212a">
+  <link rel="icon" href="data:,">
+  <title>箱庭</title>
+  <script type="importmap">{ "imports": { "three": "../vendor/three/build/three.module.js", "three/addons/": "../vendor/three/examples/jsm/" } }</script>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, "Yu Gothic UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #18212a; }
+    #root { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    #world { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
+    #world canvas { display: block; width: 100%; height: 100%; }
+    #stage-fade { position: absolute; inset: 0; z-index: 2; background: #080b10; opacity: 1; pointer-events: none; transition: opacity 200ms ease; }
+    #hud { position: absolute; z-index: 3; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 7px; border: 1px solid rgba(255,255,255,.17); border-radius: 12px; background: rgba(20,27,34,.76); box-shadow: 0 8px 28px rgba(0,0,0,.24); backdrop-filter: blur(12px); }
+    #stage-select, #sound-toggle { height: 40px; border: 0; border-radius: 8px; color: #f2f4f7; background: rgba(255,255,255,.09); font: inherit; }
+    #stage-select { min-width: 160px; padding: 0 34px 0 12px; outline-color: #b4d8ff; }
+    #sound-toggle { width: 42px; cursor: pointer; font-size: 19px; }
+    #sound-toggle[aria-pressed="false"] { color: #a8b1ba; background: rgba(255,255,255,.04); }
+    @media (max-width: 520px) {
+      #hud { bottom: max(12px, env(safe-area-inset-bottom)); }
+      #stage-select { min-width: 138px; }
+    }
+  </style>
+</head>
+<body>
+  <main id="root">
+    <section id="world" aria-label="箱庭">
+      <div id="stage-fade"></div>
+    </section>
+    <nav id="hud" aria-label="ステージ">
+      <select id="stage-select" aria-label="ステージ">
+        <option value="demo">仮の草原</option>
+        <option value="meadow">草原と湖</option>
+        <option value="canyon">砂漠の峡谷</option>
+        <option value="snow">雪山</option>
+        <option value="volcano">火山</option>
+        <option value="skyisles">浮島</option>
+      </select>
+      <button id="sound-toggle" type="button" aria-label="音" aria-pressed="true">♪</button>
+    </nav>
+  </main>
+  <script type="module" src="./js/world.js"></script>
+</body>
+</html>
