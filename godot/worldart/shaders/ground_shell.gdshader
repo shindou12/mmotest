@@ -1,5 +1,5 @@
 // 草のシェル（world.js の groundMaterial の shell 版、rulebook 8.3 / review-L29 8）。地面を層ごとに法線方向へ持ち上げて重ねる。
-// 層 i（0 始まりのインスタンス番号）の h = (i+1)/層数。色は土台と同じ式で、草の重みと小さな円で抜く。
+// 層 i（0 始まりのインスタンス番号）の h = (i+1)/層数。色は土台と同じ式で、高さテクスチャで刃を抜く。
 // 頂点は区画の中心からの位置で持つ（world.gd が焼く）。MODEL_MATRIX は区画の中心への平行移動だけ
 shader_type spatial;
 render_mode diffuse_lambert, specular_disabled, ambient_light_disabled;
@@ -14,6 +14,15 @@ uniform float edge_w = 1.25;   // 草が短くなる幅（m）
 uniform float gedge = 0.0;
 uniform float gwide = 0.0;
 varying flat float v_h;
+// 0.65m の値ノイズで草の房を作り、端だけ刃ごとの揺れを足す
+float shellEdgeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float shellEdgeClump(vec2 p) {
+	vec2 cell = floor(p), f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = shellEdgeHash(cell), b = shellEdgeHash(cell + vec2(1.0, 0.0));
+	float c = shellEdgeHash(cell + vec2(0.0, 1.0)), d = shellEdgeHash(cell + vec2(1.0, 1.0));
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 void vertex() {
 	v_w = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;   // 色は持ち上げる前の位置で引く（土台と同じ絵になる）
 	v_wn = normalize(NORMAL);
@@ -27,16 +36,20 @@ void vertex() {
 }
 void fragment() {
 	vec2 wp = v_w.xz;
-	vec2 cell = floor(wp / shell_spacing);
-	vec2 local = fract(wp / shell_spacing);
+	// 草 1 本を、なびく向きに 3 倍長い楕円にする（丸い粒に見えないように）。格子もその向きにそろえ、列ごとに半分ずらす
+	const vec2 BLADE_DIR = vec2(0.8436, 0.5369);   // normalize(0.55, 0.35)
+	vec2 bq = vec2(dot(wp, vec2(-BLADE_DIR.y, BLADE_DIR.x)), dot(wp, BLADE_DIR));
+	vec2 bsz = vec2(shell_spacing, shell_spacing * 3.0);
+	bq.x += mod(floor(bq.y / bsz.y), 2.0) * 0.5 * bsz.x;
+	vec2 cell = floor(bq / bsz);
+	vec2 local = fract(bq / bsz);
 	float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
 	float seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
-	vec2 center = vec2(0.18 + seed * 0.64, 0.18 + seed2 * 0.64);
-	float radius = 0.46 * (1.0 - 0.78 * v_h);
+	vec2 bd = (local - vec2(0.3 + seed * 0.4, 0.42 + seed2 * 0.16)) / vec2(0.52 * (1.0 - 0.6 * v_h), 0.56 * (1.0 - 0.4 * v_h));
 	float patch_f = wa_ground_patch_field(wp);
 	float patch_height = mix(1.0 - 0.45 * wa_gpatchc, 1.0 + 0.1 * wa_gpatchc, patch_f);
-	float height_var = mix(0.5, 1.0, texture(t_noise, wp / 2.0).r) * patch_height;
-	if (distance(local, center) > radius || height_var < v_h) discard;   // gw <= 1 なので、重い色の式の前に先に抜く
+	float height_var = mix(0.7, 1.0, texture(t_noise, wp / 2.0).r) * patch_height;
+	if (dot(bd, bd) > 1.0 || height_var < v_h) discard;
 	// 草と土の境: 縁までの符号つき距離 sd（m。草の内側が正）で、草を縁へ向けて edge_w かけて短くし、まだらに崩す
 	float edge_mottle = shell_edge_mottle * (gedge > 0.0 && gwide > 0.0 ? 0.35 : 1.0);
 	float sd = wa_edge_sd(t_grass_edge, grass_edge_st, wp, edge_mottle);
@@ -50,17 +63,20 @@ void fragment() {
 	vec3 col = wa_ground_col2(COLOR, te, gw, grass, shell_gw);
 	if (te >= 0.0) {
 		float seed3 = fract(seed * 57.3 + seed2 * 91.7);
-		if (seed3 > pow(1.0 - te, 1.4) * 1.08) discard;   // 高さでなく草の本数を減らす
-		float edge_height = mix(1.0, 0.5, te);
+		float keep_threshold = 1.0 - pow(1.0 - te, 1.4) * 1.08;
+		float clump_jitter = (seed3 - 0.5) * 0.15 * (1.0 - smoothstep(0.85, 1.0, te));
+		if (shellEdgeClump(wp / 0.65) < keep_threshold + clump_jitter) discard;   // 房の縁だけ刃ごとに少し崩す
+		float edge_height = mix(1.0, 0.25, te);
 		if (shell_gw * edge_height * height_var < v_h) discard;
-		col = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
-		col *= mix(0.72, 1.0, v_h);
+		vec3 edge_grass = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+		col = mix(edge_grass, col, smoothstep(0.0, 1.0, te));   // 刃の色を足元の黄ばんだ草・土へ寄せる
+		col *= mix(mix(0.85, 1.0, v_h), mix(0.95, 1.0, v_h), te);   // 根元の暗さを弱め、道の側はさらに浅くする
 	} else {
 		if (gw * height_var < v_h && ek >= 1.0) discard;   // 内側は今まで通り
 		col = mix(grass, col, smoothstep(0.0, 1.0, gw));   // 土の上へかぶさる縁は草の色
-		col *= mix(mix(0.72, 1.0, v_h), 1.0, smoothstep(0.0, 0.6, edge));   // 縁は根元を暗くしない
+		col *= mix(mix(0.85, 1.0, v_h), 1.0, smoothstep(0.0, 0.6, edge));   // 縁は根元を暗くしない
 	}
-	col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, v_h));
+	col = mix(col, col * vec3(1.04, 1.02, 0.95), smoothstep(0.6, 1.0, v_h));
 	if (te < 0.0) col = mix(col, col * vec3(1.14, 0.98, 0.52), edge);   // gedge 無効時は M-0006 の黄・オリーブ寄りを保つ
 	ALBEDO = wa_desat(col, wa_albedo_sat);
 	EMISSION = wa_ground_emission(ALBEDO, vec3(0.0, 1.0, 0.0));

@@ -55,6 +55,11 @@ var tuning_panel: Node = null
 var hold_kind := ""
 var _param_values: Dictionary = TUNING_PARAMS.defaults()
 var srad_map_default := 2.0
+var fps_capture := false
+var fps_warmup_frames := 0
+var fps_target_frames := 300
+var fps_frame_count := 0
+var fps_elapsed := 0.0
 
 
 func _ready() -> void:
@@ -82,6 +87,10 @@ func _ready() -> void:
 	add_child(tuning_panel)
 	if args.has("shot"):
 		_shoot(String(args["shot"]).split(","), String(args.get("out", "user://shots")))
+	elif args.has("fps"):
+		fps_target_frames = maxi(100, int(args["fps"]))
+		fps_warmup_frames = 120
+		fps_capture = true
 
 
 func _create_post_chain() -> void:
@@ -526,6 +535,16 @@ func _process(dt: float) -> void:
 	if v.length_squared() > 0.0 or turn != 0.0:
 		_place()
 		marker.visible = true
+	if fps_capture:
+		if fps_warmup_frames > 0:
+			fps_warmup_frames -= 1
+		else:
+			fps_frame_count += 1
+			fps_elapsed += dt
+			if fps_frame_count >= fps_target_frames:
+				print("FPS_RESULT map=%s view=%s frames=%d avg_ms=%.3f fps=%.2f" % [world.map_name, view_name, fps_frame_count, fps_elapsed * 1000.0 / fps_frame_count, fps_frame_count / maxf(fps_elapsed, 0.0001)])
+				fps_capture = false
+				get_tree().quit()
 
 
 func _unhandled_input(ev: InputEvent) -> void:

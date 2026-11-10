@@ -26,9 +26,17 @@ var path_edge_enabled := false
 ## 草が短くなる幅 (m) と境のまだらの強さ (0..1)
 var gshell_edge_width := clampf(_arg_float("gshell_edge", 1.25), 0.25, 3.0)
 var gshell_mottle := clampf(_arg_float("gshell_mottle", 0.8), 0.0, 1.0)
-const GSHELL_HEIGHT := 0.18
+var gshell_height := 0.28
+var grass_blade_style: Dictionary = {}
+var grass_blades_enabled := false
+var terrain_splat_image: Image
+var terrain_heights := PackedFloat32Array()
+var terrain_grid_origin := Vector2.ZERO
+var terrain_grid_cell := 0.5
+var terrain_grid_resolution := 0
 const GSHELL_SPACING := 0.045
 const GSHELL_CHUNK := 8.0   # シェルを分ける正方形の一辺（m）。視錐台の外を切るため
+const GBLADE_CHUNK := 8.0   # 刃の MultiMesh を分ける正方形の一辺（m）
 ## 置き物（木・岩など）を分ける正方形の一辺（m）。--achunk=<m>、0 で分けずに種類ごと 1 つ（M-0161）
 var asset_chunk := maxf(0.0, _arg_float("achunk", 16.0))
 ## 層の間引き（カメラからの距離 m）。注目点（カメラの真正面、約 33 m）の前後 band1 までは全層、band2 までは半分、その先は 1/4。
@@ -47,6 +55,7 @@ var pressure_plate_states: Array = []
 
 const SH_GROUND := preload("res://shaders/ground.gdshader")
 const SH_GROUND_SHELL := preload("res://shaders/ground_shell.gdshader")
+const SH_GRASS_BLADE := preload("res://shaders/grass_blade.gdshader")
 const SH_FOLIAGE := preload("res://shaders/foliage.gdshader")
 const SH_LAMBERT := preload("res://shaders/lambert.gdshader")
 const SH_ROCK := preload("res://shaders/rock.gdshader")
@@ -459,6 +468,7 @@ func build() -> void:
 	_build_light()
 	_build_terrain()
 	_build_splat()
+	_build_grass_blades()
 	_build_assets()
 
 
@@ -471,6 +481,24 @@ func _set_globals() -> void:
 	var rs := RenderingServer
 	gedge = maxf(0.0, float(style.get("gedge", 0.0)))
 	gwide = maxf(0.0, float(style.get("gwide", 0.0)))
+	gshell_height = maxf(0.0, float(style.get("gsh", 0.28)))
+	grass_blade_style.clear()
+	var blade_spec: Variant = style.get("gblade", null)
+	var blade_override := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--gblade="):
+			blade_override = arg.substr(9).to_lower()
+			break
+	grass_blades_enabled = blade_spec is Dictionary and not blade_spec.is_empty()
+	if grass_blades_enabled:
+		grass_blade_style = blade_spec.duplicate()
+	if blade_override in ["0", "off", "false"]:
+		grass_blades_enabled = false
+		grass_blade_style.clear()
+	elif blade_override in ["1", "on", "true"] and not grass_blades_enabled:
+		# f1_field の短い草を地図データを変えずに比較するための確認用設定。
+		grass_blades_enabled = true
+		grass_blade_style = {"h": 0.3, "hmin": 0.18, "density": 22.0, "w": 0.045, "clump": 1.6}
 	path_edge_enabled = gedge > 0.0 and gwide > 0.0
 	var gshell_arg := false
 	for arg in OS.get_cmdline_user_args():
@@ -597,7 +625,7 @@ func _build_terrain() -> void:
 			var sm := ShaderMaterial.new()
 			sm.shader = SH_GROUND_SHELL
 			sm.set_shader_parameter("shell_layers", float(layers))
-			sm.set_shader_parameter("shell_height", GSHELL_HEIGHT)
+			sm.set_shader_parameter("shell_height", gshell_height)
 			sm.set_shader_parameter("shell_spacing", GSHELL_SPACING)
 			shell_materials.append(sm)
 	var sms: Array = [m] + shell_materials   # 地面とシェルで同じ絵の引数を入れる
@@ -690,11 +718,11 @@ func _build_shells(mesh: Mesh, xf: Transform3D, rock_pix: bool) -> void:
 		arrays[Mesh.ARRAY_INDEX] = ch["I"]
 		var am := ArrayMesh.new()
 		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-		am.custom_aabb = am.get_aabb().grow(GSHELL_HEIGHT)   # 持ち上げた分も含める
+		am.custom_aabb = am.get_aabb().grow(gshell_height)   # 持ち上げた分も含める
 		tris += ch["I"].size() / 3
 		var c: float = gshell_band[0]; var w1: float = gshell_band[1]; var w2: float = gshell_band[2]
-		# 段・カメラからの距離の範囲（begin, end。end 0 は果てまで）。全層は中央の帯、半分はその両側、1/4 はさらに外
-		for e in [[0, c - w1, c + w1], [1, c - w2, c - w1], [1, c + w1, c + w2], [2, 0.0, c - w2], [2, c + w2, 0.0]]:
+		# 段・カメラからの距離の範囲（begin, end。end 0 は果てまで）。近い所は全層、遠くへ半分・1/4（寄ったときに層が減って草が平らになっていた）
+		for e in [[0, 0.0, c + w1], [1, c + w1, c + w2], [2, c + w2, 0.0]]:
 			var layers := _shell_layers()[e[0]]
 			var mm := MultiMesh.new()
 			mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -735,9 +763,14 @@ func _build_splat() -> void:
 	var cell := float(spec["terrain"].get("cell", 0.5))
 	var R := int(round(float(tm["size"]) / cell)) + 1
 	var img := Image.create(R, R, false, Image.FORMAT_RGBA8)
+	terrain_splat_image = img
+	terrain_heights.resize(R * R)
+	terrain_grid_origin = Vector2(float(tm["x0"]), float(tm["z0"]))
+	terrain_grid_cell = cell
+	terrain_grid_resolution = R
 	var edge_weights := PackedFloat32Array()
 	var edge_mottles := PackedFloat32Array()
-	if gshell > 0 or path_edge_enabled:
+	if gshell > 0 or path_edge_enabled or grass_blades_enabled:
 		edge_weights.resize(R * R)
 		edge_mottles.resize(R * R)
 		for z in R:
@@ -754,7 +787,8 @@ func _build_splat() -> void:
 		var iz := int(round((p.z - float(tm["z0"])) / cell))
 		if ix >= 0 and iz >= 0 and ix < R and iz < R:
 			img.set_pixel(ix, iz, Color(C[i].r, C[i].g, C[i].b, 1.0))
-			if gshell > 0 or path_edge_enabled:
+			terrain_heights[iz * R + ix] = p.y
+			if gshell > 0 or path_edge_enabled or grass_blades_enabled:
 				var color := C[i]
 				var dirt := _grass_smoothstep(0.4, 0.6, color.r)
 				var alt := _grass_smoothstep(0.4, 0.6, color.g)
@@ -762,7 +796,7 @@ func _build_splat() -> void:
 				edge_weights[iz * R + ix] = (1.0 - dirt) * (1.0 - alt) * (1.0 - rock)
 	splat_tex = ImageTexture.create_from_image(img)
 	RenderingServer.global_shader_parameter_set("wa_splat_st", Vector3(float(tm["x0"]), float(tm["z0"]), (R - 1) * cell))
-	if gshell > 0 or path_edge_enabled:
+	if gshell > 0 or path_edge_enabled or grass_blades_enabled:
 		# 草の縁までの符号つき距離（m。草の内側が正、土・砂・岩の側が負。R 画素に ±GEDGE_RANGE で入れる）。細い道でも幅が崩れない
 		edge_weights = _blur_grass_weights(edge_weights, R, 1.0)   # 画素の階段を少しならす
 		edge_weights = _grass_signed_distance(edge_weights, R, cell)
@@ -784,6 +818,210 @@ func _build_splat() -> void:
 			sm.set_shader_parameter("edge_w", gshell_edge_width)
 		ground_material.set_shader_parameter("edge_w", gshell_edge_width)
 		ground_material.set_shader_parameter("shell_edge_mottle", gshell_mottle)
+
+
+## 草刃用の 7 三角メッシュを作り、草地だけを 8m 区画の MultiMesh へ置く。
+func _build_grass_blades() -> void:
+	if not grass_blades_enabled or terrain_splat_image == null or grass_edge_tex == null:
+		return
+	var cfg := grass_blade_style
+	var height_max := maxf(0.05, float(cfg.get("h", 0.9)))
+	var height_min := clampf(float(cfg.get("hmin", height_max * 0.55)), 0.05, height_max)
+	var density := clampf(float(cfg.get("density", 28.0)), 1.0, 100.0)
+	var blade_width := clampf(float(cfg.get("w", 0.05)), 0.015, 0.2)
+	var clump_size := clampf(float(cfg.get("clump", 1.6)), 0.5, 6.0)
+	var seed := int(spec.get("seed", 1))
+	var terrain: Dictionary = placed["terrain"]
+	var x0 := float(terrain["x0"])
+	var z0 := float(terrain["z0"])
+	var size := float(terrain["size"])
+	var x1 := x0 + size
+	var z1 := z0 + size
+	var spacing := 1.0 / sqrt(density)
+	var clumps := _grass_blade_clumps(x0, x1, z0, z1, clump_size, height_min, height_max, seed)
+	var blade_mesh := _grass_blade_mesh()
+	var material := ShaderMaterial.new()
+	material.shader = SH_GRASS_BLADE
+	material.set_shader_parameter("t_grass", _tex("ground_grass"))
+	material.set_shader_parameter("t_dirt", _tex("ground_dirt"))
+	material.set_shader_parameter("t_rock", _tex("rock_face"))
+	material.set_shader_parameter("t_noise", _tex("noise_soft"))
+	material.set_shader_parameter("t_splat", splat_tex)
+	material.set_shader_parameter("t_grass_edge", grass_edge_tex)
+	material.set_shader_parameter("grass_edge_st", grass_edge_st)
+	material.set_shader_parameter("shell_edge_mottle", gshell_mottle)
+	material.set_shader_parameter("gedge", gedge)
+	material.set_shader_parameter("gwide", gwide)
+	material.set_shader_parameter("edge_w", gshell_edge_width)
+	material.set_shader_parameter("blade_width", blade_width)
+	material.set_shader_parameter("blade_height", height_max)
+	var ground: Dictionary = spec.get("ground", {})
+	var alt: String = {"cobble": "ground_cobble", "flagstone": "ground_flagstone"}.get(ground.get("alt", ""), "ground_sand")
+	material.set_shader_parameter("t_alt", _tex(alt))
+	if skyvis_available and placed.has("terrain"):
+		material.set_shader_parameter("t_skyvis", load("res://data/%s/skyvis.png" % map_name))
+		material.set_shader_parameter("skyvis_origin", Vector2(float(terrain["x0"]), float(terrain["z0"])))
+		material.set_shader_parameter("skyvis_size", float(terrain["size"]))
+		material.set_shader_parameter("skyvis_on", true)
+	var holder := Node3D.new()
+	holder.name = "GrassBlades"
+	add_child(holder)
+	var chunks := 0
+	var blades_total := 0
+	var chunk_x0 := floori(x0 / GBLADE_CHUNK)
+	var chunk_x1 := floori((x1 - 0.001) / GBLADE_CHUNK)
+	var chunk_z0 := floori(z0 / GBLADE_CHUNK)
+	var chunk_z1 := floori((z1 - 0.001) / GBLADE_CHUNK)
+	for cz in range(chunk_z0, chunk_z1 + 1):
+		for cx in range(chunk_x0, chunk_x1 + 1):
+			var left := maxf(x0, cx * GBLADE_CHUNK)
+			var right := minf(x1, (cx + 1) * GBLADE_CHUNK)
+			var near := maxf(z0, cz * GBLADE_CHUNK)
+			var far := minf(z1, (cz + 1) * GBLADE_CHUNK)
+			var transforms: Array[Transform3D] = []
+			var colors := PackedColorArray()
+			var custom_data := PackedColorArray()
+			for gx in range(floori(left / spacing) - 1, ceili(right / spacing) + 1):
+				for gz in range(floori(near / spacing) - 1, ceili(far / spacing) + 1):
+					var px := (gx + 0.15 + _grass_blade_hash(gx, gz, seed + 31) * 0.7) * spacing
+					var pz := (gz + 0.15 + _grass_blade_hash(gx, gz, seed + 79) * 0.7) * spacing
+					if px < left or px >= right or pz < near or pz >= far:
+						continue
+					if not _grass_blade_ground(px, pz):
+						continue
+					var feature := _grass_blade_nearest_clump(clumps, px, pz, clump_size)
+					var yaw := _grass_blade_hash(gx, gz, seed + 127) * TAU
+					var basis := Basis(Vector3.UP, yaw)
+					var lean_world := Vector3(cos(feature["angle"]), 0.0, sin(feature["angle"]))
+					var lean_local := basis.inverse() * lean_world
+					var width_scale := blade_width * (0.82 + _grass_blade_hash(gx, gz, seed + 181) * 0.36)
+					basis = basis.scaled(Vector3(width_scale, feature["height"], 1.0))
+					var chunk_center := Vector2((cx + 0.5) * GBLADE_CHUNK, (cz + 0.5) * GBLADE_CHUNK)
+					var root_y := _grass_blade_height(px, pz) + 0.012
+					transforms.append(Transform3D(basis, Vector3(px - chunk_center.x, root_y, pz - chunk_center.y)))
+					colors.append(feature["color"])
+					custom_data.append(Color(lean_local.x, lean_local.z, feature["phase"], feature["survival"]))
+			if transforms.is_empty():
+				continue
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_colors = true
+			mm.use_custom_data = true
+			mm.mesh = blade_mesh
+			mm.instance_count = transforms.size()
+			for i in transforms.size():
+				mm.set_instance_transform(i, transforms[i])
+				mm.set_instance_color(i, colors[i])
+				mm.set_instance_custom_data(i, custom_data[i])
+			var mmi := MultiMeshInstance3D.new()
+			mmi.name = "Blades_%d_%d" % [cx, cz]
+			mmi.multimesh = mm
+			mmi.material_override = material
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mmi.position = Vector3((cx + 0.5) * GBLADE_CHUNK, 0.0, (cz + 0.5) * GBLADE_CHUNK)
+			mmi.custom_aabb = AABB(Vector3(-GBLADE_CHUNK * 0.5, -5.0, -GBLADE_CHUNK * 0.5), Vector3(GBLADE_CHUNK, 15.0, GBLADE_CHUNK))
+			mmi.visibility_range_end = 68.0
+			mmi.set_meta("wa_grass_blade", true)
+			holder.add_child(mmi)
+			chunks += 1
+			blades_total += transforms.size()
+	print("[gblade] 区画 %d / 刃 %d / 三角 %d / density %.1f" % [chunks, blades_total, blades_total * 7, density])
+
+
+func _grass_blade_mesh() -> ArrayMesh:
+	var vertices := PackedVector3Array([
+		Vector3(-0.5, 0.0, 0.0), Vector3(0.5, 0.0, 0.0),
+		Vector3(-0.44, 0.28, 0.012), Vector3(0.44, 0.28, 0.012),
+		Vector3(-0.30, 0.58, 0.045), Vector3(0.30, 0.58, 0.045),
+		Vector3(-0.14, 0.82, 0.11), Vector3(0.14, 0.82, 0.11),
+		Vector3(0.0, 1.0, 0.16),
+	])
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	for i in vertices.size():
+		normals.append(Vector3(0.0, 0.0, 1.0))
+		colors.append(Color.WHITE)
+	var indices := PackedInt32Array([
+		0, 1, 3, 0, 3, 2,
+		2, 3, 5, 2, 5, 4,
+		4, 5, 7, 4, 7, 6,
+		6, 7, 8,
+	])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.custom_aabb = AABB(Vector3(-0.5, 0.0, -0.1), Vector3(1.0, 1.0, 0.4))
+	return mesh
+
+
+func _grass_blade_clumps(x0: float, x1: float, z0: float, z1: float, spacing: float, hmin: float, hmax: float, seed: int) -> Dictionary:
+	var result := {}
+	for z in range(floori(z0 / spacing) - 1, ceili(z1 / spacing) + 1):
+		for x in range(floori(x0 / spacing) - 1, ceili(x1 / spacing) + 1):
+			var h0 := _grass_blade_hash(x, z, seed + 13)
+			var h1 := _grass_blade_hash(x, z, seed + 23)
+			var h2 := _grass_blade_hash(x, z, seed + 37)
+			var shade := 0.96 + _grass_blade_hash(x, z, seed + 47) * 0.08
+			var green := 0.97 + _grass_blade_hash(x, z, seed + 53) * 0.07
+			var blue := 0.94 + _grass_blade_hash(x, z, seed + 61) * 0.1
+			var key := Vector2i(x, z)
+			result[key] = {
+				"center": Vector2((x + 0.2 + h0 * 0.6) * spacing, (z + 0.2 + h1 * 0.6) * spacing),
+				"angle": h2 * TAU,
+				"height": lerpf(hmin, hmax, _grass_blade_hash(x, z, seed + 73)),
+				"phase": _grass_blade_hash(x, z, seed + 83),
+				"survival": _grass_blade_hash(x, z, seed + 97),
+				"color": Color(shade, green, blue, 1.0),
+			}
+	return result
+
+
+func _grass_blade_nearest_clump(clumps: Dictionary, x: float, z: float, spacing: float) -> Dictionary:
+	var cell := Vector2i(floori(x / spacing), floori(z / spacing))
+	var nearest: Dictionary = {}
+	var best := INF
+	for dz in range(-1, 2):
+		for dx in range(-1, 2):
+			var feature: Dictionary = clumps[Vector2i(cell.x + dx, cell.y + dz)]
+			var delta: Vector2 = feature["center"] - Vector2(x, z)
+			var d2 := delta.length_squared()
+			if d2 < best:
+				best = d2
+				nearest = feature
+	return nearest
+
+
+func _grass_blade_ground(x: float, z: float) -> bool:
+	var uv := Vector2(x - terrain_grid_origin.x, z - terrain_grid_origin.y) / terrain_grid_cell
+	var ix := clampi(roundi(uv.x), 0, terrain_grid_resolution - 1)
+	var iz := clampi(roundi(uv.y), 0, terrain_grid_resolution - 1)
+	var c := terrain_splat_image.get_pixel(ix, iz)
+	return c.r < 0.68 and c.g < 0.68 and c.b < 0.78
+
+
+func _grass_blade_height(x: float, z: float) -> float:
+	var uv := Vector2(x - terrain_grid_origin.x, z - terrain_grid_origin.y) / terrain_grid_cell
+	var ix := clampi(floori(uv.x), 0, terrain_grid_resolution - 2)
+	var iz := clampi(floori(uv.y), 0, terrain_grid_resolution - 2)
+	var tx := clampf(uv.x - ix, 0.0, 1.0)
+	var tz := clampf(uv.y - iz, 0.0, 1.0)
+	var a := terrain_heights[iz * terrain_grid_resolution + ix]
+	var b := terrain_heights[iz * terrain_grid_resolution + ix + 1]
+	var c := terrain_heights[(iz + 1) * terrain_grid_resolution + ix]
+	var d := terrain_heights[(iz + 1) * terrain_grid_resolution + ix + 1]
+	return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), tz)
+
+
+static func _grass_blade_hash(x: int, z: int, seed: int) -> float:
+	var n := (x * 374761393 + z * 668265263 + seed * 1442695041) & 0xffffffff
+	n = ((n ^ (n >> 13)) * 1274126177) & 0xffffffff
+	n = (n ^ (n >> 16)) & 0xffffffff
+	return float(n) / 4294967295.0
 
 
 const GEDGE_RANGE := 3.0

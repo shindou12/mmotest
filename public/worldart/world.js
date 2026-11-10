@@ -280,7 +280,7 @@ const GROUND_BAKE_ON = !!(GROUND_BAKE > 0 && skyvisTex && placed.terrain);
 // gcontact=0.5 物の根元の暗さ（配置から地面の暗さの絵を作る）、gcr 半径の倍率
 // gacc=1.7 草の房は際立たせる所（道の縁・物の根元）だけに残し、この倍率で大きくする。gaccr はそれ以外に残す割合
 const GSHELL = Math.max(0, Math.floor(num('gshell', SS.gshell ?? 0)));
-const GSH = num('gsh', SS.gsh ?? 0.18), GSD = num('gsd', SS.gsd ?? 0.045);
+const GSH = num('gsh', SS.gsh ?? 0.28), GSD = num('gsd', SS.gsd ?? 0.045);
 const GPATCH = num('gpatch', SS.gpatch ?? 0), GPATCHC = num('gpatchc', SS.gpatchc ?? 0.5);
 const GCOMB = num('gcomb', SS.gcomb ?? 0);
 const GCONTACT = num('gcontact', 0), GCR = num('gcr', 1);
@@ -308,7 +308,7 @@ if (GCONTACT > 0 && placed.terrain) {
 }
 function groundMaterial(shell = null) {
   const m = new THREE.MeshLambertMaterial({ vertexColors: false });
-  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}${shell ? ':shell-m0179' : ''}:g179-${GPATCH > 0}-${!!contactTex}`;
+  m.customProgramCacheKey = () => `ground:skyvis-${GROUND_BAKE_ON ? 1 : 0}${GROUND_WIDE_ON ? ':wide-v2' : ''}${GROUND_EDGE_ON ? ':edge-v1' : ''}${shell ? ':shell-m0183-blade' : ''}:g179-${GPATCH > 0}-${!!contactTex}`;
   if (shell) m.defines = { SHELL: 1 };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { uShellH: shell ? shell.h : { value: 0 }, uShellHeight: { value: GSH }, uShellSpacing: { value: GSD }, uComb: { value: GCOMB },
@@ -345,6 +345,15 @@ vWN = normalize(mat3(modelMatrix) * normal);
         uniform sampler2D tGrass, tDirt, tAlt, tRock, tNoise, tSplat; uniform vec3 uGrassTint, uDirtTint, uST; uniform float uAltScale, uRockScale, uRockPix, uRockSoft, uGWide; uniform vec2 uWater; uniform vec3 uRockTint, uLushTint, uAltTint; uniform float uLushAmt, uLushBias;
         ${GROUND_EDGE_ON ? 'uniform float uGSoft, uGDry; uniform vec3 uDryGrass;' : ''}
         varying vec4 vSplat; varying vec3 vW; varying vec3 vWN;
+        // 0.65m の値ノイズで草の房を作り、端だけ刃ごとの揺れを足す
+        float shellEdgeHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float shellEdgeClump(vec2 p) {
+          vec2 cell = floor(p), f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          float a = shellEdgeHash(cell), b = shellEdgeHash(cell + vec2(1.0, 0.0));
+          float c = shellEdgeHash(cell + vec2(0.0, 1.0)), d = shellEdgeHash(cell + vec2(1.0, 1.0));
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
 `)
       .replace('#include <map_fragment>', `
         vec2 wp = vW.xz;
@@ -396,21 +405,29 @@ vWN = normalize(mat3(modelMatrix) * normal);
         float contact = uContact > 0.0 ? texture2D(tContact, (wp - uCO) / uCS).r : 0.0;
         #ifdef SHELL
         {
-          vec2 cell = floor(wp / uShellSpacing), local = fract(wp / uShellSpacing);
+          // 草 1 本を、なびく向きに 3 倍長い楕円にする（丸い粒に見えないように）。格子もその向きにそろえ、列ごとに半分ずらす（M-0183、Godot と同じ）
+          const vec2 BLADE_DIR = vec2(0.8436, 0.5369);
+          vec2 bq = vec2(dot(wp, vec2(-BLADE_DIR.y, BLADE_DIR.x)), dot(wp, BLADE_DIR));
+          vec2 bsz = vec2(uShellSpacing, uShellSpacing * 3.0);
+          bq.x += mod(floor(bq.y / bsz.y), 2.0) * 0.5 * bsz.x;
+          vec2 cell = floor(bq / bsz), bl = fract(bq / bsz);
           float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453), seed2 = fract(sin(dot(cell, vec2(269.5, 183.3))) * 43758.5453);
-          vec2 center = vec2(0.18 + seed * 0.64, 0.18 + seed2 * 0.64);
-          float radius = 0.46 * (1.0 - 0.78 * uShellH);
-          float heightVar = mix(0.5, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
+          float heightVar = mix(0.7, 1.0, texture2D(tNoise, wp / 2.0).r) * (uPatch > 0.0 ? mix(1.0 - 0.45 * uPatchC, 1.0 + 0.1 * uPatchC, patchF) : 1.0);
+          vec2 bd = (bl - vec2(0.3 + seed * 0.4, 0.42 + seed2 * 0.16)) / vec2(0.52 * (1.0 - 0.6 * uShellH), 0.56 * (1.0 - 0.4 * uShellH));
+          if (dot(bd, bd) > 1.0 || heightVar < uShellH) discard;
           float gwE = gwS;
           if (uEdge > 0.0) {   // 道の縁: 草を道へ向けて間引き、背を低くする（高さで消すと縁が線になる。数で減らす）
             float seed3 = fract(seed * 57.3 + seed2 * 91.7);
-            if (seed3 > pow(1.0 - te, 1.4) * 1.08) discard;
-            gwE = (1.0 - wa) * (1.0 - wr) * mix(1.0, 0.5, te);
-            col = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+            float keepThreshold = 1.0 - pow(1.0 - te, 1.4) * 1.08;
+            float clumpJitter = (seed3 - 0.5) * 0.15 * (1.0 - smoothstep(0.85, 1.0, te));
+            if (shellEdgeClump(wp / 0.65) < keepThreshold + clumpJitter) discard;
+            gwE = (1.0 - wa) * (1.0 - wr) * mix(1.0, 0.25, te);
+            vec3 edgeGrass = grass * mix(vec3(1.0), vec3(1.12, 1.0, 0.68), smoothstep(0.0, 0.7, te));
+            col = mix(edgeGrass, col, smoothstep(0.0, 1.0, te));
           }
-          if (distance(local, center) > radius || gwE * heightVar < uShellH) discard;
-          col *= mix(0.72, 1.0, uShellH);
-          col = mix(col, col * vec3(1.08, 1.06, 0.85), smoothstep(0.6, 1.0, uShellH));
+          if (gwE * heightVar < uShellH) discard;
+          col *= mix(mix(0.85, 1.0, uShellH), mix(0.95, 1.0, uShellH), te);
+          col = mix(col, col * vec3(1.04, 1.02, 0.95), smoothstep(0.6, 1.0, uShellH));
           contact *= 1.0 - 0.5 * uShellH;
         }
         #endif

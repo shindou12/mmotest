@@ -1,0 +1,7 @@
+Godot f1_field F01 open-grass crop, source PNGs before JPG resize.
+crop_xyxy=(1050, 350, 1450, 700); metric=mean sRGB Rec.709 luma, 8-bit scale
+before=120.29
+after=126.01
+change=+4.76%
+requested_viewport=1920x1080; captured_viewport=1684x1031; delivered JPGs resized to 1920x1080 with Lanczos.
+closeup crop: near_F01 xyxy=(30, 150, 350, 470), 320x320 source, enlarged 3x on each side; pair=1920x960.
