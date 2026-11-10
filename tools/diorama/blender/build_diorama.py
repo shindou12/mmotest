@@ -16,7 +16,7 @@ W = D = 72
 COUNT = W * D
 TILE = 256
 ATLAS_W, ATLAS_H, MARGIN = 2048, 1024, 4
-BEVEL, BEVEL_SEGMENTS = 0.045, 1
+BEVEL, BEVEL_SEGMENTS = 0.09, 2
 STAGE_IDS = ["meadow", "canyon", "snow", "volcano", "skyisles"]
 NAMES = {"meadow": "草原と滝の川", "canyon": "砂漠の峡谷", "snow": "雪山と氷の川",
          "volcano": "火山と溶岩の川", "skyisles": "浮島"}
@@ -205,6 +205,8 @@ def face_from_grid_rect(key, axes, u0, u1, v0, v1):
 
 
 def merge_unit_faces(specs):
+    # 面をまとめると 1 マスぶんの絵が広い面に引き伸ばされるので、まとめない（1 マス 1 枚）
+    return list(specs)
     masks, other = {}, []
     for spec in specs:
         parsed = face_grid_key(spec)

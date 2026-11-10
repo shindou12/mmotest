@@ -1155,7 +1155,7 @@ function backgroundColorFromLight(light, stageId) {
   const color = new THREE.Color(light.bgBottom || light.fog || '#263239');
   const hsl = { h: 0, s: 0, l: 0 };
   color.getHSL(hsl);
-  color.setHSL(hsl.h, clamp(Math.max(hsl.s, 0.2) * 1.12, 0.18, 0.62), 0.105);
+  color.setHSL(hsl.h, clamp(hsl.s, 0.15, 0.38), 0.05);
   return color;
 }
 
