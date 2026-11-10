@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageStat
+from PIL import Image, ImageDraw, ImageEnhance, ImageStat
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,8 +16,6 @@ SHOT_DIR = ROOT / "art" / "shots" / "diorama" / "tex"
 TILE_SIZE = 256
 EXTRUDE = 4
 INTERIOR_SIZE = TILE_SIZE - EXTRUDE * 2
-SEAM_BLUR_RATIO = 0.028
-SEAM_BAND_RATIO = 0.06
 
 # docs/diorama/contract.md の固定配置。
 TILE_ROWS = [
@@ -28,8 +27,9 @@ TILE_ROWS = [
 
 BRIGHT_MATERIALS = {"grass_top", "grass_side", "sand", "sandstone_side", "snow_top", "snow_side"}
 DARK_MATERIALS = {"basalt", "obsidian"}
-# 個別に描き直した元画像を、シートからの切り出しより優先する。
-SOURCE_OVERRIDES = {"cactus": "cactus_v2.png"}
+# 全材のシームレス画像を、元のシート切り出しより優先する。
+SOURCE_OVERRIDES = {name: f"{name}_seamless.png" for row in TILE_ROWS for name in row}
+REFERENCE_OVERRIDES = {"cactus": "cactus_v2.png"}
 
 
 def mean_color_and_brightness(image: Image.Image) -> tuple[tuple[int, int, int], float]:
@@ -49,23 +49,17 @@ def crop_center_square(image: Image.Image) -> Image.Image:
     return image.crop((left, top, left + side, top + side))
 
 
-def repair_seams(image: Image.Image, wrap_vertical: bool) -> Image.Image:
-    """半分ずらし、中央のつなぎ目を薄くぼかして混ぜる。"""
-    width, height = image.size
-    shifted = ImageChops.offset(image, width // 2, height // 2 if wrap_vertical else 0)
-    radius = max(2, round(min(width, height) * SEAM_BLUR_RATIO))
-    blurred = shifted.filter(ImageFilter.GaussianBlur(radius=radius))
-    band = max(6, round(min(width, height) * SEAM_BAND_RATIO))
-    mask = Image.new("L", image.size, 0)
-    pixels = mask.load()
-    center_x = width // 2
-    center_y = height // 2
-    for y in range(height):
-        y_weight = max(0.0, 1.0 - abs(y - center_y) / band) if wrap_vertical else 0.0
-        for x in range(width):
-            x_weight = max(0.0, 1.0 - abs(x - center_x) / band)
-            pixels[x, y] = round(255 * max(x_weight, y_weight))
-    return Image.composite(blurred, shifted, mask)
+def match_mean_color(image: Image.Image, reference: Image.Image) -> Image.Image:
+    """描き直した絵の平均 RGB を元素材に合わせる。"""
+    image = image.convert("RGB")
+    target = ImageStat.Stat(reference.convert("RGB")).mean
+    current = ImageStat.Stat(image).mean
+    lookup = [
+        max(0, min(255, value + round(target[channel] - current[channel])))
+        for channel in range(3)
+        for value in range(256)
+    ]
+    return image.point(lookup)
 
 
 def adjust_required_brightness(name: str, image: Image.Image) -> Image.Image:
@@ -128,16 +122,64 @@ def add_block_edge(image: Image.Image) -> Image.Image:
     return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
 
 
-def prepare_tile(name: str) -> Image.Image:
-    path = SOURCE_DIR / SOURCE_OVERRIDES.get(name, f"{name}.png")
+def prepare_tile(name: str) -> tuple[Image.Image, Image.Image]:
+    path = SOURCE_DIR / SOURCE_OVERRIDES[name]
     if not path.is_file():
         raise FileNotFoundError(f"元画像がありません: {path}")
-    source = Image.open(path).convert("RGB")
+    reference_path = SOURCE_DIR / REFERENCE_OVERRIDES.get(name, f"{name}.png")
+    reference = crop_center_square(Image.open(reference_path).convert("RGB"))
+    source = match_mean_color(Image.open(path), reference)
     source = crop_center_square(source)
     interior = source.resize((INTERIOR_SIZE, INTERIOR_SIZE), Image.Resampling.LANCZOS)
-    interior = repair_seams(interior, wrap_vertical=not name.endswith("_side"))
     interior = adjust_required_brightness(name, interior)
-    return add_block_edge(extrude_edges(interior))
+    interior = preserve_outline_strength(interior, reference)
+    return add_block_edge(extrude_edges(interior)), interior
+
+
+def laplacian_variance(image: Image.Image, center_band: bool = False) -> float:
+    """グレースケールの4近傍ラプラシアン分散を返す。"""
+    gray = image.convert("L")
+    pixels = gray.load()
+    width, height = gray.size
+    center_x, center_y = width // 2, height // 2
+    total = 0
+    total_squared = 0
+    count = 0
+    for y in range(1, height - 1):
+        in_horizontal_band = center_y - 12 <= y < center_y + 12
+        for x in range(1, width - 1):
+            in_vertical_band = center_x - 12 <= x < center_x + 12
+            if center_band and not (in_vertical_band or in_horizontal_band):
+                continue
+            value = 4 * pixels[x, y] - pixels[x - 1, y] - pixels[x + 1, y] - pixels[x, y - 1] - pixels[x, y + 1]
+            total += value
+            total_squared += value * value
+            count += 1
+    mean = total / count
+    return total_squared / count - mean * mean
+
+
+def preserve_outline_strength(image: Image.Image, reference: Image.Image) -> Image.Image:
+    """コントラストだけを補い、元素材の輪郭分散の 85% を保つ。"""
+    reference_256 = reference.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.LANCZOS)
+    target = laplacian_variance(reference_256) * 0.85
+    result = image
+    for _ in range(4):
+        current = laplacian_variance(result.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.LANCZOS))
+        if current >= target or current <= 0:
+            break
+        factor = math.sqrt(target / current) * 1.02
+        result = ImageEnhance.Contrast(result).enhance(factor)
+    return result
+
+
+def edge_color_delta(texture: Image.Image) -> tuple[tuple[float, float, float], float]:
+    """外周の縁線を除いた左右端列の平均色差を返す。"""
+    width, height = texture.size
+    left = ImageStat.Stat(texture.crop((0, 0, 1, height))).mean
+    right = ImageStat.Stat(texture.crop((width - 1, 0, width, height))).mean
+    delta = tuple(abs(a - b) for a, b in zip(left, right))
+    return delta, sum(delta) / 3
 
 
 def save_tiling_preview(tiles: dict[str, Image.Image]) -> Path:
@@ -162,11 +204,13 @@ def save_tiling_preview(tiles: dict[str, Image.Image]) -> Path:
 def main() -> None:
     ATLAS_DIR.mkdir(parents=True, exist_ok=True)
     tiles: dict[str, Image.Image] = {}
+    textures: dict[str, Image.Image] = {}
     atlas = Image.new("RGB", (8 * TILE_SIZE, 4 * TILE_SIZE))
     for row, names in enumerate(TILE_ROWS):
         for col, name in enumerate(names):
-            tile = prepare_tile(name)
+            tile, texture = prepare_tile(name)
             tiles[name] = tile
+            textures[name] = texture
             atlas.paste(tile, (col * TILE_SIZE, row * TILE_SIZE))
 
     atlas_path = ATLAS_DIR / "atlas.png"
@@ -193,6 +237,31 @@ def main() -> None:
         for name in row:
             color, brightness = mean_color_and_brightness(tiles[name].crop((EXTRUDE, EXTRUDE, TILE_SIZE - EXTRUDE, TILE_SIZE - EXTRUDE)))
             print(f"{name:<14} #{color[0]:02X}{color[1]:02X}{color[2]:02X}   {brightness:.3f}")
+
+    print("material       center/whole  output/source  LR mean dRGB       mean d")
+    failures = []
+    for row in TILE_ROWS:
+        for name in row:
+            texture = textures[name].resize((TILE_SIZE, TILE_SIZE), Image.Resampling.LANCZOS)
+            reference_name = REFERENCE_OVERRIDES.get(name, f"{name}.png")
+            source_path = SOURCE_DIR / reference_name
+            source = crop_center_square(Image.open(source_path).convert("RGB"))
+            source_reference = source.resize((TILE_SIZE, TILE_SIZE), Image.Resampling.LANCZOS)
+            whole_strength = laplacian_variance(texture)
+            center_strength = laplacian_variance(texture, center_band=True)
+            source_strength = laplacian_variance(source_reference)
+            center_ratio = center_strength / whole_strength if whole_strength else 0.0
+            preserved_ratio = whole_strength / source_strength if source_strength else 0.0
+            delta, mean_delta = edge_color_delta(textures[name])
+            print(
+                f"{name:<14} {center_ratio:>6.3f}        {preserved_ratio:>6.3f}       "
+                f"({delta[0]:4.1f},{delta[1]:4.1f},{delta[2]:4.1f})    {mean_delta:5.2f}"
+            )
+            if center_ratio < 0.8 or preserved_ratio < 0.85:
+                failures.append(f"{name}: center/whole={center_ratio:.3f}, output/source={preserved_ratio:.3f}")
+
+    if failures:
+        raise SystemExit("輪郭の基準を満たさないマス: " + "; ".join(failures))
 
 
 if __name__ == "__main__":
