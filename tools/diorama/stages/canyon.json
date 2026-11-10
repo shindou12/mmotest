@@ -4,7 +4,7 @@
   "seed": 1,
   "spawn": [8, 62],
   "waterLevel": 5.4,
-  "materials": ["sand", "sandstone", "redrock", "wood", "water"],
+  "materials": ["sand", "sandstone", "redrock", "wood", "grass"],
   "ambience": "desert",
   "particles": "dust",
   "light": {
@@ -14,8 +14,9 @@
     "bloom": 0.18, "exposure": 0.9
   },
   "params": {
-    "mesaHeight": [24, 28], "valleyFloor": [4, 8], "canyonWidth": [4, 6],
-    "oasisCenter": [37, 38], "oasisRadii": [4.0, 3.5],
-    "treeCount": [70, 82], "smallCount": 420
+    "mesaHeight": [24, 28], "valleyFloor": [4, 8], "canyonWidth": [8, 14],
+    "oasisCenter": [36, 38], "oasisRadii": [5.0, 4.5],
+    "treeCount": [60, 60], "cactusCount": 35, "palmCount": [12, 12],
+    "deadwoodCount": 13, "smallCount": 420
   }
 }
