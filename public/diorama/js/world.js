@@ -56,7 +56,7 @@ const camera = new THREE.PerspectiveCamera(24, window.innerWidth / window.innerH
 const FAR_PITCH = THREE.MathUtils.degToRad(52);
 const NEAR_PITCH = THREE.MathUtils.degToRad(36);
 const CAMERA_NEAR_DISTANCE = 18;
-const yaw = THREE.MathUtils.degToRad(45);
+const yaw = THREE.MathUtils.degToRad(14);   // 見本と同じ、ほぼ正面からの見下ろし
 const cameraForwardXZ = new THREE.Vector2(-Math.sin(yaw), -Math.cos(yaw));
 const cameraRightXZ = new THREE.Vector2(Math.cos(yaw), -Math.sin(yaw));
 const cameraGoal = new THREE.Vector3();
@@ -984,9 +984,10 @@ function setLight(stage) {
   hemiLight.color.set(light.skyColor || '#c6e6ff');
   hemiLight.groundColor.set(light.groundColor || '#635747');
   const scale = clamp(Number(light.sunPower ?? 3) / 3, 0.65, 1.15);
-  hemiLight.intensity = Number(light.hemiPower ?? 0.9) * scale;
+  // r160 の光は π で割られるので、日なたが白飛びしない範囲で π 前後の強さにする（影の中は日なたの 55% くらい）
+  hemiLight.intensity = Math.max(1.5, 2.1 * Number(light.hemiPower ?? 0.9) / 0.9);
   sunLight.color.set(light.sunColor || '#ffe7bf');
-  sunLight.intensity = hemiLight.intensity * 0.67;
+  sunLight.intensity = 2.3 * scale;
   const lightDistance = Math.max(40, size * 1.2);
   sunLight.position.copy(center).addScaledVector(sunDirection, lightDistance);
   sunLight.target.position.copy(center);
