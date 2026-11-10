@@ -1,0 +1,401 @@
+{
+  "origin": "このCodexチャットで制作した手描き風アセット",
+  "conversation": "01a197da-ca51-7162-82ef-489108b86f5c",
+  "date": "2026-11-04",
+  "viewer": "https://painterly-stump-viewer.shindou-kazuma12.chatgpt.site/",
+  "archives": [
+    {
+      "name": "荷馬車",
+      "path": "current/cart-lab.zip",
+      "bytes": 571318,
+      "sha256": "265867e0dc297018e3ec5d76231e4bce7d0a1fe39e121d45f5dd5ad10a8e0285",
+      "contents": [
+        "Painterly_Cargo_Cart_Asset.blend",
+        "Painterly_Cargo_Cart_Asset.glb",
+        "README.txt",
+        "Textures/wood_trim.png"
+      ]
+    },
+    {
+      "name": "木箱・描き込みX版",
+      "path": "current/crate-painted-x.zip",
+      "bytes": 4562115,
+      "sha256": "e73634dd4a4a02bceb7e0973d000df7dec99a7ece2d87e35e51aca8730a99b46",
+      "contents": [
+        "crate_sol_painted_x.glb",
+        "crate_sol_painted_x.blend",
+        "crate_painted_x_basecolor.png",
+        "README.txt"
+      ]
+    },
+    {
+      "name": "木の柵",
+      "path": "current/fence.zip",
+      "bytes": 8426942,
+      "sha256": "a27b167fd4b9900cd23b93d2a02d44503bbf258b53c8e07d3cf080f665da6158",
+      "contents": [
+        "Painterly_Fence_Asset/Fence_Painterly.glb",
+        "Painterly_Fence_Asset/Fence_Painterly.blend",
+        "Painterly_Fence_Asset/Textures/fence_basecolor.png",
+        "Painterly_Fence_Asset/README.txt"
+      ]
+    },
+    {
+      "name": "針葉樹・元の葉を少し細長くした版",
+      "path": "current/fir-v1.zip",
+      "bytes": 10640816,
+      "sha256": "05c7b4fdbca1e6831428bdaab16cc2e46e04795cf51e936375ad3c2dfd6ca21f",
+      "contents": [
+        "Painterly_Fir.glb",
+        "Painterly_Fir.blend",
+        "Textures/BaseColor.png",
+        "README.md"
+      ]
+    },
+    {
+      "name": "lantern-blockout",
+      "path": "variants/lantern-blockout.zip",
+      "bytes": 116145,
+      "sha256": "5019d866a325f74f889a44e7f6c274cdb6d341c585354e861e4d16757492fc40",
+      "contents": [
+        "Stone_Lantern_Blockout/Stone_Lantern_Blockout_v2.glb",
+        "Stone_Lantern_Blockout/Stone_Lantern_Blockout_v2.blend",
+        "Stone_Lantern_Blockout/README.md"
+      ]
+    },
+    {
+      "name": "lantern-painted",
+      "path": "variants/lantern-painted.zip",
+      "bytes": 16152056,
+      "sha256": "5ed159175e40b3a76b48ee822707a395bd3b95eb129cfbdd1786d4165f74289a",
+      "contents": [
+        "Painterly_Stone_Lantern/Stone_Lantern_Painterly.glb",
+        "Painterly_Stone_Lantern/Stone_Lantern_Painterly.blend",
+        "Painterly_Stone_Lantern/Textures/lantern_basecolor.png",
+        "Painterly_Stone_Lantern/Textures/lantern_emission.png",
+        "Painterly_Stone_Lantern/README.md"
+      ]
+    },
+    {
+      "name": "石灯籠・補助マップ比較版",
+      "path": "current/lantern-surface.zip",
+      "bytes": 15803716,
+      "sha256": "6462b1a1f38860805f98730ad2afa57e7e23ec771f6098769fb65b91e3b9f165",
+      "contents": [
+        "Lantern_Curvature_Roughness/Lantern_Curvature_Roughness.blend",
+        "Lantern_Curvature_Roughness/Lantern_Curvature_Roughness.glb",
+        "Lantern_Curvature_Roughness/README.md",
+        "Lantern_Curvature_Roughness/Textures/lantern_basecolor.png",
+        "Lantern_Curvature_Roughness/Textures/lantern_emission.png",
+        "Lantern_Curvature_Roughness/Textures/lantern_orm.png"
+      ]
+    },
+    {
+      "name": "ヤシの木",
+      "path": "current/palm-v2.zip",
+      "bytes": 13829675,
+      "sha256": "3d89dd9bbf5bf5c0c21e55f6e44f2b8f7999ce2cebc00d7a7ccf2f8012772358",
+      "contents": [
+        "Painterly_Palm_v2/Palm_Painterly_v2.glb",
+        "Painterly_Palm_v2/Palm_Painterly_v2.blend",
+        "Painterly_Palm_v2/Textures/palm_v2_basecolor.png",
+        "Painterly_Palm_v2/README.md"
+      ]
+    },
+    {
+      "name": "palm",
+      "path": "variants/palm.zip",
+      "bytes": 12689098,
+      "sha256": "fb85019a735874cfc709b06684c5e3b1f5c4c68f249c4f451e6bd96c08519d32",
+      "contents": [
+        "Painterly_Palm/Palm_Painterly.glb",
+        "Painterly_Palm/Palm_Painterly.blend",
+        "Painterly_Palm/Textures/palm_basecolor.png",
+        "Painterly_Palm/README.md"
+      ]
+    },
+    {
+      "name": "岩",
+      "path": "current/rock-v2.zip",
+      "bytes": 11933392,
+      "sha256": "d19f58f9e452ce01a7f0514f24d0269cd98ff3feb458505d85e6e66853aee63d",
+      "contents": [
+        "Painterly_Rock_Asset_v2/Rock_Painterly_v2.glb",
+        "Painterly_Rock_Asset_v2/Rock_Painterly_v2.blend",
+        "Painterly_Rock_Asset_v2/Textures/rock_v2_basecolor.png",
+        "Painterly_Rock_Asset_v2/README.txt"
+      ]
+    },
+    {
+      "name": "rock",
+      "path": "variants/rock.zip",
+      "bytes": 13043082,
+      "sha256": "d9c32104bd15b658268bfea9ba0bddd690ea91b2d625150b02248e18758c79ce",
+      "contents": [
+        "Painterly_Rock_Asset/Rock_Painterly.glb",
+        "Painterly_Rock_Asset/Rock_Painterly.blend",
+        "Painterly_Rock_Asset/Textures/rock_basecolor.png",
+        "Painterly_Rock_Asset/README.txt"
+      ]
+    },
+    {
+      "name": "stump-lab",
+      "path": "variants/stump-lab.zip",
+      "bytes": 9563265,
+      "sha256": "57f32745ac176d3518f662362afd6e59d5dfbdd5b8cee9907283504fc99e8af6",
+      "contents": [
+        "Painterly_Stump_Baked_Asset.blend",
+        "Painterly_Stump_Baked_Asset.glb",
+        "README.txt",
+        "Textures/basecolor.png",
+        "Textures/normal.png"
+      ]
+    },
+    {
+      "name": "元の切り株ブロックアウト",
+      "path": "current/stump-original-blockout.zip",
+      "bytes": 233230,
+      "sha256": "e91af83e4e9e6538e383e8e944f68cda5e1bf1c3f27e8ed4cebf95370eabaea9",
+      "contents": [
+        "Original_Stump_Blockout.blend",
+        "Original_Stump_Blockout.glb",
+        "README.txt"
+      ]
+    },
+    {
+      "name": "切り株・制作工程版",
+      "path": "current/stump-pipeline.zip",
+      "bytes": 14521429,
+      "sha256": "e47e954354acfd67e918fa421e4633075e5993fe94649af07500cfffe0c490c0",
+      "contents": [
+        "Painterly_Stump.glb",
+        "Painterly_Stump.blend",
+        "README.txt",
+        "Textures/basecolor.png",
+        "Textures/normal.png",
+        "Textures/orm.png"
+      ]
+    },
+    {
+      "name": "stump",
+      "path": "variants/stump.zip",
+      "bytes": 15220716,
+      "sha256": "196a35ce5d424b839c89ca2d0ea6bf83c5103b5f7d76aff22ee0830dbdbf76fb",
+      "contents": [
+        "Painterly_Stump_Asset/Stump_Painterly.glb",
+        "Painterly_Stump_Asset/Stump_Painterly.blend",
+        "Painterly_Stump_Asset/Textures/stump_basecolor.png",
+        "Painterly_Stump_Asset/README.txt"
+      ]
+    },
+    {
+      "name": "丸い広葉樹",
+      "path": "current/tree-cute-v1.zip",
+      "bytes": 11513903,
+      "sha256": "dde008d3df2ae44348b3cf1ac3ef05fd0e6860f8b6fdb594d2e50a309b656347",
+      "contents": [
+        "Cute_Broadleaf.glb",
+        "Cute_Broadleaf.blend",
+        "Textures/basecolor.png",
+        "README.txt"
+      ]
+    },
+    {
+      "name": "こんもりした広葉樹",
+      "path": "current/tree-full-v1.zip",
+      "bytes": 1925292,
+      "sha256": "17893a59fe4c14757c0ba212de3180dc4916f323fefb0712ae683db766226794",
+      "contents": [
+        "Broadleaf_Fuller.blend",
+        "Broadleaf_Fuller.glb",
+        "README.md",
+        "textures/bark_paint.png",
+        "textures/leaf_pigment.png"
+      ]
+    },
+    {
+      "name": "tree-lab",
+      "path": "variants/tree-lab.zip",
+      "bytes": 1923820,
+      "sha256": "0d1d035c564d21b4e88163762ee436b4e01d4617e68a21ab0ae86f10b29fcd72",
+      "contents": [
+        "Painterly_Broadleaf_Asset.blend",
+        "Painterly_Broadleaf_Asset.glb",
+        "README.txt",
+        "Textures/bark_paint.png",
+        "Textures/leaf_pigment.png"
+      ]
+    },
+    {
+      "name": "参考画像の広葉樹",
+      "path": "current/tree-reference-v1.zip",
+      "bytes": 13159997,
+      "sha256": "092927f5b4e4f2c568af83e4a5224176f4f9b8ad3b0bf003e254310986d5d82f",
+      "contents": [
+        "Reference_Oak.glb",
+        "Reference_Oak.blend",
+        "Paint_Source.blend",
+        "README.md",
+        "Textures/BaseColor.png"
+      ]
+    },
+    {
+      "name": "workflow-recipes",
+      "path": "methods/workflow-recipes.zip",
+      "bytes": 8080528,
+      "sha256": "b6dbf1b21e68c2909dde25d6a2b0c01e02991dc0b4431f05f0cdb475ebbb37c2",
+      "contents": [
+        "README.txt",
+        "ART_DIRECTION.md",
+        "cart/EVIDENCE_LEDGER.md",
+        "cart/M01/reference_3view.png",
+        "cart/M01/reference_prompt.txt",
+        "cart/M01/replay.py",
+        "cart/M01/wood_trim.png",
+        "cart/M02/replay.py",
+        "cart/M02/wood_trim.png",
+        "cart/M03/replay.py",
+        "cart/M03/wood_trim.png",
+        "cart/M04/replay.py",
+        "cart/M04/wood_trim.png",
+        "cart/M05/replay.py",
+        "cart/M05/wood_trim.png",
+        "cart/M06/paint_broad.py",
+        "cart/M06/replay.py",
+        "cart/M06/wood_trim.png",
+        "cart/M07/replay.py",
+        "cart/M07/wood_trim.png",
+        "cart/M21/EVALUATION.md",
+        "cart/M21/black_metal_verification_corrected.json",
+        "cart/M21/failed_emission_only_export.json",
+        "cart/M21/paint_broad.py",
+        "cart/M21/refine_recipe.py",
+        "cart/M21/repair_initial_export.py",
+        "cart/M21/replay.py",
+        "cart/M21/review_rig.py",
+        "cart/M21/roundtrip_verification.json",
+        "cart/M21/stock_helpers.py",
+        "cart/M21/unlit_material.py",
+        "cart/M21/verification_corrected.json",
+        "cart/M21/verification_initial.json",
+        "cart/M21/wood_trim.png",
+        "cart/audit_gn.py",
+        "cart/audit_registry.py",
+        "cart/audit_texture_uv.py",
+        "cart/build_cart.py",
+        "cart/build_cart_pass1.py",
+        "cart/contact_sheet.py",
+        "cart/fix_side_and_audit.py",
+        "cart/inspect_gn.py",
+        "cart/make_paint.py",
+        "cart/optimize_selected.py",
+        "cart/reference_measurements.json",
+        "cart/registry.json",
+        "cart/registry_audit.json",
+        "cart/replay_verification.json",
+        "cart/review_rig.py",
+        "cart/verify_glb.py",
+        "cart/wood_trim.png",
+        "cart/write_registry.py",
+        "index.json",
+        "stump/M15/source_corrected/REPLAY.txt",
+        "stump/M15/source_corrected/build_method.py",
+        "stump/M15/source_corrected/lab_common.py",
+        "stump/M15/source_corrected/projection_paint.py",
+        "stump/M15/source_corrected/review_rig.py",
+        "stump/M16/source_refined/REPLAY.txt",
+        "stump/M16/source_refined/build_method.py",
+        "stump/M16/source_refined/lab_common.py",
+        "stump/M16/source_refined/projection_paint.py",
+        "stump/M16/source_refined/review_rig.py",
+        "stump/M17/source_production/REPLAY.txt",
+        "stump/M17/source_production/build_method.py",
+        "stump/M17/source_production/lab_common.py",
+        "stump/M17/source_production/projection_paint.py",
+        "stump/M17/source_production/review_rig.py",
+        "stump/M17/source_repeat_final/build_method.py",
+        "stump/M17/source_repeat_final/lab_common.py",
+        "stump/M17/source_repeat_final/projection_paint.py",
+        "stump/M17/source_repeat_final/review_rig.py",
+        "stump/M18/source_corrected/REPLAY.txt",
+        "stump/M18/source_corrected/build_method.py",
+        "stump/M18/source_corrected/lab_common.py",
+        "stump/M18/source_corrected/projection_paint.py",
+        "stump/M18/source_corrected/review_rig.py",
+        "stump/M19/source_refined/REPLAY.txt",
+        "stump/M19/source_refined/build_method.py",
+        "stump/M19/source_refined/lab_common.py",
+        "stump/M19/source_refined/projection_paint.py",
+        "stump/M19/source_refined/review_rig.py",
+        "stump/M20/source_corrected/REPLAY.txt",
+        "stump/M20/source_corrected/build_method.py",
+        "stump/M20/source_corrected/lab_common.py",
+        "stump/M20/source_corrected/projection_paint.py",
+        "stump/M20/source_corrected/review_rig.py",
+        "stump/README.md",
+        "stump/export_checks.json",
+        "stump/palette/bark_painted.png",
+        "stump/palette/endgrain_painted.png",
+        "stump/registry.json",
+        "tree/M08/export_checks.json",
+        "tree/M08/initial_source.py",
+        "tree/M08/review_rig.py",
+        "tree/M08/source.py",
+        "tree/M09/export_checks.json",
+        "tree/M09/initial_source.py",
+        "tree/M09/review_rig.py",
+        "tree/M09/source.py",
+        "tree/M10/export_checks.json",
+        "tree/M10/initial_source.py",
+        "tree/M10/review_rig.py",
+        "tree/M10/source.py",
+        "tree/M11/export_checks.json",
+        "tree/M11/initial_source.py",
+        "tree/M11/review_rig.py",
+        "tree/M11/source.py",
+        "tree/M12/export_checks.json",
+        "tree/M12/initial_source.py",
+        "tree/M12/review_rig.py",
+        "tree/M12/source.py",
+        "tree/M13/export_checks.json",
+        "tree/M13/initial_source.py",
+        "tree/M13/review_rig.py",
+        "tree/M13/source.py",
+        "tree/M14/export_checks.json",
+        "tree/M14/initial_source.py",
+        "tree/M14/review_rig.py",
+        "tree/M14/source.py",
+        "tree/M22/EVALUATION.md",
+        "tree/M22/GENERATION.md",
+        "tree/M22/atlas_generated.png",
+        "tree/M22/atlas_guide.png",
+        "tree/M22/build_corrected.json",
+        "tree/M22/build_initial.json",
+        "tree/M22/build_painted.json",
+        "tree/M22/geometry_helpers.py",
+        "tree/M22/make_guide.py",
+        "tree/M22/prepare_helpers.py",
+        "tree/M22/replay.py",
+        "tree/M22/review_rig.py",
+        "tree/M22/roundtrip_verification.json",
+        "tree/README.md",
+        "tree/WINNER.md",
+        "tree/registry.json",
+        "tree/replay_all.ps1",
+        "tree/replay_verification.json"
+      ]
+    },
+    {
+      "name": "painterly_fir_soft_v2",
+      "path": "variants/Painterly_Fir_Soft_Asset.zip",
+      "bytes": 10640743,
+      "sha256": "3a1dcd9a090da3311c6f52e1871e47a2d499f7730216c2b5d236eb9c13ee9140"
+    },
+    {
+      "name": "painterly_fir_v3",
+      "path": "variants/Painterly_Fir_Needles_Asset.zip",
+      "bytes": 5940135,
+      "sha256": "600f384df50ca68df6b1ce99321a45e0c8c244d8d339b9f8cc57a494ed4addfe"
+    }
+  ]
+}
