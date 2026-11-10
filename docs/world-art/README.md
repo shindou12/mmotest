@@ -11,6 +11,7 @@ Blender でのアセット制作から three.js の画面まで、一貫して�
 | 場所 | 中身 |
 |---|---|
 | **`docs/world-art/rulebook.md`** | **第 3 世代の規則集（いま使う規則・数値・判断基準・検証の目標・落とし穴）。最優先** |
+| **`docs/world-art/style-secrets.md`** | **スタイライズドな風景とアセットのルールと秘伝（M-0186。RO3・原神・Samsara Saga に共通する絵の作り方、今の画面との差、チェック表）** |
 | `docs/world-art/templates/map-gen3.json` | 新しい地図の雛形（第 3 世代の光・階調・仕上げ・地面の色入り。組み立てて撮れることを確認済み） |
 | `docs/world-art/rules/` | 見本 23 枚の調査（camera-scale・lighting-post・ground-alpha）、アイデア 18 項目の状態（ideas.md）、入／切の比較（ab-L22.md） |
 | `docs/world-art/goal-f1_field.md` | ゲームの第 1 層「ひだまりの草原」を遊びの形のまま第 3 世代で作り直した記録（L25） |

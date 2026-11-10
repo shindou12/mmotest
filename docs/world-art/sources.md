@@ -32,3 +32,6 @@ imozuru（https://github.com/MaryCache/imozuru, commit 14635fb）は `~/.claude/
 - 影と日なたを分けて色を付ける・Kuwahara の使いどころ: [Stylized Rendering in Unreal（The Rookies）](https://www.therookies.co/entries/7431)
 - Kuwahara の仕組み（WebGL）: [On Crafting Painterly Shaders](https://blog.maximeheckel.com/posts/on-crafting-painterly-shaders)
 - 絵に Kuwahara を掛けて塗った見た目にする（Blender）: [80.lv の解説](https://80.lv/articles/tutorial-how-to-make-any-texture-look-painterly-in-blender/)
+
+## スタイライズドな風景とアセットのルール（M-0186、2026-11-10）
+出典の一覧は `docs/world-art/style-secrets.md` の末尾（原神 GDC 2021 の書き起こし、Zesix の Illine の記録、葉の球の法線、手描きの岩、80.lv）。
