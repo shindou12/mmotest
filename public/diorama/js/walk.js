@@ -97,7 +97,7 @@ export function stepWalk(state, input, dt, stage) {
   const normX = inputLength > 1 ? desiredX / inputLength : desiredX;
   const normZ = inputLength > 1 ? desiredZ / inputLength : desiredZ;
   const onIce = fromTile.liquid === 3 || /ice/i.test(fromTile.material);
-  const speed = onIce ? 3.9 : 3.35;
+  const speed = 5.5;
   const acceleration = onIce ? 8 : 26;
   const drag = onIce ? 1.7 : 13;
   const targetVX = normX * speed;
@@ -207,7 +207,7 @@ export function stepWalk(state, input, dt, stage) {
 
   if (movedDistance > 0.002 && state.jumpHeight === 0 && !returned) {
     const tile = currentTile(stage, state);
-    const cycleLength = tile.liquid === 1 ? 0.66 : /snow/i.test(tile.material) ? 0.9 : 0.84;
+    const cycleLength = tile.liquid === 1 ? 2.1 : /snow/i.test(tile.material) ? 2.9 : 2.7;
     const oldPhase = state.phase;
     const phaseAdvance = movedDistance * Math.PI * 2 / cycleLength;
     const firstBeat = Math.floor(oldPhase / Math.PI);

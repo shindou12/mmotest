@@ -2,9 +2,9 @@
   "id": "skyisles",
   "name": "浮島",
   "seed": 1,
-  "spawn": [23, 8],
-  "waterLevel": 0.0,
-  "materials": ["turf", "cloudstone", "crystal", "wood"],
+  "spawn": [35, 36],
+  "waterLevel": 18.4,
+  "materials": ["turf", "cloudstone", "crystal", "wood", "water"],
   "ambience": "sky",
   "particles": "spark",
   "light": {
@@ -15,9 +15,9 @@
   },
   "params": {
     "islands": [
-      [7, 8, 5.8, 6], [23, 8, 7.0, 10], [40, 9, 5.6, 8],
-      [12, 25, 6.3, 4], [31, 26, 7.7, 12], [20, 41, 6.4, 7], [41, 41, 5.4, 5]
+      [35, 36, 13.0, 18], [12, 12, 5.0, 8], [59, 11, 4.5, 13],
+      [11, 48, 5.2, 11], [60, 47, 5.5, 21], [20, 63, 4.0, 6], [51, 63, 5.0, 15]
     ],
-    "undersideDepth": [7.0, 9.6]
+    "undersideDepth": [6, 14], "treeCount": [64, 76], "smallCount": 420
   }
 }

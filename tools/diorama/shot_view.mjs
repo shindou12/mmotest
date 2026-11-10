@@ -13,6 +13,8 @@ try { pw = await (await import('../../e2e/lib/harness.mjs')).loadPlaywright(); }
 const [url, out, width = 1280, height = 720] = process.argv.slice(2);
 if (!url || !out) throw new Error('使い方: node tools/diorama/shot_view.mjs <URL> <out.png> [幅] [高さ]');
 mkdirSync(dirname(out), { recursive: true });
+const shotUrl = new URL(url);
+const zoomMode = shotUrl.searchParams.get('zoom') === 'near' ? 'near' : 'far';
 
 function decodePng(buffer) {
   let offset = 8;
@@ -66,23 +68,96 @@ function decodePng(buffer) {
   return { width, height, channels, pixels };
 }
 
-function pixelDelta(leftBuffer, rightBuffer) {
+function pixelDelta(leftBuffer, rightBuffer, region = null) {
   const left = decodePng(leftBuffer);
   const right = decodePng(rightBuffer);
   if (left.width !== right.width || left.height !== right.height) throw new Error('画素差の画像サイズが一致しません');
   let sum = 0;
   let changed = 0;
-  const pixels = left.width * left.height;
-  for (let pixel = 0; pixel < pixels; pixel++) {
-    let maximum = 0;
-    for (let channel = 0; channel < 3; channel++) {
-      const difference = Math.abs(left.pixels[pixel * left.channels + channel] - right.pixels[pixel * right.channels + channel]);
-      sum += difference;
-      maximum = Math.max(maximum, difference);
+  const x0 = region ? Math.max(0, Math.floor(region.x)) : 0;
+  const y0 = region ? Math.max(0, Math.floor(region.y)) : 0;
+  const x1 = region ? Math.min(left.width, Math.ceil(region.x + region.width)) : left.width;
+  const y1 = region ? Math.min(left.height, Math.ceil(region.y + region.height)) : left.height;
+  const pixels = Math.max(0, x1 - x0) * Math.max(0, y1 - y0);
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const pixel = y * left.width + x;
+      let maximum = 0;
+      for (let channel = 0; channel < 3; channel++) {
+        const difference = Math.abs(left.pixels[pixel * left.channels + channel] - right.pixels[pixel * right.channels + channel]);
+        sum += difference;
+        maximum = Math.max(maximum, difference);
+      }
+      if (maximum >= 2) changed++;
     }
-    if (maximum >= 2) changed++;
   }
-  return { mean: sum / (pixels * 3), percent: changed / pixels * 100 };
+  return { mean: pixels ? sum / (pixels * 3) : 0, percent: pixels ? changed / pixels * 100 : 0, pixels };
+}
+
+function pixelDeltaRegions(leftBuffer, rightBuffer, regions) {
+  const deltas = regions.map((region) => pixelDelta(leftBuffer, rightBuffer, region));
+  const pixels = deltas.reduce((total, delta) => total + delta.pixels, 0);
+  return {
+    mean: pixels ? deltas.reduce((total, delta) => total + delta.mean * delta.pixels, 0) / pixels : 0,
+    percent: pixels ? deltas.reduce((total, delta) => total + delta.percent * delta.pixels, 0) / pixels : 0,
+    pixels,
+  };
+}
+
+function patchBrightness(imageBuffer, point, radius = 3) {
+  if (!point?.visible) return null;
+  const image = decodePng(imageBuffer);
+  const x0 = Math.max(0, Math.floor(point.x - radius));
+  const y0 = Math.max(0, Math.floor(point.y - radius));
+  const x1 = Math.min(image.width, Math.ceil(point.x + radius + 1));
+  const y1 = Math.min(image.height, Math.ceil(point.y + radius + 1));
+  const luminance = [];
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+    const offset = (y * image.width + x) * image.channels;
+    luminance.push((image.pixels[offset] * 0.2126 + image.pixels[offset + 1] * 0.7152 + image.pixels[offset + 2] * 0.0722) / 255);
+  }
+  if (!luminance.length) return null;
+  luminance.sort((a, b) => a - b);
+  return luminance[Math.floor(luminance.length * 0.5)];
+}
+
+function lightingRatio(imageBuffer, samples) {
+  const median = (points) => {
+    const values = (points || []).map((point) => patchBrightness(imageBuffer, { ...point, visible: true })).filter((value) => value !== null);
+    values.sort((a, b) => a - b);
+    return values.length ? values[Math.floor(values.length * 0.5)] : null;
+  };
+  const shadow = median(samples?.shadow);
+  const sun = median(samples?.sun);
+  return { shadow, sun, ratio: shadow !== null && sun > 0 ? shadow / sun : null, shadowCount: samples?.shadow?.length || 0, sunCount: samples?.sun?.length || 0, stats: samples?.stats || null };
+}
+
+function regionAround(point, width, height, size = 42) {
+  if (!point?.visible) return null;
+  const half = size * 0.5;
+  return { x: Math.max(0, point.x - half), y: Math.max(0, point.y - half), width: Math.min(size, width), height: Math.min(size, height) };
+}
+
+function blurRegionDeltas(lowImage, highImage, probes, width, height) {
+  if (zoomMode === 'far') {
+    const center = pixelDelta(lowImage, highImage, { x: width * 0.25, y: height * 0.34, width: width * 0.5, height: height * 0.32 });
+    const edge = pixelDeltaRegions(lowImage, highImage, [
+      { x: 0, y: 0, width, height: height * 0.12 },
+      { x: 0, y: height * 0.88, width, height: height * 0.12 },
+    ]);
+    return { center, edge };
+  }
+  return {
+    hero: pixelDelta(lowImage, highImage, regionAround(probes?.hero, width, height, 44) || { x: width * 0.4, y: height * 0.4, width: width * 0.2, height: height * 0.2 }),
+    far: pixelDelta(lowImage, highImage, { x: width * 0.07, y: height * 0.04, width: width * 0.86, height: height * 0.42 }),
+  };
+}
+
+function dumpDataset(html, name) {
+  const match = html.match(new RegExp(`data-diorama-${name}="([^"]*)"`));
+  if (!match) return null;
+  const value = match[1].replaceAll('&quot;', '"').replaceAll('&#39;', "'").replaceAll('&amp;', '&');
+  try { return JSON.parse(value); } catch { return null; }
 }
 
 const launchArgs = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
@@ -108,11 +183,16 @@ async function takeWithPlaywright() {
     await page.evaluate(() => window.__renderOnce());
     const baseline = await page.screenshot({ path: out, timeout: 600000 });
     const info = await page.evaluate(() => window.__info);
+    const probes = await page.evaluate(() => window.__shotProbes?.() || null);
+    const lightingSamples = await page.evaluate(() => window.__lightingSamples?.() || { shadow: [], sun: [] });
+    const lighting = lightingRatio(baseline, lightingSamples);
     const bloomLow = Math.max(0, Number(baseFx.bloom) - 0.22);
     const bloomHigh = Math.min(1, Number(baseFx.bloom) + 0.22);
-    const blurLow = 0.18;
+    const blurLow = 0.04;
     const blurHigh = 0.72;
     const variants = {};
+    let blurLowImage = null;
+    let blurHighImage = null;
     for (const [name, settings] of [
       ['bloomLow', { bloom: bloomLow, blur: baseFx.blur }],
       ['bloomHigh', { bloom: bloomHigh, blur: baseFx.blur }],
@@ -121,9 +201,13 @@ async function takeWithPlaywright() {
     ]) {
       await page.evaluate((fx) => window.__setFx(fx), settings);
       await page.evaluate(() => window.__renderOnce());
-      variants[name] = pixelDelta(baseline, await page.screenshot({ type: 'png', timeout: 600000 }));
+      const image = await page.screenshot({ type: 'png', timeout: 600000 });
+      variants[name] = pixelDelta(baseline, image);
+      if (name === 'blurLow') blurLowImage = image;
+      if (name === 'blurHigh') blurHighImage = image;
     }
-    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh };
+    const blurRegions = blurRegionDeltas(blurLowImage, blurHighImage, probes, Number(width), Number(height));
+    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh, blurRegions, lighting };
   } finally {
     await browser.close();
   }
@@ -132,10 +216,11 @@ async function takeWithPlaywright() {
 function withFxQuery(bloom, blur, renderScale = 1) {
   const parsed = new URL(url);
   parsed.searchParams.set('pause', '1');
-  parsed.searchParams.set('bloom', String(bloom));
-  parsed.searchParams.set('blur', String(blur));
+  if (Number.isFinite(bloom)) parsed.searchParams.set('bloom', String(bloom));
+  else parsed.searchParams.delete('bloom');
+  if (Number.isFinite(blur)) parsed.searchParams.set('blur', String(blur));
+  else parsed.searchParams.delete('blur');
   parsed.searchParams.set('rscale', String(renderScale));
-  parsed.searchParams.set('shadowRes', '1024');
   return parsed.toString();
 }
 
@@ -158,11 +243,8 @@ async function takeWithChrome() {
   const errors = [];
   const variants = {};
   let info = { calls: 0, triangles: 0 };
-  const baseFx = { bloom: 0.35, blur: 0.4 };
-  const bloomLow = Math.max(0, baseFx.bloom - 0.22);
-  const bloomHigh = Math.min(1, baseFx.bloom + 0.22);
-  const blurLow = 0.18;
-  const blurHigh = 0.72;
+  let blurRegions = null;
+  let lighting = null;
   try {
     const run = async (targetUrl, screenshotPath) => {
       const result = await execFileAsync(chromeExecutable, chromeArgs(targetUrl, screenshotPath, true, profile), {
@@ -177,18 +259,37 @@ async function takeWithChrome() {
       const triangles = result.stdout.match(/data-diorama-triangles="(\d+)"/);
       if (calls) info.calls = Number(calls[1]);
       if (triangles) info.triangles = Number(triangles[1]);
-      return readFileSync(screenshotPath);
+      return {
+        image: readFileSync(screenshotPath),
+        bloom: Number(result.stdout.match(/data-diorama-bloom="([\d.]+)"/)?.[1]),
+        blur: Number(result.stdout.match(/data-diorama-blur="([\d.]+)"/)?.[1]),
+        probes: dumpDataset(result.stdout, 'probes'),
+        lightingSamples: dumpDataset(result.stdout, 'lighting-samples'),
+      };
     };
-    const baseline = await run(withFxQuery(baseFx.bloom, baseFx.blur, 0.75), out);
+    const baselineCapture = await run(withFxQuery(null, null, 1), out);
+    const baseline = baselineCapture.image;
+    const baseFx = { bloom: Number.isFinite(baselineCapture.bloom) ? baselineCapture.bloom : 0.35, blur: Number.isFinite(baselineCapture.blur) ? baselineCapture.blur : 0.18 };
+    const probes = baselineCapture.probes;
+    lighting = lightingRatio(baseline, baselineCapture.lightingSamples);
+    const bloomLow = Math.max(0, baseFx.bloom - 0.22);
+    const bloomHigh = Math.min(1, baseFx.bloom + 0.22);
+    const blurLow = 0.04;
+    const blurHigh = 0.72;
+    let blurLowImage = null;
+    let blurHighImage = null;
     for (const [name, bloom, blur] of [
       ['bloomLow', bloomLow, baseFx.blur], ['bloomHigh', bloomHigh, baseFx.blur],
       ['blurLow', baseFx.bloom, blurLow], ['blurHigh', baseFx.bloom, blurHigh],
     ]) {
       const imagePath = join(tempRoot, `${name}.png`);
-      const image = await run(withFxQuery(bloom, blur, 0.75), imagePath);
-      variants[name] = pixelDelta(baseline, image);
+      const capture = await run(withFxQuery(bloom, blur, 1), imagePath);
+      variants[name] = pixelDelta(baseline, capture.image);
+      if (name === 'blurLow') blurLowImage = capture.image;
+      if (name === 'blurHigh') blurHighImage = capture.image;
     }
-    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh };
+    blurRegions = blurRegionDeltas(blurLowImage, blurHighImage, probes, Number(width), Number(height));
+    return { errors, info, variants, bloomLow, bloomHigh, blurLow, blurHigh, blurRegions, lighting };
   } finally {
     const tempBase = resolve(tmpdir()) + sep;
     const tempTarget = resolve(tempRoot);
@@ -200,6 +301,18 @@ const result = pw ? await takeWithPlaywright() : await takeWithChrome();
 const seconds = ((Date.now() - started) / 1000).toFixed(1);
 const errorText = result.errors.length ? result.errors.join(' | ') : 'no errors';
 console.log(`${out} ${seconds}s calls=${result.info?.calls} tris=${result.info?.triangles} ${errorText}`);
-console.log(`bloom ${result.bloomLow.toFixed(2)} Δmean=${result.variants.bloomLow.mean.toFixed(3)} changed=${result.variants.bloomLow.percent.toFixed(2)}% | ${result.bloomHigh.toFixed(2)} Δmean=${result.variants.bloomHigh.mean.toFixed(3)} changed=${result.variants.bloomHigh.percent.toFixed(2)}%`);
-console.log(`blur ${result.blurLow.toFixed(2)} Δmean=${result.variants.blurLow.mean.toFixed(3)} changed=${result.variants.blurLow.percent.toFixed(2)}% | ${result.blurHigh.toFixed(2)} Δmean=${result.variants.blurHigh.mean.toFixed(3)} changed=${result.variants.blurHigh.percent.toFixed(2)}%`);
-if (result.errors.length || Object.values(result.variants).some((delta) => delta.mean <= 0 || delta.percent <= 0)) process.exitCode = 1;
+console.log(`bloom ${result.bloomLow.toFixed(2)} Δmean=${result.variants.bloomLow.mean.toFixed(6)} changed=${result.variants.bloomLow.percent.toFixed(2)}% | ${result.bloomHigh.toFixed(2)} Δmean=${result.variants.bloomHigh.mean.toFixed(6)} changed=${result.variants.bloomHigh.percent.toFixed(2)}%`);
+console.log(`blur ${result.blurLow.toFixed(2)} Δmean=${result.variants.blurLow.mean.toFixed(6)} changed=${result.variants.blurLow.percent.toFixed(2)}% | ${result.blurHigh.toFixed(2)} Δmean=${result.variants.blurHigh.mean.toFixed(6)} changed=${result.variants.blurHigh.percent.toFixed(2)}%`);
+const lighting = result.lighting;
+console.log(`grass shadow/sun=${lighting?.shadow === null || lighting?.shadow === undefined ? 'n/a' : lighting.shadow.toFixed(3)} / ${lighting?.sun === null || lighting?.sun === undefined ? 'n/a' : lighting.sun.toFixed(3)} ratio=${lighting?.ratio === null || lighting?.ratio === undefined ? 'n/a' : lighting.ratio.toFixed(3)} samples=${lighting?.shadowCount || 0}/${lighting?.sunCount || 0}`);
+if (lighting?.stats) console.log(`grass probes candidates=${lighting.stats.candidates} visible=${lighting.stats.visible}`);
+if (zoomMode === 'far') {
+  console.log(`blur far center Δmean=${result.blurRegions.center.mean.toFixed(3)} changed=${result.blurRegions.center.percent.toFixed(2)}% | edges Δmean=${result.blurRegions.edge.mean.toFixed(3)} changed=${result.blurRegions.edge.percent.toFixed(2)}%`);
+} else {
+  console.log(`blur near hero Δmean=${result.blurRegions.hero.mean.toFixed(3)} changed=${result.blurRegions.hero.percent.toFixed(2)}% | far Δmean=${result.blurRegions.far.mean.toFixed(3)} changed=${result.blurRegions.far.percent.toFixed(2)}%`);
+}
+const invalidLighting = zoomMode === 'far' && (lighting?.ratio === null || lighting?.ratio === undefined || lighting.ratio < 0.55 || lighting.ratio > 0.65);
+const invalidBlur = zoomMode === 'far'
+  ? result.blurRegions.center.mean > 0.12 || result.blurRegions.edge.mean <= 0
+  : result.blurRegions.far.mean <= 0;
+if (result.errors.length || result.variants.blurLow.mean <= 0 || result.variants.blurHigh.mean <= 0 || invalidLighting || invalidBlur) process.exitCode = 1;

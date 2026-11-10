@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWalkState, stepWalk } from '../public/diorama/js/walk.js';
+import { getSurfaceSoundProfile, getSurfaceSoundSettings } from '../public/diorama/js/sfx.js';
 
 function stage({ size = [4, 1], height, blocked, liquid, spawn = [0, 0], materials = ['grass'], surface } = {}) {
   return {
@@ -80,4 +81,19 @@ test('溶岩へ入ると spawn に戻る', () => {
   assert.equal(state.i, 0);
   assert.equal(state.x, 0.5);
   assert.ok(result.events.some((event) => event.type === 'lavaReturn'));
+});
+
+test('材ごとの音設定を公開し、通常歩行は毎秒5.5マスで進む', () => {
+  const settings = getSurfaceSoundSettings();
+  for (const material of ['grass', 'dirt', 'sand', 'stone', 'snow', 'ice', 'wood', 'bark', 'water']) {
+    assert.ok(settings[material], `${material} sound settings are missing`);
+    assert.ok(settings[material].freq > 0 && settings[material].high > 0);
+  }
+  assert.deepEqual(getSurfaceSoundProfile('bark'), settings.bark);
+
+  const map = stage({ size: [20, 1] });
+  const state = createWalkState(map);
+  const result = stepWalk(state, { x: 1, z: 0 }, 0.25, map);
+  assert.equal(state.velocityX, 5.5);
+  assert.ok(Math.abs(result.movedDistance - 1.375) < 1e-9);
 });

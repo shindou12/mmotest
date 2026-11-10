@@ -1,6 +1,7 @@
 """生成された箱庭 JSON と GLB が契約の配列、名前、属性、UV に合うか調べる。"""
 
 import json
+import math
 import struct
 import sys
 from pathlib import Path
@@ -71,10 +72,43 @@ def read_scalar_indices(document, accessor_index):
     return accessor.get("count", 0)
 
 
+def color_stats(document, binary, accessor_index):
+    accessor = document["accessors"][accessor_index]
+    value_type = accessor.get("type")
+    if value_type not in ("VEC3", "VEC4"):
+        fail("COLOR_0 accessor が VEC3/VEC4 ではありません")
+    component_count = 3 if value_type == "VEC3" else 4
+    component_type = accessor.get("componentType")
+    formats = {5126: ("f", 4, 1.0), 5121: ("B", 1, 255.0), 5123: ("H", 2, 65535.0)}
+    if component_type not in formats:
+        fail("COLOR_0 accessor の componentType が未対応です")
+    fmt, component_size, denominator = formats[component_type]
+    if component_type != 5126 and not accessor.get("normalized", False):
+        fail("整数 COLOR_0 accessor が normalized ではありません")
+    view = document["bufferViews"][accessor["bufferView"]]
+    base = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+    stride = view.get("byteStride", component_count * component_size)
+    minimum = math.inf
+    total = 0.0
+    value_count = 0
+    for n in range(accessor.get("count", 0)):
+        at = base + n * stride
+        values = struct.unpack_from("<" + fmt * component_count, binary, at)
+        for value in values[:3]:
+            value = value if component_type == 5126 else value / denominator
+            minimum = min(minimum, value)
+            total += value
+            value_count += 1
+    return minimum, total, value_count
+
+
 def validate_uvs(document, binary, path):
     materials = document.get("materials", [])
     primitive_count = 0
     triangles = 0
+    color_min = math.inf
+    color_total = 0.0
+    color_count = 0
     for mesh in document.get("meshes", []):
         for primitive in mesh.get("primitives", []):
             primitive_count += 1
@@ -85,6 +119,10 @@ def validate_uvs(document, binary, path):
                 fail("TEXCOORD_0 がありません: {} / {}".format(path, mesh.get("name")))
             if "COLOR_0" not in attributes:
                 fail("COLOR_0 がありません: {} / {}".format(path, mesh.get("name")))
+            minimum, total, count = color_stats(document, binary, attributes["COLOR_0"])
+            color_min = min(color_min, minimum)
+            color_total += total
+            color_count += count
             material_index = primitive.get("material")
             if material_index is None or material_index >= len(materials):
                 fail("材質が指定されていません: {} / {}".format(path, mesh.get("name")))
@@ -105,7 +143,7 @@ def validate_uvs(document, binary, path):
             triangles += read_scalar_indices(document, indices) // 3 if indices is not None else document["accessors"][attributes["POSITION"]]["count"] // 3
     if not primitive_count:
         fail("GLB に primitive がありません: " + str(path))
-    return triangles
+    return triangles, color_min, color_total / max(1, color_count)
 
 
 def walkability(data):
@@ -140,8 +178,8 @@ def validate_stage_json(path, expected_id):
     if data.get("id") != expected_id:
         fail("JSON id がファイル名と一致しません: " + str(path))
     width, depth = data.get("size", [0, 0])
-    if (width, depth) != (48, 48):
-        fail("size が 48x48 ではありません: " + str(path))
+    if (width, depth) != (72, 72):
+        fail("size が 72x72 ではありません: " + str(path))
     expected = width * depth
     for key in ("height", "surface", "blocked", "liquid"):
         if not isinstance(data.get(key), list) or len(data[key]) != expected:
@@ -158,9 +196,18 @@ def validate_stage_json(path, expected_id):
         fail("liquid に 0..3 以外があります: " + str(path))
     if any(not isinstance(value, int) or value < -1 for value in data["height"]):
         fail("height に -1 未満または整数以外があります: " + str(path))
+    if any(value > 28 for value in data["height"]):
+        fail("height が28を超えています: " + str(path))
     pct = walkability(data)
-    if pct < 70.0:
-        fail("歩ける割合が 70% 未満です: {} {:.1f}%".format(expected_id, pct))
+    if pct < 65.0:
+        fail("歩ける割合が 65% 未満です: {} {:.1f}%".format(expected_id, pct))
+    si, sk = data["spawn"]
+    spawn_height = data["height"][sk * width + si]
+    for dk in (-1, 0, 1):
+        for di in (-1, 0, 1):
+            n = (sk + dk) * width + si + di
+            if data["height"][n] != spawn_height or data["liquid"][n] != 0 or data["blocked"][n] != 0:
+                fail("spawn の周囲3x3が平坦な陸地ではありません: " + expected_id)
     return data, pct
 
 
@@ -198,12 +245,17 @@ def main():
         data, pct = validate_stage_json(json_path, stage_id)
         document, binary = parse_glb(glb_path)
         mesh_names = {mesh.get("name") for mesh in document.get("meshes", [])}
-        if not {"terrain", "props"}.issubset(mesh_names) or not mesh_names.issubset({"terrain", "props", "glow", "water"}):
+        required = {"terrain", "props"}
+        if stage_id != "canyon":
+            required.add("fall")
+        if not required.issubset(mesh_names) or not mesh_names.issubset({"terrain", "props", "glow", "water", "fall"}):
             fail("ステージのメッシュ名が不正です: {} {}".format(stage_id, sorted(mesh_names)))
-        triangles = validate_uvs(document, binary, glb_path)
-        if triangles > 250000:
-            fail("三角形が 25 万を超えています: {} {}".format(stage_id, triangles))
-        stage_results.append((stage_id, triangles, pct))
+        triangles, color_min, color_avg = validate_uvs(document, binary, glb_path)
+        if triangles > 800000:
+            fail("三角形が 80 万を超えています: {} {}".format(stage_id, triangles))
+        if color_min < 0.35:
+            fail("COLOR_0 の最小値が 0.35 未満です: {} {:.4f}".format(stage_id, color_min))
+        stage_results.append((stage_id, triangles, pct, color_min, color_avg))
 
     hero_path = diorama_root / "models" / "hero.glb"
     if not hero_path.exists():
@@ -214,12 +266,13 @@ def main():
     node_names = {node.get("name") for node in hero.get("nodes", [])}
     if not expected_parts.issubset(hero_names) or not expected_parts.issubset(node_names):
         fail("人物の部品名が不足しています: meshes={} nodes={}".format(sorted(hero_names), sorted(node_names)))
-    validate_uvs(hero, binary, hero_path)
+    hero_triangles, _, _ = validate_uvs(hero, binary, hero_path)
 
-    for stage_id, triangles, pct in stage_results:
-        print("{}: triangles={} walkable={:.1f}% OK".format(stage_id, triangles, pct))
-    print("hero.glb: 7 parts, UV + COLOR_0 OK")
-    print("OK: 5 stages, JSON arrays, materials, mesh names, atlas UVs, COLOR_0")
+    for stage_id, triangles, pct, color_min, color_avg in stage_results:
+        print("{}: triangles={} walkable={:.1f}% COLOR_0 min={:.4f} avg={:.4f} OK".format(
+            stage_id, triangles, pct, color_min, color_avg))
+    print("hero.glb: 7 parts, triangles={} UV + COLOR_0 OK".format(hero_triangles))
+    print("OK: 5 stages, 72x72 arrays, materials, mesh names, atlas UVs, COLOR_0 >= 0.35")
 
 
 if __name__ == "__main__":

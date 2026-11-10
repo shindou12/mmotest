@@ -15,14 +15,18 @@
     #world { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
     #world canvas { display: block; width: 100%; height: 100%; }
     #stage-fade { position: absolute; inset: 0; z-index: 2; background: #080b10; opacity: 1; pointer-events: none; transition: opacity 200ms ease; }
-    #hud { position: absolute; z-index: 3; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 7px; border: 1px solid rgba(255,255,255,.17); border-radius: 12px; background: rgba(20,27,34,.76); box-shadow: 0 8px 28px rgba(0,0,0,.24); backdrop-filter: blur(12px); }
-    #stage-select, #sound-toggle { height: 40px; border: 0; border-radius: 8px; color: #f2f4f7; background: rgba(255,255,255,.09); font: inherit; }
-    #stage-select { min-width: 160px; padding: 0 34px 0 12px; outline-color: #b4d8ff; }
-    #sound-toggle { width: 42px; cursor: pointer; font-size: 19px; }
+    #hud { position: absolute; z-index: 3; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; align-items: center; gap: 6px; max-width: calc(100% - 20px); padding: 6px; border: 1px solid rgba(255,255,255,.17); border-radius: 11px; background: rgba(15,24,27,.82); box-shadow: 0 8px 28px rgba(0,0,0,.3); backdrop-filter: blur(10px); }
+    #stage-buttons { display: flex; align-items: center; gap: 4px; }
+    #stage-buttons button, #sound-toggle { height: 36px; border: 0; border-radius: 7px; color: #dce4e2; background: rgba(255,255,255,.07); font: inherit; }
+    #stage-buttons button { padding: 0 10px; cursor: pointer; white-space: nowrap; font-size: 13px; }
+    #stage-buttons button[aria-pressed="true"] { color: #172220; background: #c7dfd2; box-shadow: 0 0 0 1px rgba(240,255,248,.3) inset; }
+    #sound-toggle { width: 40px; flex: 0 0 40px; cursor: pointer; font-size: 18px; }
     #sound-toggle[aria-pressed="false"] { color: #a8b1ba; background: rgba(255,255,255,.04); }
     @media (max-width: 520px) {
-      #hud { bottom: max(12px, env(safe-area-inset-bottom)); }
-      #stage-select { min-width: 138px; }
+      #hud { bottom: max(12px, env(safe-area-inset-bottom)); gap: 3px; padding: 4px; }
+      #stage-buttons { gap: 2px; }
+      #stage-buttons button { height: 34px; padding: 0 6px; font-size: 11px; }
+      #sound-toggle { width: 34px; flex-basis: 34px; height: 34px; }
     }
   </style>
 </head>
@@ -32,14 +36,13 @@
       <div id="stage-fade"></div>
     </section>
     <nav id="hud" aria-label="ステージ">
-      <select id="stage-select" aria-label="ステージ">
-        <option value="demo">仮の草原</option>
-        <option value="meadow">草原と湖</option>
-        <option value="canyon">砂漠の峡谷</option>
-        <option value="snow">雪山</option>
-        <option value="volcano">火山</option>
-        <option value="skyisles">浮島</option>
-      </select>
+      <div id="stage-buttons" role="group" aria-label="ステージ">
+        <button type="button" data-stage="meadow" aria-pressed="false">草原と湖</button>
+        <button type="button" data-stage="canyon" aria-pressed="false">砂漠の峡谷</button>
+        <button type="button" data-stage="snow" aria-pressed="false">雪山</button>
+        <button type="button" data-stage="volcano" aria-pressed="false">火山</button>
+        <button type="button" data-stage="skyisles" aria-pressed="false">浮島</button>
+      </div>
       <button id="sound-toggle" type="button" aria-label="音" aria-pressed="true">♪</button>
     </nav>
   </main>

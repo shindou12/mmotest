@@ -2,9 +2,9 @@
   "id": "canyon",
   "name": "砂漠の峡谷",
   "seed": 1,
-  "spawn": [8, 7],
-  "waterLevel": 2.8,
-  "materials": ["sand", "sandstone", "redrock", "wood"],
+  "spawn": [8, 62],
+  "waterLevel": 5.4,
+  "materials": ["sand", "sandstone", "redrock", "wood", "water"],
   "ambience": "desert",
   "particles": "dust",
   "light": {
@@ -14,11 +14,8 @@
     "bloom": 0.18, "exposure": 0.9
   },
   "params": {
-    "mesaHeight": [12, 14],
-    "valleyFloor": [2, 3],
-    "shelfWidth": 2.5,
-    "rampZ": [13, 34],
-    "oasisCenter": [22, 26],
-    "oasisRadii": [4.2, 3.2]
+    "mesaHeight": [24, 28], "valleyFloor": [4, 8], "canyonWidth": [4, 6],
+    "oasisCenter": [37, 38], "oasisRadii": [4.0, 3.5],
+    "treeCount": [70, 82], "smallCount": 420
   }
 }

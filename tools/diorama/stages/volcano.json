@@ -2,9 +2,9 @@
   "id": "volcano",
   "name": "火山",
   "seed": 1,
-  "spawn": [24, 10],
-  "waterLevel": 8.5,
-  "materials": ["basalt", "ash", "lava", "obsidian", "wood"],
+  "spawn": [10, 61],
+  "waterLevel": 20.0,
+  "materials": ["basalt", "ash", "lava", "obsidian", "wood", "sand"],
   "ambience": "volcano",
   "particles": "ember",
   "light": {
@@ -14,9 +14,7 @@
     "bloom": 0.8, "exposure": 0.72
   },
   "params": {
-    "center": [24, 24],
-    "craterRadius": 3.2,
-    "mountainHeight": 14,
-    "rivers": [0.0, 1.57, 3.14, 4.71]
+    "center": [40, 31], "craterRadius": 7.5,
+    "rivers": [0.35, 2.1, 4.35], "treeCount": [68, 78], "smallCount": 420
   }
 }

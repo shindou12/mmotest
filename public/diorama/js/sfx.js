@@ -20,6 +20,7 @@ const SURFACES = {
   snow: { freq: 345, high: 980, wave: 'sine', gain: 0.04 },
   ice: { freq: 460, high: 1300, wave: 'sine', gain: 0.033 },
   wood: { freq: 230, high: 850, wave: 'triangle', gain: 0.042 },
+  bark: { freq: 230, high: 850, wave: 'triangle', gain: 0.042 },
   planks: { freq: 225, high: 860, wave: 'triangle', gain: 0.043 },
   water: { freq: 240, high: 520, wave: 'sine', gain: 0.029 },
 };
@@ -28,6 +29,14 @@ function surfaceProfile(name) {
   const key = String(name || 'grass').toLowerCase();
   for (const [prefix, profile] of Object.entries(SURFACES)) if (key.includes(prefix)) return profile;
   return SURFACES.grass;
+}
+
+export function getSurfaceSoundSettings() {
+  return Object.fromEntries(Object.entries(SURFACES).map(([material, settings]) => [material, { ...settings }]));
+}
+
+export function getSurfaceSoundProfile(name) {
+  return { ...surfaceProfile(name) };
 }
 
 export class DioramaSfx {
@@ -41,6 +50,9 @@ export class DioramaSfx {
     this.ambienceKind = 'meadow';
     this.birdTimer = 0;
     this.random = Math.random;
+    this.flow = null;
+    this.flowDistance = Infinity;
+    this.flowKind = 'water';
   }
 
   unlock() {
@@ -48,6 +60,7 @@ export class DioramaSfx {
     this._ensureContext();
     if (this.context?.state === 'suspended') this.context.resume().catch(() => {});
     if (!this.environment) this.changeAmbience(this.ambienceKind);
+    this._updateFlowAudio();
   }
 
   setEnabled(value) {
@@ -62,10 +75,12 @@ export class DioramaSfx {
     if (this.enabled) {
       this.context.resume().catch(() => {});
       this.changeAmbience(this.ambienceKind);
+      this._updateFlowAudio();
     } else {
       clearTimeout(this.birdTimer);
       this.birdTimer = 0;
       this.environment?.bus.gain.setTargetAtTime(0, now, 0.04);
+      this.flow?.bus.gain.setTargetAtTime(0, now, 0.04);
     }
   }
 
@@ -115,6 +130,40 @@ export class DioramaSfx {
       gain.connect(send);
       send.connect(this.convolver);
     }
+  }
+
+  setFlowDistance(distance, kind = 'water') {
+    this.flowDistance = Number.isFinite(Number(distance)) ? Math.max(0, Number(distance)) : Infinity;
+    this.flowKind = kind === 'lava' ? 'lava' : 'water';
+    if (!this.enabled || !this.context) return;
+    this._updateFlowAudio();
+  }
+
+  _updateFlowAudio() {
+    if (!this.enabled || !this.context) return;
+    const strength = Math.max(0, Math.min(1, (8 - this.flowDistance) / 8));
+    if (strength <= 0 && !this.flow) return;
+    if (!this.flow) {
+      const bus = this.context.createGain();
+      bus.gain.value = 0;
+      this._route(bus, 0.08);
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 0.4;
+      const source = this.context.createBufferSource();
+      source.buffer = this.noise;
+      source.loop = true;
+      const volume = this.context.createGain();
+      volume.gain.value = 0.18;
+      source.connect(filter);
+      filter.connect(volume);
+      volume.connect(bus);
+      source.start();
+      this.flow = { bus, filter, source, volume };
+    }
+    const now = this.context.currentTime;
+    this.flow.filter.frequency.setTargetAtTime(this.flowKind === 'lava' ? 210 : 880, now, 0.16);
+    this.flow.bus.gain.setTargetAtTime(0.16 * strength * strength, now, 0.18);
   }
 
   changeAmbience(kind) {
